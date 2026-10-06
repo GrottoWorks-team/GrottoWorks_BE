@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Services/" />
+  <Folder Name="/Services/ParishCoordination/">
+    <Project Path="Services/ParishCoordination/ParishCoordination.Api/ParishCoordination.Api.csproj" />
+    <Project Path="Services/ParishCoordination/ParishCoordination.Application/ParishCoordination.Application.csproj" />
+    <Project Path="Services/ParishCoordination/ParishCoordination.Domain/ParishCoordination.Domain.csproj" />
+    <Project Path="Services/ParishCoordination/ParishCoordination.Infrastructure/ParishCoordination.Infrastructure.csproj" />
+  </Folder>
+</Solution>

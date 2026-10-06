@@ -2,11 +2,13 @@ namespace ParishCoordination.Domain.Entities;
 
 public sealed class Parish
 {
+    private const string ActiveStatus = "ACTIVE";
+
     private Parish()
     {
     }
 
-    public Parish(
+    private Parish(
         Guid id,
         string name,
         string? address,
@@ -22,6 +24,21 @@ public sealed class Parish
         Status = status;
         CreatedAt = createdAt;
         UpdatedAt = updatedAt;
+    }
+
+    public static Parish Create(
+        string name,
+        string? address,
+        string? description,
+        DateTimeOffset createdAtUtc)
+    {
+        return new Parish(
+            Guid.NewGuid(),
+            name,
+            address,
+            description,
+            ActiveStatus,
+            createdAtUtc);
     }
 
     public Guid Id { get; private set; }

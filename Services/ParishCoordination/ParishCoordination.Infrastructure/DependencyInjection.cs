@@ -25,6 +25,7 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString));
 
         services.AddScoped<IParishReadService, ParishReadService>();
+        services.AddScoped<IParishWriteService, ParishWriteService>();
 
         return services;
     }

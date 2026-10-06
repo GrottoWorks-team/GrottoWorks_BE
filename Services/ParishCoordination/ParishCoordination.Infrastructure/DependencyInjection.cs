@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ParishCoordination.Application.Parishes;
 using ParishCoordination.Infrastructure.Data;
+using ParishCoordination.Infrastructure.Parishes;
 
 namespace ParishCoordination.Infrastructure;
 
@@ -21,6 +23,8 @@ public static class DependencyInjection
 
         services.AddDbContext<ParishCoordinationDbContext>(options =>
             options.UseNpgsql(connectionString));
+
+        services.AddScoped<IParishReadService, ParishReadService>();
 
         return services;
     }

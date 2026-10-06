@@ -4,3 +4,8 @@ GET {{ParishCoordination.Api_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
+
+GET {{ParishCoordination.Api_HostAddress}}/api/v1/parishes
+Accept: application/json
+
+###

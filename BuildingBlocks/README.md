@@ -47,6 +47,10 @@ Lỗi: RFC 9457 ProblemDetails kèm `code` ổn định + `correlationId` + `tra
 
 ## 4. Interrim của Vũ (sẽ thay bằng BuildingBlocks.Web)
 
-Tới khi `BuildingBlocks.Web` (F-PLT-03) có, Identity.Api dùng bản địa phương:
-`Identity.Api.Common` (ApiResponse/PagedResponse, CorrelationIdMiddleware,
-ExceptionHandlingMiddleware, CurrentUser). Khi F-PLT-03 xong → refactor sang package chung, xóa bản địa phương.
+`BuildingBlocks.Web` (F-PLT-03) **đã có** và `ParishCoordination.Api` đã dùng chung
+(`AddGrottoWorksWeb` / `UseGrottoWorksDefaults` / `ApiResults` / `IReadinessProbe`).
+Tuy nhiên `Identity.Api` **vẫn còn** bản địa phương `Identity.Api.Common`
+(ApiResponse/PagedResponse, CorrelationIdMiddleware, ExceptionHandlingMiddleware,
+CurrentUser) — di chuyển sang package chung được ghi nhận ở đây để không phá 49 test
+unit đang xanh; refactor Identity sang `BuildingBlocks.Web` + `BuildingBlocks.Security`
+là việc còn lại của F-PLT-03/04, xóa bản địa phương sau khi test xanh.

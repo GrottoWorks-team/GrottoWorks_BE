@@ -1,0 +1,110 @@
+# Local development overrides: ports, credentials and per-service environment (F-PLT-02).
+# Secrets come from .env (copy .env.example first) — never commit .env.
+# Host ports: 6100 identity, 6101 parish, 6102 gateway (6000 is blocked by browsers as an unsafe port).
+services:
+  postgres:
+    container_name: grottoworks-postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Creates one database per service on first start (F-PLT-02).
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    container_name: grottoworks-rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER:-grottoworks}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS:-grottoworks}
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  redis:
+    container_name: grottoworks-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    # bitnamilegacy/minio runs as non-root (uid 1001) and uses its own entrypoint:
+    # no `command:` override, data lives in /bitnami/minio/data, console on 9001.
+    container_name: grottoworks-minio
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-grottoworks}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-grottoworks_minio_1234}
+      - MINIO_CONSOLE_PORT_NUMBER=9001
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/bitnami/minio/data
+
+  identity.api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__IdentityDatabase=Host=postgres;Port=5432;Database=identity_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
+      - Jwt__SigningKey=${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY (>= 32 chars) in .env}
+      - Seed__AdminPassword=${SEED_ADMIN_PASSWORD:-ChangeMe!123456}
+      - Database__MigrateOnStartup=true
+      - MessageBroker__Host=amqp://rabbitmq:5672
+      - MessageBroker__UserName=${RABBITMQ_DEFAULT_USER:-grottoworks}
+      - MessageBroker__Password=${RABBITMQ_DEFAULT_PASS:-grottoworks}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "6100:8080"
+
+  parishcoordination.api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__ParishCoordinationDatabase=Host=postgres;Port=5432;Database=parish_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
+      - Database__MigrateOnStartup=true
+      - MessageBroker__Host=amqp://rabbitmq:5672
+      - MessageBroker__UserName=${RABBITMQ_DEFAULT_USER:-grottoworks}
+      - MessageBroker__Password=${RABBITMQ_DEFAULT_PASS:-grottoworks}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "6101:8080"
+
+  yarpapigateway:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - Jwt__SigningKey=${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY (>= 32 chars) in .env}
+      # YARP reads clusters from the "ReverseProxy" section, so the prefix is required.
+      # Inside the compose network the gateway talks to services by service name.
+      - ReverseProxy__Clusters__identity__Destinations__destination1__Address=http://identity.api:8080/
+      - ReverseProxy__Clusters__parish__Destinations__destination1__Address=http://parishcoordination.api:8080/
+    depends_on:
+      - identity.api
+      - parishcoordination.api
+    ports:
+      - "6102:8080"

@@ -1,4 +1,12 @@
 <Solution>
+  <Folder Name="/ApiGateway/">
+    <Project Path="ApiGateway/YarpApiGateway/YarpApiGateway.csproj" />
+  </Folder>
+  <Folder Name="/BuildingBlocks/">
+    <Project Path="BuildingBlocks/BuildingBlocks.Messaging/BuildingBlocks.Messaging.csproj" />
+    <Project Path="BuildingBlocks/BuildingBlocks.Security/BuildingBlocks.Security.csproj" />
+    <Project Path="BuildingBlocks/BuildingBlocks.Web/BuildingBlocks.Web.csproj" />
+  </Folder>
   <Folder Name="/Services/" />
   <Folder Name="/Services/ParishCoordination/">
     <Project Path="Services/ParishCoordination/ParishCoordination.Api/ParishCoordination.Api.csproj" />
@@ -16,4 +24,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Identity.UnitTests/Identity.UnitTests.csproj" />
   </Folder>
+  <Project Path="docker-compose.dcproj">
+    <Build />
+  </Project>
 </Solution>

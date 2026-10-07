@@ -1,0 +1,17 @@
+{
+  "profiles": {
+    "Docker Compose": {
+      "commandName": "DockerCompose",
+      "commandVersion": "1.0",
+      "serviceActions": {
+        "postgres": "StartWithoutDebugging",
+        "rabbitmq": "StartWithoutDebugging",
+        "redis": "StartWithoutDebugging",
+        "minio": "StartWithoutDebugging",
+        "identity.api": "StartDebugging",
+        "parishcoordination.api": "StartDebugging",
+        "yarpapigateway": "StartDebugging"
+      }
+    }
+  }
+}

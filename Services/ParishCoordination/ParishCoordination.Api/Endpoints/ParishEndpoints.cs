@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Routing;
 using ParishCoordination.Api.Requests;
 using ParishCoordination.Api.Responses;
 using ParishCoordination.Application.Parishes.CreateParish;
+using ParishCoordination.Application.Parishes.GetParish;
 using ParishCoordination.Application.Parishes.GetParishes;
 
 namespace ParishCoordination.Api.Endpoints;
@@ -16,6 +17,13 @@ public static class ParishEndpoints
             .WithName("listParishes")
             .WithTags("Parish")
             .Produces<ParishListResponse>(StatusCodes.Status200OK);
+
+        app.MapGet("/api/v1/parishes/{parishId}", GetParishAsync)
+            .WithName("getParish")
+            .WithTags("Parish")
+            .Produces<ParishResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         app.MapPost("/api/v1/parishes", CreateParishAsync)
             .WithName("createParish")
@@ -31,6 +39,27 @@ public static class ParishEndpoints
         var query = new GetParishesQuery();
         var parishes = await queryHandler.HandleAsync(query, cancellationToken);
         var response = new ParishListResponse(parishes);
+
+        return Results.Ok(response);
+    }
+
+    private static async Task<IResult> GetParishAsync(
+        Guid parishId,
+        GetParishQueryHandler queryHandler,
+        CancellationToken cancellationToken)
+    {
+        var query = new GetParishQuery(parishId);
+        var parish = await queryHandler.HandleAsync(query, cancellationToken);
+
+        if (parish is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Parish not found",
+                detail: $"Parish with ID '{parishId}' was not found.");
+        }
+
+        var response = new ParishResponse(parish);
 
         return Results.Ok(response);
     }

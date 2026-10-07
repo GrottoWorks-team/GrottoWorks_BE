@@ -10,6 +10,11 @@ Accept: application/json
 
 ###
 
+GET {{ParishCoordination.Api_HostAddress}}/api/v1/parishes/00000000-0000-0000-0000-000000000000
+Accept: application/json
+
+###
+
 POST {{ParishCoordination.Api_HostAddress}}/api/v1/parishes
 Content-Type: application/json
 

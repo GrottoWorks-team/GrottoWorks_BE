@@ -1,6 +1,6 @@
 namespace ParishCoordination.Domain.Enums;
 
-public enum ParishStatus
+public enum CommunityStatus
 {
     Active,
     Inactive

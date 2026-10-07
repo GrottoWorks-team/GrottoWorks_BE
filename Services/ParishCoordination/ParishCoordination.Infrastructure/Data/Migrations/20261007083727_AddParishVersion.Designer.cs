@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ParishCoordination.Infrastructure.Data;
@@ -11,9 +12,11 @@ using ParishCoordination.Infrastructure.Data;
 namespace ParishCoordination.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(ParishCoordinationDbContext))]
-    partial class ParishCoordinationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261007083727_AddParishVersion")]
+    partial class AddParishVersion
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,58 +24,6 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("ParishCoordination.Domain.Entities.Community", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("community_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text")
-                        .HasColumnName("community_description");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)")
-                        .HasColumnName("community_name");
-
-                    b.Property<Guid>("ParishId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("parish_id");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("community_status");
-
-                    b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<int>("Version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1)
-                        .HasColumnName("version");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ParishId");
-
-                    b.HasIndex("ParishId", "Name")
-                        .IsUnique();
-
-                    b.ToTable("community", (string)null);
-                });
 
             modelBuilder.Entity("ParishCoordination.Domain.Entities.Parish", b =>
                 {
@@ -120,15 +71,6 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("parish", (string)null);
-                });
-
-            modelBuilder.Entity("ParishCoordination.Domain.Entities.Community", b =>
-                {
-                    b.HasOne("ParishCoordination.Domain.Entities.Parish", null)
-                        .WithMany()
-                        .HasForeignKey("ParishId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

@@ -1,6 +1,6 @@
 using ParishCoordination.Domain.Entities;
 
-namespace ParishCoordination.Application.Parishes.CreateParish;
+namespace ParishCoordination.Application.Parishes.Commands.CreateParish;
 
 public sealed class CreateParishCommandHandler(IParishRepository parishRepository)
 {

@@ -1,4 +1,4 @@
-namespace ParishCoordination.Application.Parishes.GetParishes;
+namespace ParishCoordination.Application.Parishes.Queries.GetParishes;
 
 public sealed class GetParishesQueryHandler(IParishRepository parishRepository)
 {

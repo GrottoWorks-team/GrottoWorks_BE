@@ -3,7 +3,7 @@ using ParishCoordination.Application.Parishes;
 using ParishCoordination.Domain.Entities;
 using ParishCoordination.Infrastructure.Data;
 
-namespace ParishCoordination.Infrastructure.Parishes;
+namespace ParishCoordination.Infrastructure.Repositories;
 
 public sealed class ParishRepository(ParishCoordinationDbContext dbContext)
     : IParishRepository

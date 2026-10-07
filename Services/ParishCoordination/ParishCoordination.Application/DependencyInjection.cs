@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
-using ParishCoordination.Application.Parishes.CreateParish;
-using ParishCoordination.Application.Parishes.GetParish;
-using ParishCoordination.Application.Parishes.GetParishes;
+using ParishCoordination.Application.Parishes.Commands.CreateParish;
+using ParishCoordination.Application.Parishes.Queries.GetParish;
+using ParishCoordination.Application.Parishes.Queries.GetParishes;
 
 namespace ParishCoordination.Application;
 

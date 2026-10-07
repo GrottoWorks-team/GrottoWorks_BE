@@ -24,6 +24,7 @@ public sealed class Parish
         Status = status;
         CreatedAt = createdAt;
         UpdatedAt = updatedAt;
+        Version = 1;
     }
 
     public static Parish Create(
@@ -41,6 +42,21 @@ public sealed class Parish
             createdAtUtc);
     }
 
+    public void Update(
+        string name,
+        string? address,
+        string? description,
+        ParishStatus status,
+        DateTimeOffset updatedAtUtc)
+    {
+        Name = name;
+        Address = address;
+        Description = description;
+        Status = status;
+        UpdatedAt = updatedAtUtc;
+        Version++;
+    }
+
     public Guid Id { get; private set; }
 
     public string Name { get; private set; } = string.Empty;
@@ -54,4 +70,6 @@ public sealed class Parish
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset? UpdatedAt { get; private set; }
+
+    public int Version { get; private set; }
 }

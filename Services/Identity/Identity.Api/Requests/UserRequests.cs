@@ -11,7 +11,7 @@ public sealed class UpdateProfileRequest
     [StringLength(30, ErrorMessage = "Phone must not exceed 30 characters.")]
     public string? Phone { get; init; }
 
-    [StringLength(1000, ErrorMessage = "Introduction must not exceed 1000 characters.")]
+    [StringLength(2000, ErrorMessage = "Introduction must not exceed 2000 characters.")]
     public string? Introduction { get; init; }
 
     public Guid? CommunityId { get; init; }

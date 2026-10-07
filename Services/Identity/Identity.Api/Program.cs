@@ -15,9 +15,15 @@ using Microsoft.IdentityModel.Tokens;
 var builder = WebApplication.CreateBuilder(args);
 
 // OpenAPI + DataAnnotations validation for minimal API request DTOs (ParishCoordination pattern).
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
 builder.Services.AddValidation();
 builder.Services.AddHttpContextAccessor();
+
+// Malformed JSON / unparsable parameters throw BadHttpRequestException in every environment
+// (default is Development only), so ExceptionHandlingMiddleware returns the 400 ProblemDetails
+// instead of an empty 400 in Production.
+builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
 builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails = context =>
@@ -79,6 +85,13 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    // Interactive API docs (Swagger UI, F-PLT-08) at /swagger — Development only.
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/openapi/v1.json", "Identity API v1");
+        options.RoutePrefix = "swagger";
+        options.EnablePersistAuthorization();
+    });
 }
 
 app.UseCorrelationId();

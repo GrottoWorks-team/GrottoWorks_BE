@@ -29,14 +29,21 @@ public sealed class LoginCommandHandler(
         }
         catch (DomainException)
         {
+            passwordHasher.VerifyDummy(command.Password);
             throw InvalidCredentials();
         }
 
         var user = await userAccountStore.GetByEmailAsync(normalizedEmail, cancellationToken);
 
-        if (user is null ||
-            user.PasswordHash is null ||
-            !passwordHasher.Verify(user, user.PasswordHash, command.Password))
+        if (user?.PasswordHash is null)
+        {
+            // Same cost as a real check: response time must not reveal whether the email exists.
+            passwordHasher.VerifyDummy(command.Password);
+            throw InvalidCredentials();
+        }
+
+        var verification = passwordHasher.Verify(user, user.PasswordHash, command.Password);
+        if (verification == PasswordVerification.Failed)
         {
             throw InvalidCredentials();
         }
@@ -54,6 +61,14 @@ public sealed class LoginCommandHandler(
         }
 
         var now = DateTimeOffset.UtcNow;
+
+        if (verification == PasswordVerification.SuccessRehashNeeded)
+        {
+            // Hash parameters were upgraded (e.g. a newer .NET iteration count): store the new hash.
+            user.SetPasswordHash(passwordHasher.Hash(user, command.Password), now);
+            await userAccountStore.SaveChangesAsync(cancellationToken);
+        }
+
         var accessToken = tokenService.IssueAccessToken(user, user.VolunteerProfile?.CommunityId);
         var refreshToken = tokenService.IssueRefreshToken(user.UserId);
 

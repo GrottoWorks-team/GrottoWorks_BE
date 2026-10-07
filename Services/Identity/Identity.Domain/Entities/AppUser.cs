@@ -8,6 +8,9 @@ namespace Identity.Domain.Entities;
 /// </summary>
 public sealed class AppUser
 {
+    /// <summary>API Contract: User.displayName is 1–120 characters (DB column allows 150).</summary>
+    public const int MaxFullNameLength = 120;
+
     private AppUser()
     {
     }
@@ -23,22 +26,16 @@ public sealed class AppUser
         ArgumentNullException.ThrowIfNull(role);
 
         var trimmedFullName = (fullName ?? string.Empty).Trim();
-        if (trimmedFullName.Length is 0 or > 150)
+        if (trimmedFullName.Length is 0 or > MaxFullNameLength)
         {
             throw new DomainException(
                 "USER_FULL_NAME_INVALID",
-                "Full name is required and must not exceed 150 characters.");
+                $"Full name is required and must not exceed {MaxFullNameLength} characters.");
         }
 
         var normalizedEmail = NormalizeEmail(email);
 
-        // BR-67: every account except the system administrator belongs to a parish.
-        if (parishId is null && role.Code != RoleCodes.Admin)
-        {
-            throw new DomainException(
-                "USER_PARISH_REQUIRED",
-                "A parish is required for every account except ADMIN.");
-        }
+        EnsureParishRule(parishId, role.Code);
 
         return new AppUser
         {
@@ -121,12 +118,7 @@ public sealed class AppUser
     {
         ArgumentNullException.ThrowIfNull(role);
 
-        if (ParishId is null && role.Code != RoleCodes.Admin)
-        {
-            throw new DomainException(
-                "USER_PARISH_REQUIRED",
-                "A parish is required for every account except ADMIN.");
-        }
+        EnsureParishRule(ParishId, role.Code);
 
         // One role per account (ERD v3.5).
         Role = role;
@@ -136,12 +128,7 @@ public sealed class AppUser
 
     public void ChangeParish(Guid? parishId, DateTimeOffset now)
     {
-        if (parishId is null && Role?.Code != RoleCodes.Admin)
-        {
-            throw new DomainException(
-                "USER_PARISH_REQUIRED",
-                "A parish is required for every account except ADMIN.");
-        }
+        EnsureParishRule(parishId, Role?.Code);
 
         ParishId = parishId;
         UpdatedAt = now;
@@ -152,11 +139,11 @@ public sealed class AppUser
         if (fullName is not null)
         {
             var trimmed = fullName.Trim();
-            if (trimmed.Length is 0 or > 150)
+            if (trimmed.Length is 0 or > MaxFullNameLength)
             {
                 throw new DomainException(
                     "USER_FULL_NAME_INVALID",
-                    "Full name is required and must not exceed 150 characters.");
+                    $"Full name is required and must not exceed {MaxFullNameLength} characters.");
             }
 
             FullName = trimmed;
@@ -192,6 +179,17 @@ public sealed class AppUser
     public void CreateProfile(Guid communityId, string? introduction = null, string? availabilityNote = null)
     {
         VolunteerProfile ??= VolunteerProfile.Create(UserId, communityId, introduction, availabilityNote);
+    }
+
+    /// <summary>BR-67: every account except ADMIN belongs to a parish; an empty uuid is not a parish.</summary>
+    private static void EnsureParishRule(Guid? parishId, string? roleCode)
+    {
+        if (parishId == Guid.Empty || (parishId is null && roleCode != RoleCodes.Admin))
+        {
+            throw new DomainException(
+                "USER_PARISH_REQUIRED",
+                "A parish is required for every account except ADMIN.");
+        }
     }
 
     private static string? NormalizePhone(string? phone)

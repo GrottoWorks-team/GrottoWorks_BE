@@ -69,7 +69,7 @@
 | 4 | F-PLT-04 | `BuildingBlocks.Security`: JWT bearer (issuer/audience/key từ config), `ICurrentUser { UserId, Role, ParishId, CommunityId }`, policy `RequireRole(...)`, helper `EnsureSameParish` | Chờ Vũ chốt claim (giữa S1) |
 | 5 | F-PLT-05 | `BuildingBlocks.Messaging`: MassTransit + RabbitMQ, `IntegrationEvent` envelope (Mục 8 API Contract), EF Core Outbox/Inbox (`AddEntityFrameworkOutbox`), retry 3 lần → `_error` queue, base consumer idempotent theo `eventId` | Viết sample publish/consume giữa Parish ↔ service test |
 | 6 | F-PLT-06 | `ApiGateway` (YARP): route `/api/v1/{service-prefix}/**`, validate JWT, rate limit (fixed window) cho `/auth/*`, `/files/uploads`, `/reports/exports`, forward `X-Correlation-Id` | Login → gọi Parish qua gateway |
-| 7 | F-PLT-08 | Gateway gom `/openapi/v1.json` từng service, Scalar UI | S2 |
+| 7 | F-PLT-08 | Gateway gom `/openapi/v1.json` từng service, Swagger UI | S2 |
 | 8 | F-PLT-09 | GitHub Actions: `dotnet build`, `dotnet test`, `dotnet format --verify-no-changes` | S2 |
 | 9 | F-PLT-07 | `IdempotencyFilter` (Redis, key + hash body + response, TTL 24h; trùng key khác body → 422) | S3, trước RES-09 / TSK-11 |
 

@@ -35,6 +35,7 @@ public sealed class ExceptionHandlingMiddleware(
             ["USER_PHONE_INVALID"] = (422, "Invalid phone number"),
             ["USER_PARISH_REQUIRED"] = (422, "Parish required"),
             ["PROFILE_COMMUNITY_REQUIRED"] = (422, "Community required"),
+            ["PROFILE_COMMUNITY_NOT_IN_PARISH"] = (422, "Community outside your parish"),
             ["PROFILE_USER_REQUIRED"] = (422, "Invalid profile"),
             ["PROFILE_TEXT_TOO_LONG"] = (422, "Text too long"),
             ["SKILL_CODE_INVALID"] = (422, "Invalid skill code"),
@@ -89,7 +90,7 @@ public sealed class ExceptionHandlingMiddleware(
                 StatusCodes.Status400BadRequest,
                 "INVALID_REQUEST_BODY",
                 "Malformed request or invalid parameter syntax.",
-                "The request body could not be read as JSON.");
+                "The request body or a request parameter could not be read.");
         }
         catch (Exception exception) when (!context.Response.HasStarted)
         {

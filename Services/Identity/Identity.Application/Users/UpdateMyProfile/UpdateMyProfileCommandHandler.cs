@@ -15,7 +15,8 @@ public sealed record UpdateMyProfileCommand(
 /// <summary>F-IDN-05: update own account data and volunteer details.</summary>
 public sealed class UpdateMyProfileCommandHandler(
     ICurrentUser currentUser,
-    IUserAccountStore userAccountStore)
+    IUserAccountStore userAccountStore,
+    IParishDirectory parishDirectory)
 {
     public async Task<UserProfileDto> HandleAsync(
         UpdateMyProfileCommand command,
@@ -23,6 +24,8 @@ public sealed class UpdateMyProfileCommandHandler(
     {
         var user = await userAccountStore.GetDetailsByIdAsync(currentUser.UserId, cancellationToken)
             ?? throw new DomainException("USER_NOT_FOUND", "The user no longer exists.");
+
+        await EnsureCommunityInOwnParishAsync(user, command.CommunityId, cancellationToken);
 
         var now = DateTimeOffset.UtcNow;
         user.UpdateProfile(command.DisplayName, command.Phone, now);
@@ -49,5 +52,27 @@ public sealed class UpdateMyProfileCommandHandler(
         await userAccountStore.SaveChangesAsync(cancellationToken);
 
         return UserProfileDto.From(user);
+    }
+
+    private async Task EnsureCommunityInOwnParishAsync(
+        AppUser user,
+        Guid? communityId,
+        CancellationToken cancellationToken)
+    {
+        // Guid.Empty is rejected by the domain (PROFILE_COMMUNITY_REQUIRED); unchanged values need no lookup.
+        if (communityId is not { } requested ||
+            requested == Guid.Empty ||
+            requested == user.VolunteerProfile?.CommunityId)
+        {
+            return;
+        }
+
+        if (user.ParishId is not { } parishId ||
+            !await parishDirectory.CommunityBelongsToParishAsync(requested, parishId, cancellationToken))
+        {
+            throw new DomainException(
+                "PROFILE_COMMUNITY_NOT_IN_PARISH",
+                "The community does not belong to your parish.");
+        }
     }
 }

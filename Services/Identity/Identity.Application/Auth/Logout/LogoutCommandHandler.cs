@@ -6,8 +6,12 @@ namespace Identity.Application.Auth.Logout;
 
 public sealed record LogoutCommand(string RefreshToken);
 
-/// <summary>F-IDN-03: revoke the presented refresh token family. Idempotent — an unknown token still returns success.</summary>
+/// <summary>
+/// F-IDN-03: revoke the presented refresh token family. Idempotent — an unknown token, or a token that
+/// belongs to another account, still returns success (nothing is revoked, nothing is disclosed).
+/// </summary>
 public sealed class LogoutCommandHandler(
+    ICurrentUser currentUser,
     IRefreshTokenStore refreshTokenStore,
     IAuthenticationTokenService tokenService)
 {
@@ -23,7 +27,7 @@ public sealed class LogoutCommandHandler(
         var tokenHash = tokenService.HashRefreshToken(command.RefreshToken.Trim());
         var existing = await refreshTokenStore.GetByHashAsync(tokenHash, cancellationToken);
 
-        if (existing is null)
+        if (existing is null || existing.UserId != currentUser.UserId)
         {
             return;
         }

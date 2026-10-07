@@ -7,6 +7,7 @@ using Identity.Infrastructure.Authentication;
 using Identity.Infrastructure.Auth;
 using Identity.Infrastructure.Data;
 using Identity.Infrastructure.Observability;
+using Identity.Infrastructure.Parish;
 using Identity.Infrastructure.Passwording;
 using Identity.Infrastructure.Skills;
 using Microsoft.EntityFrameworkCore;
@@ -51,6 +52,8 @@ public static class DependencyInjection
         services.AddSingleton<IAuthenticationTokenService, TokenService>();
         services.AddScoped<IIntegrationEventPublisher, LoggingIntegrationEventPublisher>();
         services.AddScoped<IReadinessProbe, DatabaseReadinessProbe>();
+        // INTERIM until ParishCoordination exposes communities (F-PAR-02) — see PendingParishDirectory.
+        services.AddScoped<IParishDirectory, PendingParishDirectory>();
         services.AddScoped<IIdentityDataSeeder, IdentityDataSeeder>();
 
         return services;

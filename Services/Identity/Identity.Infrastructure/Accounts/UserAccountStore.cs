@@ -1,4 +1,5 @@
 using Identity.Application.Accounts;
+using Identity.Domain;
 using Identity.Domain.Entities;
 using Identity.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -62,6 +63,17 @@ public sealed class UserAccountStore(IdentityDbContext dbContext) : IUserAccount
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception)
+            when (exception.IsUniqueViolation(DbUpdateExceptionExtensions.AppUserEmailIndex))
+        {
+            // Lost the race against a concurrent registration with the same email.
+            throw new DomainException(
+                "AUTH_EMAIL_ALREADY_EXISTS",
+                "An account with this email already exists.");
+        }
     }
 }

@@ -1,4 +1,5 @@
 using Identity.Application.Skills;
+using Identity.Domain;
 using Identity.Domain.Entities;
 using Identity.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +36,16 @@ public sealed class SkillStore(IdentityDbContext dbContext) : ISkillStore
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception)
+            when (exception.IsUniqueViolation(DbUpdateExceptionExtensions.SkillCodeIndex))
+        {
+            throw new DomainException(
+                "SKILL_CODE_ALREADY_EXISTS",
+                "A skill with this code already exists.");
+        }
     }
 }

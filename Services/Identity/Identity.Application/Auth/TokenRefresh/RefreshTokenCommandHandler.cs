@@ -36,16 +36,7 @@ public sealed class RefreshTokenCommandHandler(
 
         if (existing.IsReuse)
         {
-            await refreshTokenStore.RevokeFamilyAsync(
-                existing.FamilyId,
-                RefreshToken.ReasonReuseDetected,
-                now,
-                cancellationToken);
-            await refreshTokenStore.SaveChangesAsync(cancellationToken);
-
-            throw new DomainException(
-                "AUTH_REFRESH_TOKEN_REUSED",
-                "The refresh token was already used. The session has been revoked.");
+            throw await RevokeFamilyAsReuseAsync(existing.FamilyId, now, cancellationToken);
         }
 
         if (existing.IsExpired(now))
@@ -77,18 +68,38 @@ public sealed class RefreshTokenCommandHandler(
                     : "This account is inactive. Contact an administrator.");
         }
 
-        var nowUtc = DateTimeOffset.UtcNow;
-        var accessToken = tokenService.IssueAccessToken(user, user.VolunteerProfile?.CommunityId);
         var nextToken = tokenService.IssueRefreshToken(user.UserId, existing.FamilyId);
 
-        existing.RotateWith(nextToken.Token.RefreshTokenId, nowUtc);
-        refreshTokenStore.Add(nextToken.Token);
-        await refreshTokenStore.SaveChangesAsync(cancellationToken);
+        // Two concurrent requests with the same token: only one wins the atomic claim,
+        // the loser is a reuse and revokes the whole family.
+        if (!await refreshTokenStore.TryRotateAsync(existing, nextToken.Token, now, cancellationToken))
+        {
+            throw await RevokeFamilyAsReuseAsync(existing.FamilyId, now, cancellationToken);
+        }
+
+        var accessToken = tokenService.IssueAccessToken(user, user.VolunteerProfile?.CommunityId);
 
         return new TokenPairDto(
             accessToken.Value,
             nextToken.Plaintext,
-            (int)Math.Max(1, (accessToken.ExpiresAt - nowUtc).TotalSeconds),
+            (int)Math.Max(1, (accessToken.ExpiresAt - now).TotalSeconds),
             TokenPairDto.BearerTokenType);
+    }
+
+    private async Task<DomainException> RevokeFamilyAsReuseAsync(
+        Guid familyId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        await refreshTokenStore.RevokeFamilyAsync(
+            familyId,
+            RefreshToken.ReasonReuseDetected,
+            now,
+            cancellationToken);
+        await refreshTokenStore.SaveChangesAsync(cancellationToken);
+
+        return new DomainException(
+            "AUTH_REFRESH_TOKEN_REUSED",
+            "The refresh token was already used. The session has been revoked.");
     }
 }

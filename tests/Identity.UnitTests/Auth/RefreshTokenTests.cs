@@ -29,8 +29,8 @@ public sealed class RefreshTokenTests
     private static RefreshTokenCommandHandler CreateRefreshHandler(FakeUserStore users, FakeRefreshTokenStore tokens) =>
         new(users, tokens, new FakeTokenService());
 
-    private static LogoutCommandHandler CreateLogoutHandler(FakeRefreshTokenStore tokens) =>
-        new(tokens, new FakeTokenService());
+    private static LogoutCommandHandler CreateLogoutHandler(FakeRefreshTokenStore tokens, Guid callerId) =>
+        new(new FakeCurrentUser(callerId), tokens, new FakeTokenService());
 
     [Fact]
     public async Task Refresh_rotates_the_token_pair_and_links_the_family()
@@ -153,13 +153,13 @@ public sealed class RefreshTokenTests
     {
         var users = new FakeUserStore();
         var tokens = new FakeRefreshTokenStore();
-        SeedActiveUser(users);
+        var user = SeedActiveUser(users);
 
         var first = await CreateLoginHandler(users, tokens).HandleAsync(
             new LoginCommand("nguyen@example.com", "Volunteer123"),
             CancellationToken.None);
 
-        var handler = CreateLogoutHandler(tokens);
+        var handler = CreateLogoutHandler(tokens, user.UserId);
         await handler.HandleAsync(new LogoutCommand(first.RefreshToken), CancellationToken.None);
 
         tokens.AddedTokens.Should().OnlyContain(token => token.IsRevoked);
@@ -167,5 +167,48 @@ public sealed class RefreshTokenTests
         // Logging out again with the same (revoked) token or an unknown token stays a success.
         await handler.HandleAsync(new LogoutCommand(first.RefreshToken), CancellationToken.None);
         await handler.HandleAsync(new LogoutCommand("unknown-token"), CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Refresh_that_loses_a_concurrent_rotation_is_treated_as_reuse()
+    {
+        var users = new FakeUserStore();
+        var tokens = new FakeRefreshTokenStore();
+        SeedActiveUser(users);
+
+        var first = await CreateLoginHandler(users, tokens).HandleAsync(
+            new LoginCommand("nguyen@example.com", "Volunteer123"),
+            CancellationToken.None);
+
+        // Another request with the same token rotated it between our read and our write.
+        tokens.LoseNextRotationRace = true;
+
+        var act = async () => await CreateRefreshHandler(users, tokens).HandleAsync(
+            new RefreshTokenCommand(first.RefreshToken),
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<DomainException>()
+            .Where(exception => exception.Code == "AUTH_REFRESH_TOKEN_REUSED");
+        tokens.RevokedFamilies.Should().ContainSingle()
+            .Which.Reason.Should().Be(RefreshToken.ReasonReuseDetected);
+        tokens.AddedTokens.Should().ContainSingle("the losing request must not persist a new token");
+    }
+
+    [Fact]
+    public async Task Logout_ignores_a_refresh_token_owned_by_another_account()
+    {
+        var users = new FakeUserStore();
+        var tokens = new FakeRefreshTokenStore();
+        SeedActiveUser(users);
+
+        var first = await CreateLoginHandler(users, tokens).HandleAsync(
+            new LoginCommand("nguyen@example.com", "Volunteer123"),
+            CancellationToken.None);
+
+        await CreateLogoutHandler(tokens, callerId: Guid.NewGuid())
+            .HandleAsync(new LogoutCommand(first.RefreshToken), CancellationToken.None);
+
+        tokens.AddedTokens.Should().OnlyContain(token => !token.IsRevoked);
+        tokens.RevokedFamilies.Should().BeEmpty();
     }
 }

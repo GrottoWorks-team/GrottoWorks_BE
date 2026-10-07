@@ -9,6 +9,17 @@ public interface IRefreshTokenStore
 
     void Add(RefreshTokenEntity refreshToken);
 
+    /// <summary>
+    /// Atomically claims <paramref name="current"/> for rotation and persists <paramref name="next"/>.
+    /// Returns <c>false</c> when the token was already rotated or revoked by a concurrent request —
+    /// the caller must then treat the presentation as reuse (F-IDN-03).
+    /// </summary>
+    Task<bool> TryRotateAsync(
+        RefreshTokenEntity current,
+        RefreshTokenEntity next,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Revokes every token of a family — used on logout and on reuse detection.</summary>
     Task RevokeFamilyAsync(Guid familyId, string reason, DateTimeOffset now, CancellationToken cancellationToken = default);
 

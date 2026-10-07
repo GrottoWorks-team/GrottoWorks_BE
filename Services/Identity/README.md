@@ -51,3 +51,10 @@ tests/Identity.UnitTests/     # xUnit + FluentAssertions (chạy local, không c
 | `POST /api/v1/skills` | `createSkill` | ADMIN |
 | `PATCH /api/v1/skills/{skillId}` | `updateSkill` | ADMIN |
 | `GET /health/live`, `GET /health/ready` | — | PUBLIC |
+## Việc còn mở (sau review 07/10)
+
+- `PendingParishDirectory` là bản **tạm**: chấp nhận mọi `communityId` và log warning. Cần thay bằng
+  internal endpoint hoặc projection community của ParishCoordination (F-PAR-02, Lâm) trước demo S1.
+- Denylist access token (Redis, theo `jti`) khi logout/lock chưa làm — access token cũ còn hiệu lực tối đa 15'.
+- Chưa có integration test (WebApplicationFactory + Testcontainers Postgres) cho rotation đồng thời
+  và unique violation → 409.

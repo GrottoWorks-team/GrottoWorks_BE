@@ -130,4 +130,26 @@ public sealed class AppUserTests
         user.VolunteerProfile!.CommunityId.Should().Be(communityId);
         user.VolunteerProfile!.Introduction.Should().Be("Gioi thieu");
     }
+
+    [Fact]
+    public void Create_rejects_an_empty_parish_id()
+    {
+        var act = () => AppUser.Create("Nguyen Van A", "nguyen@example.com", null, Guid.Empty, VolunteerRole, Now);
+
+        act.Should().Throw<DomainException>().Which.Code.Should().Be("USER_PARISH_REQUIRED");
+    }
+
+    [Fact]
+    public void Create_rejects_a_full_name_longer_than_the_contract_limit()
+    {
+        var act = () => AppUser.Create(
+            new string('A', AppUser.MaxFullNameLength + 1),
+            "nguyen@example.com",
+            null,
+            Guid.NewGuid(),
+            VolunteerRole,
+            Now);
+
+        act.Should().Throw<DomainException>().Which.Code.Should().Be("USER_FULL_NAME_INVALID");
+    }
 }

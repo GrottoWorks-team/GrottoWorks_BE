@@ -79,6 +79,27 @@ public sealed class FakeRefreshTokenStore : IRefreshTokenStore
     public void Add(RefreshTokenEntity refreshToken)
         => AddInternal(refreshToken);
 
+    /// <summary>When true, the next rotation loses the race against a concurrent request.</summary>
+    public bool LoseNextRotationRace { get; set; }
+
+    public Task<bool> TryRotateAsync(
+        RefreshTokenEntity current,
+        RefreshTokenEntity next,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        if (LoseNextRotationRace || current.IsReuse)
+        {
+            LoseNextRotationRace = false;
+            return Task.FromResult(false);
+        }
+
+        current.RotateWith(next.RefreshTokenId, now);
+        AddInternal(next);
+        SaveChangesCount++;
+        return Task.FromResult(true);
+    }
+
     public Task RevokeFamilyAsync(
         Guid familyId,
         string reason,
@@ -150,13 +171,46 @@ public sealed class FakeSkillStore : ISkillStore
     }
 }
 
-/// <summary>Simple deterministic fake: hash = "hash:" + password; verify compares the stored hash.</summary>
+/// <summary>
+/// Simple deterministic fake: hash = "hash:" + password. A stored "legacy:" + password hash verifies
+/// as <see cref="PasswordVerification.SuccessRehashNeeded"/>.
+/// </summary>
 public sealed class FakePasswordHasher : IPasswordHasher
 {
+    public int DummyVerifications { get; private set; }
+
     public string Hash(AppUser user, string password) => "hash:" + password;
 
-    public bool Verify(AppUser user, string passwordHash, string password)
-        => string.Equals(passwordHash, "hash:" + password, StringComparison.Ordinal);
+    public PasswordVerification Verify(AppUser user, string passwordHash, string password)
+    {
+        if (string.Equals(passwordHash, "hash:" + password, StringComparison.Ordinal))
+        {
+            return PasswordVerification.Success;
+        }
+
+        return string.Equals(passwordHash, "legacy:" + password, StringComparison.Ordinal)
+            ? PasswordVerification.SuccessRehashNeeded
+            : PasswordVerification.Failed;
+    }
+
+    public void VerifyDummy(string password) => DummyVerifications++;
+}
+
+/// <summary>Allows every community unless <see cref="Allow"/> is false.</summary>
+public sealed class FakeParishDirectory(bool allow = true) : IParishDirectory
+{
+    public bool Allow { get; } = allow;
+
+    public List<(Guid CommunityId, Guid ParishId)> Checks { get; } = [];
+
+    public Task<bool> CommunityBelongsToParishAsync(
+        Guid communityId,
+        Guid parishId,
+        CancellationToken cancellationToken = default)
+    {
+        Checks.Add((communityId, parishId));
+        return Task.FromResult(Allow);
+    }
 }
 
 public sealed class FakeTokenService : IAuthenticationTokenService

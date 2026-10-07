@@ -59,7 +59,8 @@ public sealed class MyProfileTests
 
         var profile = await new UpdateMyProfileCommandHandler(
             new FakeCurrentUser(user.UserId),
-            users).HandleAsync(
+            users,
+            new FakeParishDirectory()).HandleAsync(
                 new UpdateMyProfileCommand("Tran Van B", "0901234567", "Gioi thieu", CommunityId),
                 CancellationToken.None);
 
@@ -77,7 +78,7 @@ public sealed class MyProfileTests
         users.Seed(user);
         var currentUser = new FakeCurrentUser(user.UserId);
 
-        await new UpdateMyProfileCommandHandler(currentUser, users).HandleAsync(
+        await new UpdateMyProfileCommandHandler(currentUser, users, new FakeParishDirectory()).HandleAsync(
             new UpdateMyProfileCommand(null, null, null, CommunityId),
             CancellationToken.None);
 
@@ -97,11 +98,54 @@ public sealed class MyProfileTests
 
         var act = async () => await new UpdateMyProfileCommandHandler(
             new FakeCurrentUser(user.UserId),
-            users).HandleAsync(
+            users,
+            new FakeParishDirectory()).HandleAsync(
                 new UpdateMyProfileCommand(null, null, "Gioi thieu", null),
                 CancellationToken.None);
 
         await act.Should().ThrowAsync<DomainException>()
             .Where(exception => exception.Code == "PROFILE_COMMUNITY_REQUIRED");
+    }
+
+    [Fact]
+    public async Task UpdateMyProfile_rejects_a_community_outside_the_callers_parish()
+    {
+        var users = new FakeUserStore();
+        var user = CreateOwnUser();
+        users.Seed(user);
+        var directory = new FakeParishDirectory(allow: false);
+
+        var act = async () => await new UpdateMyProfileCommandHandler(
+            new FakeCurrentUser(user.UserId),
+            users,
+            directory).HandleAsync(
+                new UpdateMyProfileCommand(null, null, null, CommunityId),
+                CancellationToken.None);
+
+        await act.Should().ThrowAsync<DomainException>()
+            .Where(exception => exception.Code == "PROFILE_COMMUNITY_NOT_IN_PARISH");
+        directory.Checks.Should().ContainSingle().Which.Should().Be((CommunityId, ParishId));
+        user.VolunteerProfile.Should().BeNull();
+        users.SaveChangesCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task UpdateMyProfile_does_not_recheck_an_unchanged_community()
+    {
+        var users = new FakeUserStore();
+        var user = CreateOwnUser();
+        user.CreateProfile(CommunityId);
+        users.Seed(user);
+        var directory = new FakeParishDirectory(allow: false);
+
+        var profile = await new UpdateMyProfileCommandHandler(
+            new FakeCurrentUser(user.UserId),
+            users,
+            directory).HandleAsync(
+                new UpdateMyProfileCommand(null, null, "Gioi thieu", CommunityId),
+                CancellationToken.None);
+
+        profile.Introduction.Should().Be("Gioi thieu");
+        directory.Checks.Should().BeEmpty();
     }
 }

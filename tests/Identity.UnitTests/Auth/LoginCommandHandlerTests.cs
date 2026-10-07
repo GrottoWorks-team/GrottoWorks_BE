@@ -27,8 +27,8 @@ public sealed class LoginCommandHandlerTests
         return new SeededAccount(users, tokens, user);
     }
 
-    private static LoginCommandHandler CreateHandler(SeededAccount account) =>
-        new(account.Users, account.Tokens, new FakePasswordHasher(), new FakeTokenService());
+    private static LoginCommandHandler CreateHandler(SeededAccount account, FakePasswordHasher? hasher = null) =>
+        new(account.Users, account.Tokens, hasher ?? new FakePasswordHasher(), new FakeTokenService());
 
     [Fact]
     public async Task Login_issues_a_token_pair_when_credentials_are_valid()
@@ -106,5 +106,34 @@ public sealed class LoginCommandHandlerTests
         await act.Should().ThrowAsync<DomainException>()
             .Where(exception => exception.Code == "AUTH_ACCOUNT_INACTIVE");
         account.Tokens.AddedTokens.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Login_with_unknown_email_still_runs_a_password_verification()
+    {
+        var account = SeedActiveUser();
+        var hasher = new FakePasswordHasher();
+
+        var act = async () => await CreateHandler(account, hasher).HandleAsync(
+            new LoginCommand("nobody@example.com", "Whatever123"),
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<DomainException>();
+        hasher.DummyVerifications.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Login_upgrades_a_hash_that_needs_rehashing()
+    {
+        var account = SeedActiveUser();
+        account.User.SetPasswordHash("legacy:Volunteer123", DateTimeOffset.UtcNow);
+
+        var result = await CreateHandler(account).HandleAsync(
+            new LoginCommand("nguyen@example.com", "Volunteer123"),
+            CancellationToken.None);
+
+        result.AccessToken.Should().NotBeNullOrWhiteSpace();
+        account.User.PasswordHash.Should().Be("hash:Volunteer123");
+        account.Users.SaveChangesCount.Should().Be(1);
     }
 }

@@ -1,9 +1,9 @@
+using ParishCoordination.Domain.Enums;
+
 namespace ParishCoordination.Domain.Entities;
 
 public sealed class Parish
 {
-    private const string ActiveStatus = "ACTIVE";
-
     private Parish()
     {
     }
@@ -13,7 +13,7 @@ public sealed class Parish
         string name,
         string? address,
         string? description,
-        string status,
+        ParishStatus status,
         DateTimeOffset createdAt,
         DateTimeOffset? updatedAt = null)
     {
@@ -37,7 +37,7 @@ public sealed class Parish
             name,
             address,
             description,
-            ActiveStatus,
+            ParishStatus.Active,
             createdAtUtc);
     }
 
@@ -49,7 +49,7 @@ public sealed class Parish
 
     public string? Description { get; private set; }
 
-    public string Status { get; private set; } = string.Empty;
+    public ParishStatus Status { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
 

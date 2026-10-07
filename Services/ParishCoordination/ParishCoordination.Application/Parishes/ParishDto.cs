@@ -1,4 +1,5 @@
 using ParishCoordination.Domain.Entities;
+using ParishCoordination.Domain.Enums;
 
 namespace ParishCoordination.Application.Parishes;
 
@@ -7,7 +8,7 @@ public sealed record ParishDto(
     string Name,
     string? Address,
     string? Description,
-    string Status,
+    ParishStatus Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt)
 {

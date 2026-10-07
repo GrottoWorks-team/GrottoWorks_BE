@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using ParishCoordination.Domain.Entities;
+using ParishCoordination.Domain.Enums;
 
 namespace ParishCoordination.Infrastructure.Data.Configurations;
 
@@ -29,6 +30,9 @@ public sealed class ParishConfiguration : IEntityTypeConfiguration<Parish>
 
         builder.Property(parish => parish.Status)
             .HasColumnName("parish_status")
+            .HasConversion(
+                status => status.ToString().ToUpperInvariant(),
+                value => Enum.Parse<ParishStatus>(value, true))
             .HasMaxLength(30)
             .IsRequired();
 

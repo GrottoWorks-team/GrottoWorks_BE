@@ -1,3 +1,6 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Http;
 using ParishCoordination.Api.Endpoints;
 using ParishCoordination.Application;
 using ParishCoordination.Infrastructure;
@@ -7,8 +10,27 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddValidation();
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        if (context.ProblemDetails is HttpValidationProblemDetails)
+        {
+            context.ProblemDetails.Status = StatusCodes.Status422UnprocessableEntity;
+            context.HttpContext.Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
+        }
+    };
+});
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(
+        new JsonStringEnumConverter(
+            JsonNamingPolicy.SnakeCaseUpper,
+            allowIntegerValues: false));
+});
 
 var app = builder.Build();
 

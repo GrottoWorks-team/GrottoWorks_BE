@@ -9,3 +9,14 @@ GET {{ParishCoordination.Api_HostAddress}}/api/v1/parishes
 Accept: application/json
 
 ###
+
+POST {{ParishCoordination.Api_HostAddress}}/api/v1/parishes
+Content-Type: application/json
+
+{
+  "name": "Giáo xứ Thánh Giuse",
+  "address": "123 Đường Mẫu",
+  "description": "Giáo xứ dùng hệ thống GrottoWorks"
+}
+
+###

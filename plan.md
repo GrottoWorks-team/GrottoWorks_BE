@@ -263,7 +263,7 @@ Kịch bản nghiệm thu theo owner (Mục 8 spec): Lâm #1–4, #11, #16; Vũ 
 **Chung**
 - [ ] Đọc lại BA v1.1, ERD v3.5, API Contract v1.2; comment chỗ chưa đồng ý.
 - [ ] Tạo GitHub Project board: 1 function ID = 1 issue, label owner/priority/sprint.
-- [ ] Thống nhất JWT claim + event envelope, ghi vào `BuildingBlocks/README.md`.
+- [x] Thống nhất JWT claim + event envelope, ghi vào `BuildingBlocks/README.md`.
 
 **Lâm**
 - [ ] Merge `lam-dev-1`, xóa `weatherforecast`.
@@ -273,9 +273,9 @@ Kịch bản nghiệm thu theo owner (Mục 8 spec): Lâm #1–4, #11, #16; Vũ 
 - [ ] `getParish`, `updateParish`.
 
 **Vũ**
-- [ ] Tạo `Services/Identity` theo template Parish, thêm vào `GrottoWorks_BE.slnx`.
-- [ ] Entity `AppUser`, `Role` + migration đầu, seed 5 role + ADMIN.
-- [ ] Draft `login` phát JWT (để Lâm test Security từ đầu S1).
+- [x] Tạo `Services/Identity` theo template Parish, thêm vào `GrottoWorks_BE.slnx`.
+- [x] Entity `AppUser`, `Role` + migration đầu, seed 5 role + ADMIN.
+- [x] Draft `login` phát JWT (để Lâm test Security từ đầu S1). ✅ S0+S1 gộp: cả `registerUser`, `refreshToken`, `logout`, `getMyProfile`, `updateMyProfile`, skill catalog (F-IDN-01..03, 05, 06) — 49 unit tests; API smoke-tested (migration/seed chờ DB).
 - [ ] Phác `InventoryCalculator` + bảng test case shortage từ BA 8.5 (chuẩn bị S3).
 
 ---
@@ -290,7 +290,7 @@ Kịch bản nghiệm thu theo owner (Mục 8 spec): Lâm #1–4, #11, #16; Vũ 
 | ParishCoordination | Lâm | PAR-01, 02, 05..08 | PAR-04, 09, 10 | — | 0 / 9 (PAR-01 một phần) |
 | TaskExecution | Lâm | TSK-01..04, 06..11, 17 | TSK-05, 12..15, 15b | TSK-16 | 0 / 18 |
 | NotificationAudit | Lâm | NTF-01 | NTF-02..04 | NTF-05, 06 | 0 / 6 |
-| Identity | Vũ | IDN-01..03, 05..09 | IDN-04, 10 | — | 0 / 10 |
+| Identity | Vũ | IDN-01..03, 05..09 | IDN-04, 10 | — | 5 / 10 (S0+S1: IDN-01, 02, 03, 05, 06) |
 | Resource | Vũ | RES-01..07, 09, 10, 12, 13, 15, 17 | RES-11, 13b, 13c, 16, 18, 20 | RES-14 | 0 / 20 |
 | Readiness | Vũ | — | RDY-02..06 | — | 0 / 5 |
 | Reporting | Vũ | — | RPT-01..05 | RPT-06 | 0 / 6 |

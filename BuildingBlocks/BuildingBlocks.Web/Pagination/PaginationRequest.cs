@@ -39,29 +39,73 @@ public sealed record PaginationRequest(int Page = 1, int Size = PaginationReques
                 StatusCodes.Status400BadRequest);
         }
 
-        string? sort = query["sort"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(sort))
+        return new PaginationRequest(page, size, ParseSort(query, allowedSortFields));
+    }
+
+    /// <summary>
+    /// API Contract 4.4: <c>sort=field,asc</c> or <c>sort=field,desc</c>, possibly repeated.
+    /// Every value is validated (never silently ignored); this parser supports a single sort
+    /// field per endpoint, so repeating a different field returns 400. Normalized as
+    /// <c>"field,asc"</c> / <c>"field,desc"</c>.
+    /// </summary>
+    private static string? ParseSort(IQueryCollection query, string[] allowedSortFields)
+    {
+        string? sort = null;
+
+        foreach (var rawValue in query["sort"])
         {
-            sort = sort.Trim();
+            if (string.IsNullOrWhiteSpace(rawValue))
+            {
+                continue;
+            }
+
+            var parts = rawValue.Trim().Split(',');
+            if (parts.Length > 2)
+            {
+                throw new DomainException(
+                    "INVALID_SORT_FIELD",
+                    $"'sort' value '{rawValue.Trim()}' must be 'field' or 'field,asc|desc'.",
+                    StatusCodes.Status400BadRequest);
+            }
+
+            var field = parts[0].Trim();
+            var direction = parts.Length == 2 ? parts[1].Trim().ToLowerInvariant() : "asc";
+
+            if (direction is not ("asc" or "desc"))
+            {
+                throw new DomainException(
+                    "INVALID_SORT_DIRECTION",
+                    $"'sort' direction '{direction}' must be 'asc' or 'desc'.",
+                    StatusCodes.Status400BadRequest);
+            }
+
             var match = allowedSortFields.FirstOrDefault(
-                field => string.Equals(field, sort, StringComparison.OrdinalIgnoreCase));
+                allowed => string.Equals(allowed, field, StringComparison.OrdinalIgnoreCase));
 
             if (match is null)
             {
                 throw new DomainException(
                     "INVALID_SORT_FIELD",
-                    $"'sort' field '{sort}' is not supported.",
+                    $"'sort' field '{field}' is not supported.",
                     StatusCodes.Status400BadRequest);
             }
 
-            sort = match;
-        }
-        else
-        {
-            sort = null;
+            var normalized = $"{match},{direction}";
+
+            if (sort is null)
+            {
+                sort = normalized;
+            }
+            else if (!string.Equals(sort, normalized, StringComparison.Ordinal))
+            {
+                throw new DomainException(
+                    "MULTIPLE_SORT_FIELDS",
+                    "This endpoint supports at most one sort field.",
+                    StatusCodes.Status400BadRequest);
+            }
         }
 
-        return new PaginationRequest(page, size, sort);
+        return sort;
     }
 
     private static int ParseIntParameter(IQueryCollection query, string name, int defaultValue)

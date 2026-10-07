@@ -18,6 +18,7 @@ builder.Services.AddProblemDetails(options =>
         if (context.ProblemDetails is HttpValidationProblemDetails)
         {
             context.ProblemDetails.Status = StatusCodes.Status422UnprocessableEntity;
+            context.ProblemDetails.Extensions["code"] = "VALIDATION_FAILED";
             context.HttpContext.Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
         }
     };

@@ -1,4 +1,6 @@
 @ParishCoordination.Api_HostAddress = http://localhost:5178
+@ParishId = 00000000-0000-0000-0000-000000000000
+@ParishVersion = 1
 
 GET {{ParishCoordination.Api_HostAddress}}/weatherforecast/
 Accept: application/json
@@ -10,7 +12,7 @@ Accept: application/json
 
 ###
 
-GET {{ParishCoordination.Api_HostAddress}}/api/v1/parishes/00000000-0000-0000-0000-000000000000
+GET {{ParishCoordination.Api_HostAddress}}/api/v1/parishes/{{ParishId}}
 Accept: application/json
 
 ###
@@ -22,6 +24,39 @@ Content-Type: application/json
   "name": "Giáo xứ Thánh Giuse",
   "address": "123 Đường Mẫu",
   "description": "Giáo xứ dùng hệ thống GrottoWorks"
+}
+
+###
+
+PATCH {{ParishCoordination.Api_HostAddress}}/api/v1/parishes/{{ParishId}}
+Content-Type: application/json
+If-Match: "{{ParishVersion}}"
+
+{
+  "name": "Giáo xứ Thánh Giuse mới",
+  "address": "456 Đường Mới",
+  "description": "Thông tin mới",
+  "status": "ACTIVE"
+}
+
+###
+
+PATCH {{ParishCoordination.Api_HostAddress}}/api/v1/parishes/{{ParishId}}
+Content-Type: application/json
+
+{
+  "address": "   ",
+  "description": "   "
+}
+
+###
+
+PATCH {{ParishCoordination.Api_HostAddress}}/api/v1/parishes/{{ParishId}}
+Content-Type: application/json
+If-Match: "999"
+
+{
+  "status": "INACTIVE"
 }
 
 ###

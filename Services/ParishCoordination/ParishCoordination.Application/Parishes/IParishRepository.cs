@@ -4,6 +4,10 @@ namespace ParishCoordination.Application.Parishes;
 
 public interface IParishRepository
 {
+    Task<Parish?> GetByIdAsync(
+        Guid parishId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Parish>> GetAllAsync(
         CancellationToken cancellationToken = default);
 

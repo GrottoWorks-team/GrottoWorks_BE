@@ -8,6 +8,17 @@ namespace ParishCoordination.Infrastructure.Parishes;
 public sealed class ParishRepository(ParishCoordinationDbContext dbContext)
     : IParishRepository
 {
+    public async Task<Parish?> GetByIdAsync(
+        Guid parishId,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Parishes
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                parish => parish.Id == parishId,
+                cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Parish>> GetAllAsync(
         CancellationToken cancellationToken = default)
     {

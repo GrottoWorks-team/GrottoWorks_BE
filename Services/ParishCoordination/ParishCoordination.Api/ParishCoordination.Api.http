@@ -2,12 +2,17 @@
 @ParishId = 00000000-0000-0000-0000-000000000000
 @ParishVersion = 1
 
-GET {{ParishCoordination.Api_HostAddress}}/weatherforecast/
+GET {{ParishCoordination.Api_HostAddress}}/health/live
 Accept: application/json
 
 ###
 
-GET {{ParishCoordination.Api_HostAddress}}/api/v1/parishes
+GET {{ParishCoordination.Api_HostAddress}}/health/ready
+Accept: application/json
+
+###
+
+GET {{ParishCoordination.Api_HostAddress}}/api/v1/parishes?page=1&size=10&sort=name,asc
 Accept: application/json
 
 ###

@@ -16,7 +16,10 @@ public interface IParishRepository
         Guid parishId,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<Parish>> GetAllAsync(
+    Task<(IReadOnlyList<Parish> Items, long TotalItems)> GetPagedAsync(
+        int page,
+        int size,
+        bool sortDescending,
         CancellationToken cancellationToken = default);
 
     void Add(Parish parish);

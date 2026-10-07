@@ -1,7 +1,8 @@
+using BuildingBlocks.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using ParishCoordination.Api.Responses;
+using ParishCoordination.Application.Communities;
 using ParishCoordination.Application.Communities.Queries.GetCommunities;
 
 namespace ParishCoordination.Api.Endpoints;
@@ -13,13 +14,14 @@ public static class CommunityEndpoints
         app.MapGet("/api/v1/parishes/{parishId}/communities", GetCommunitiesAsync)
             .WithName("listCommunities")
             .WithTags("Parish")
-            .Produces<CommunityListResponse>(StatusCodes.Status200OK)
+            .Produces<ApiResponse<IReadOnlyList<CommunityDto>>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
     }
 
     private static async Task<IResult> GetCommunitiesAsync(
         Guid parishId,
+        HttpContext httpContext,
         GetCommunitiesQueryHandler queryHandler,
         CancellationToken cancellationToken)
     {
@@ -38,6 +40,6 @@ public static class CommunityEndpoints
                 });
         }
 
-        return Results.Ok(new CommunityListResponse(communities));
+        return Results.Ok(ApiResults.Ok(communities, httpContext));
     }
 }

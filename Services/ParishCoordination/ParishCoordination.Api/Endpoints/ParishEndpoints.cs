@@ -1,9 +1,11 @@
+using BuildingBlocks.Pagination;
+using BuildingBlocks.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using ParishCoordination.Api.Requests;
-using ParishCoordination.Api.Responses;
+using ParishCoordination.Application.Parishes;
 using ParishCoordination.Application.Parishes.Commands.CreateParish;
 using ParishCoordination.Application.Parishes.Commands.UpdateParish;
 using ParishCoordination.Application.Parishes.Queries.GetParish;
@@ -18,19 +20,20 @@ public static class ParishEndpoints
         app.MapGet("/api/v1/parishes", GetAllParishesAsync)
             .WithName("listParishes")
             .WithTags("Parish")
-            .Produces<ParishListResponse>(StatusCodes.Status200OK);
+            .Produces<PagedResponse<ParishDto>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest);
 
         app.MapGet("/api/v1/parishes/{parishId}", GetParishAsync)
             .WithName("getParish")
             .WithTags("Parish")
-            .Produces<ParishResponse>(StatusCodes.Status200OK)
+            .Produces<ApiResponse<ParishDto>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         app.MapPatch("/api/v1/parishes/{parishId}", UpdateParishAsync)
             .WithName("updateParish")
             .WithTags("Parish")
-            .Produces<ParishResponse>(StatusCodes.Status200OK)
+            .Produces<ApiResponse<ParishDto>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed)
@@ -39,19 +42,21 @@ public static class ParishEndpoints
         app.MapPost("/api/v1/parishes", CreateParishAsync)
             .WithName("createParish")
             .WithTags("Parish")
-            .Produces<ParishCreatedResponse>(StatusCodes.Status201Created)
+            .Produces<ApiResponse<ParishDto>>(StatusCodes.Status201Created)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
     }
 
     private static async Task<IResult> GetAllParishesAsync(
+        HttpContext httpContext,
         GetParishesQueryHandler queryHandler,
         CancellationToken cancellationToken)
     {
-        var query = new GetParishesQuery();
-        var parishes = await queryHandler.HandleAsync(query, cancellationToken);
-        var response = new ParishListResponse(parishes);
+        var pagination = PaginationRequest.FromQuery(httpContext.Request.Query, "name");
+        var query = new GetParishesQuery(pagination.Page, pagination.Size, pagination.Sort);
+        var result = await queryHandler.HandleAsync(query, cancellationToken);
 
-        return Results.Ok(response);
+        return Results.Ok(
+            ApiResults.Page(result.Items, result.TotalItems, pagination.Page, pagination.Size, httpContext));
     }
 
     private static async Task<IResult> GetParishAsync(
@@ -73,9 +78,8 @@ public static class ParishEndpoints
         }
 
         SetETag(httpContext, parish.Version);
-        var response = new ParishResponse(parish);
 
-        return Results.Ok(response);
+        return Results.Ok(ApiResults.Ok(parish, httpContext));
     }
 
     private static async Task<IResult> UpdateParishAsync(
@@ -128,7 +132,7 @@ public static class ParishEndpoints
         var parish = result.Parish!;
         SetETag(httpContext, parish.Version);
 
-        return Results.Ok(new ParishResponse(parish));
+        return Results.Ok(ApiResults.Ok(parish, httpContext));
     }
 
     private static async Task<IResult> CreateParishAsync(
@@ -144,9 +148,10 @@ public static class ParishEndpoints
 
         var parish = await commandHandler.HandleAsync(command, cancellationToken);
         SetETag(httpContext, parish.Version);
-        var response = new ParishCreatedResponse(parish);
 
-        return Results.Json(response, statusCode: StatusCodes.Status201Created);
+        return Results.Json(
+            ApiResults.Ok(parish, httpContext),
+            statusCode: StatusCodes.Status201Created);
     }
 
     private static string? CleanOptionalText(string? value)

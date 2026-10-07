@@ -30,14 +30,25 @@ public sealed class ParishRepository(ParishCoordinationDbContext dbContext)
                 cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Parish>> GetAllAsync(
+    public async Task<(IReadOnlyList<Parish> Items, long TotalItems)> GetPagedAsync(
+        int page,
+        int size,
+        bool sortDescending,
         CancellationToken cancellationToken = default)
     {
-        return await dbContext.Parishes
-            .AsNoTracking()
-            .OrderBy(parish => parish.Name)
-            .ThenBy(parish => parish.Id)
+        var parishes = dbContext.Parishes.AsNoTracking();
+
+        parishes = sortDescending
+            ? parishes.OrderByDescending(parish => parish.Name).ThenByDescending(parish => parish.Id)
+            : parishes.OrderBy(parish => parish.Name).ThenBy(parish => parish.Id);
+
+        var totalItems = await parishes.LongCountAsync(cancellationToken);
+        var items = await parishes
+            .Skip((page - 1) * size)
+            .Take(size)
             .ToListAsync(cancellationToken);
+
+        return (items, totalItems);
     }
 
     public async Task<Parish?> GetByIdForUpdateAsync(

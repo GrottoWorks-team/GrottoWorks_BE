@@ -2,14 +2,22 @@ namespace ParishCoordination.Application.Parishes.Queries.GetParishes;
 
 public sealed class GetParishesQueryHandler(IParishRepository parishRepository)
 {
-    public async Task<IReadOnlyList<ParishDto>> HandleAsync(
+    public async Task<GetParishesResult> HandleAsync(
         GetParishesQuery query,
         CancellationToken cancellationToken = default)
     {
-        var parishes = await parishRepository.GetAllAsync(cancellationToken);
+        var sortDescending = query.Sort?.EndsWith(",desc", StringComparison.OrdinalIgnoreCase) == true;
 
-        return parishes
+        var (parishes, totalItems) = await parishRepository.GetPagedAsync(
+            query.Page,
+            query.Size,
+            sortDescending,
+            cancellationToken);
+
+        var items = parishes
             .Select(ParishDto.From)
             .ToList();
+
+        return new GetParishesResult(items, totalItems);
     }
 }

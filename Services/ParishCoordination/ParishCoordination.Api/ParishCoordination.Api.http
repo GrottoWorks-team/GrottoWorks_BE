@@ -17,6 +17,11 @@ Accept: application/json
 
 ###
 
+GET {{ParishCoordination.Api_HostAddress}}/api/v1/parishes/{{ParishId}}/communities
+Accept: application/json
+
+###
+
 POST {{ParishCoordination.Api_HostAddress}}/api/v1/parishes
 Content-Type: application/json
 

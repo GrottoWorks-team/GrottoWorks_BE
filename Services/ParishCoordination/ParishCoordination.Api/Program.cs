@@ -44,6 +44,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.MapParishEndpoints();
+app.MapCommunityEndpoints();
 
 var summaries = new[]
 {

@@ -8,6 +8,17 @@ namespace ParishCoordination.Infrastructure.Repositories;
 public sealed class ParishRepository(ParishCoordinationDbContext dbContext)
     : IParishRepository
 {
+    public async Task<bool> ExistsAsync(
+        Guid parishId,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Parishes
+            .AsNoTracking()
+            .AnyAsync(
+                parish => parish.Id == parishId,
+                cancellationToken);
+    }
+
     public async Task<Parish?> GetByIdAsync(
         Guid parishId,
         CancellationToken cancellationToken = default)

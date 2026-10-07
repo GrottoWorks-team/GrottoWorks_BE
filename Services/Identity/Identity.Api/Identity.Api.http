@@ -1,0 +1,86 @@
+@Identity.Api_HostAddress = http://localhost:5180
+@accessToken = {{login.response.body.$.data.accessToken}}
+@refreshToken = {{login.response.body.$.data.refreshToken}}
+
+### F-IDN-01 — liveness probe
+GET {{Identity.Api_HostAddress}}/health/live
+Accept: application/json
+
+### F-IDN-01 — readiness probe (database)
+GET {{Identity.Api_HostAddress}}/health/ready
+Accept: application/json
+
+### F-IDN-02 — register a volunteer account
+# @name register
+POST {{Identity.Api_HostAddress}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "volunteer@grottoworks.local",
+  "password": "Volunteer123",
+  "displayName": "Nguyễn Văn Tình Nguyện",
+  "phone": "0900000001",
+  "parishId": "00000000-0000-0000-0000-000000000001"
+}
+
+### F-IDN-02 — login
+# @name login
+POST {{Identity.Api_HostAddress}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "volunteer@grottoworks.local",
+  "password": "Volunteer123"
+}
+
+### F-IDN-03 — rotate the token pair
+POST {{Identity.Api_HostAddress}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### F-IDN-05 — get my profile
+GET {{Identity.Api_HostAddress}}/api/v1/users/me
+Accept: application/json
+Authorization: Bearer {{accessToken}}
+
+### F-IDN-05 — update my profile
+PATCH {{Identity.Api_HostAddress}}/api/v1/users/me
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "displayName": "Nguyễn Văn Tình Nguyện",
+  "phone": "0900000001",
+  "introduction": "Mình có thể giúp lắp đèn và đi phát quà Giáng sinh.",
+  "communityId": "00000000-0000-0000-0000-000000000010"
+}
+
+### F-IDN-06 — list the skill catalog
+GET {{Identity.Api_HostAddress}}/api/v1/skills
+Accept: application/json
+Authorization: Bearer {{accessToken}}
+
+### F-IDN-06 — create a skill (ADMIN only)
+POST {{Identity.Api_HostAddress}}/api/v1/skills
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "code": "SOUND",
+  "name": "Âm thanh",
+  "description": "Vận hành loa, micro và bảng điều khiển âm thanh."
+}
+
+### F-IDN-03 — logout (revokes the token family)
+POST {{Identity.Api_HostAddress}}/api/v1/auth/logout
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+###

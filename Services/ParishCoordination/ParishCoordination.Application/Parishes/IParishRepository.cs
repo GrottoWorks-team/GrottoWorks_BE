@@ -8,6 +8,10 @@ public interface IParishRepository
         Guid parishId,
         CancellationToken cancellationToken = default);
 
+    Task<Parish?> GetByIdForUpdateAsync(
+        Guid parishId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Parish>> GetAllAsync(
         CancellationToken cancellationToken = default);
 

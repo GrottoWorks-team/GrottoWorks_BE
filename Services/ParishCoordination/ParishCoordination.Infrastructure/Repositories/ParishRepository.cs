@@ -29,6 +29,16 @@ public sealed class ParishRepository(ParishCoordinationDbContext dbContext)
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<Parish?> GetByIdForUpdateAsync(
+        Guid parishId,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Parishes
+            .SingleOrDefaultAsync(
+                parish => parish.Id == parishId,
+                cancellationToken);
+    }
+
     public void Add(Parish parish)
     {
         dbContext.Parishes.Add(parish);
@@ -36,6 +46,13 @@ public sealed class ParishRepository(ParishCoordinationDbContext dbContext)
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new ParishConcurrencyException(exception);
+        }
     }
 }

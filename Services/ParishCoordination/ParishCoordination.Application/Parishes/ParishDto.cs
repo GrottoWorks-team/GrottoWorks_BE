@@ -10,7 +10,8 @@ public sealed record ParishDto(
     string? Description,
     ParishStatus Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? UpdatedAt)
+    DateTimeOffset? UpdatedAt,
+    int Version)
 {
     public static ParishDto From(Parish parish)
     {
@@ -21,6 +22,7 @@ public sealed record ParishDto(
             parish.Description,
             parish.Status,
             parish.CreatedAt,
-            parish.UpdatedAt);
+            parish.UpdatedAt,
+            parish.Version);
     }
 }

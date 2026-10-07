@@ -44,5 +44,10 @@ public sealed class ParishConfiguration : IEntityTypeConfiguration<Parish>
         builder.Property(parish => parish.UpdatedAt)
             .HasColumnName("updated_at")
             .HasColumnType("timestamp with time zone");
+
+        builder.Property(parish => parish.Version)
+            .HasColumnName("version")
+            .HasDefaultValue(1)
+            .IsConcurrencyToken();
     }
 }

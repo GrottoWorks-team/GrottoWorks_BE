@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using ParishCoordination.Api.Responses;
-using ParishCoordination.Application.Parishes;
+using ParishCoordination.Application.Parishes.GetParishes;
 
 namespace ParishCoordination.Api.Endpoints;
 
@@ -17,10 +17,11 @@ public static class ParishEndpoints
     }
 
     private static async Task<IResult> GetAllParishesAsync(
-        IParishReadService parishReadService,
+        GetParishesQueryHandler queryHandler,
         CancellationToken cancellationToken)
     {
-        var parishes = await parishReadService.GetAllAsync(cancellationToken);
+        var query = new GetParishesQuery();
+        var parishes = await queryHandler.HandleAsync(query, cancellationToken);
         var response = new ParishListResponse(parishes);
 
         return Results.Ok(response);

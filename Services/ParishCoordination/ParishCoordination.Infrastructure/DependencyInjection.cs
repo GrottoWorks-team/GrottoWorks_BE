@@ -24,8 +24,7 @@ public static class DependencyInjection
         services.AddDbContext<ParishCoordinationDbContext>(options =>
             options.UseNpgsql(connectionString));
 
-        services.AddScoped<IParishReadService, ParishReadService>();
-        services.AddScoped<IParishWriteService, ParishWriteService>();
+        services.AddScoped<IParishRepository, ParishRepository>();
 
         return services;
     }

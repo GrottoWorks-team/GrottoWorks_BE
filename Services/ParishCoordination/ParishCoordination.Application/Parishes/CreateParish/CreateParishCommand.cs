@@ -1,4 +1,4 @@
-namespace ParishCoordination.Application.Parishes;
+namespace ParishCoordination.Application.Parishes.CreateParish;
 
 public sealed record CreateParishCommand(
     string Name,

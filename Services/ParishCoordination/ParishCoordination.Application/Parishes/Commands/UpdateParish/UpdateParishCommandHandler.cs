@@ -1,6 +1,10 @@
+using BuildingBlocks.Security;
+
 namespace ParishCoordination.Application.Parishes.Commands.UpdateParish;
 
-public sealed class UpdateParishCommandHandler(IParishRepository parishRepository)
+public sealed class UpdateParishCommandHandler(
+    IParishRepository parishRepository,
+    ICurrentUser currentUser)
 {
     public async Task<UpdateParishResult> HandleAsync(
         UpdateParishCommand command,
@@ -14,6 +18,8 @@ public sealed class UpdateParishCommandHandler(IParishRepository parishRepositor
         {
             return new UpdateParishResult(UpdateParishOutcome.NotFound, null);
         }
+
+        ParishAccess.EnsureSameParish(currentUser, parish.Id);
 
         if (command.ExpectedVersion.HasValue &&
             command.ExpectedVersion.Value != parish.Version)

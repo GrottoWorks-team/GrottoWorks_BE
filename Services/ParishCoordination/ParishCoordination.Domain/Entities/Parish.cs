@@ -42,6 +42,22 @@ public sealed class Parish
             createdAtUtc);
     }
 
+    public static Parish Create(
+        Guid id,
+        string name,
+        string? address,
+        string? description,
+        DateTimeOffset createdAtUtc)
+    {
+        return new Parish(
+            id,
+            name,
+            address,
+            description,
+            ParishStatus.Active,
+            createdAtUtc);
+    }
+
     public void Update(
         string name,
         string? address,

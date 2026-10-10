@@ -8,6 +8,25 @@ public sealed class Community
     {
     }
 
+    public static Community Create(
+        Guid id,
+        Guid parishId,
+        string name,
+        string? description,
+        DateTimeOffset createdAtUtc)
+    {
+        return new Community
+        {
+            Id = id,
+            ParishId = parishId,
+            Name = name,
+            Description = description,
+            Status = CommunityStatus.Active,
+            CreatedAt = createdAtUtc,
+            Version = 1
+        };
+    }
+
     public Guid Id { get; private set; }
 
     public Guid ParishId { get; private set; }

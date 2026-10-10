@@ -34,9 +34,15 @@ public sealed class ParishRepository(ParishCoordinationDbContext dbContext)
         int page,
         int size,
         bool sortDescending,
+        Guid? parishId = null,
         CancellationToken cancellationToken = default)
     {
         var parishes = dbContext.Parishes.AsNoTracking();
+
+        if (parishId.HasValue)
+        {
+            parishes = parishes.Where(parish => parish.Id == parishId.Value);
+        }
 
         parishes = sortDescending
             ? parishes.OrderByDescending(parish => parish.Name).ThenByDescending(parish => parish.Id)

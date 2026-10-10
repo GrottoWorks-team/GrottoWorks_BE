@@ -27,6 +27,7 @@ public static class DependencyInjection
 
         services.AddScoped<IParishRepository, ParishRepository>();
         services.AddScoped<ICommunityRepository, CommunityRepository>();
+        services.AddScoped<IParishCoordinationDataSeeder, ParishCoordinationDataSeeder>();
 
         return services;
     }

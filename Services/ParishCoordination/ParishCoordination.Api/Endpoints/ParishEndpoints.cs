@@ -1,5 +1,7 @@
 using BuildingBlocks.Pagination;
+using BuildingBlocks.Security;
 using BuildingBlocks.Web;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -20,12 +22,14 @@ public static class ParishEndpoints
         app.MapGet("/api/v1/parishes", GetAllParishesAsync)
             .WithName("listParishes")
             .WithTags("Parish")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish))
             .Produces<PagedResponse<ParishDto>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest);
 
         app.MapGet("/api/v1/parishes/{parishId}", GetParishAsync)
             .WithName("getParish")
             .WithTags("Parish")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish))
             .Produces<ApiResponse<ParishDto>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
@@ -33,6 +37,7 @@ public static class ParishEndpoints
         app.MapPatch("/api/v1/parishes/{parishId}", UpdateParishAsync)
             .WithName("updateParish")
             .WithTags("Parish")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish))
             .Produces<ApiResponse<ParishDto>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -42,6 +47,7 @@ public static class ParishEndpoints
         app.MapPost("/api/v1/parishes", CreateParishAsync)
             .WithName("createParish")
             .WithTags("Parish")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish))
             .Produces<ApiResponse<ParishDto>>(StatusCodes.Status201Created)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
     }
@@ -71,6 +77,7 @@ public static class ParishEndpoints
         if (parish is null)
         {
             return CreateProblem(
+                httpContext,
                 statusCode: StatusCodes.Status404NotFound,
                 title: "Parish not found",
                 detail: $"Parish with ID '{parishId}' was not found.",
@@ -93,6 +100,7 @@ public static class ParishEndpoints
         if (!TryParseExpectedVersion(ifMatch, out var expectedVersion))
         {
             return CreateProblem(
+                httpContext,
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Invalid If-Match header",
                 detail: "If-Match must contain a positive integer version.",
@@ -114,6 +122,7 @@ public static class ParishEndpoints
         if (result.Outcome == UpdateParishOutcome.NotFound)
         {
             return CreateProblem(
+                httpContext,
                 statusCode: StatusCodes.Status404NotFound,
                 title: "Parish not found",
                 detail: $"Parish with ID '{parishId}' was not found.",
@@ -123,6 +132,7 @@ public static class ParishEndpoints
         if (result.Outcome == UpdateParishOutcome.VersionMismatch)
         {
             return CreateProblem(
+                httpContext,
                 statusCode: StatusCodes.Status412PreconditionFailed,
                 title: "Parish version mismatch",
                 detail: "The parish was changed by another request. Load it again and retry.",
@@ -199,6 +209,7 @@ public static class ParishEndpoints
     }
 
     private static IResult CreateProblem(
+        HttpContext httpContext,
         int statusCode,
         string title,
         string detail,
@@ -210,7 +221,9 @@ public static class ParishEndpoints
             detail: detail,
             extensions: new Dictionary<string, object?>
             {
-                ["code"] = code
+                ["code"] = code,
+                ["correlationId"] = CorrelationIdMiddlewareExtensions.GetCorrelationId(httpContext),
+                ["traceId"] = httpContext.TraceIdentifier
             });
     }
 }

@@ -84,6 +84,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__ParishCoordinationDatabase=Host=postgres;Port=5432;Database=parish_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
+      - Jwt__SigningKey=${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY (>= 32 chars) in .env}
       - Database__MigrateOnStartup=true
       - MessageBroker__Host=amqp://rabbitmq:5672
       - MessageBroker__UserName=${RABBITMQ_DEFAULT_USER:-grottoworks}

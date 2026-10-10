@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="8.2.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\BuildingBlocks\BuildingBlocks.Security\BuildingBlocks.Security.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\BuildingBlocks.Web\BuildingBlocks.Web.csproj" />
+    <ProjectReference Include="..\..\Services\ParishCoordination\ParishCoordination.Api\ParishCoordination.Api.csproj" />
+    <ProjectReference Include="..\..\Services\ParishCoordination\ParishCoordination.Application\ParishCoordination.Application.csproj" />
+    <ProjectReference Include="..\..\Services\ParishCoordination\ParishCoordination.Domain\ParishCoordination.Domain.csproj" />
+    <ProjectReference Include="..\..\Services\ParishCoordination\ParishCoordination.Infrastructure\ParishCoordination.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

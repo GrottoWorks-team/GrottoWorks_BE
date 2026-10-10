@@ -20,6 +20,7 @@ public interface IParishRepository
         int page,
         int size,
         bool sortDescending,
+        Guid? parishId = null,
         CancellationToken cancellationToken = default);
 
     void Add(Parish parish);

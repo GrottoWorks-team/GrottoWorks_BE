@@ -1,3 +1,4 @@
+using BuildingBlocks.Security;
 using BuildingBlocks.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -14,6 +15,7 @@ public static class CommunityEndpoints
         app.MapGet("/api/v1/parishes/{parishId}/communities", GetCommunitiesAsync)
             .WithName("listCommunities")
             .WithTags("Parish")
+            .RequireAuthorization()
             .Produces<ApiResponse<IReadOnlyList<CommunityDto>>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
@@ -36,7 +38,9 @@ public static class CommunityEndpoints
                 detail: $"Parish with ID '{parishId}' was not found.",
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = "PARISH_NOT_FOUND"
+                    ["code"] = "PARISH_NOT_FOUND",
+                    ["correlationId"] = CorrelationIdMiddlewareExtensions.GetCorrelationId(httpContext),
+                    ["traceId"] = httpContext.TraceIdentifier
                 });
         }
 

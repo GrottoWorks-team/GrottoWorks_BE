@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using BuildingBlocks.Security;
 using BuildingBlocks.Web;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -12,8 +13,13 @@ using ParishCoordination.Infrastructure.Data;
 var builder = WebApplication.CreateBuilder(args);
 
 // OpenAPI + DataAnnotations validation for minimal API request DTOs (ParishCoordination pattern).
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
 builder.Services.AddValidation();
+builder.Services.AddGrottoWorksSecurity(builder.Configuration);
+builder.Services.AddGrottoWorksCurrentUser();
+builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationMiddlewareResultHandler,
+    ProblemDetailsAuthorizationMiddlewareResultHandler>();
 
 // Cross-cutting defaults (F-PLT-03): { data, meta } envelope plumbing, ProblemDetails with 422
 // field-validation status + correlationId, exception -> RFC 9457 with a stable code.
@@ -63,6 +69,8 @@ if (app.Environment.IsDevelopment())
 // Correlation id first, exception handler second so every error carries the id (F-PLT-03).
 app.UseGrottoWorksDefaults();
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapParishEndpoints();
 app.MapCommunityEndpoints();
@@ -78,12 +86,15 @@ if (app.Configuration.GetValue("Database:MigrateOnStartup", true))
         using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ParishCoordinationDbContext>();
         await dbContext.Database.MigrateAsync();
+        await scope.ServiceProvider
+            .GetRequiredService<IParishCoordinationDataSeeder>()
+            .SeedAsync();
     }
     catch (Exception exception)
     {
         app.Logger.LogError(
             exception,
-            "Database migration failed. The service stays up; /health/ready reports Unhealthy.");
+            "Database migration/seed failed. The service stays up; /health/ready reports Unhealthy.");
     }
 }
 

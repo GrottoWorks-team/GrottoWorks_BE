@@ -4,6 +4,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using ParishCoordination.Api.Endpoints;
@@ -11,6 +12,7 @@ using ParishCoordination.Application.Communities.Commands.CreateCommunity;
 using ParishCoordination.Application.Communities.Queries.GetCommunities;
 using ParishCoordination.Application.Parishes.Commands.CreateParish;
 using ParishCoordination.Application.Seasons.Queries.GetSeasons;
+using ParishCoordination.Application.Seasons.Commands.CreateSeason;
 using ParishCoordination.Application.Parishes.Commands.UpdateParish;
 using ParishCoordination.Application.Parishes.Queries.GetParish;
 using ParishCoordination.Application.Parishes.Queries.GetParishes;
@@ -35,6 +37,7 @@ public sealed class RouteAuthorizationTests
         builder.Services.AddScoped<GetCommunitiesQueryHandler>();
         builder.Services.AddScoped<CreateCommunityCommandHandler>();
         builder.Services.AddScoped<GetSeasonsQueryHandler>();
+        builder.Services.AddScoped<CreateSeasonCommandHandler>();
         builder.Services.AddScoped<IReadinessProbe, TestReadinessProbe>();
         using var app = builder.Build();
 
@@ -51,11 +54,14 @@ public sealed class RouteAuthorizationTests
         var communities = FindByName(app, "listCommunities");
         var createCommunity = FindByName(app, "createCommunity");
         var seasons = FindByName(app, "listSeasons");
+        var createSeason = FindByName(app, "createSeason");
         var live = FindByName(app, "livenessProbe");
 
         GetRoles(listParishes).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createParish).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createCommunity).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
+        GetRoles(createSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
+        createSeason.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Should().Contain(metadata => metadata.StatusCode == 201);
         (seasons.Metadata.GetMetadata<IAuthorizeData>() is not null ||
             seasons.Metadata.GetMetadata<AuthorizationPolicy>() is not null).Should().BeTrue();
         (communities.Metadata.GetMetadata<IAuthorizeData>() is not null ||

@@ -94,6 +94,37 @@ internal sealed class FakeSeasonRepository : ISeasonRepository
 {
     public List<Season> Items { get; } = [];
     public Guid? LastScopeId { get; private set; }
+    public bool ThrowNameConflictOnSave { get; set; }
+    public bool ThrowYearConflictOnSave { get; set; }
+
+    public Task<bool> ExistsByNameAsync(
+        Guid parishId,
+        string name,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(season => season.ParishId == parishId && season.Name == name));
+
+    public Task<bool> ExistsByYearAsync(
+        Guid parishId,
+        int seasonYear,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(season => season.ParishId == parishId && season.SeasonYear == seasonYear));
+
+    public void Add(Season season) => Items.Add(season);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        if (ThrowNameConflictOnSave)
+        {
+            throw new SeasonNameConflictException(new InvalidOperationException("simulated name conflict"));
+        }
+
+        if (ThrowYearConflictOnSave)
+        {
+            throw new SeasonYearConflictException(new InvalidOperationException("simulated year conflict"));
+        }
+
+        return Task.CompletedTask;
+    }
 
     public Task<(IReadOnlyList<Season> Items, long TotalItems)> GetPagedAsync(
         Guid? parishId,

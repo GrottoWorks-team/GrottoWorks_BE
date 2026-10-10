@@ -9,6 +9,30 @@ public sealed class Season
     }
 
     public static Season Create(
+        Guid parishId,
+        Guid createdByUserId,
+        string name,
+        int seasonYear,
+        DateOnly startDate,
+        DateOnly endDate,
+        string? description,
+        decimal? estimatedBudget,
+        DateTimeOffset createdAtUtc)
+    {
+        return Create(
+            Guid.NewGuid(),
+            parishId,
+            createdByUserId,
+            name,
+            seasonYear,
+            startDate,
+            endDate,
+            SeasonStatus.Draft,
+            description,
+            estimatedBudget,
+            createdAtUtc);
+    }
+    public static Season Create(
         Guid id,
         Guid parishId,
         Guid createdByUserId,

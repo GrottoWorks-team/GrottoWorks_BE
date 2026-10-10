@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using ParishCoordination.Application.Seasons;
 using ParishCoordination.Domain.Entities;
 using ParishCoordination.Infrastructure.Data;
@@ -8,6 +9,49 @@ namespace ParishCoordination.Infrastructure.Repositories;
 public sealed class SeasonRepository(ParishCoordinationDbContext dbContext)
     : ISeasonRepository
 {
+    public async Task<bool> ExistsByNameAsync(
+        Guid parishId,
+        string name,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Seasons
+            .AsNoTracking()
+            .AnyAsync(
+                season => season.ParishId == parishId && season.Name == name,
+                cancellationToken);
+    }
+
+    public async Task<bool> ExistsByYearAsync(
+        Guid parishId,
+        int seasonYear,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Seasons
+            .AsNoTracking()
+            .AnyAsync(
+                season => season.ParishId == parishId && season.SeasonYear == seasonYear,
+                cancellationToken);
+    }
+
+    public void Add(Season season)
+    {
+        dbContext.Seasons.Add(season);
+    }
+
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (TryGetUniqueConflict(exception, out var conflict))
+        {
+            throw conflict == SeasonConflict.Name
+                ? new SeasonNameConflictException(exception)
+                : new SeasonYearConflictException(exception);
+        }
+    }
+
     public async Task<(IReadOnlyList<Season> Items, long TotalItems)> GetPagedAsync(
         Guid? parishId,
         int page,
@@ -56,5 +100,38 @@ public sealed class SeasonRepository(ParishCoordinationDbContext dbContext)
             .ToListAsync(cancellationToken);
 
         return (items, totalItems);
+    }
+
+    private static bool TryGetUniqueConflict(
+        DbUpdateException exception,
+        out SeasonConflict conflict)
+    {
+        conflict = default;
+        if (exception.InnerException is not PostgresException postgresException ||
+            postgresException.SqlState != PostgresErrorCodes.UniqueViolation)
+        {
+            return false;
+        }
+
+        var constraint = postgresException.ConstraintName ?? string.Empty;
+        if (constraint.Contains("season_name", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = SeasonConflict.Name;
+            return true;
+        }
+
+        if (constraint.Contains("season_year", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = SeasonConflict.Year;
+            return true;
+        }
+
+        return false;
+    }
+
+    private enum SeasonConflict
+    {
+        Name,
+        Year
     }
 }

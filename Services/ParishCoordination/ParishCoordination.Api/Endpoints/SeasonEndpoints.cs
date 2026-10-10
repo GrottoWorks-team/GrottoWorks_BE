@@ -8,6 +8,7 @@ using ParishCoordination.Api.Requests;
 using ParishCoordination.Application.Seasons;
 using ParishCoordination.Application.Seasons.Commands.CreateSeason;
 using ParishCoordination.Application.Seasons.Queries.GetSeasons;
+using ParishCoordination.Application.Seasons.Queries.GetSeason;
 
 namespace ParishCoordination.Api.Endpoints;
 
@@ -24,6 +25,15 @@ public static class SeasonEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
+        app.MapGet("/api/v1/seasons/{seasonId}", GetSeasonAsync)
+            .WithName("getSeason")
+            .WithTags("Parish")
+            .RequireAuthorization()
+            .Produces<ApiResponse<SeasonDto>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
         app.MapPost("/api/v1/seasons", CreateSeasonAsync)
             .WithName("createSeason")
             .WithTags("Parish")
@@ -68,6 +78,28 @@ public static class SeasonEndpoints
                 httpContext));
     }
 
+    private static async Task<IResult> GetSeasonAsync(
+        Guid seasonId,
+        HttpContext httpContext,
+        GetSeasonQueryHandler queryHandler,
+        CancellationToken cancellationToken)
+    {
+        var season = await queryHandler.HandleAsync(
+            new GetSeasonQuery(seasonId),
+            cancellationToken);
+
+        if (season is null)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Season not found",
+                $"Season with ID '{seasonId}' was not found.",
+                "SEASON_NOT_FOUND");
+        }
+
+        return Results.Ok(ApiResults.Ok(season, httpContext));
+    }
     private static async Task<IResult> CreateSeasonAsync(
         CreateSeasonRequest request,
         HttpContext httpContext,

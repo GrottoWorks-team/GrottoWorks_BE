@@ -4,6 +4,9 @@ namespace ParishCoordination.Application.Seasons;
 
 public interface ISeasonRepository
 {
+    Task<Season?> GetByIdAsync(
+        Guid seasonId,
+        CancellationToken cancellationToken = default);
     Task<bool> ExistsByNameAsync(
         Guid parishId,
         string name,

@@ -97,6 +97,10 @@ internal sealed class FakeSeasonRepository : ISeasonRepository
     public bool ThrowNameConflictOnSave { get; set; }
     public bool ThrowYearConflictOnSave { get; set; }
 
+    public Task<Season?> GetByIdAsync(
+        Guid seasonId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.SingleOrDefault(season => season.Id == seasonId));
     public Task<bool> ExistsByNameAsync(
         Guid parishId,
         string name,

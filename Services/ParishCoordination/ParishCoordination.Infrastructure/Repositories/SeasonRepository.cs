@@ -9,6 +9,16 @@ namespace ParishCoordination.Infrastructure.Repositories;
 public sealed class SeasonRepository(ParishCoordinationDbContext dbContext)
     : ISeasonRepository
 {
+    public async Task<Season?> GetByIdAsync(
+        Guid seasonId,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Seasons
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                season => season.Id == seasonId,
+                cancellationToken);
+    }
     public async Task<bool> ExistsByNameAsync(
         Guid parishId,
         string name,

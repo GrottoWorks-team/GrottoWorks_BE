@@ -21,6 +21,7 @@ public static class DependencyInjection
         services.AddScoped<GetParishQueryHandler>();
         services.AddScoped<GetParishesQueryHandler>();
         services.AddScoped<GetSeasonsQueryHandler>();
+        services.AddScoped<GetSeasonQueryHandler>();
         services.AddScoped<CreateSeasonCommandHandler>();
 
         return services;

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using ParishCoordination.Application.Communities.Commands.CreateCommunity;
 using ParishCoordination.Application.Communities.Queries.GetCommunities;
 using ParishCoordination.Application.Parishes.Commands.CreateParish;
 using ParishCoordination.Application.Parishes.Commands.UpdateParish;
@@ -12,6 +13,7 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddScoped<GetCommunitiesQueryHandler>();
+        services.AddScoped<CreateCommunityCommandHandler>();
         services.AddScoped<CreateParishCommandHandler>();
         services.AddScoped<UpdateParishCommandHandler>();
         services.AddScoped<GetParishQueryHandler>();

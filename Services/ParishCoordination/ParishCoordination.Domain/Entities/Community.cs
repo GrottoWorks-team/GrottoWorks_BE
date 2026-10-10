@@ -9,6 +9,15 @@ public sealed class Community
     }
 
     public static Community Create(
+        Guid parishId,
+        string name,
+        string? description,
+        DateTimeOffset createdAtUtc)
+    {
+        return Create(Guid.NewGuid(), parishId, name, description, createdAtUtc);
+    }
+
+    public static Community Create(
         Guid id,
         Guid parishId,
         string name,

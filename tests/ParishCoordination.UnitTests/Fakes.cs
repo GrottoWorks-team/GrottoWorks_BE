@@ -48,7 +48,8 @@ internal sealed class FakeParishRepository : IParishRepository
             : query.OrderBy(parish => parish.Name).ThenBy(parish => parish.Id);
 
         var all = query.ToList();
-        return Task.FromResult<(IReadOnlyList<Parish>, long)>((all.Skip((page - 1) * size).Take(size).ToList(), all.Count));
+        return Task.FromResult<(IReadOnlyList<Parish>, long)>(
+            (all.Skip((page - 1) * size).Take(size).ToList(), all.Count));
     }
 
     public void Add(Parish parish) => Items.Add(parish);
@@ -73,4 +74,17 @@ internal sealed class FakeCommunityRepository : ICommunityRepository
         CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Community>>(
             Items.Where(community => community.ParishId == parishId).ToList());
+
+    public Task<bool> ExistsByNameAsync(
+        Guid parishId,
+        string name,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(community =>
+            community.ParishId == parishId &&
+            community.Name == name));
+
+    public void Add(Community community) => Items.Add(community);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
 }

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using ParishCoordination.Api.Endpoints;
+using ParishCoordination.Application.Communities.Commands.CreateCommunity;
 using ParishCoordination.Application.Communities.Queries.GetCommunities;
 using ParishCoordination.Application.Parishes.Commands.CreateParish;
 using ParishCoordination.Application.Parishes.Commands.UpdateParish;
@@ -31,6 +32,7 @@ public sealed class RouteAuthorizationTests
         builder.Services.AddScoped<UpdateParishCommandHandler>();
         builder.Services.AddScoped<CreateParishCommandHandler>();
         builder.Services.AddScoped<GetCommunitiesQueryHandler>();
+        builder.Services.AddScoped<CreateCommunityCommandHandler>();
         builder.Services.AddScoped<IReadinessProbe, TestReadinessProbe>();
         using var app = builder.Build();
 
@@ -44,10 +46,12 @@ public sealed class RouteAuthorizationTests
             .OfType<RouteEndpoint>()
             .Single(endpoint => endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == "createParish");
         var communities = FindByName(app, "listCommunities");
+        var createCommunity = FindByName(app, "createCommunity");
         var live = FindByName(app, "livenessProbe");
 
         GetRoles(listParishes).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createParish).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
+        GetRoles(createCommunity).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         (communities.Metadata.GetMetadata<IAuthorizeData>() is not null ||
             communities.Metadata.GetMetadata<AuthorizationPolicy>() is not null).Should().BeTrue();
         live.Metadata.GetMetadata<IAllowAnonymous>().Should().NotBeNull();

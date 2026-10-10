@@ -41,10 +41,16 @@ public sealed class SecurityAndContractTests
     public void Create_and_update_requests_validate_required_and_partial_fields()
     {
         var invalidCreate = new CreateParishRequest();
+        var invalidCommunity = new CreateCommunityRequest();
+        var tooLongCommunity = new CreateCommunityRequest { Name = new string('x', 151) };
+        var whitespaceCommunity = new CreateCommunityRequest { Name = "   " };
         var invalidUpdate = new UpdateParishRequest();
         var validUpdate = new UpdateParishRequest { Description = "updated" };
 
         Validate(invalidCreate).Should().Contain(result => result.MemberNames.Contains(nameof(CreateParishRequest.Name)));
+        Validate(invalidCommunity).Should().Contain(result => result.MemberNames.Contains(nameof(CreateCommunityRequest.Name)));
+        Validate(tooLongCommunity).Should().Contain(result => result.MemberNames.Contains(nameof(CreateCommunityRequest.Name)));
+        Validate(whitespaceCommunity).Should().Contain(result => result.MemberNames.Contains(nameof(CreateCommunityRequest.Name)));
         Validate(invalidUpdate).Should().Contain(result => result.ErrorMessage!.Contains("At least one field"));
         Validate(validUpdate).Should().BeEmpty();
     }

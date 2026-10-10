@@ -1,6 +1,7 @@
 using BuildingBlocks.Security;
 using ParishCoordination.Application.Communities;
 using ParishCoordination.Application.Parishes;
+using ParishCoordination.Application.Seasons;
 using ParishCoordination.Domain.Entities;
 
 namespace ParishCoordination.UnitTests;
@@ -87,4 +88,55 @@ internal sealed class FakeCommunityRepository : ICommunityRepository
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
+}
+
+internal sealed class FakeSeasonRepository : ISeasonRepository
+{
+    public List<Season> Items { get; } = [];
+    public Guid? LastScopeId { get; private set; }
+
+    public Task<(IReadOnlyList<Season> Items, long TotalItems)> GetPagedAsync(
+        Guid? parishId,
+        int page,
+        int size,
+        string? sort,
+        CancellationToken cancellationToken = default)
+    {
+        LastScopeId = parishId;
+        IEnumerable<Season> query = Items;
+
+        if (parishId.HasValue)
+        {
+            query = query.Where(season => season.ParishId == parishId.Value);
+        }
+
+        var sortParts = (sort ?? "seasonYear,desc").Split(',');
+        var field = sortParts[0];
+        var descending = sortParts.Length == 2 &&
+            string.Equals(sortParts[1], "desc", StringComparison.OrdinalIgnoreCase);
+
+        query = field switch
+        {
+            "name" => descending
+                ? query.OrderByDescending(season => season.Name).ThenByDescending(season => season.Id)
+                : query.OrderBy(season => season.Name).ThenBy(season => season.Id),
+            "seasonYear" => descending
+                ? query.OrderByDescending(season => season.SeasonYear).ThenByDescending(season => season.StartDate).ThenByDescending(season => season.Id)
+                : query.OrderBy(season => season.SeasonYear).ThenBy(season => season.StartDate).ThenBy(season => season.Id),
+            "startDate" => descending
+                ? query.OrderByDescending(season => season.StartDate).ThenByDescending(season => season.Id)
+                : query.OrderBy(season => season.StartDate).ThenBy(season => season.Id),
+            "endDate" => descending
+                ? query.OrderByDescending(season => season.EndDate).ThenByDescending(season => season.Id)
+                : query.OrderBy(season => season.EndDate).ThenBy(season => season.Id),
+            "status" => descending
+                ? query.OrderByDescending(season => season.Status).ThenByDescending(season => season.Id)
+                : query.OrderBy(season => season.Status).ThenBy(season => season.Id),
+            _ => query.OrderByDescending(season => season.SeasonYear).ThenByDescending(season => season.StartDate).ThenByDescending(season => season.Id)
+        };
+
+        var all = query.ToList();
+        return Task.FromResult<(IReadOnlyList<Season>, long)>(
+            (all.Skip((page - 1) * size).Take(size).ToList(), all.Count));
+    }
 }

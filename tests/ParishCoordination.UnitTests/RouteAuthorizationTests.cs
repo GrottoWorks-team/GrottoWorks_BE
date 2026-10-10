@@ -10,6 +10,7 @@ using ParishCoordination.Api.Endpoints;
 using ParishCoordination.Application.Communities.Commands.CreateCommunity;
 using ParishCoordination.Application.Communities.Queries.GetCommunities;
 using ParishCoordination.Application.Parishes.Commands.CreateParish;
+using ParishCoordination.Application.Seasons.Queries.GetSeasons;
 using ParishCoordination.Application.Parishes.Commands.UpdateParish;
 using ParishCoordination.Application.Parishes.Queries.GetParish;
 using ParishCoordination.Application.Parishes.Queries.GetParishes;
@@ -33,11 +34,13 @@ public sealed class RouteAuthorizationTests
         builder.Services.AddScoped<CreateParishCommandHandler>();
         builder.Services.AddScoped<GetCommunitiesQueryHandler>();
         builder.Services.AddScoped<CreateCommunityCommandHandler>();
+        builder.Services.AddScoped<GetSeasonsQueryHandler>();
         builder.Services.AddScoped<IReadinessProbe, TestReadinessProbe>();
         using var app = builder.Build();
 
         app.MapParishEndpoints();
         app.MapCommunityEndpoints();
+        app.MapSeasonEndpoints();
         app.MapGrottoWorksHealthEndpoints();
         await app.StartAsync();
 
@@ -47,11 +50,14 @@ public sealed class RouteAuthorizationTests
             .Single(endpoint => endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == "createParish");
         var communities = FindByName(app, "listCommunities");
         var createCommunity = FindByName(app, "createCommunity");
+        var seasons = FindByName(app, "listSeasons");
         var live = FindByName(app, "livenessProbe");
 
         GetRoles(listParishes).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createParish).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createCommunity).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
+        (seasons.Metadata.GetMetadata<IAuthorizeData>() is not null ||
+            seasons.Metadata.GetMetadata<AuthorizationPolicy>() is not null).Should().BeTrue();
         (communities.Metadata.GetMetadata<IAuthorizeData>() is not null ||
             communities.Metadata.GetMetadata<AuthorizationPolicy>() is not null).Should().BeTrue();
         live.Metadata.GetMetadata<IAllowAnonymous>().Should().NotBeNull();

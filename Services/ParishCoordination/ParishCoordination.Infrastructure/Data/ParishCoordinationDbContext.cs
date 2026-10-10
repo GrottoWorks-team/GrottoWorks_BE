@@ -10,6 +10,8 @@ public sealed class ParishCoordinationDbContext(DbContextOptions<ParishCoordinat
 
     public DbSet<Community> Communities => Set<Community>();
 
+    public DbSet<Season> Seasons => Set<Season>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ParishCoordinationDbContext).Assembly);

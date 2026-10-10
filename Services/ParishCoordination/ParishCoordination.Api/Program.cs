@@ -74,6 +74,7 @@ app.UseAuthorization();
 
 app.MapParishEndpoints();
 app.MapCommunityEndpoints();
+app.MapSeasonEndpoints();
 app.MapGrottoWorksHealthEndpoints();
 
 // Apply pending migrations at startup so `docker compose up` yields a ready service.

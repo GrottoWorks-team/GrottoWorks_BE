@@ -71,6 +71,10 @@ public sealed class SecurityAndContractTests
         parsed.Size.Should().Be(25);
         parsed.Sort.Should().Be("name,desc");
 
+        var invalidSort = new QueryCollection(new Dictionary<string, StringValues> { ["sort"] = "unknown,asc" });
+        FluentActions.Invoking(() => PaginationRequest.FromQuery(invalidSort, "name", "seasonYear", "startDate", "endDate", "status"))
+            .Should().Throw<DomainException>().Which.Code.Should().Be("INVALID_SORT_FIELD");
+
         var invalid = new QueryCollection(new Dictionary<string, StringValues> { ["size"] = "101" });
         FluentActions.Invoking(() => PaginationRequest.FromQuery(invalid, "name"))
             .Should().Throw<DomainException>().Which.Code.Should().Be("PAGE_SIZE_EXCEEDED");
@@ -87,6 +91,27 @@ public sealed class SecurityAndContractTests
         response.Data.Value.Should().Be(42);
         response.Meta.CorrelationId.Should().Be("corr-123");
         JsonSerializer.Serialize(response).Should().Contain("corr-123");
+    }
+
+    [Fact]
+    public void Page_response_preserves_page_metadata_and_correlation_id()
+    {
+        var context = new DefaultHttpContext();
+        context.Items[CorrelationIdMiddleware.ItemKey] = "corr-page";
+
+        var response = ApiResults.Page(
+            new[] { "season" },
+            totalItems: 3,
+            page: 2,
+            size: 1,
+            context);
+
+        response.Data.Should().ContainSingle().Which.Should().Be("season");
+        response.Page.Page.Should().Be(2);
+        response.Page.Size.Should().Be(1);
+        response.Page.TotalItems.Should().Be(3);
+        response.Page.TotalPages.Should().Be(3);
+        response.Meta.CorrelationId.Should().Be("corr-page");
     }
 
     private static List<ValidationResult> Validate(object instance)

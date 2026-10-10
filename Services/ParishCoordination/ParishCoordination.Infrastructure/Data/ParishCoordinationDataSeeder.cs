@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using ParishCoordination.Domain.Entities;
+using ParishCoordination.Domain.Enums;
 
 namespace ParishCoordination.Infrastructure.Data;
 
@@ -11,6 +12,7 @@ public sealed class ParishCoordinationDataSeeder(
     public static readonly Guid DemoParishId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     public static readonly Guid DemoCommunityNorthId = Guid.Parse("22222222-2222-2222-2222-222222222222");
     public static readonly Guid DemoCommunitySouthId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+    public static readonly Guid DemoSeasonId = Guid.Parse("44444444-4444-4444-4444-444444444444");
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
@@ -53,6 +55,25 @@ public sealed class ParishCoordinationDataSeeder(
                 DemoParishId,
                 "Demo Community South",
                 "Seed community for local development.",
+                DateTimeOffset.UtcNow));
+            changed = true;
+        }
+
+        if (await dbContext.Seasons.FindAsync(
+                new object[] { DemoSeasonId },
+                cancellationToken) is null)
+        {
+            dbContext.Seasons.Add(Season.Create(
+                DemoSeasonId,
+                DemoParishId,
+                Guid.Empty,
+                "GrottoWorks Demo Season 2026",
+                2026,
+                new DateOnly(2026, 10, 1),
+                new DateOnly(2027, 1, 15),
+                SeasonStatus.Draft,
+                "Seed season for local development.",
+                100000000m,
                 DateTimeOffset.UtcNow));
             changed = true;
         }

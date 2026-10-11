@@ -8,6 +8,14 @@ namespace ParishCoordination.Infrastructure.Repositories;
 public sealed class WorkAreaRepository(ParishCoordinationDbContext dbContext)
     : IWorkAreaRepository
 {
+    public void Add(WorkArea workArea)
+    {
+        dbContext.WorkAreas.Add(workArea);
+    }
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
+        dbContext.SaveChangesAsync(cancellationToken);
+
     public async Task<(IReadOnlyList<WorkArea> Items, long TotalItems)> GetPagedBySeasonIdAsync(
         Guid seasonId,
         int page,

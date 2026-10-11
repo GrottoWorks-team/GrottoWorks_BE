@@ -4,6 +4,10 @@ namespace ParishCoordination.Application.WorkAreas;
 
 public interface IWorkAreaRepository
 {
+    void Add(WorkArea workArea);
+
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
+
     Task<(IReadOnlyList<WorkArea> Items, long TotalItems)> GetPagedBySeasonIdAsync(
         Guid seasonId,
         int page,

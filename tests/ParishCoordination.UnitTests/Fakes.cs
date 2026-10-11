@@ -71,6 +71,11 @@ internal sealed class FakeCommunityRepository : ICommunityRepository
 {
     public List<Community> Items { get; } = [];
 
+    public Task<Community?> GetByIdAsync(
+        Guid communityId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.SingleOrDefault(community => community.Id == communityId));
+
     public Task<IReadOnlyList<Community>> GetByParishIdAsync(
         Guid parishId,
         CancellationToken cancellationToken = default) =>
@@ -180,6 +185,11 @@ internal sealed class FakeSeasonRepository : ISeasonRepository
 internal sealed class FakeWorkAreaRepository : IWorkAreaRepository
 {
     public List<WorkArea> Items { get; } = [];
+
+    public void Add(WorkArea workArea) => Items.Add(workArea);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
 
     public Task<WorkArea?> GetByIdAsync(
         Guid workAreaId,

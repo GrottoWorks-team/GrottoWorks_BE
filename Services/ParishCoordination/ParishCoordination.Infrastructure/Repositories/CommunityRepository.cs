@@ -9,6 +9,17 @@ namespace ParishCoordination.Infrastructure.Repositories;
 public sealed class CommunityRepository(ParishCoordinationDbContext dbContext)
     : ICommunityRepository
 {
+    public async Task<Community?> GetByIdAsync(
+        Guid communityId,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Communities
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                community => community.Id == communityId,
+                cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Community>> GetByParishIdAsync(
         Guid parishId,
         CancellationToken cancellationToken = default)

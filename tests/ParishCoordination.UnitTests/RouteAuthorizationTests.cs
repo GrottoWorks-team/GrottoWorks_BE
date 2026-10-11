@@ -16,6 +16,7 @@ using ParishCoordination.Application.Seasons.Queries.GetSeason;
 using ParishCoordination.Application.Seasons.Commands.CreateSeason;
 using ParishCoordination.Application.WorkAreas.Queries.GetWorkArea;
 using ParishCoordination.Application.WorkAreas.Queries.ListWorkAreas;
+using ParishCoordination.Application.WorkAreas.Commands.CreateWorkArea;
 using ParishCoordination.Application.Parishes.Commands.UpdateParish;
 using ParishCoordination.Application.Parishes.Queries.GetParish;
 using ParishCoordination.Application.Parishes.Queries.GetParishes;
@@ -44,6 +45,7 @@ public sealed class RouteAuthorizationTests
         builder.Services.AddScoped<CreateSeasonCommandHandler>();
         builder.Services.AddScoped<ListWorkAreasQueryHandler>();
         builder.Services.AddScoped<GetWorkAreaQueryHandler>();
+        builder.Services.AddScoped<CreateWorkAreaCommandHandler>();
         builder.Services.AddScoped<IReadinessProbe, TestReadinessProbe>();
         using var app = builder.Build();
 
@@ -64,13 +66,22 @@ public sealed class RouteAuthorizationTests
         var createSeason = FindByName(app, "createSeason");
         var listWorkAreas = FindByName(app, "listWorkAreas");
         var getWorkArea = FindByName(app, "getWorkArea");
+        var createWorkArea = FindByName(app, "createWorkArea");
         var live = FindByName(app, "livenessProbe");
 
         GetRoles(listParishes).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createParish).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createCommunity).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
+        GetRoles(createWorkArea).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         createSeason.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Should().Contain(metadata => metadata.StatusCode == 201);
+        createWorkArea.RoutePattern.RawText.Should().Be("/api/v1/seasons/{seasonId}/work-areas");
+        createWorkArea.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
+            .Should().Contain(metadata => metadata.StatusCode == 201);
+        createWorkArea.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
+            .Should().Contain(metadata => metadata.StatusCode == 409);
+        createWorkArea.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
+            .Should().Contain(metadata => metadata.StatusCode == 422);
         listWorkAreas.RoutePattern.RawText.Should().Be("/api/v1/seasons/{seasonId}/work-areas");
         getWorkArea.RoutePattern.RawText.Should().Be("/api/v1/work-areas/{workAreaId}");
         (listWorkAreas.Metadata.GetMetadata<IAuthorizeData>() is not null ||

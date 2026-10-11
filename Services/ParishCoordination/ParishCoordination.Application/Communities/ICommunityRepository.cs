@@ -4,6 +4,10 @@ namespace ParishCoordination.Application.Communities;
 
 public interface ICommunityRepository
 {
+    Task<Community?> GetByIdAsync(
+        Guid communityId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Community>> GetByParishIdAsync(
         Guid parishId,
         CancellationToken cancellationToken = default);

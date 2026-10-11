@@ -189,6 +189,74 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
                     b.ToTable("christmas_season", (string)null);
                 });
 
+            modelBuilder.Entity("ParishCoordination.Domain.Entities.WorkArea", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_id");
+
+                    b.Property<Guid?>("CommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("community_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateOnly?>("Deadline")
+                        .HasColumnType("date")
+                        .HasColumnName("deadline");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("work_area_description");
+
+                    b.Property<Guid?>("LeaderUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("leader_user_id");
+
+                    b.Property<Guid?>("MaterialOfficerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_officer_user_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("work_area_name");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<DateOnly?>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("start_date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("work_area_status");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("WorkAreaCategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_category_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CommunityId");
+
+                    b.HasIndex("SeasonId");
+
+                    b.ToTable("work_area", (string)null);
+                });
+
             modelBuilder.Entity("ParishCoordination.Domain.Entities.Community", b =>
                 {
                     b.HasOne("ParishCoordination.Domain.Entities.Parish", null)
@@ -203,6 +271,20 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
                     b.HasOne("ParishCoordination.Domain.Entities.Parish", null)
                         .WithMany()
                         .HasForeignKey("ParishId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ParishCoordination.Domain.Entities.WorkArea", b =>
+                {
+                    b.HasOne("ParishCoordination.Domain.Entities.Community", null)
+                        .WithMany()
+                        .HasForeignKey("CommunityId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ParishCoordination.Domain.Entities.Season", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

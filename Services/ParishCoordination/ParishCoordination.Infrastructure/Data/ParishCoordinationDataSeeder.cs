@@ -13,6 +13,7 @@ public sealed class ParishCoordinationDataSeeder(
     public static readonly Guid DemoCommunityNorthId = Guid.Parse("22222222-2222-2222-2222-222222222222");
     public static readonly Guid DemoCommunitySouthId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     public static readonly Guid DemoSeasonId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+    public static readonly Guid DemoWorkAreaId = Guid.Parse("66666666-6666-6666-6666-666666666666");
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
@@ -74,6 +75,26 @@ public sealed class ParishCoordinationDataSeeder(
                 SeasonStatus.Draft,
                 "Seed season for local development.",
                 100000000m,
+                DateTimeOffset.UtcNow));
+            changed = true;
+        }
+
+        if (await dbContext.WorkAreas.FindAsync(
+                new object[] { DemoWorkAreaId },
+                cancellationToken) is null)
+        {
+            dbContext.WorkAreas.Add(WorkArea.Create(
+                DemoWorkAreaId,
+                DemoSeasonId,
+                DemoCommunityNorthId,
+                null,
+                null,
+                null,
+                "Demo Work Area North",
+                "Seed work area for local development.",
+                new DateOnly(2026, 10, 1),
+                new DateOnly(2026, 12, 20),
+                WorkAreaStatus.Planned,
                 DateTimeOffset.UtcNow));
             changed = true;
         }

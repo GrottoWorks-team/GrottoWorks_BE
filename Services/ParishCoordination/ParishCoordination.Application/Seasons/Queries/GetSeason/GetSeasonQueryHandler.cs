@@ -1,4 +1,5 @@
 using BuildingBlocks.Security;
+using ParishCoordination.Application.Seasons;
 
 namespace ParishCoordination.Application.Seasons.Queries.GetSeason;
 

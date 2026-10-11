@@ -2,6 +2,7 @@ using BuildingBlocks.Security;
 using ParishCoordination.Application.Communities;
 using ParishCoordination.Application.Parishes;
 using ParishCoordination.Application.Seasons;
+using ParishCoordination.Application.WorkAreas;
 using ParishCoordination.Domain.Entities;
 
 namespace ParishCoordination.UnitTests;
@@ -172,6 +173,47 @@ internal sealed class FakeSeasonRepository : ISeasonRepository
 
         var all = query.ToList();
         return Task.FromResult<(IReadOnlyList<Season>, long)>(
+            (all.Skip((page - 1) * size).Take(size).ToList(), all.Count));
+    }
+}
+
+internal sealed class FakeWorkAreaRepository : IWorkAreaRepository
+{
+    public List<WorkArea> Items { get; } = [];
+
+    public Task<WorkArea?> GetByIdAsync(
+        Guid workAreaId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.SingleOrDefault(workArea => workArea.Id == workAreaId));
+
+    public Task<(IReadOnlyList<WorkArea> Items, long TotalItems)> GetPagedBySeasonIdAsync(
+        Guid seasonId,
+        int page,
+        int size,
+        string? sort,
+        CancellationToken cancellationToken = default)
+    {
+        IEnumerable<WorkArea> query = Items.Where(workArea => workArea.SeasonId == seasonId);
+        var sortParts = (sort ?? "workAreaName,asc").Split(',');
+        var field = sortParts[0];
+        var descending = sortParts.Length == 2 &&
+            string.Equals(sortParts[1], "desc", StringComparison.OrdinalIgnoreCase);
+
+        query = field switch
+        {
+            "status" => descending
+                ? query.OrderByDescending(workArea => workArea.Status).ThenByDescending(workArea => workArea.Id)
+                : query.OrderBy(workArea => workArea.Status).ThenBy(workArea => workArea.Id),
+            "id" => descending
+                ? query.OrderByDescending(workArea => workArea.Id)
+                : query.OrderBy(workArea => workArea.Id),
+            _ => descending
+                ? query.OrderByDescending(workArea => workArea.Name).ThenByDescending(workArea => workArea.Id)
+                : query.OrderBy(workArea => workArea.Name).ThenBy(workArea => workArea.Id)
+        };
+
+        var all = query.ToList();
+        return Task.FromResult<(IReadOnlyList<WorkArea>, long)>(
             (all.Skip((page - 1) * size).Take(size).ToList(), all.Count));
     }
 }

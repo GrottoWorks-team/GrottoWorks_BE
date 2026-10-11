@@ -3,6 +3,9 @@ using ParishCoordination.Application.Communities.Commands.CreateCommunity;
 using ParishCoordination.Application.Communities.Queries.GetCommunities;
 using ParishCoordination.Application.Parishes.Commands.CreateParish;
 using ParishCoordination.Application.Seasons.Queries.GetSeasons;
+using ParishCoordination.Application.Seasons.Queries.GetSeason;
+using ParishCoordination.Application.WorkAreas.Queries.GetWorkArea;
+using ParishCoordination.Application.WorkAreas.Queries.ListWorkAreas;
 using ParishCoordination.Application.Seasons.Commands.CreateSeason;
 using ParishCoordination.Application.Parishes.Commands.UpdateParish;
 using ParishCoordination.Application.Parishes.Queries.GetParish;
@@ -22,6 +25,8 @@ public static class DependencyInjection
         services.AddScoped<GetParishesQueryHandler>();
         services.AddScoped<GetSeasonsQueryHandler>();
         services.AddScoped<GetSeasonQueryHandler>();
+        services.AddScoped<ListWorkAreasQueryHandler>();
+        services.AddScoped<GetWorkAreaQueryHandler>();
         services.AddScoped<CreateSeasonCommandHandler>();
 
         return services;

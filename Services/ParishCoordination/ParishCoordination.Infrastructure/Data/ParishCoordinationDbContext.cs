@@ -12,6 +12,8 @@ public sealed class ParishCoordinationDbContext(DbContextOptions<ParishCoordinat
 
     public DbSet<Season> Seasons => Set<Season>();
 
+    public DbSet<WorkArea> WorkAreas => Set<WorkArea>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ParishCoordinationDbContext).Assembly);

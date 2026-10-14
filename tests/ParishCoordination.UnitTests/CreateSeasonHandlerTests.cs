@@ -28,7 +28,7 @@ public sealed class CreateSeasonHandlerTests
         result.Outcome.Should().Be(CreateSeasonOutcome.Success);
         result.Season.Should().NotBeNull();
         result.Season!.Name.Should().Be("Christmas");
-        result.Season.Status.Should().Be(SeasonStatus.Draft);
+        result.Season.Status.Should().Be(SeasonStatus.Planning);
         result.Season.ParishId.Should().Be(ParishNorth);
         result.Season.Id.Should().NotBeEmpty();
         seasonRepository.Items.Should().ContainSingle();

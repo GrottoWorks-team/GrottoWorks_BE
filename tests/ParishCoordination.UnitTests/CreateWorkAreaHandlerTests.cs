@@ -205,7 +205,7 @@ public sealed class CreateWorkAreaHandlerTests
             startDate ?? new DateOnly(2026, 10, 1),
             deadline ?? new DateOnly(2026, 12, 1));
 
-    private static FakeSeasonRepository Seasons(SeasonStatus status = SeasonStatus.Draft)
+    private static FakeSeasonRepository Seasons(SeasonStatus status = SeasonStatus.Planning)
     {
         var repository = new FakeSeasonRepository();
         repository.Items.Add(Season.Create(

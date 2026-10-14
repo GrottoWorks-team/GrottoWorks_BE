@@ -27,7 +27,7 @@ public sealed class Season
             seasonYear,
             startDate,
             endDate,
-            SeasonStatus.Draft,
+            SeasonStatus.Planning,
             description,
             estimatedBudget,
             createdAtUtc);

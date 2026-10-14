@@ -182,7 +182,7 @@ public sealed class SeasonHandlerTests
             2026,
             new DateOnly(2026, 10, 1),
             new DateOnly(2027, 1, 15),
-            SeasonStatus.Draft,
+            SeasonStatus.Planning,
             null,
             200m,
             DateTimeOffset.UtcNow));

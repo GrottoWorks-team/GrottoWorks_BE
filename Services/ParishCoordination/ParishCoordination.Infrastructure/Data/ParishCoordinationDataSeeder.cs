@@ -72,7 +72,7 @@ public sealed class ParishCoordinationDataSeeder(
                 2026,
                 new DateOnly(2026, 10, 1),
                 new DateOnly(2027, 1, 15),
-                SeasonStatus.Draft,
+                SeasonStatus.Planning,
                 "Seed season for local development.",
                 100000000m,
                 DateTimeOffset.UtcNow));

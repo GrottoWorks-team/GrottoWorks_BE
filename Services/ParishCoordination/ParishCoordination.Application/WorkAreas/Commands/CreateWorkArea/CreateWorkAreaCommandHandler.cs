@@ -29,7 +29,7 @@ public sealed class CreateWorkAreaCommandHandler(
 
         ParishAccess.EnsureSameParish(currentUser, season.ParishId);
 
-        if (season.Status is not SeasonStatus.Draft and not SeasonStatus.Planning)
+        if (season.Status is not SeasonStatus.Planning)
         {
             return CreateWorkAreaResult.SeasonInvalidState();
         }

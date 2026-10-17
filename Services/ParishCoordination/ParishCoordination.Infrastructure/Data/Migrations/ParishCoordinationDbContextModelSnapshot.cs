@@ -257,6 +257,43 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
                     b.ToTable("work_area", (string)null);
                 });
 
+            modelBuilder.Entity("ParishCoordination.Domain.Entities.WorkAreaCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_category_id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("category_code");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("category_description");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("category_name");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("category_status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("work_area_category", (string)null);
+                });
+
             modelBuilder.Entity("ParishCoordination.Domain.Entities.Community", b =>
                 {
                     b.HasOne("ParishCoordination.Domain.Entities.Parish", null)

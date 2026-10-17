@@ -3,7 +3,9 @@ using ParishCoordination.Application.Communities;
 using ParishCoordination.Application.Parishes;
 using ParishCoordination.Application.Seasons;
 using ParishCoordination.Application.WorkAreas;
+using ParishCoordination.Application.WorkAreaCategories;
 using ParishCoordination.Domain.Entities;
+using ParishCoordination.Domain.Enums;
 
 namespace ParishCoordination.UnitTests;
 
@@ -246,5 +248,28 @@ internal sealed class FakeWorkAreaRepository : IWorkAreaRepository
         var all = query.ToList();
         return Task.FromResult<(IReadOnlyList<WorkArea>, long)>(
             (all.Skip((page - 1) * size).Take(size).ToList(), all.Count));
+    }
+}
+
+internal sealed class FakeWorkAreaCategoryRepository : IWorkAreaCategoryRepository
+{
+    public List<WorkAreaCategory> Items { get; } = [];
+
+    public Task<IReadOnlyList<WorkAreaCategory>> GetAllAsync(
+        WorkAreaCategoryStatus? status,
+        CancellationToken cancellationToken = default)
+    {
+        IEnumerable<WorkAreaCategory> query = Items;
+
+        if (status.HasValue)
+        {
+            query = query.Where(category => category.Status == status.Value);
+        }
+
+        return Task.FromResult<IReadOnlyList<WorkAreaCategory>>(
+            query
+                .OrderBy(category => category.Name)
+                .ThenBy(category => category.Id)
+                .ToList());
     }
 }

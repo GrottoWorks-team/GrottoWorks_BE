@@ -8,6 +8,10 @@ public interface ICommunityRepository
         Guid communityId,
         CancellationToken cancellationToken = default);
 
+    Task<Community?> GetByIdForUpdateAsync(
+        Guid communityId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Community>> GetByParishIdAsync(
         Guid parishId,
         CancellationToken cancellationToken = default);

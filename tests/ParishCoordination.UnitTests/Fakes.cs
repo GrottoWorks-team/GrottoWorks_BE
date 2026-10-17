@@ -70,8 +70,15 @@ internal sealed class FakeParishRepository : IParishRepository
 internal sealed class FakeCommunityRepository : ICommunityRepository
 {
     public List<Community> Items { get; } = [];
+    public bool ThrowConcurrencyOnSave { get; set; }
+    public bool ThrowNameConflictOnSave { get; set; }
 
     public Task<Community?> GetByIdAsync(
+        Guid communityId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.SingleOrDefault(community => community.Id == communityId));
+
+    public Task<Community?> GetByIdForUpdateAsync(
         Guid communityId,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.SingleOrDefault(community => community.Id == communityId));
@@ -92,8 +99,22 @@ internal sealed class FakeCommunityRepository : ICommunityRepository
 
     public void Add(Community community) => Items.Add(community);
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
-        Task.CompletedTask;
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        if (ThrowConcurrencyOnSave)
+        {
+            throw new CommunityConcurrencyException(
+                new InvalidOperationException("simulated concurrency"));
+        }
+
+        if (ThrowNameConflictOnSave)
+        {
+            throw new CommunityNameConflictException(
+                new InvalidOperationException("simulated name conflict"));
+        }
+
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class FakeSeasonRepository : ISeasonRepository

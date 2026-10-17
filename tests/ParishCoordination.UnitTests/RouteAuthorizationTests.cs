@@ -4,11 +4,13 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using ParishCoordination.Api.Endpoints;
 using ParishCoordination.Application.Communities.Commands.CreateCommunity;
+using ParishCoordination.Application.Communities.Commands.UpdateCommunity;
 using ParishCoordination.Application.Communities.Queries.GetCommunities;
 using ParishCoordination.Application.Parishes.Commands.CreateParish;
 using ParishCoordination.Application.Seasons.Queries.GetSeasons;
@@ -40,6 +42,7 @@ public sealed class RouteAuthorizationTests
         builder.Services.AddScoped<CreateParishCommandHandler>();
         builder.Services.AddScoped<GetCommunitiesQueryHandler>();
         builder.Services.AddScoped<CreateCommunityCommandHandler>();
+        builder.Services.AddScoped<UpdateCommunityCommandHandler>();
         builder.Services.AddScoped<GetSeasonsQueryHandler>();
         builder.Services.AddScoped<GetSeasonQueryHandler>();
         builder.Services.AddScoped<CreateSeasonCommandHandler>();
@@ -52,6 +55,7 @@ public sealed class RouteAuthorizationTests
         app.MapParishEndpoints();
         app.MapCommunityEndpoints();
         app.MapSeasonEndpoints();
+        app.MapWorkAreaEndpoints();
         app.MapGrottoWorksHealthEndpoints();
         await app.StartAsync();
 
@@ -61,6 +65,7 @@ public sealed class RouteAuthorizationTests
             .Single(endpoint => endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == "createParish");
         var communities = FindByName(app, "listCommunities");
         var createCommunity = FindByName(app, "createCommunity");
+        var updateCommunity = FindByName(app, "updateCommunity");
         var seasons = FindByName(app, "listSeasons");
         var getSeason = FindByName(app, "getSeason");
         var createSeason = FindByName(app, "createSeason");
@@ -72,6 +77,7 @@ public sealed class RouteAuthorizationTests
         GetRoles(listParishes).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createParish).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createCommunity).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
+        GetRoles(updateCommunity).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createWorkArea).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         createSeason.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Should().Contain(metadata => metadata.StatusCode == 201);
@@ -101,6 +107,19 @@ public sealed class RouteAuthorizationTests
             seasons.Metadata.GetMetadata<AuthorizationPolicy>() is not null).Should().BeTrue();
         (communities.Metadata.GetMetadata<IAuthorizeData>() is not null ||
             communities.Metadata.GetMetadata<AuthorizationPolicy>() is not null).Should().BeTrue();
+        updateCommunity.RoutePattern.RawText.Should().Be("/api/v1/communities/{communityId}");
+        var updateCommunityStatusCodes = updateCommunity.Metadata
+            .GetOrderedMetadata<IProducesResponseTypeMetadata>()
+            .Select(metadata => metadata.StatusCode)
+            .ToArray();
+        updateCommunityStatusCodes.Should().Contain(StatusCodes.Status200OK);
+        updateCommunityStatusCodes.Should().Contain(StatusCodes.Status400BadRequest);
+        updateCommunityStatusCodes.Should().Contain(StatusCodes.Status401Unauthorized);
+        updateCommunityStatusCodes.Should().Contain(StatusCodes.Status403Forbidden);
+        updateCommunityStatusCodes.Should().Contain(StatusCodes.Status404NotFound);
+        updateCommunityStatusCodes.Should().Contain(StatusCodes.Status409Conflict);
+        updateCommunityStatusCodes.Should().Contain(StatusCodes.Status412PreconditionFailed);
+        updateCommunityStatusCodes.Should().Contain(StatusCodes.Status422UnprocessableEntity);
         live.Metadata.GetMetadata<IAllowAnonymous>().Should().NotBeNull();
     }
 

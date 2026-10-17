@@ -43,6 +43,16 @@ public sealed class WorkAreaCategory
         return code.Trim().ToUpperInvariant();
     }
 
+    public void Update(
+        string name,
+        string? description,
+        WorkAreaCategoryStatus status)
+    {
+        Name = name;
+        Description = description;
+        Status = status;
+    }
+
     public Guid Id { get; private set; }
 
     public string Code { get; private set; } = string.Empty;

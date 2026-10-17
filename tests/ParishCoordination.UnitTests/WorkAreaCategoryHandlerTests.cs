@@ -3,6 +3,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using ParishCoordination.Application.WorkAreaCategories;
 using ParishCoordination.Application.WorkAreaCategories.Commands.CreateWorkAreaCategory;
+using ParishCoordination.Application.WorkAreaCategories.Commands.UpdateWorkAreaCategory;
 using ParishCoordination.Application.WorkAreaCategories.Queries.ListWorkAreaCategories;
 using ParishCoordination.Domain.Entities;
 using ParishCoordination.Domain.Enums;
@@ -130,6 +131,129 @@ public sealed class WorkAreaCategoryHandlerTests
     }
 
     [Fact]
+    public async Task Update_changes_fields_and_keeps_code_immutable()
+    {
+        var repository = CategoryRepository();
+        var handler = new UpdateWorkAreaCategoryCommandHandler(repository);
+
+        var result = await handler.HandleAsync(
+            new UpdateWorkAreaCategoryCommand(
+                AlphaCategoryId,
+                "  Updated decoration  ",
+                true,
+                "Updated description",
+                WorkAreaCategoryStatus.Inactive));
+
+        result.Outcome.Should().Be(UpdateWorkAreaCategoryOutcome.Success);
+        result.Category!.Code.Should().Be("DECORATION");
+        result.Category.Name.Should().Be("Updated decoration");
+        result.Category.Description.Should().Be("Updated description");
+        result.Category.Status.Should().Be(WorkAreaCategoryStatus.Inactive);
+        repository.SaveChangesCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Update_preserves_fields_that_were_not_provided()
+    {
+        var repository = CategoryRepository();
+        var handler = new UpdateWorkAreaCategoryCommandHandler(repository);
+
+        var result = await handler.HandleAsync(
+            new UpdateWorkAreaCategoryCommand(
+                AlphaCategoryId,
+                "New name",
+                false,
+                null,
+                null));
+
+        result.Category!.Name.Should().Be("New name");
+        result.Category.Description.Should().Be("Original description");
+        result.Category.Status.Should().Be(WorkAreaCategoryStatus.Active);
+    }
+
+    [Fact]
+    public async Task Update_can_clear_description()
+    {
+        var repository = CategoryRepository();
+        var handler = new UpdateWorkAreaCategoryCommandHandler(repository);
+
+        var result = await handler.HandleAsync(
+            new UpdateWorkAreaCategoryCommand(
+                AlphaCategoryId,
+                null,
+                true,
+                null,
+                null));
+
+        result.Category!.Description.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Update_can_deactivate_and_reactivate_category()
+    {
+        var repository = CategoryRepository();
+        var handler = new UpdateWorkAreaCategoryCommandHandler(repository);
+
+        var inactive = await handler.HandleAsync(
+            new UpdateWorkAreaCategoryCommand(
+                AlphaCategoryId,
+                null,
+                false,
+                null,
+                WorkAreaCategoryStatus.Inactive));
+        var active = await handler.HandleAsync(
+            new UpdateWorkAreaCategoryCommand(
+                AlphaCategoryId,
+                null,
+                false,
+                null,
+                WorkAreaCategoryStatus.Active));
+
+        inactive.Category!.Status.Should().Be(WorkAreaCategoryStatus.Inactive);
+        active.Category!.Status.Should().Be(WorkAreaCategoryStatus.Active);
+        repository.SaveChangesCount.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Update_returns_not_found_for_unknown_category()
+    {
+        var handler = new UpdateWorkAreaCategoryCommandHandler(
+            new FakeWorkAreaCategoryRepository());
+
+        var result = await handler.HandleAsync(
+            new UpdateWorkAreaCategoryCommand(
+                Guid.NewGuid(),
+                "New name",
+                false,
+                null,
+                null));
+
+        result.Outcome.Should().Be(UpdateWorkAreaCategoryOutcome.NotFound);
+        result.Category.Should().BeNull();
+    }
+
+    [Fact]
+    public void Update_request_rejects_empty_and_invalid_name()
+    {
+        var emptyRequest = Validate(new UpdateWorkAreaCategoryRequest());
+        var whitespaceName = Validate(new UpdateWorkAreaCategoryRequest
+        {
+            Name = "   "
+        });
+        var longName = Validate(new UpdateWorkAreaCategoryRequest
+        {
+            Name = new string('n', 101)
+        });
+
+        emptyRequest.Should().Contain(result =>
+            result.ErrorMessage!.Contains("At least one field"));
+        whitespaceName.Should().Contain(result =>
+            result.MemberNames.Contains(nameof(UpdateWorkAreaCategoryRequest.Name)));
+        longName.Should().Contain(result =>
+            result.MemberNames.Contains(nameof(UpdateWorkAreaCategoryRequest.Name)));
+    }
+
+    [Fact]
     public async Task No_status_filter_returns_all_categories_in_stable_name_order()
     {
         await using var context = CreateDbContext();
@@ -242,6 +366,18 @@ public sealed class WorkAreaCategoryHandlerTests
             .Options;
 
         return new ParishCoordinationDbContext(options);
+    }
+
+    private static FakeWorkAreaCategoryRepository CategoryRepository()
+    {
+        var repository = new FakeWorkAreaCategoryRepository();
+        repository.Items.Add(WorkAreaCategory.Create(
+            AlphaCategoryId,
+            "DECORATION",
+            "Decoration",
+            "Original description",
+            WorkAreaCategoryStatus.Active));
+        return repository;
     }
 
     private static List<ValidationResult> Validate(object instance)

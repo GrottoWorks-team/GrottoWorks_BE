@@ -283,6 +283,14 @@ internal sealed class FakeWorkAreaCategoryRepository : IWorkAreaCategoryReposito
             category.Code == normalizedCode));
     }
 
+    public Task<WorkAreaCategory?> GetByIdForUpdateAsync(
+        Guid categoryId,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Items.SingleOrDefault(category =>
+            category.Id == categoryId));
+    }
+
     public void Add(WorkAreaCategory category)
     {
         Items.Add(category);

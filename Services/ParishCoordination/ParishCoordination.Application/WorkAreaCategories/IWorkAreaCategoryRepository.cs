@@ -13,6 +13,10 @@ public interface IWorkAreaCategoryRepository
         string normalizedCode,
         CancellationToken cancellationToken = default);
 
+    Task<WorkAreaCategory?> GetByIdForUpdateAsync(
+        Guid categoryId,
+        CancellationToken cancellationToken = default);
+
     void Add(WorkAreaCategory category);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);

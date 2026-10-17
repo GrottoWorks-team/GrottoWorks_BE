@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using ParishCoordination.Api.Requests;
+using ParishCoordination.Application.WorkAreas.Commands.AssignWorkAreaCommunity;
 using ParishCoordination.Application.WorkAreas.Commands.CreateWorkArea;
 using ParishCoordination.Application.WorkAreas.Commands.UpdateWorkArea;
 using ParishCoordination.Application.WorkAreas;
@@ -60,6 +61,22 @@ public static class WorkAreaEndpoints
                 GrottoWorksRoles.Parish,
                 GrottoWorksRoles.Leader))
             .Accepts<UpdateWorkAreaRequest>("application/json")
+            .Produces<ApiResponse<WorkAreaDto>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        app.MapPut("/api/v1/work-areas/{workAreaId}/community", AssignWorkAreaCommunityAsync)
+            .WithName("assignWorkAreaCommunity")
+            .WithTags("Parish")
+            .RequireAuthorization(policy => policy.RequireRole(
+                GrottoWorksRoles.Admin,
+                GrottoWorksRoles.Parish))
+            .Accepts<AssignWorkAreaCommunityRequest>("application/json")
             .Produces<ApiResponse<WorkAreaDto>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
@@ -271,6 +288,97 @@ public static class WorkAreaEndpoints
         }
 
         if (result.Outcome == UpdateWorkAreaOutcome.VersionMismatch)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status412PreconditionFailed,
+                "Work area version mismatch",
+                "The work area was changed by another request. Load it again and retry.",
+                "WORK_AREA_VERSION_MISMATCH");
+        }
+
+        var workArea = result.WorkArea!;
+        SetETag(httpContext, workArea.Version);
+
+        return Results.Ok(ApiResults.Ok(workArea, httpContext));
+    }
+
+    private static async Task<IResult> AssignWorkAreaCommunityAsync(
+        Guid workAreaId,
+        AssignWorkAreaCommunityRequest request,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
+        HttpContext httpContext,
+        AssignWorkAreaCommunityCommandHandler commandHandler,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseExpectedVersion(ifMatch, out var expectedVersion))
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status400BadRequest,
+                "Invalid If-Match header",
+                "If-Match must contain a positive integer version.",
+                "INVALID_IF_MATCH");
+        }
+
+        var result = await commandHandler.HandleAsync(
+            new AssignWorkAreaCommunityCommand(
+                workAreaId,
+                request.CommunityId!.Value,
+                expectedVersion),
+            cancellationToken);
+
+        if (result.Outcome == AssignWorkAreaCommunityOutcome.WorkAreaNotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Work area not found",
+                $"Work area with ID '{workAreaId}' was not found.",
+                "WORK_AREA_NOT_FOUND");
+        }
+
+        if (result.Outcome == AssignWorkAreaCommunityOutcome.SeasonNotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Season not found",
+                "The season that owns this work area was not found.",
+                "SEASON_NOT_FOUND");
+        }
+
+        if (result.Outcome == AssignWorkAreaCommunityOutcome.SeasonInvalidState)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "Season cannot be changed",
+                "Work areas in an archived season are read-only.",
+                "SEASON_INVALID_STATE");
+        }
+
+        if (result.Outcome == AssignWorkAreaCommunityOutcome.CommunityNotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Community not found",
+                $"Community with ID '{request.CommunityId}' was not found.",
+                "COMMUNITY_NOT_FOUND");
+        }
+
+        if (result.Outcome == AssignWorkAreaCommunityOutcome.CommunityInactive)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "Community is inactive",
+                "An inactive community cannot be assigned to a work area.",
+                "COMMUNITY_INACTIVE");
+        }
+
+        if (result.Outcome == AssignWorkAreaCommunityOutcome.VersionMismatch)
         {
             return CreateProblem(
                 httpContext,

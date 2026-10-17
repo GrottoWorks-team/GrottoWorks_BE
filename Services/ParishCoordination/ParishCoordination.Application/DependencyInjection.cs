@@ -8,6 +8,7 @@ using ParishCoordination.Application.Seasons.Queries.GetSeason;
 using ParishCoordination.Application.WorkAreas.Queries.GetWorkArea;
 using ParishCoordination.Application.WorkAreas.Queries.ListWorkAreas;
 using ParishCoordination.Application.WorkAreas.Commands.CreateWorkArea;
+using ParishCoordination.Application.WorkAreas.Commands.AssignWorkAreaCommunity;
 using ParishCoordination.Application.WorkAreas.Commands.UpdateWorkArea;
 using ParishCoordination.Application.WorkAreaCategories.Queries.ListWorkAreaCategories;
 using ParishCoordination.Application.WorkAreaCategories.Commands.CreateWorkAreaCategory;
@@ -36,6 +37,7 @@ public static class DependencyInjection
         services.AddScoped<ListWorkAreasQueryHandler>();
         services.AddScoped<GetWorkAreaQueryHandler>();
         services.AddScoped<CreateWorkAreaCommandHandler>();
+        services.AddScoped<AssignWorkAreaCommunityCommandHandler>();
         services.AddScoped<UpdateWorkAreaCommandHandler>();
         services.AddScoped<CreateSeasonCommandHandler>();
         services.AddScoped<UpdateSeasonCommandHandler>();

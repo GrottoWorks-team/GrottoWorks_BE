@@ -87,6 +87,21 @@ public sealed class WorkArea
         Version++;
     }
 
+    public bool AssignCommunity(
+        Guid communityId,
+        DateTimeOffset updatedAtUtc)
+    {
+        if (CommunityId == communityId)
+        {
+            return false;
+        }
+
+        CommunityId = communityId;
+        UpdatedAt = updatedAtUtc;
+        Version++;
+        return true;
+    }
+
     public Guid Id { get; private set; }
 
     public Guid SeasonId { get; private set; }

@@ -3,9 +3,11 @@ using BuildingBlocks.Security;
 using BuildingBlocks.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using ParishCoordination.Api.Requests;
 using ParishCoordination.Application.WorkAreas.Commands.CreateWorkArea;
+using ParishCoordination.Application.WorkAreas.Commands.UpdateWorkArea;
 using ParishCoordination.Application.WorkAreas;
 using ParishCoordination.Application.WorkAreas.Queries.GetWorkArea;
 using ParishCoordination.Application.WorkAreas.Queries.ListWorkAreas;
@@ -48,6 +50,23 @@ public static class WorkAreaEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        app.MapPatch("/api/v1/work-areas/{workAreaId}", UpdateWorkAreaAsync)
+            .WithName("updateWorkArea")
+            .WithTags("Parish")
+            .RequireAuthorization(policy => policy.RequireRole(
+                GrottoWorksRoles.Admin,
+                GrottoWorksRoles.Parish,
+                GrottoWorksRoles.Leader))
+            .Accepts<UpdateWorkAreaRequest>("application/json")
+            .Produces<ApiResponse<WorkAreaDto>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
     }
 
@@ -110,6 +129,8 @@ public static class WorkAreaEndpoints
                 "WORK_AREA_NOT_FOUND");
         }
 
+        SetETag(httpContext, workArea.Version);
+
         return Results.Ok(ApiResults.Ok(workArea, httpContext));
     }
 
@@ -161,13 +182,151 @@ public static class WorkAreaEndpoints
                 "SEASON_INVALID_STATE");
         }
 
+        var workArea = result.WorkArea!;
+        SetETag(httpContext, workArea.Version);
+
         return Results.Json(
-            ApiResults.Ok(result.WorkArea!, httpContext),
+            ApiResults.Ok(workArea, httpContext),
             statusCode: StatusCodes.Status201Created);
+    }
+
+    private static async Task<IResult> UpdateWorkAreaAsync(
+        Guid workAreaId,
+        UpdateWorkAreaRequest request,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
+        HttpContext httpContext,
+        UpdateWorkAreaCommandHandler commandHandler,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseExpectedVersion(ifMatch, out var expectedVersion))
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status400BadRequest,
+                "Invalid If-Match header",
+                "If-Match must contain a positive integer version.",
+                "INVALID_IF_MATCH");
+        }
+
+        var command = new UpdateWorkAreaCommand(
+            workAreaId,
+            request.Name?.Trim(),
+            request.Description is not null,
+            CleanOptionalText(request.Description),
+            request.CategoryId,
+            request.StartDate,
+            request.Deadline,
+            expectedVersion);
+
+        var result = await commandHandler.HandleAsync(command, cancellationToken);
+
+        if (result.Outcome == UpdateWorkAreaOutcome.NotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Work area not found",
+                $"Work area with ID '{workAreaId}' was not found.",
+                "WORK_AREA_NOT_FOUND");
+        }
+
+        if (result.Outcome == UpdateWorkAreaOutcome.SeasonNotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Season not found",
+                "The season that owns this work area was not found.",
+                "SEASON_NOT_FOUND");
+        }
+
+        if (result.Outcome == UpdateWorkAreaOutcome.SeasonInvalidState)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "Season cannot be changed",
+                "Work areas in an archived season are read-only.",
+                "SEASON_INVALID_STATE");
+        }
+
+        if (result.Outcome == UpdateWorkAreaOutcome.CategoryNotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Work area category not found",
+                $"Work area category with ID '{request.CategoryId}' was not found.",
+                "WORK_AREA_CATEGORY_NOT_FOUND");
+        }
+
+        if (result.Outcome == UpdateWorkAreaOutcome.CategoryInactive)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "Work area category is inactive",
+                "An inactive work area category cannot be assigned.",
+                "WORK_AREA_CATEGORY_INACTIVE");
+        }
+
+        if (result.Outcome == UpdateWorkAreaOutcome.VersionMismatch)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status412PreconditionFailed,
+                "Work area version mismatch",
+                "The work area was changed by another request. Load it again and retry.",
+                "WORK_AREA_VERSION_MISMATCH");
+        }
+
+        var workArea = result.WorkArea!;
+        SetETag(httpContext, workArea.Version);
+
+        return Results.Ok(ApiResults.Ok(workArea, httpContext));
     }
 
     private static string? CleanOptionalText(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static bool TryParseExpectedVersion(
+        string? ifMatch,
+        out int? expectedVersion)
+    {
+        expectedVersion = null;
+
+        if (string.IsNullOrWhiteSpace(ifMatch))
+        {
+            return true;
+        }
+
+        var value = ifMatch.Trim();
+        var startsWithQuote = value.StartsWith('"');
+        var endsWithQuote = value.EndsWith('"');
+
+        if (startsWithQuote || endsWithQuote)
+        {
+            if (!startsWithQuote || !endsWithQuote || value.Length <= 2)
+            {
+                return false;
+            }
+
+            value = value[1..^1];
+        }
+
+        if (!int.TryParse(value, out var version) || version <= 0)
+        {
+            return false;
+        }
+
+        expectedVersion = version;
+        return true;
+    }
+
+    private static void SetETag(HttpContext httpContext, int version)
+    {
+        httpContext.Response.Headers.ETag = $"\"{version}\"";
+    }
 
     private static IResult CreateProblem(
         HttpContext httpContext,

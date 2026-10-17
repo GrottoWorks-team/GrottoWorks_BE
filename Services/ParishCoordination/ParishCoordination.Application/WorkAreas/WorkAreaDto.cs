@@ -9,7 +9,8 @@ public sealed record WorkAreaDto(
     Guid? CommunityId,
     Guid? LeaderId,
     Guid? MaterialOfficerId,
-    WorkAreaStatus Status)
+    WorkAreaStatus Status,
+    int Version)
 {
     public static WorkAreaDto From(WorkArea workArea)
     {
@@ -19,6 +20,7 @@ public sealed record WorkAreaDto(
             workArea.CommunityId,
             workArea.LeaderUserId,
             workArea.MaterialOfficerUserId,
-            workArea.Status);
+            workArea.Status,
+            workArea.Version);
     }
 }

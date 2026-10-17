@@ -49,6 +49,17 @@ public sealed class WorkAreaCategoryRepository(
                 cancellationToken);
     }
 
+    public Task<WorkAreaCategory?> GetByIdAsync(
+        Guid categoryId,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.WorkAreaCategories
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                category => category.Id == categoryId,
+                cancellationToken);
+    }
+
     public void Add(WorkAreaCategory category)
     {
         dbContext.WorkAreaCategories.Add(category);

@@ -251,6 +251,13 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("version");
+
                     b.Property<Guid?>("WorkAreaCategoryId")
                         .HasColumnType("uuid")
                         .HasColumnName("work_area_category_id");

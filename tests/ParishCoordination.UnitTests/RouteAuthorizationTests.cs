@@ -20,6 +20,7 @@ using ParishCoordination.Application.Seasons.Commands.UpdateSeason;
 using ParishCoordination.Application.WorkAreas.Queries.GetWorkArea;
 using ParishCoordination.Application.WorkAreas.Queries.ListWorkAreas;
 using ParishCoordination.Application.WorkAreas.Commands.CreateWorkArea;
+using ParishCoordination.Application.WorkAreas.Commands.UpdateWorkArea;
 using ParishCoordination.Application.WorkAreaCategories.Queries.ListWorkAreaCategories;
 using ParishCoordination.Application.WorkAreaCategories.Commands.CreateWorkAreaCategory;
 using ParishCoordination.Application.WorkAreaCategories.Commands.UpdateWorkAreaCategory;
@@ -54,6 +55,7 @@ public sealed class RouteAuthorizationTests
         builder.Services.AddScoped<ListWorkAreasQueryHandler>();
         builder.Services.AddScoped<GetWorkAreaQueryHandler>();
         builder.Services.AddScoped<CreateWorkAreaCommandHandler>();
+        builder.Services.AddScoped<UpdateWorkAreaCommandHandler>();
         builder.Services.AddScoped<ListWorkAreaCategoriesQueryHandler>();
         builder.Services.AddScoped<CreateWorkAreaCategoryCommandHandler>();
         builder.Services.AddScoped<UpdateWorkAreaCategoryCommandHandler>();
@@ -82,6 +84,7 @@ public sealed class RouteAuthorizationTests
         var listWorkAreas = FindByName(app, "listWorkAreas");
         var getWorkArea = FindByName(app, "getWorkArea");
         var createWorkArea = FindByName(app, "createWorkArea");
+        var updateWorkArea = FindByName(app, "updateWorkArea");
         var listWorkAreaCategories = FindByName(app, "listWorkAreaCategories");
         var createWorkAreaCategory = FindByName(app, "createWorkAreaCategory");
         var updateWorkAreaCategory = FindByName(app, "updateWorkAreaCategory");
@@ -94,6 +97,10 @@ public sealed class RouteAuthorizationTests
         GetRoles(createSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(updateSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createWorkArea).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
+        GetRoles(updateWorkArea).Should().BeEquivalentTo(
+            GrottoWorksRoles.Admin,
+            GrottoWorksRoles.Parish,
+            GrottoWorksRoles.Leader);
         createSeason.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Should().Contain(metadata => metadata.StatusCode == 201);
         updateSeason.RoutePattern.RawText.Should().Be("/api/v1/seasons/{seasonId}");
         var updateSeasonStatusCodes = updateSeason.Metadata
@@ -115,6 +122,19 @@ public sealed class RouteAuthorizationTests
             .Should().Contain(metadata => metadata.StatusCode == 409);
         createWorkArea.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
             .Should().Contain(metadata => metadata.StatusCode == 422);
+        updateWorkArea.RoutePattern.RawText.Should().Be("/api/v1/work-areas/{workAreaId}");
+        var updateWorkAreaStatusCodes = updateWorkArea.Metadata
+            .GetOrderedMetadata<IProducesResponseTypeMetadata>()
+            .Select(metadata => metadata.StatusCode)
+            .ToArray();
+        updateWorkAreaStatusCodes.Should().Contain(StatusCodes.Status200OK);
+        updateWorkAreaStatusCodes.Should().Contain(StatusCodes.Status400BadRequest);
+        updateWorkAreaStatusCodes.Should().Contain(StatusCodes.Status401Unauthorized);
+        updateWorkAreaStatusCodes.Should().Contain(StatusCodes.Status403Forbidden);
+        updateWorkAreaStatusCodes.Should().Contain(StatusCodes.Status404NotFound);
+        updateWorkAreaStatusCodes.Should().Contain(StatusCodes.Status409Conflict);
+        updateWorkAreaStatusCodes.Should().Contain(StatusCodes.Status412PreconditionFailed);
+        updateWorkAreaStatusCodes.Should().Contain(StatusCodes.Status422UnprocessableEntity);
         listWorkAreas.RoutePattern.RawText.Should().Be("/api/v1/seasons/{seasonId}/work-areas");
         getWorkArea.RoutePattern.RawText.Should().Be("/api/v1/work-areas/{workAreaId}");
         (listWorkAreas.Metadata.GetMetadata<IAuthorizeData>() is not null ||

@@ -232,13 +232,30 @@ internal sealed class FakeSeasonRepository : ISeasonRepository
 internal sealed class FakeWorkAreaRepository : IWorkAreaRepository
 {
     public List<WorkArea> Items { get; } = [];
+    public bool ThrowConcurrencyOnSave { get; set; }
+    public int SaveChangesCount { get; private set; }
 
     public void Add(WorkArea workArea) => Items.Add(workArea);
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
-        Task.CompletedTask;
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+
+        if (ThrowConcurrencyOnSave)
+        {
+            throw new WorkAreaConcurrencyException(
+                new InvalidOperationException("simulated concurrency"));
+        }
+
+        return Task.CompletedTask;
+    }
 
     public Task<WorkArea?> GetByIdAsync(
+        Guid workAreaId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.SingleOrDefault(workArea => workArea.Id == workAreaId));
+
+    public Task<WorkArea?> GetByIdForUpdateAsync(
         Guid workAreaId,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.SingleOrDefault(workArea => workArea.Id == workAreaId));
@@ -308,6 +325,14 @@ internal sealed class FakeWorkAreaCategoryRepository : IWorkAreaCategoryReposito
     }
 
     public Task<WorkAreaCategory?> GetByIdForUpdateAsync(
+        Guid categoryId,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Items.SingleOrDefault(category =>
+            category.Id == categoryId));
+    }
+
+    public Task<WorkAreaCategory?> GetByIdAsync(
         Guid categoryId,
         CancellationToken cancellationToken = default)
     {

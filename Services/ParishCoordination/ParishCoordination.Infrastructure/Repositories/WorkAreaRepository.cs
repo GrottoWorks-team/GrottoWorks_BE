@@ -13,8 +13,17 @@ public sealed class WorkAreaRepository(ParishCoordinationDbContext dbContext)
         dbContext.WorkAreas.Add(workArea);
     }
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
-        dbContext.SaveChangesAsync(cancellationToken);
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new WorkAreaConcurrencyException(exception);
+        }
+    }
 
     public async Task<(IReadOnlyList<WorkArea> Items, long TotalItems)> GetPagedBySeasonIdAsync(
         Guid seasonId,
@@ -61,6 +70,16 @@ public sealed class WorkAreaRepository(ParishCoordinationDbContext dbContext)
     {
         return await dbContext.WorkAreas
             .AsNoTracking()
+            .SingleOrDefaultAsync(
+                workArea => workArea.Id == workAreaId,
+                cancellationToken);
+    }
+
+    public async Task<WorkArea?> GetByIdForUpdateAsync(
+        Guid workAreaId,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.WorkAreas
             .SingleOrDefaultAsync(
                 workArea => workArea.Id == workAreaId,
                 cancellationToken);

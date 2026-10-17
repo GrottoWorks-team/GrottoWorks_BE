@@ -65,6 +65,12 @@ public sealed class WorkAreaConfiguration : IEntityTypeConfiguration<WorkArea>
             .HasColumnName("updated_at")
             .HasColumnType("timestamp with time zone");
 
+        builder.Property(workArea => workArea.Version)
+            .HasColumnName("version")
+            .HasDefaultValue(1)
+            .IsConcurrencyToken()
+            .IsRequired();
+
         builder.HasIndex(workArea => workArea.SeasonId);
 
         builder.HasOne<Season>()

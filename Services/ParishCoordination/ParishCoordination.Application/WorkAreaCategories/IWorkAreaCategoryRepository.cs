@@ -8,4 +8,12 @@ public interface IWorkAreaCategoryRepository
     Task<IReadOnlyList<WorkAreaCategory>> GetAllAsync(
         WorkAreaCategoryStatus? status,
         CancellationToken cancellationToken = default);
+
+    Task<bool> CodeExistsAsync(
+        string normalizedCode,
+        CancellationToken cancellationToken = default);
+
+    void Add(WorkAreaCategory category);
+
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -9,6 +9,19 @@ public sealed class WorkAreaCategory
     }
 
     public static WorkAreaCategory Create(
+        string code,
+        string name,
+        string? description)
+    {
+        return Create(
+            Guid.NewGuid(),
+            NormalizeCode(code),
+            name.Trim(),
+            string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+            WorkAreaCategoryStatus.Active);
+    }
+
+    public static WorkAreaCategory Create(
         Guid id,
         string code,
         string name,
@@ -23,6 +36,11 @@ public sealed class WorkAreaCategory
             Description = description,
             Status = status
         };
+    }
+
+    public static string NormalizeCode(string code)
+    {
+        return code.Trim().ToUpperInvariant();
     }
 
     public Guid Id { get; private set; }

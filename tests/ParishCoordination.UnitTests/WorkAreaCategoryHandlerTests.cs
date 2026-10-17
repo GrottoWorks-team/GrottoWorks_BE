@@ -1,11 +1,14 @@
+using System.ComponentModel.DataAnnotations;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using ParishCoordination.Application.WorkAreaCategories;
+using ParishCoordination.Application.WorkAreaCategories.Commands.CreateWorkAreaCategory;
 using ParishCoordination.Application.WorkAreaCategories.Queries.ListWorkAreaCategories;
 using ParishCoordination.Domain.Entities;
 using ParishCoordination.Domain.Enums;
 using ParishCoordination.Infrastructure.Data;
 using ParishCoordination.Infrastructure.Repositories;
+using ParishCoordination.Api.Requests;
 
 namespace ParishCoordination.UnitTests;
 
@@ -17,6 +20,114 @@ public sealed class WorkAreaCategoryHandlerTests
         Guid.Parse("22222222-2222-2222-2222-222222222222");
     private static readonly Guid BetaCategoryId =
         Guid.Parse("33333333-3333-3333-3333-333333333333");
+
+    [Fact]
+    public async Task Create_normalizes_fields_and_creates_active_category()
+    {
+        var repository = new FakeWorkAreaCategoryRepository();
+        var handler = new CreateWorkAreaCategoryCommandHandler(repository);
+
+        var result = await handler.HandleAsync(
+            new CreateWorkAreaCategoryCommand(
+                "  decoration ",
+                "  Decoration  ",
+                "  Build decorations  "));
+
+        result.Outcome.Should().Be(CreateWorkAreaCategoryOutcome.Success);
+        result.Category!.Id.Should().NotBe(Guid.Empty);
+        result.Category.Code.Should().Be("DECORATION");
+        result.Category.Name.Should().Be("Decoration");
+        result.Category.Description.Should().Be("Build decorations");
+        result.Category.Status.Should().Be(WorkAreaCategoryStatus.Active);
+        repository.SaveChangesCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Create_converts_whitespace_description_to_null()
+    {
+        var repository = new FakeWorkAreaCategoryRepository();
+        var handler = new CreateWorkAreaCategoryCommandHandler(repository);
+
+        var result = await handler.HandleAsync(
+            new CreateWorkAreaCategoryCommand(
+                "LIGHTING",
+                "Lighting",
+                "   "));
+
+        result.Category!.Description.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Create_rejects_existing_normalized_code_before_saving()
+    {
+        var repository = new FakeWorkAreaCategoryRepository();
+        repository.Items.Add(WorkAreaCategory.Create(
+            AlphaCategoryId,
+            "DECORATION",
+            "Decoration",
+            null,
+            WorkAreaCategoryStatus.Active));
+        var handler = new CreateWorkAreaCategoryCommandHandler(repository);
+
+        var result = await handler.HandleAsync(
+            new CreateWorkAreaCategoryCommand(
+                " decoration ",
+                "Duplicate",
+                null));
+
+        result.Outcome.Should().Be(CreateWorkAreaCategoryOutcome.CodeConflict);
+        result.Category.Should().BeNull();
+        repository.SaveChangesCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Create_maps_unique_constraint_race_to_code_conflict()
+    {
+        var repository = new FakeWorkAreaCategoryRepository
+        {
+            ThrowCodeConflictOnSave = true
+        };
+        var handler = new CreateWorkAreaCategoryCommandHandler(repository);
+
+        var result = await handler.HandleAsync(
+            new CreateWorkAreaCategoryCommand(
+                "DECORATION",
+                "Decoration",
+                null));
+
+        result.Outcome.Should().Be(CreateWorkAreaCategoryOutcome.CodeConflict);
+        result.Category.Should().BeNull();
+        repository.SaveChangesCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void Create_request_validates_required_fields_and_length_limits()
+    {
+        var missingFields = Validate(new CreateWorkAreaCategoryRequest());
+        var whitespaceFields = Validate(new CreateWorkAreaCategoryRequest
+        {
+            Code = "   ",
+            Name = "   "
+        });
+        var longFields = Validate(new CreateWorkAreaCategoryRequest
+        {
+            Code = new string('c', 51),
+            Name = new string('n', 101)
+        });
+
+        missingFields.Should().Contain(result =>
+            result.MemberNames.Contains(nameof(CreateWorkAreaCategoryRequest.Code)));
+        missingFields.Should().Contain(result =>
+            result.MemberNames.Contains(nameof(CreateWorkAreaCategoryRequest.Name)));
+        whitespaceFields.Should().Contain(result =>
+            result.MemberNames.Contains(nameof(CreateWorkAreaCategoryRequest.Code)));
+        whitespaceFields.Should().Contain(result =>
+            result.MemberNames.Contains(nameof(CreateWorkAreaCategoryRequest.Name)));
+        longFields.Should().Contain(result =>
+            result.MemberNames.Contains(nameof(CreateWorkAreaCategoryRequest.Code)));
+        longFields.Should().Contain(result =>
+            result.MemberNames.Contains(nameof(CreateWorkAreaCategoryRequest.Name)));
+    }
 
     [Fact]
     public async Task No_status_filter_returns_all_categories_in_stable_name_order()
@@ -131,6 +242,17 @@ public sealed class WorkAreaCategoryHandlerTests
             .Options;
 
         return new ParishCoordinationDbContext(options);
+    }
+
+    private static List<ValidationResult> Validate(object instance)
+    {
+        var results = new List<ValidationResult>();
+        Validator.TryValidateObject(
+            instance,
+            new ValidationContext(instance),
+            results,
+            validateAllProperties: true);
+        return results;
     }
 
     private static IReadOnlyList<WorkAreaCategory> Categories()

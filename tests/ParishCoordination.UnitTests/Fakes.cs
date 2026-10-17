@@ -254,6 +254,8 @@ internal sealed class FakeWorkAreaRepository : IWorkAreaRepository
 internal sealed class FakeWorkAreaCategoryRepository : IWorkAreaCategoryRepository
 {
     public List<WorkAreaCategory> Items { get; } = [];
+    public bool ThrowCodeConflictOnSave { get; set; }
+    public int SaveChangesCount { get; private set; }
 
     public Task<IReadOnlyList<WorkAreaCategory>> GetAllAsync(
         WorkAreaCategoryStatus? status,
@@ -271,5 +273,31 @@ internal sealed class FakeWorkAreaCategoryRepository : IWorkAreaCategoryReposito
                 .OrderBy(category => category.Name)
                 .ThenBy(category => category.Id)
                 .ToList());
+    }
+
+    public Task<bool> CodeExistsAsync(
+        string normalizedCode,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Items.Any(category =>
+            category.Code == normalizedCode));
+    }
+
+    public void Add(WorkAreaCategory category)
+    {
+        Items.Add(category);
+    }
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+
+        if (ThrowCodeConflictOnSave)
+        {
+            throw new WorkAreaCategoryCodeConflictException(
+                new InvalidOperationException("simulated code conflict"));
+        }
+
+        return Task.CompletedTask;
     }
 }

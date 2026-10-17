@@ -20,6 +20,7 @@ using ParishCoordination.Application.WorkAreas.Queries.GetWorkArea;
 using ParishCoordination.Application.WorkAreas.Queries.ListWorkAreas;
 using ParishCoordination.Application.WorkAreas.Commands.CreateWorkArea;
 using ParishCoordination.Application.WorkAreaCategories.Queries.ListWorkAreaCategories;
+using ParishCoordination.Application.WorkAreaCategories.Commands.CreateWorkAreaCategory;
 using ParishCoordination.Application.Parishes.Commands.UpdateParish;
 using ParishCoordination.Application.Parishes.Queries.GetParish;
 using ParishCoordination.Application.Parishes.Queries.GetParishes;
@@ -51,6 +52,7 @@ public sealed class RouteAuthorizationTests
         builder.Services.AddScoped<GetWorkAreaQueryHandler>();
         builder.Services.AddScoped<CreateWorkAreaCommandHandler>();
         builder.Services.AddScoped<ListWorkAreaCategoriesQueryHandler>();
+        builder.Services.AddScoped<CreateWorkAreaCategoryCommandHandler>();
         builder.Services.AddScoped<IReadinessProbe, TestReadinessProbe>();
         using var app = builder.Build();
 
@@ -76,6 +78,7 @@ public sealed class RouteAuthorizationTests
         var getWorkArea = FindByName(app, "getWorkArea");
         var createWorkArea = FindByName(app, "createWorkArea");
         var listWorkAreaCategories = FindByName(app, "listWorkAreaCategories");
+        var createWorkAreaCategory = FindByName(app, "createWorkAreaCategory");
         var live = FindByName(app, "livenessProbe");
 
         GetRoles(listParishes).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
@@ -112,6 +115,18 @@ public sealed class RouteAuthorizationTests
         categoryStatusCodes.Should().Contain(StatusCodes.Status200OK);
         categoryStatusCodes.Should().Contain(StatusCodes.Status400BadRequest);
         categoryStatusCodes.Should().Contain(StatusCodes.Status401Unauthorized);
+        createWorkAreaCategory.RoutePattern.RawText.Should().Be("/api/v1/work-area-categories");
+        GetRoles(createWorkAreaCategory).Should().BeEquivalentTo(GrottoWorksRoles.Admin);
+        var createCategoryStatusCodes = createWorkAreaCategory.Metadata
+            .GetOrderedMetadata<IProducesResponseTypeMetadata>()
+            .Select(metadata => metadata.StatusCode)
+            .ToArray();
+        createCategoryStatusCodes.Should().Contain(StatusCodes.Status201Created);
+        createCategoryStatusCodes.Should().Contain(StatusCodes.Status400BadRequest);
+        createCategoryStatusCodes.Should().Contain(StatusCodes.Status401Unauthorized);
+        createCategoryStatusCodes.Should().Contain(StatusCodes.Status403Forbidden);
+        createCategoryStatusCodes.Should().Contain(StatusCodes.Status409Conflict);
+        createCategoryStatusCodes.Should().Contain(StatusCodes.Status422UnprocessableEntity);
         getSeason.RoutePattern.RawText.Should().Be("/api/v1/seasons/{seasonId}");
         (getSeason.Metadata.GetMetadata<IAuthorizeData>() is not null ||
             getSeason.Metadata.GetMetadata<AuthorizationPolicy>() is not null).Should().BeTrue();

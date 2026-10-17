@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using ParishCoordination.Application.WorkAreaCategories;
 using ParishCoordination.Domain.Entities;
 using ParishCoordination.Domain.Enums;
@@ -25,5 +26,41 @@ public sealed class WorkAreaCategoryRepository(
             .OrderBy(category => category.Name)
             .ThenBy(category => category.Id)
             .ToListAsync(cancellationToken);
+    }
+
+    public Task<bool> CodeExistsAsync(
+        string normalizedCode,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.WorkAreaCategories
+            .AsNoTracking()
+            .AnyAsync(
+                category => category.Code == normalizedCode,
+                cancellationToken);
+    }
+
+    public void Add(WorkAreaCategory category)
+    {
+        dbContext.WorkAreaCategories.Add(category);
+    }
+
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsUniqueViolation(exception))
+        {
+            throw new WorkAreaCategoryCodeConflictException(exception);
+        }
+    }
+
+    private static bool IsUniqueViolation(DbUpdateException exception)
+    {
+        return exception.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation
+        };
     }
 }

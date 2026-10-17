@@ -5,6 +5,7 @@ using ParishCoordination.Application.Communities;
 using ParishCoordination.Application.Parishes;
 using ParishCoordination.Application.Seasons;
 using ParishCoordination.Application.WorkAreas;
+using ParishCoordination.Application.WorkAreaCategories;
 using ParishCoordination.Infrastructure.Data;
 using ParishCoordination.Infrastructure.Repositories;
 
@@ -31,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<ICommunityRepository, CommunityRepository>();
         services.AddScoped<ISeasonRepository, SeasonRepository>();
         services.AddScoped<IWorkAreaRepository, WorkAreaRepository>();
+        services.AddScoped<IWorkAreaCategoryRepository, WorkAreaCategoryRepository>();
         services.AddScoped<IParishCoordinationDataSeeder, ParishCoordinationDataSeeder>();
 
         return services;

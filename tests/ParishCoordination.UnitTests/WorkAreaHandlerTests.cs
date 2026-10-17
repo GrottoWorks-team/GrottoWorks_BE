@@ -203,7 +203,8 @@ public sealed class WorkAreaHandlerTests
             nameof(WorkAreaDto.CommunityId),
             nameof(WorkAreaDto.LeaderId),
             nameof(WorkAreaDto.MaterialOfficerId),
-            nameof(WorkAreaDto.Status));
+            nameof(WorkAreaDto.Status),
+            nameof(WorkAreaDto.Version));
         dtoProperties.Should().NotContain("Name");
         dtoProperties.Should().NotContain("Description");
         dtoProperties.Should().NotContain("StartDate");

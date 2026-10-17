@@ -19,27 +19,44 @@ public sealed class SeasonRepository(ParishCoordinationDbContext dbContext)
                 season => season.Id == seasonId,
                 cancellationToken);
     }
+
+    public async Task<Season?> GetByIdForUpdateAsync(
+        Guid seasonId,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Seasons
+            .SingleOrDefaultAsync(
+                season => season.Id == seasonId,
+                cancellationToken);
+    }
+
     public async Task<bool> ExistsByNameAsync(
         Guid parishId,
         string name,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? excludeSeasonId = null)
     {
         return await dbContext.Seasons
             .AsNoTracking()
             .AnyAsync(
-                season => season.ParishId == parishId && season.Name == name,
+                season => season.ParishId == parishId &&
+                    season.Name == name &&
+                    (!excludeSeasonId.HasValue || season.Id != excludeSeasonId.Value),
                 cancellationToken);
     }
 
     public async Task<bool> ExistsByYearAsync(
         Guid parishId,
         int seasonYear,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? excludeSeasonId = null)
     {
         return await dbContext.Seasons
             .AsNoTracking()
             .AnyAsync(
-                season => season.ParishId == parishId && season.SeasonYear == seasonYear,
+                season => season.ParishId == parishId &&
+                    season.SeasonYear == seasonYear &&
+                    (!excludeSeasonId.HasValue || season.Id != excludeSeasonId.Value),
                 cancellationToken);
     }
 
@@ -59,6 +76,10 @@ public sealed class SeasonRepository(ParishCoordinationDbContext dbContext)
             throw conflict == SeasonConflict.Name
                 ? new SeasonNameConflictException(exception)
                 : new SeasonYearConflictException(exception);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new SeasonConcurrencyException(exception);
         }
     }
 

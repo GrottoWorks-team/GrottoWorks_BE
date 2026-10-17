@@ -20,6 +20,16 @@ public sealed class CommunityRepository(ParishCoordinationDbContext dbContext)
                 cancellationToken);
     }
 
+    public async Task<Community?> GetByIdForUpdateAsync(
+        Guid communityId,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Communities
+            .SingleOrDefaultAsync(
+                community => community.Id == communityId,
+                cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Community>> GetByParishIdAsync(
         Guid parishId,
         CancellationToken cancellationToken = default)
@@ -52,6 +62,10 @@ public sealed class CommunityRepository(ParishCoordinationDbContext dbContext)
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new CommunityConcurrencyException(exception);
         }
         catch (DbUpdateException exception) when (IsUniqueViolation(exception))
         {

@@ -36,6 +36,19 @@ public sealed class Community
         };
     }
 
+    public void Update(
+        string name,
+        string? description,
+        CommunityStatus status,
+        DateTimeOffset updatedAtUtc)
+    {
+        Name = name;
+        Description = description;
+        Status = status;
+        UpdatedAt = updatedAtUtc;
+        Version++;
+    }
+
     public Guid Id { get; private set; }
 
     public Guid ParishId { get; private set; }

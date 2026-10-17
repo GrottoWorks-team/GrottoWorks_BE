@@ -18,4 +18,8 @@ public interface IWorkAreaRepository
     Task<WorkArea?> GetByIdAsync(
         Guid workAreaId,
         CancellationToken cancellationToken = default);
+
+    Task<WorkArea?> GetByIdForUpdateAsync(
+        Guid workAreaId,
+        CancellationToken cancellationToken = default);
 }

@@ -57,8 +57,28 @@ public sealed class Season
             Status = status,
             Description = description,
             EstimatedBudget = estimatedBudget,
-            CreatedAt = createdAtUtc
+            CreatedAt = createdAtUtc,
+            Version = 1
         };
+    }
+
+    public void Update(
+        string name,
+        int seasonYear,
+        DateOnly startDate,
+        DateOnly endDate,
+        string? description,
+        decimal? estimatedBudget,
+        DateTimeOffset updatedAtUtc)
+    {
+        Name = name;
+        SeasonYear = seasonYear;
+        StartDate = startDate;
+        EndDate = endDate;
+        Description = description;
+        EstimatedBudget = estimatedBudget;
+        UpdatedAt = updatedAtUtc;
+        Version++;
     }
 
     public Guid Id { get; private set; }
@@ -84,4 +104,6 @@ public sealed class Season
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset? UpdatedAt { get; private set; }
+
+    public int Version { get; private set; } = 1;
 }

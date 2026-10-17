@@ -7,15 +7,22 @@ public interface ISeasonRepository
     Task<Season?> GetByIdAsync(
         Guid seasonId,
         CancellationToken cancellationToken = default);
+
+    Task<Season?> GetByIdForUpdateAsync(
+        Guid seasonId,
+        CancellationToken cancellationToken = default);
+
     Task<bool> ExistsByNameAsync(
         Guid parishId,
         string name,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Guid? excludeSeasonId = null);
 
     Task<bool> ExistsByYearAsync(
         Guid parishId,
         int seasonYear,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Guid? excludeSeasonId = null);
 
     void Add(Season season);
 

@@ -3,7 +3,9 @@ using ParishCoordination.Application.Communities;
 using ParishCoordination.Application.Parishes;
 using ParishCoordination.Application.Seasons;
 using ParishCoordination.Application.WorkAreas;
+using ParishCoordination.Application.WorkAreaCategories;
 using ParishCoordination.Domain.Entities;
+using ParishCoordination.Domain.Enums;
 
 namespace ParishCoordination.UnitTests;
 
@@ -70,8 +72,15 @@ internal sealed class FakeParishRepository : IParishRepository
 internal sealed class FakeCommunityRepository : ICommunityRepository
 {
     public List<Community> Items { get; } = [];
+    public bool ThrowConcurrencyOnSave { get; set; }
+    public bool ThrowNameConflictOnSave { get; set; }
 
     public Task<Community?> GetByIdAsync(
+        Guid communityId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.SingleOrDefault(community => community.Id == communityId));
+
+    public Task<Community?> GetByIdForUpdateAsync(
         Guid communityId,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.SingleOrDefault(community => community.Id == communityId));
@@ -92,8 +101,22 @@ internal sealed class FakeCommunityRepository : ICommunityRepository
 
     public void Add(Community community) => Items.Add(community);
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
-        Task.CompletedTask;
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        if (ThrowConcurrencyOnSave)
+        {
+            throw new CommunityConcurrencyException(
+                new InvalidOperationException("simulated concurrency"));
+        }
+
+        if (ThrowNameConflictOnSave)
+        {
+            throw new CommunityNameConflictException(
+                new InvalidOperationException("simulated name conflict"));
+        }
+
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class FakeSeasonRepository : ISeasonRepository
@@ -102,27 +125,51 @@ internal sealed class FakeSeasonRepository : ISeasonRepository
     public Guid? LastScopeId { get; private set; }
     public bool ThrowNameConflictOnSave { get; set; }
     public bool ThrowYearConflictOnSave { get; set; }
+    public bool ThrowConcurrencyOnSave { get; set; }
+    public int SaveChangesCount { get; private set; }
 
     public Task<Season?> GetByIdAsync(
         Guid seasonId,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.SingleOrDefault(season => season.Id == seasonId));
+
+    public Task<Season?> GetByIdForUpdateAsync(
+        Guid seasonId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.SingleOrDefault(season => season.Id == seasonId));
+
     public Task<bool> ExistsByNameAsync(
         Guid parishId,
         string name,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(Items.Any(season => season.ParishId == parishId && season.Name == name));
+        CancellationToken cancellationToken = default,
+        Guid? excludeSeasonId = null) =>
+        Task.FromResult(Items.Any(season =>
+            season.ParishId == parishId &&
+            season.Name == name &&
+            (!excludeSeasonId.HasValue || season.Id != excludeSeasonId.Value)));
 
     public Task<bool> ExistsByYearAsync(
         Guid parishId,
         int seasonYear,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(Items.Any(season => season.ParishId == parishId && season.SeasonYear == seasonYear));
+        CancellationToken cancellationToken = default,
+        Guid? excludeSeasonId = null) =>
+        Task.FromResult(Items.Any(season =>
+            season.ParishId == parishId &&
+            season.SeasonYear == seasonYear &&
+            (!excludeSeasonId.HasValue || season.Id != excludeSeasonId.Value)));
 
     public void Add(Season season) => Items.Add(season);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        SaveChangesCount++;
+
+        if (ThrowConcurrencyOnSave)
+        {
+            throw new SeasonConcurrencyException(
+                new InvalidOperationException("simulated concurrency"));
+        }
+
         if (ThrowNameConflictOnSave)
         {
             throw new SeasonNameConflictException(new InvalidOperationException("simulated name conflict"));
@@ -185,13 +232,30 @@ internal sealed class FakeSeasonRepository : ISeasonRepository
 internal sealed class FakeWorkAreaRepository : IWorkAreaRepository
 {
     public List<WorkArea> Items { get; } = [];
+    public bool ThrowConcurrencyOnSave { get; set; }
+    public int SaveChangesCount { get; private set; }
 
     public void Add(WorkArea workArea) => Items.Add(workArea);
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
-        Task.CompletedTask;
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+
+        if (ThrowConcurrencyOnSave)
+        {
+            throw new WorkAreaConcurrencyException(
+                new InvalidOperationException("simulated concurrency"));
+        }
+
+        return Task.CompletedTask;
+    }
 
     public Task<WorkArea?> GetByIdAsync(
+        Guid workAreaId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.SingleOrDefault(workArea => workArea.Id == workAreaId));
+
+    public Task<WorkArea?> GetByIdForUpdateAsync(
         Guid workAreaId,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.SingleOrDefault(workArea => workArea.Id == workAreaId));
@@ -225,5 +289,72 @@ internal sealed class FakeWorkAreaRepository : IWorkAreaRepository
         var all = query.ToList();
         return Task.FromResult<(IReadOnlyList<WorkArea>, long)>(
             (all.Skip((page - 1) * size).Take(size).ToList(), all.Count));
+    }
+}
+
+internal sealed class FakeWorkAreaCategoryRepository : IWorkAreaCategoryRepository
+{
+    public List<WorkAreaCategory> Items { get; } = [];
+    public bool ThrowCodeConflictOnSave { get; set; }
+    public int SaveChangesCount { get; private set; }
+
+    public Task<IReadOnlyList<WorkAreaCategory>> GetAllAsync(
+        WorkAreaCategoryStatus? status,
+        CancellationToken cancellationToken = default)
+    {
+        IEnumerable<WorkAreaCategory> query = Items;
+
+        if (status.HasValue)
+        {
+            query = query.Where(category => category.Status == status.Value);
+        }
+
+        return Task.FromResult<IReadOnlyList<WorkAreaCategory>>(
+            query
+                .OrderBy(category => category.Name)
+                .ThenBy(category => category.Id)
+                .ToList());
+    }
+
+    public Task<bool> CodeExistsAsync(
+        string normalizedCode,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Items.Any(category =>
+            category.Code == normalizedCode));
+    }
+
+    public Task<WorkAreaCategory?> GetByIdForUpdateAsync(
+        Guid categoryId,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Items.SingleOrDefault(category =>
+            category.Id == categoryId));
+    }
+
+    public Task<WorkAreaCategory?> GetByIdAsync(
+        Guid categoryId,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Items.SingleOrDefault(category =>
+            category.Id == categoryId));
+    }
+
+    public void Add(WorkAreaCategory category)
+    {
+        Items.Add(category);
+    }
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+
+        if (ThrowCodeConflictOnSave)
+        {
+            throw new WorkAreaCategoryCodeConflictException(
+                new InvalidOperationException("simulated code conflict"));
+        }
+
+        return Task.CompletedTask;
     }
 }

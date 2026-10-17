@@ -14,7 +14,8 @@ public sealed record SeasonDto(
     string? Description,
     decimal? EstimatedBudget,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? UpdatedAt)
+    DateTimeOffset? UpdatedAt,
+    int Version)
 {
     public static SeasonDto From(Season season)
     {
@@ -29,6 +30,7 @@ public sealed record SeasonDto(
             season.Description,
             season.EstimatedBudget,
             season.CreatedAt,
-            season.UpdatedAt);
+            season.UpdatedAt,
+            season.Version);
     }
 }

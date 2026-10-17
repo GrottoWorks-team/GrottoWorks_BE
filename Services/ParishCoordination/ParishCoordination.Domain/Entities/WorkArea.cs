@@ -63,8 +63,43 @@ public sealed class WorkArea
             StartDate = startDate,
             Deadline = deadline,
             Status = status,
-            CreatedAt = createdAtUtc
+            CreatedAt = createdAtUtc,
+            Version = 1
         };
+    }
+
+    public void Update(
+        string name,
+        string? description,
+        Guid? workAreaCategoryId,
+        DateOnly? startDate,
+        DateOnly? deadline,
+        DateTimeOffset updatedAtUtc)
+    {
+        Name = name.Trim();
+        Description = string.IsNullOrWhiteSpace(description)
+            ? null
+            : description.Trim();
+        WorkAreaCategoryId = workAreaCategoryId;
+        StartDate = startDate;
+        Deadline = deadline;
+        UpdatedAt = updatedAtUtc;
+        Version++;
+    }
+
+    public bool AssignCommunity(
+        Guid communityId,
+        DateTimeOffset updatedAtUtc)
+    {
+        if (CommunityId == communityId)
+        {
+            return false;
+        }
+
+        CommunityId = communityId;
+        UpdatedAt = updatedAtUtc;
+        Version++;
+        return true;
     }
 
     public Guid Id { get; private set; }
@@ -92,4 +127,6 @@ public sealed class WorkArea
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset? UpdatedAt { get; private set; }
+
+    public int Version { get; private set; } = 1;
 }

@@ -14,6 +14,8 @@ public sealed class ParishCoordinationDbContext(DbContextOptions<ParishCoordinat
 
     public DbSet<WorkArea> WorkAreas => Set<WorkArea>();
 
+    public DbSet<WorkAreaCategory> WorkAreaCategories => Set<WorkAreaCategory>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ParishCoordinationDbContext).Assembly);

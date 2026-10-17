@@ -44,6 +44,13 @@ public sealed class SecurityAndContractTests
         var invalidCommunity = new CreateCommunityRequest();
         var tooLongCommunity = new CreateCommunityRequest { Name = new string('x', 151) };
         var whitespaceCommunity = new CreateCommunityRequest { Name = "   " };
+        var emptyCommunityUpdate = new UpdateCommunityRequest();
+        var whitespaceCommunityUpdate = new UpdateCommunityRequest { Name = "   " };
+        var tooLongCommunityUpdate = new UpdateCommunityRequest { Name = new string('x', 151) };
+        var validCommunityUpdate = new UpdateCommunityRequest
+        {
+            Status = ParishCoordination.Domain.Enums.CommunityStatus.Inactive
+        };
         var invalidUpdate = new UpdateParishRequest();
         var validUpdate = new UpdateParishRequest { Description = "updated" };
 
@@ -51,6 +58,10 @@ public sealed class SecurityAndContractTests
         Validate(invalidCommunity).Should().Contain(result => result.MemberNames.Contains(nameof(CreateCommunityRequest.Name)));
         Validate(tooLongCommunity).Should().Contain(result => result.MemberNames.Contains(nameof(CreateCommunityRequest.Name)));
         Validate(whitespaceCommunity).Should().Contain(result => result.MemberNames.Contains(nameof(CreateCommunityRequest.Name)));
+        Validate(emptyCommunityUpdate).Should().Contain(result => result.ErrorMessage!.Contains("At least one field"));
+        Validate(whitespaceCommunityUpdate).Should().Contain(result => result.MemberNames.Contains(nameof(UpdateCommunityRequest.Name)));
+        Validate(tooLongCommunityUpdate).Should().Contain(result => result.MemberNames.Contains(nameof(UpdateCommunityRequest.Name)));
+        Validate(validCommunityUpdate).Should().BeEmpty();
         Validate(invalidUpdate).Should().Contain(result => result.ErrorMessage!.Contains("At least one field"));
         Validate(validUpdate).Should().BeEmpty();
     }

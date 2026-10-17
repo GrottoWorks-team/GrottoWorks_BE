@@ -1,22 +1,28 @@
 # GrottoWorks Backend — Kế hoạch implement
 
-**Ngày lập:** 07/10/2026 · **Dựa trên:** `GrottoWorks_BE_Task_Assignment_Spec_v1.md` (v1.2), BA v1.1, ERD v3.5, API Contract v1.2
+**Ngày lập:** 07/10/2026 · **Cập nhật:** 14/10/2026 · **Dựa trên:** `GrottoWorks_BE_Task_Assignment_Spec_v1.md` (v1.3), BA v1.2, ERD v3.6, API Contract v1.3
 **Team:** Nguyễn Tiến Lâm (Leader) · Nguyễn Trí Vũ
 **Thời gian:** S0 (07/10/2026) → S9 (28/02/2027), 03/2027 tài liệu + bảo vệ
 
 > File này là kế hoạch **thực thi**: mỗi function ID trong spec được tách thành các bước code cụ thể, thứ tự làm, phụ thuộc và tiêu chí xong. Khi spec đổi, cập nhật spec trước rồi sửa file này trong cùng PR.
+>
+> **Path, operationId, role, tên event lấy đúng theo API Contract v1.3** (Spec §0). API đã implement thì giữ nguyên tài liệu; muốn đổi thì đổi code trước rồi cập nhật tài liệu trong cùng PR.
 
 ---
 
-## 0. Hiện trạng repo (`GrottoWorks_BE`, nhánh `main`, commit `69d2f0f`)
+## 0. Hiện trạng repo (`GrottoWorks_BE`, nhánh `main`, commit `4498720` — 14/10/2026)
 
 | Thành phần | Trạng thái |
 |---|---|
-| `Services/ParishCoordination` | Có Api / Application / Domain / Infrastructure; entity `Parish`; `listParishes`, `createParish`; migration `InitialCreateParish`; còn code mẫu `weatherforecast` |
+| `Services/ParishCoordination` | 12 API: `listParishes`, `createParish`, `getParish`, `updateParish`, `listCommunities`, `createCommunity`, `listSeasons`, `createSeason`, `getSeason`, `listWorkAreas`, `createWorkArea`, `getWorkArea`; role ADMIN/PARISH; season tạo ở PLANNING (không DRAFT), unique tên + năm; seed demo (1 parish, 2 community, 1 season, 1 work area); `tests/ParishCoordination.UnitTests` |
+| `Services/Identity` | 9 API (F-IDN-01, 02, 03, 05, 06) + event contract `identity.user.registered/locked/unlocked`; 49 unit test. Còn dùng bản local `Identity.Api.Common` |
+| `BuildingBlocks/` | `.Web`, `.Security`, `.Messaging` — bản đầu do Vũ commit `09170a5`; `IntegrationEventEnvelope` **chưa đủ field Contract §8** |
+| `ApiGateway/` | YARP, route theo path Contract cho identity + parish; thiếu `/admin/**`, `/roles` |
+| docker-compose | Có |
 | Pattern Application | Handler class thường (`CreateParishCommandHandler.HandleAsync`), đăng ký `AddScoped` trong `DependencyInjection.cs` — **không dùng MediatR**. Giữ pattern này cho mọi service |
-| `ApiGateway/`, `BuildingBlocks/` | Thư mục rỗng |
-| Chưa có | `.Contracts`, `tests/`, docker-compose, auth, messaging, CI |
-| Nhánh khác | `origin/lam-dev-1` chưa merge |
+| Chưa có | `.Contracts` cho Parish, Outbox/Inbox, Idempotency, OpenAPI tổng hợp, CI |
+
+**Lệch code ↔ Contract ở phần đã implement (ghi nhận, owner quyết):** role Contract = PARISH, code = ADMIN/PARISH; `SeasonDto` thiếu `version`, budget là số (Contract: Money); envelope event thiếu `eventId, correlationId, actorId, parishId, seasonId, aggregateVersion`.
 
 ---
 
@@ -29,7 +35,7 @@
 3. **Domain** — entity/aggregate + enum + method nghiệp vụ (state transition, kiểm tra BR) trong `.Domain`; ném `DomainException(code)` khi vi phạm rule.
 4. **Infrastructure** — `IEntityTypeConfiguration` khớp ERD v3.5 (tên bảng/cột snake_case, unique, check), repository, migration `dotnet ef migrations add <FunctionId>_<Mô tả>`.
 5. **Application** — Command/Query + Handler, scope check (`ICurrentUser` + projection `work_area_scope`), ghi outbox event nếu có.
-6. **Api** — Minimal API, `WithName(operationId)` + `WithTags`, request/response record theo schema API Contract, envelope `{ data, meta }`.
+6. **Api** — Minimal API, `WithName(operationId)` + `WithTags`, request/response record theo schema API Contract, envelope `{ data, meta }` / `{ data, page, meta }` (Contract 4.2).
 7. **Test** — unit test domain rule; integration test (Testcontainers PostgreSQL) cho happy path + 1 lỗi chính.
 8. **Contract** — event mới/đổi payload đặt trong `<Service>.Contracts`, tăng `Version`, tag người kia review.
 9. **PR** — commit `<type>(<Service>): <mô tả>`, review chéo, CI xanh, cập nhật `.http` file mẫu.
@@ -52,7 +58,7 @@
 | S7 | 11/01 – 24/01 | Support vật tư; material report; readiness; điểm | TSK-15b, 16, hỗ trợ FE/Mobile | RES-17, 18, 20, RDY-03..05, RPT-02, 03 |
 | S8 | 25/01 – 07/02 | Dashboard + báo cáo | NTF-05, 06, fix bug | RDY-06, RES-14, RPT-04, 05 |
 | Tết | 06/02 – 14/02 | Buffer | — | — |
-| S9 | 15/02 – 28/02 | Full flow demo | Hardening, E2E 17 kịch bản, perf | RPT-06, hardening, test |
+| S9 | 15/02 – 28/02 | Full flow demo | Hardening, E2E 16 kịch bản, perf | RPT-06, hardening, test |
 | — | 03/2027 | Bảo vệ | Tài liệu, deploy | Tài liệu, deploy |
 
 ---
@@ -65,10 +71,10 @@
 |---|---|---|---|
 | 1 | F-PLT-01 | Merge `lam-dev-1`; xóa `weatherforecast` khỏi `Program.cs`; thêm project `ParishCoordination.Contracts` và `tests/ParishCoordination.UnitTests`, `tests/ParishCoordination.IntegrationTests`; README "tạo service mới" | Template chuẩn để Vũ copy |
 | 2 | F-PLT-02 | `docker-compose.yml`: PostgreSQL 17 (script init tạo `identity_db, parish_db, task_db, resource_db, readiness_db, reporting_db, notify_db`), RabbitMQ 4 management, Redis, MinIO; `.env.example`; `docker-compose.override.yml` cho service | `docker compose up` |
-| 3 | F-PLT-03 | `BuildingBlocks.Web`: `ApiResponse<T>` / `PagedResponse<T>`, `DomainException` → ProblemDetails handler (`code`, `traceId`), parser `page/size/sort` (size ≤ 100, field lạ → 400), `CorrelationIdMiddleware`, health check `/health/live` `/health/ready`, extension `AddGrottoWorksDefaults()` | Package dùng chung, Parish dùng trước |
+| 3 | F-PLT-03 | `BuildingBlocks.Web`: `ApiResponse<T>` / `PagedResponse<T>`, `DomainException` → ProblemDetails handler (`code`, `correlationId`, `traceId`), parser `page/size/sort` (size ≤ 100, field lạ → 400), `CorrelationIdMiddleware`, health check `/health/live` `/health/ready`, extension `AddGrottoWorksDefaults()` | Package dùng chung, Parish dùng trước |
 | 4 | F-PLT-04 | `BuildingBlocks.Security`: JWT bearer (issuer/audience/key từ config), `ICurrentUser { UserId, Role, ParishId, CommunityId }`, policy `RequireRole(...)`, helper `EnsureSameParish` | Chờ Vũ chốt claim (giữa S1) |
-| 5 | F-PLT-05 | `BuildingBlocks.Messaging`: MassTransit + RabbitMQ, `IntegrationEvent` envelope (Mục 8 API Contract), EF Core Outbox/Inbox (`AddEntityFrameworkOutbox`), retry 3 lần → `_error` queue, base consumer idempotent theo `eventId` | Viết sample publish/consume giữa Parish ↔ service test |
-| 6 | F-PLT-06 | `ApiGateway` (YARP): route `/api/v1/{service-prefix}/**`, validate JWT, rate limit (fixed window) cho `/auth/*`, `/files/uploads`, `/reports/exports`, forward `X-Correlation-Id` | Login → gọi Parish qua gateway |
+| 5 | F-PLT-05 | `BuildingBlocks.Messaging`: MassTransit + RabbitMQ, `IntegrationEvent` envelope đủ 12 field Mục 8 API Contract (`eventId, eventType, version, occurredAt, correlationId, actorId, parishId, seasonId, aggregateType, aggregateId, aggregateVersion, payload`), EF Core Outbox/Inbox (`AddEntityFrameworkOutbox`), retry 3 lần → `_error` queue, base consumer idempotent theo `eventId` | Viết sample publish/consume giữa Parish ↔ service test |
+| 6 | F-PLT-06 | `ApiGateway` (YARP): route theo **path API Contract** (không prefix service; route cụ thể cho prefix dùng chung — Mục 10.2), validate JWT, rate limit (fixed window) cho `/auth/login`, `/auth/register`, `/auth/password/*`, `/files/upload-requests`, `/report-exports`, `/system-data-exports`, forward `X-Correlation-Id`; `/internal/**` không expose | Login → gọi Parish qua gateway |
 | 7 | F-PLT-08 | Gateway gom `/openapi/v1.json` từng service, Swagger UI | S2 |
 | 8 | F-PLT-09 | GitHub Actions: `dotnet build`, `dotnet test`, `dotnet format --verify-no-changes` | S2 |
 | 9 | F-PLT-07 | `IdempotencyFilter` (Redis, key + hash body + response, TTL 24h; trùng key khác body → 422) | S3, trước RES-09 / TSK-11 |
@@ -79,11 +85,11 @@
 |---|---|---|---|---|---|
 | 1 | F-PAR-01 | `Parish` (có) | `getParish`, `updateParish` (+ 2 cái đã có) | ADMIN/PARISH; status ACTIVE/INACTIVE | — |
 | 2 | F-PAR-02 | `Community` | `listCommunities`, `createCommunity`, `updateCommunity` | Tên unique trong parish; deactivate thay xóa | — |
-| 3 | F-PAR-04 | `WorkAreaCategory` | CRUD | Đã tham chiếu → chỉ deactivate | — |
-| 4 | F-PAR-05 | `ChristmasSeason` (+ `estimated_budget`) | `listSeasons`, `createSeason`, `getSeason`, `updateSeason` | BR-01..03; unique tên **và** năm trong parish; chỉ sửa DRAFT/PLANNING | — |
+| 3 | F-PAR-04 | `WorkAreaCategory` | `listWorkAreaCategories`, `createWorkAreaCategory`, `updateWorkAreaCategory` | Đã tham chiếu → chỉ deactivate | — |
+| 4 | F-PAR-05 | `ChristmasSeason` (+ `estimated_budget`) | `listSeasons`, `createSeason`, `getSeason`, `updateSeason` | BR-01..03; unique tên **và** năm trong parish; season tạo ở PLANNING; `updateSeason` chỉ khi PLANNING | — |
 | 5 | F-PAR-07 | `WorkArea` | `listWorkAreas`, `createWorkArea`, `getWorkArea`, `updateWorkArea` | BR-04, BR-05; lịch nằm trong season | `planning.work-area.created/updated` |
 | 6 | F-PAR-08 | cột leader/officer/community | `assignWorkAreaCommunity`, `assignWorkAreaLeader`, `assignMaterialOfficer` | BR-06; gọi `/internal/users` kiểm tra ACTIVE + đúng role | `planning.work-area.assigned` |
-| 7 | F-PAR-06 | state machine season | `activateSeason`, `completeSeason`, `archiveSeason` | Không activate khi work area thiếu leader/MO; không 2 season ACTIVE trùng thời gian; archive → read-only | `planning.season.activated/completed/archived` |
+| 7 | F-PAR-06 | state machine season | `activateSeason`, `completeSeason`, `archiveSeason` | PLANNING → ACTIVE → READY → COMPLETED → ARCHIVED (không DRAFT); không activate khi work area thiếu leader/MO; không 2 season ACTIVE trùng thời gian; archive → read-only | `planning.season.activated/completed/archived` |
 | 8 | F-PAR-09 | state machine work area | Consumer | PLANNED → IN_PROGRESS → READINESS_REVIEW → NEEDS_CORRECTION/READY → COMPLETED | consume `task.status.changed`, `readiness.area.*` |
 | 9 | F-PAR-10 | read-model `work_area_progress` | `getWorkAreaProgress` | % task COMPLETED | consume event Task |
 
@@ -102,20 +108,20 @@ Khởi tạo service theo template (S2, ngày đầu): `TaskExecution.*`, `task_
 | 5 | F-TSK-06 | `TaskAssignment`; assign/accept/decline; BR-11..14; capacity + override reason | IDN-09 | S3 |
 | 6 | F-TSK-07 | apply/approve/reject; tranh slot cuối → optimistic concurrency (test 2 request song song) | TSK-06 | S3 |
 | 7 | F-TSK-08 | `listMyTasks` | TSK-06 | S3 |
-| 8 | F-TSK-17 | Consumer `purchase.request.decided`; `POST /purchase-requests/{id}/purchase-task`; consumer `purchase.delivery.confirmed` → task COMPLETED | RES-07 (Vũ) | S4 |
+| 8 | F-TSK-17 | Consumer `purchase.request.decided`; `createPurchaseTask` — `POST /purchase-requests/{requestId}/purchase-tasks`; buyer accept → publish `task.purchase-task.assigned`; consumer `purchase.delivery.confirmed` → task COMPLETED | RES-07 (Vũ) | S4 |
 | 9 | F-TSK-11 | `attendance_request`, `attendance`; requestCheckIn → Leader duyệt **từng** request; check-out trực tiếp; `working_hours`; Idempotency-Key | PLT-07 | S4 |
 | 10 | F-TSK-09 | `task_progress`, `progress_evidence`; fileId phải complete (`/internal/files/{id}`) | NTF-01 | S4 |
-| 11 | F-TSK-10 | submit/review/approve/revision/resubmit; approve set `approved_by/at` + task COMPLETED trong 1 transaction | TSK-09 | S4 |
+| 11 | F-TSK-10 | submit/review/approve/revision/resubmit; approve set `approved_by/at` + task COMPLETED trong 1 transaction; event `task.progress.submitted`, `task.completion.reviewed` | TSK-09 | S4 |
 | 12 | F-TSK-05 | `listVolunteerMatches` (skill, community, availability, xung đột lịch BR-15), cache Redis | IDN-07 | S4 |
 | 13 | F-TSK-12 | Attendance correction BR-20..22 | TSK-11 | S5 |
 | 14 | F-TSK-13 | `listMyAttendance`, `getWorkingHours`, `listLongOpenSessions` + `BackgroundService` quét phiên mở lâu | TSK-11 | S5 |
 | 15 | F-TSK-14 | Support request STAFFING/MATERIAL/MIXED, position + skill (AND), material item | — | S6 |
 | 16 | F-TSK-15 | Response nhân lực, approve member → tạo assignment | TSK-14 | S6 |
-| 17 | F-TSK-15b | Response vật tư (MO nguồn), approve → `support.material.approved`; consume `support.transfer.confirmed` → FULFILLED/PARTIALLY_FULFILLED | RES-20 (Vũ) | S7 |
+| 17 | F-TSK-15b | Response vật tư (MO nguồn); `approveSupportMaterial` gọi **đồng bộ** Resource `POST /internal/support-transfers` (typed HttpClient, Idempotency-Key = itemId, không retry POST) — 409 `MATERIAL_INSUFFICIENT_AVAILABLE` trả thẳng cho Leader; 200 → APPROVED + `support.material.approved` (thông báo); consume `support.transfer.confirmed` → FULFILLED/PARTIALLY_FULFILLED | RES-20 (Vũ) | S7 |
 | 18 | F-TSK-16 | `getCrossCommunitySupportSummary` | TSK-14/15 | S7 |
 | + | Internal | `POST /internal/tasks` cho corrective task (Idempotency-Key) | — | **hết S6** |
 
-**Mốc giao cho Vũ:** `task.materials.changed`, `task.completion.reviewed`, `task.assignment.responded` hết S4; `POST /internal/tasks` hết S6; `support.material.approved` giữa S7.
+**Mốc giao cho Vũ:** `task.materials.changed`, `task.completion.reviewed`, `task.purchase-task.assigned` hết S4; `POST /internal/tasks` hết S6; `support.material.approved` giữa S7.
 
 ### 3.4 NotificationAudit — S3 → S8
 
@@ -164,26 +170,26 @@ Khởi tạo (S2): `Services/Resource/*`, `resource_db`, outbox/inbox.
 
 | Thứ tự | Function | Việc chính | Phụ thuộc | Sprint |
 |---|---|---|---|---|
-| 1 | F-RES-01 | `work_area_scope`, `task_projection`; consumer `planning.*`, `task.materials.changed`, `task.completion.reviewed`, `task.assignment.responded` (task PURCHASE → lưu buyer) | PAR-07/08 (Lâm) | S2 |
+| 1 | F-RES-01 | `work_area_scope`, `task_projection`; consumer `planning.*`, `task.materials.changed`, `task.completion.reviewed`, `task.purchase-task.assigned` (lưu buyer, PR → `BUYER_ASSIGNED`) | PAR-07/08 (Lâm) | S2 |
 | 2 | F-RES-02 | `material_category`, `material` (code unique, đơn vị tính) | — | S2 |
 | 3 | F-RES-03 | `material_requirement` unique (work_area, material), quantity > 0, MO đúng work area | RES-01 | S3 |
 | 4 | F-RES-04 | `material_transaction` + `recordOpeningStock`, `listInventory`, `getAllocationHistory`; BR-23, BR-24 | thiết kế ledger | S3 |
 | 5 | F-RES-05 | `getWorkAreaShortages`, `listMaterialNeeds`; BR-25; event `material.shortage.changed` | RES-03/04 | S3 |
 | 6 | F-RES-06 | `purchase_request` + items; CRUD/submit/history; BR-27; shortage = 0 → cần override + lý do | RES-05 | S4 |
 | 7 | F-RES-07 | `approvePurchaseRequest`, `rejectPurchaseRequest` — **role LEADER** đúng work area (D-01); reject cần lý do (BR-31); event `purchase.request.submitted/decided` | RES-06 | S4 (**giữa S4 chốt với Lâm**) |
-| 8 | F-RES-12 | Donor CRUD; không auto-merge; link `user_id` tùy chọn | — | S5 |
+| 8 | F-RES-12 | `listDonors`, `createDonor`, `updateDonor`; không auto-merge; link `user_id` tùy chọn | — | S5 |
 | 9 | F-RES-09 | `purchase`, `purchase_item`; `recordPurchase`, `attachPurchaseReceipt`; chỉ buyer (assignee ACCEPTED của task PURCHASE); status PURCHASED, stock **chưa** tăng (BR-26); Idempotency-Key | TSK-17, NTF-01, PLT-07 | S5 |
 | 10 | F-RES-10 | `confirmPurchaseDelivery` (usable qty → ledger + tính lại shortage trong 1 transaction; giao thiếu → còn phần dở), `requestPurchaseInfo`; event `purchase.delivery.confirmed` | RES-09 | S5 |
-| 11 | F-RES-13 | `donation`, `donation_item`, `donation_receipt(_item)`; `recordDirectDonation` (RECEIVED + 1 receipt, 1 transaction); `listDonations`, `getDonation`, `listMyContributions`; event `contribution.donation.recorded` | RES-12 | S5 |
+| 11 | F-RES-13 | `donation`, `donation_item`, `donation_receipt(_item)`; `recordDirectDonation` (RECEIVED + 1 receipt, 1 transaction); `listDonations`, `getDonation`, `listMyContributions`; event `contribution.receipt.confirmed` | RES-12 | S5 |
 | 12 | F-RES-11 | `approveCostOverrun` (LEADER); BR-32 chặn confirm khi vượt dự toán | RES-10 | S6 |
-| 13 | F-RES-13b | Pledge: `listContributionNeeds`, `pledgeMaterialDonation`, `pledgeMonetarySupport`, `cancelDonationPledge`; pledge không tăng stock (BR-39) | RES-13 | S6 |
-| 14 | F-RES-13c | `recordDonationReceipt`; BR-38 cộng dồn, PARTIALLY_RECEIVED → RECEIVED, nhận vượt → cảnh báo | RES-13b | S6 |
+| 13 | F-RES-13b | Pledge: `listContributionNeeds`, `pledgeMaterialDonation`, `pledgeMonetarySupport`, `cancelDonationPledge`; pledge không tăng stock (BR-39); event `contribution.pledged` | RES-13 | S6 |
+| 14 | F-RES-13c | `recordDonationReceipt`; BR-38 cộng dồn, PARTIALLY_RECEIVED → RECEIVED, nhận vượt → cảnh báo; event `contribution.receipt.confirmed` | RES-13b | S6 |
 | 15 | F-RES-15 | `material_allocation(_item)`; `allocateMaterial`, `listMaterialAllocations`; BR-33; test 2 MO song song → 1 thành công, 1 `MATERIAL_INSUFFICIENT_AVAILABLE` | RES-04, task_projection | S6 |
 | 16 | F-RES-16 | `createInventoryAdjustment`; damaged/lost/disposed không quay lại usable (BR-43) | RES-04 | S6 |
-| 17 | F-RES-17 | `task_material_report(_item)`; submit (Volunteer), list, verify, revision (MO); BR-44..51 | RES-15, `task.completion.reviewed` | S7 |
+| 17 | F-RES-17 | `task_material_report(_item)`; submit (Volunteer), list, verify, revision (MO); BR-44..51; event `material-report.submitted/verified` | RES-15, `task.completion.reviewed` | S7 |
 | 18 | F-RES-18 | `borrowed_item`, `borrow_transaction`; loan offer (D-05) → accept/reject → issue/assign/return/incident; job nhắc hạn → `borrowed-item.return-due/overdue` | — | S7 |
-| 19 | F-RES-20 | Consumer `support.material.approved` → TRANSFER_OUT; `POST /support-transfers/{id}/confirm` (MO nhận) → TRANSFER_IN; event `support.transfer.confirmed` | TSK-15b (Lâm) | S7 |
-| 20 | F-RES-14 | `PATCH /donations/{id}` reconcile delta stock + contribution; event `contribution.donation.adjusted` | RES-13c | S8 (P2) |
+| 19 | F-RES-20 | `POST /internal/support-transfers` (Task gọi đồng bộ): khóa tồn kho nguồn, kiểm tra unallocated, ghi TRANSFER_OUT, idempotent theo itemId; `confirmSupportMaterialReceipt` — `POST /support-response-materials/{itemId}/confirm-receipt` (MO nhận, Resource host) → TRANSFER_IN; event `support.transfer.confirmed` | TSK-15b (Lâm) | S7 |
+| 20 | F-RES-14 | `adjustDonation` — `PATCH /donations/{donationId}` reconcile delta stock + contribution; event `contribution.donation.adjusted` | RES-13c | S8 (P2) |
 
 ### 4.3 Readiness — S6 → S8
 
@@ -202,7 +208,7 @@ Khởi tạo (S2): `Services/Resource/*`, `resource_db`, outbox/inbox.
 |---|---|---|---|---|
 | 0 | Setup | `Services/Reporting/*`, `reporting_db`, inbox | — | S6 |
 | 1 | F-RPT-01 | `contribution_type`, `recognition_rule` (version, `effective_from/to`); đổi điểm = version mới (BR-68) | — | S6 |
-| 2 | F-RPT-02 | Consumer `task.completion.reviewed`, `attendance.hours.approved`, `purchase.delivery.confirmed`, `contribution.donation.recorded/adjusted`, `support.member.completed` → `contribution` + `recognition_point` (lưu rule version); unique theo eventId/reference (BR-54..56); event `recognition.entry.created` | Event từ Task/Resource | S7 |
+| 2 | F-RPT-02 | Consumer `task.completion.reviewed`, `attendance.hours.approved`, `purchase.delivery.confirmed`, `contribution.receipt.confirmed`, `contribution.donation.adjusted`, `support.member.completed` → `contribution` + `recognition_point` (lưu rule version); unique theo eventId/reference (BR-54..56); event `recognition.entry.created` | Event từ Task/Resource | S7 |
 | 3 | F-RPT-03 | `getMyRecognition`, `getSeasonRecognition` | RPT-02 | S7 |
 | 4 | F-RPT-04 | Read-model dashboard (season, work area, material) cập nhật từ event; cache Redis; mục tiêu < 3s | Toàn bộ event | S8 |
 | 5 | F-RPT-05 | 6 báo cáo (task, material, purchase, contribution, attendance, readiness); BR-57 ghi parish/season/thời gian/bộ lọc | RPT-04 | S8 |
@@ -220,10 +226,11 @@ Khởi tạo (S2): `Services/Resource/*`, `resource_db`, outbox/inbox.
 | Hết S2 (15/11) | Lâm | `planning.work-area.*`, `planning.season.*` | Vũ (Resource) | Vũ seed `work_area_scope` bằng script |
 | Hết S2 (15/11) | Vũ | `GET /internal/users` | Lâm (assign) | Lâm stub client trả user ACTIVE |
 | Hết S3 (29/11) | Lâm | File upload + `/internal/files/{id}` | Cả hai | Cho phép fileId bỏ qua kiểm tra ở môi trường dev |
-| Giữa S4 (06/12) | Vũ ↔ Lâm | `purchase.request.decided` + rule buyer = assignee task PURCHASE | Cả hai | — (phải chốt, chặn demo S4/S5) |
+| Giữa S4 (06/12) | Vũ ↔ Lâm | `purchase.request.decided` + `task.purchase-task.assigned` (buyer = assignee task PURCHASE) | Cả hai | — (phải chốt, chặn demo S4/S5) |
 | Hết S4 (13/12) | Lâm | `task.materials.changed`, `task.completion.reviewed` | Vũ (allocation, report) | Vũ publish event giả bằng tool test |
 | Hết S6 (10/01) | Lâm | `POST /internal/tasks` | Vũ (corrective task) | RDY-04 chỉ hỗ trợ link task có sẵn |
-| Giữa S7 (18/01) | Lâm ↔ Vũ | `support.material.approved` / `support.transfer.confirmed` | Cả hai | — |
+| Đầu S7 (13/01) | Vũ | `POST /internal/support-transfers` | Lâm (TSK-15b) | Lâm stub client trả 200 |
+| Giữa S7 (18/01) | Vũ | `confirmSupportMaterialReceipt` + `support.transfer.confirmed` | Lâm | — |
 
 **Cách tránh chặn nhau:** event contract (record C# trong `.Contracts`) được merge **trước** phần implement, để bên consumer code song song với dữ liệu giả.
 
@@ -237,7 +244,7 @@ Khởi tạo (S2): `Services/Resource/*`, `resource_db`, outbox/inbox.
 | Integration | `WebApplicationFactory` + Testcontainers (PostgreSQL, RabbitMQ) | Mỗi người | Trong từng PR |
 | Contract event | Test serialize/deserialize event giữa publisher và consumer | Người publish viết, người consume review | Khi đổi `.Contracts` |
 | Concurrency | Test song song: tranh slot task (TSK-07), allocation (RES-15), transfer (RES-20) | Owner | S3, S6, S7 |
-| E2E | Bộ `.http` / Postman collection chạy 16 kịch bản (Mục 8 spec) qua gateway | Lâm chủ trì, Vũ viết phần mình | S9 |
+| E2E | Bộ `.http` / Postman collection chạy 16 kịch bản (BA §17 / Mục 8 spec) qua gateway | Lâm chủ trì, Vũ viết phần mình | S9 |
 | Performance | k6: dashboard < 3s, list endpoint chính | Vũ (dashboard), Lâm (còn lại) | S9 |
 
 Kịch bản nghiệm thu theo owner (Mục 8 spec): Lâm #1–4, #11, #16; Vũ #5–10, #12–14; cả hai #15.
@@ -263,14 +270,18 @@ Kịch bản nghiệm thu theo owner (Mục 8 spec): Lâm #1–4, #11, #16; Vũ 
 **Chung**
 - [ ] Đọc lại BA v1.1, ERD v3.5, API Contract v1.2; comment chỗ chưa đồng ý.
 - [ ] Tạo GitHub Project board: 1 function ID = 1 issue, label owner/priority/sprint.
-- [x] Thống nhất JWT claim + event envelope, ghi vào `BuildingBlocks/README.md`.
+- [x] Thống nhất JWT claim, ghi vào `BuildingBlocks/README.md`.
+- [ ] Event envelope: `BuildingBlocks/README.md §2` + `IntegrationEventEnvelope` sửa đủ field Contract §8.
+- [x] Đồng bộ Spec v1.3, BA v1.2, ERD v3.6, API Contract v1.3 (14/10/2026).
 
 **Lâm**
-- [ ] Merge `lam-dev-1`, xóa `weatherforecast`.
-- [ ] Thêm `.Contracts` + `tests/` cho Parish; README tạo service mới.
-- [ ] `docker-compose.yml` (PostgreSQL nhiều DB, RabbitMQ, Redis, MinIO).
-- [ ] `BuildingBlocks.Web` v1.
-- [ ] `getParish`, `updateParish`.
+- [x] Merge `lam-dev-1`, xóa `weatherforecast`.
+- [x] `tests/` cho Parish.
+- [ ] `.Contracts` cho Parish; README tạo service mới.
+- [x] `docker-compose.yml` (bản đầu `09170a5`, Lâm review).
+- [x] `BuildingBlocks.Web` v1.
+- [x] `getParish`, `updateParish`; community, season, work area (list/create/get); season tạo ở PLANNING.
+- [ ] Gateway: route `/admin/**`, `/roles`.
 
 **Vũ**
 - [x] Tạo `Services/Identity` theo template Parish, thêm vào `GrottoWorks_BE.slnx`.
@@ -286,11 +297,64 @@ Kịch bản nghiệm thu theo owner (Mục 8 spec): Lâm #1–4, #11, #16; Vũ 
 
 | Service | Owner | P0 | P1 | P2 | Xong |
 |---|---|---|---|---|---|
-| Platform | Lâm | PLT-01..06 | PLT-07..09 | — | 0 / 9 |
-| ParishCoordination | Lâm | PAR-01, 02, 05..08 | PAR-04, 09, 10 | — | 0 / 9 (PAR-01 một phần) |
+| Platform | Lâm | PLT-01..06 | PLT-07..09 | — | 🟨 PLT-02..06 bản đầu (`09170a5`); PLT-05 envelope cần sửa |
+| ParishCoordination | Lâm | PAR-01, 02, 05..08 | PAR-04, 09, 10 | — | ✅ PAR-01 · 🟨 PAR-02 (thiếu update), PAR-05 (thiếu update), PAR-07 (thiếu update) |
 | TaskExecution | Lâm | TSK-01..04, 06..11, 17 | TSK-05, 12..15, 15b | TSK-16 | 0 / 18 |
 | NotificationAudit | Lâm | NTF-01 | NTF-02..04 | NTF-05, 06 | 0 / 6 |
 | Identity | Vũ | IDN-01..03, 05..09 | IDN-04, 10 | — | 5 / 10 (S0+S1: IDN-01, 02, 03, 05, 06) |
 | Resource | Vũ | RES-01..07, 09, 10, 12, 13, 15, 17 | RES-11, 13b, 13c, 16, 18, 20 | RES-14 | 0 / 20 |
 | Readiness | Vũ | — | RDY-02..06 | — | 0 / 5 |
 | Reporting | Vũ | — | RPT-01..05 | RPT-06 | 0 / 6 |
+
+---
+
+## 10. Đồng bộ với API Contract v1.3 (14/10/2026)
+
+### 10.1 Quyết định đã chốt
+
+| ID | Nội dung | Ảnh hưởng |
+|---|---|---|
+| R-05 | Hệ thống phục vụ 1 giáo xứ; dữ liệu seed demo. Giữ nguyên các API parish đã code (`createParish`, `listParishes`, …) | Không đổi tài liệu |
+| R-06 | Season không có DRAFT, tạo ở PLANNING (đã code `41dac24`) | F-PAR-05, 06; BA v1.2, ERD v3.6, Contract v1.3 |
+| R-07 | Danh mục event thống nhất (10.3) | Contract §8, Spec §6.1 |
+| R-08 | `approveSupportMaterial` gọi đồng bộ Resource `POST /internal/support-transfers` | F-TSK-15b, F-RES-20 |
+| R-09 | Tên **và** năm season unique trong parish (đã code) | ERD v3.6, Contract v1.3 |
+
+### 10.2 Route gateway (prefix `/api/v1`; route cụ thể đặt `Order` nhỏ hơn route chung)
+
+| Route | Service |
+|---|---|
+| `/users/me/tasks`, `/users/me/attendance` | task |
+| `/users/me/contributions` | resource |
+| `/users/me/recognition` | reporting |
+| `/users/me/notification-preferences` | notify |
+| `/users/**`, `/auth/**`, `/skills/**`, `/admin/**`, `/roles` | identity |
+| `/seasons/{id}/material-needs`, `/seasons/{id}/contribution-needs` | resource |
+| `/seasons/{id}/support-summary` | task |
+| `/seasons/{id}/readiness` | readiness |
+| `/seasons/{id}/recognition` | reporting |
+| `/parishes/**`, `/communities/**`, `/work-area-categories/**`, `/seasons/**` | parish |
+| `/work-areas/{id}/tasks`, `/attendance-requests`, `/attendance-corrections`, `/working-hours` | task |
+| `/work-areas/{id}/material-requirements`, `/work-areas/{id}/shortages` | resource |
+| `/work-areas/{id}/readiness-checks` | readiness |
+| `/work-areas/**` | parish |
+| `/tasks/{id}/material-reports` | resource |
+| `/purchase-requests/{id}/purchase-tasks` | task |
+| `/support-response-materials/{id}/confirm-receipt` | resource |
+| `/tasks/**`, `/task-applications/**`, `/task-assignments/**`, `/attendance/**`, `/attendance-requests/**`, `/attendance-corrections/**`, `/support-requests/**`, `/support-response-members/**`, `/support-response-materials/**` | task |
+| `/purchase-requests/**`, `/purchases/**`, `/material-categories/**`, `/materials/**`, `/material-requirements/**`, `/material-allocations/**`, `/inventory/**`, `/inventory-adjustments/**`, `/task-material-reports/**`, `/donations/**`, `/donors/**`, `/loan-offers/**`, `/borrowed-items/**` | resource |
+| `/readiness-checks/**` | readiness |
+| `/dashboards/**`, `/reports/**`, `/report-exports/**`, `/contribution-types/**`, `/recognition-rules/**` | reporting |
+| `/notifications/**`, `/notification-rules/**`, `/activity-logs/**`, `/resource-history/**`, `/system-data-exports/**`, `/backups/**`, `/files/**` | notify |
+| `/internal/**` | không expose |
+
+### 10.3 Danh mục event (khớp Contract v1.3 Mục 8)
+
+| Publisher | Event |
+|---|---|
+| Identity | `identity.user.registered`, `identity.user.locked`, `identity.user.unlocked` |
+| Parish | `planning.season.activated/completed/archived`, `planning.work-area.created/updated/assigned` |
+| Task | `task.status.changed`, `task.materials.changed`, `task.assignment.created/responded`, `task.purchase-task.assigned`, `task.progress.submitted`, `task.completion.reviewed`, `attendance.request.submitted/reviewed`, `attendance.hours.approved`, `attendance.session.open-too-long`, `support.request.published`, `support.member.completed`, `support.material.approved` |
+| Resource | `material.shortage.changed`, `material-report.submitted/verified`, `purchase.request.submitted/decided`, `purchase.delivery.confirmed`, `contribution.pledged`, `contribution.receipt.confirmed`, `contribution.donation.adjusted`, `loan.offer.submitted`, `borrowed-item.return-due/overdue`, `support.transfer.confirmed` |
+| Readiness | `readiness.item.failed`, `readiness.area.ready/reopened` |
+| Reporting | `recognition.entry.created` |

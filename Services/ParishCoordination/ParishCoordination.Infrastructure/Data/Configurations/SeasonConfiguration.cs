@@ -67,6 +67,11 @@ public sealed class SeasonConfiguration : IEntityTypeConfiguration<Season>
             .HasColumnName("updated_at")
             .HasColumnType("timestamp with time zone");
 
+        builder.Property(season => season.Version)
+            .HasColumnName("version")
+            .HasDefaultValue(1)
+            .IsConcurrencyToken();
+
         builder.HasIndex(season => new { season.ParishId, season.SeasonYear })
             .IsUnique();
 

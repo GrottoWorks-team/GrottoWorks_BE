@@ -125,27 +125,51 @@ internal sealed class FakeSeasonRepository : ISeasonRepository
     public Guid? LastScopeId { get; private set; }
     public bool ThrowNameConflictOnSave { get; set; }
     public bool ThrowYearConflictOnSave { get; set; }
+    public bool ThrowConcurrencyOnSave { get; set; }
+    public int SaveChangesCount { get; private set; }
 
     public Task<Season?> GetByIdAsync(
         Guid seasonId,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.SingleOrDefault(season => season.Id == seasonId));
+
+    public Task<Season?> GetByIdForUpdateAsync(
+        Guid seasonId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.SingleOrDefault(season => season.Id == seasonId));
+
     public Task<bool> ExistsByNameAsync(
         Guid parishId,
         string name,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(Items.Any(season => season.ParishId == parishId && season.Name == name));
+        CancellationToken cancellationToken = default,
+        Guid? excludeSeasonId = null) =>
+        Task.FromResult(Items.Any(season =>
+            season.ParishId == parishId &&
+            season.Name == name &&
+            (!excludeSeasonId.HasValue || season.Id != excludeSeasonId.Value)));
 
     public Task<bool> ExistsByYearAsync(
         Guid parishId,
         int seasonYear,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(Items.Any(season => season.ParishId == parishId && season.SeasonYear == seasonYear));
+        CancellationToken cancellationToken = default,
+        Guid? excludeSeasonId = null) =>
+        Task.FromResult(Items.Any(season =>
+            season.ParishId == parishId &&
+            season.SeasonYear == seasonYear &&
+            (!excludeSeasonId.HasValue || season.Id != excludeSeasonId.Value)));
 
     public void Add(Season season) => Items.Add(season);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        SaveChangesCount++;
+
+        if (ThrowConcurrencyOnSave)
+        {
+            throw new SeasonConcurrencyException(
+                new InvalidOperationException("simulated concurrency"));
+        }
+
         if (ThrowNameConflictOnSave)
         {
             throw new SeasonNameConflictException(new InvalidOperationException("simulated name conflict"));

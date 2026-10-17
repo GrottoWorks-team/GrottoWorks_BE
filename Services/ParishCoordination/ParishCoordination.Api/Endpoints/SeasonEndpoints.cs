@@ -3,10 +3,12 @@ using BuildingBlocks.Security;
 using BuildingBlocks.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using ParishCoordination.Api.Requests;
 using ParishCoordination.Application.Seasons;
 using ParishCoordination.Application.Seasons.Commands.CreateSeason;
+using ParishCoordination.Application.Seasons.Commands.UpdateSeason;
 using ParishCoordination.Application.Seasons.Queries.GetSeasons;
 using ParishCoordination.Application.Seasons.Queries.GetSeason;
 
@@ -46,6 +48,22 @@ public static class SeasonEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        app.MapPatch("/api/v1/seasons/{seasonId}", UpdateSeasonAsync)
+            .WithName("updateSeason")
+            .WithTags("Parish")
+            .RequireAuthorization(policy => policy.RequireRole(
+                GrottoWorksRoles.Admin,
+                GrottoWorksRoles.Parish))
+            .Accepts<UpdateSeasonRequest>("application/json")
+            .Produces<ApiResponse<SeasonDto>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
     }
 
@@ -98,8 +116,11 @@ public static class SeasonEndpoints
                 "SEASON_NOT_FOUND");
         }
 
+        SetETag(httpContext, season.Version);
+
         return Results.Ok(ApiResults.Ok(season, httpContext));
     }
+
     private static async Task<IResult> CreateSeasonAsync(
         CreateSeasonRequest request,
         HttpContext httpContext,
@@ -147,14 +168,153 @@ public static class SeasonEndpoints
                 "SEASON_YEAR_CONFLICT");
         }
 
+        var season = result.Season!;
+        SetETag(httpContext, season.Version);
+
         return Results.Json(
-            ApiResults.Ok(result.Season!, httpContext),
+            ApiResults.Ok(season, httpContext),
             statusCode: StatusCodes.Status201Created);
+    }
+
+    private static async Task<IResult> UpdateSeasonAsync(
+        Guid seasonId,
+        UpdateSeasonRequest request,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
+        HttpContext httpContext,
+        UpdateSeasonCommandHandler commandHandler,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseExpectedVersion(ifMatch, out var expectedVersion))
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status400BadRequest,
+                "Invalid If-Match header",
+                "If-Match must contain a positive integer version.",
+                "INVALID_IF_MATCH");
+        }
+
+        var result = await commandHandler.HandleAsync(
+            new UpdateSeasonCommand(
+                seasonId,
+                request.Name?.Trim(),
+                request.SeasonYear,
+                request.StartDate,
+                request.EndDate,
+                request.Description is not null,
+                CleanOptionalText(request.Description),
+                request.EstimatedBudget,
+                expectedVersion),
+            cancellationToken);
+
+        if (result.Outcome == UpdateSeasonOutcome.NotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Season not found",
+                $"Season with ID '{seasonId}' was not found.",
+                "SEASON_NOT_FOUND");
+        }
+
+        if (result.Outcome == UpdateSeasonOutcome.InvalidState)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "Season cannot be updated",
+                "Only seasons in PLANNING status can be updated.",
+                "SEASON_INVALID_STATE");
+        }
+
+        if (result.Outcome == UpdateSeasonOutcome.InvalidDateRange)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status422UnprocessableEntity,
+                "Invalid season date range",
+                "End date must be after start date.",
+                "SEASON_INVALID_DATE_RANGE");
+        }
+
+        if (result.Outcome == UpdateSeasonOutcome.NameConflict)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "Season name conflict",
+                "A season with the same name already exists in this parish.",
+                "SEASON_NAME_CONFLICT");
+        }
+
+        if (result.Outcome == UpdateSeasonOutcome.YearConflict)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "Season year conflict",
+                "A season with the same year already exists in this parish.",
+                "SEASON_YEAR_CONFLICT");
+        }
+
+        if (result.Outcome == UpdateSeasonOutcome.VersionMismatch)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status412PreconditionFailed,
+                "Season version mismatch",
+                "The season was changed by another request. Load it again and retry.",
+                "SEASON_VERSION_MISMATCH");
+        }
+
+        var season = result.Season!;
+        SetETag(httpContext, season.Version);
+
+        return Results.Ok(ApiResults.Ok(season, httpContext));
     }
 
     private static string? CleanOptionalText(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static bool TryParseExpectedVersion(
+        string? ifMatch,
+        out int? expectedVersion)
+    {
+        expectedVersion = null;
+
+        if (string.IsNullOrWhiteSpace(ifMatch))
+        {
+            return true;
+        }
+
+        var value = ifMatch.Trim();
+        var startsWithQuote = value.StartsWith('"');
+        var endsWithQuote = value.EndsWith('"');
+
+        if (startsWithQuote || endsWithQuote)
+        {
+            if (!startsWithQuote || !endsWithQuote || value.Length <= 2)
+            {
+                return false;
+            }
+
+            value = value[1..^1];
+        }
+
+        if (!int.TryParse(value, out var version) || version <= 0)
+        {
+            return false;
+        }
+
+        expectedVersion = version;
+        return true;
+    }
+
+    private static void SetETag(HttpContext httpContext, int version)
+    {
+        httpContext.Response.Headers.ETag = $"\"{version}\"";
     }
 
     private static IResult CreateProblem(

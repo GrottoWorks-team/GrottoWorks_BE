@@ -73,6 +73,12 @@ namespace Identity.Infrastructure.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("UserId");
 
                     b.HasIndex("Email")
@@ -82,6 +88,50 @@ namespace Identity.Infrastructure.Data.Migrations
                     b.HasIndex("RoleId");
 
                     b.ToTable("app_user", (string)null);
+                });
+
+            modelBuilder.Entity("Identity.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.Property<Guid>("PasswordResetTokenId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("password_reset_token_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("PasswordResetTokenId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_password_reset_token_token_hash");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_password_reset_token_user_id");
+
+                    b.ToTable("password_reset_token", null, t =>
+                        {
+                            t.HasCheckConstraint("password_reset_token_valid_ttl", "\"expires_at\" > \"created_at\"");
+                        });
                 });
 
             modelBuilder.Entity("Identity.Domain.Entities.RefreshToken", b =>
@@ -213,7 +263,6 @@ namespace Identity.Infrastructure.Data.Migrations
             modelBuilder.Entity("Identity.Domain.Entities.VolunteerAvailability", b =>
                 {
                     b.Property<Guid>("VolunteerAvailabilityId")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("volunteer_availability_id");
 
@@ -270,7 +319,6 @@ namespace Identity.Infrastructure.Data.Migrations
             modelBuilder.Entity("Identity.Domain.Entities.VolunteerSkill", b =>
                 {
                     b.Property<Guid>("VolunteerSkillId")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("volunteer_skill_id");
 
@@ -311,6 +359,15 @@ namespace Identity.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("Identity.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.HasOne("Identity.Domain.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Identity.Domain.Entities.RefreshToken", b =>

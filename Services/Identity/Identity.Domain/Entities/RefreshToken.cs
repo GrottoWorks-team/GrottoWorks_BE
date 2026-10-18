@@ -13,6 +13,7 @@ public sealed class RefreshToken
     public const string ReasonLoggedOut = "logged_out";
     public const string ReasonExpired = "expired";
     public const string ReasonUserBlocked = "user_blocked";
+    public const string ReasonPasswordReset = "password_reset";
 
     private RefreshToken()
     {

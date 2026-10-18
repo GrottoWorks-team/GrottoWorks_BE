@@ -21,12 +21,34 @@ public sealed class ExceptionHandlingMiddleware(
             ["AUTH_INVALID_REFRESH_TOKEN"] = (401, "Invalid refresh token"),
             ["AUTH_REFRESH_TOKEN_EXPIRED"] = (401, "Refresh token expired"),
             ["AUTH_REFRESH_TOKEN_REUSED"] = (401, "Refresh token reused"),
+            ["AUTH_RESET_TOKEN_INVALID"] = (422, "Invalid or expired reset code"),
+            // 400 — malformed query (API Contract 4.4)
+            ["INVALID_FILTER_FIELD"] = (400, "Unknown query parameter"),
+            ["INVALID_FILTER_VALUE"] = (400, "Invalid filter value"),
+            ["INVALID_PAGE"] = (400, "Invalid page"),
+            ["INVALID_PAGE_SIZE"] = (400, "Invalid page size"),
+            ["INVALID_SORT_FIELD"] = (400, "Invalid sort field"),
+            ["INVALID_SORT_DIRECTION"] = (400, "Invalid sort direction"),
+            ["INVALID_IF_MATCH"] = (400, "Invalid If-Match header"),
+            ["INTERNAL_USERS_IDS_REQUIRED"] = (400, "User ids required"),
+            ["INTERNAL_USERS_TOO_MANY_IDS"] = (400, "Too many user ids"),
+            // 403 — outside data scope
+            ["USER_PARISH_SCOPE_REQUIRED"] = (403, "Parish scope required"),
             // 404 — not found
             ["USER_NOT_FOUND"] = (404, "User not found"),
             ["SKILL_NOT_FOUND"] = (404, "Skill not found"),
             // 409 — conflicts
             ["AUTH_EMAIL_ALREADY_EXISTS"] = (409, "Email already registered"),
             ["SKILL_CODE_ALREADY_EXISTS"] = (409, "Skill code already exists"),
+            ["USER_ALREADY_LOCKED"] = (409, "Account already locked"),
+            ["USER_NOT_LOCKED"] = (409, "Account not locked"),
+            ["USER_LOCKED_USE_UNLOCK"] = (409, "Account is locked"),
+            ["USER_CANNOT_LOCK_SELF"] = (409, "Cannot lock own account"),
+            ["USER_CANNOT_DEACTIVATE_SELF"] = (409, "Cannot deactivate own account"),
+            ["USER_CANNOT_CHANGE_OWN_ROLE"] = (409, "Cannot change own role"),
+            ["USER_COMMUNITY_OUTSIDE_PARISH"] = (409, "Community outside the new parish"),
+            // 412 — optimistic concurrency (API Contract 4.1)
+            ["USER_VERSION_MISMATCH"] = (412, "Version mismatch"),
             // 422 — field validation
             ["AUTH_EMAIL_INVALID"] = (422, "Invalid email"),
             ["AUTH_PASSWORD_POLICY_VIOLATION"] = (422, "Password does not meet the policy"),
@@ -47,7 +69,21 @@ public sealed class ExceptionHandlingMiddleware(
             ["VOLUNTEER_SKILL_INVALID"] = (422, "Invalid volunteer skill"),
             ["REFRESH_TOKEN_USER_REQUIRED"] = (422, "Invalid refresh token"),
             ["REFRESH_TOKEN_HASH_REQUIRED"] = (422, "Invalid refresh token"),
-            ["REFRESH_TOKEN_INVALID_TTL"] = (422, "Invalid refresh token lifetime")
+            ["REFRESH_TOKEN_INVALID_TTL"] = (422, "Invalid refresh token lifetime"),
+            ["ROLE_UNKNOWN"] = (422, "Unknown role"),
+            ["USER_PARISH_UNKNOWN"] = (422, "Unknown parish"),
+            ["USER_STATUS_USE_LOCK"] = (422, "Use the lock endpoint"),
+            ["REASON_INVALID"] = (422, "Reason required"),
+            ["VOLUNTEER_SKILL_UNKNOWN"] = (422, "Unknown skill"),
+            ["VOLUNTEER_SKILL_INACTIVE"] = (422, "Inactive skill"),
+            ["VOLUNTEER_SKILL_DUPLICATE"] = (422, "Duplicate skill"),
+            ["VOLUNTEER_SKILL_LIMIT"] = (422, "Too many skills"),
+            ["AVAILABILITY_OVERLAP"] = (422, "Overlapping availability"),
+            ["AVAILABILITY_LIMIT"] = (422, "Too many availability slots"),
+            ["AVAILABILITY_NOTE_TOO_LONG"] = (422, "Availability note too long"),
+            ["PASSWORD_RESET_USER_REQUIRED"] = (422, "Invalid reset code"),
+            ["PASSWORD_RESET_HASH_REQUIRED"] = (422, "Invalid reset code"),
+            ["PASSWORD_RESET_INVALID_TTL"] = (422, "Invalid reset code lifetime")
         };
 
     public async Task InvokeAsync(HttpContext context)

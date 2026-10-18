@@ -71,6 +71,23 @@ public sealed class RefreshTokenStore(IdentityDbContext dbContext) : IRefreshTok
         }
     }
 
+    public async Task RevokeAllForUserAsync(
+        Guid userId,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        // Tracked update so the revocation commits atomically with the caller's account change.
+        var live = await dbContext.RefreshTokens
+            .Where(token => token.UserId == userId && token.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in live)
+        {
+            token.Revoke(reason, now);
+        }
+    }
+
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         await dbContext.SaveChangesAsync(cancellationToken);

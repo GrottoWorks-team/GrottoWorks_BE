@@ -22,6 +22,20 @@ public sealed class SkillStore(IdentityDbContext dbContext) : ISkillStore
         return dbContext.Skills.FirstOrDefaultAsync(skill => skill.SkillId == skillId, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Skill>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> skillIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (skillIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await dbContext.Skills
+            .Where(skill => skillIds.Contains(skill.SkillId))
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<bool> CodeExistsAsync(
         string normalizedCode,
         CancellationToken cancellationToken = default)

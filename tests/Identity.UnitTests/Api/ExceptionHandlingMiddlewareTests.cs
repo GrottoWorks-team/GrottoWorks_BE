@@ -96,3 +96,32 @@ public class ExceptionHandlingMiddlewareTests
         context.Response.Body.Length.Should().Be(0);
     }
 }
+/// <summary>S2 error codes keep their documented HTTP status (API Contract 4.3).</summary>
+public sealed class ExceptionHandlingMiddlewareS2Tests
+{
+    [Theory]
+    [InlineData("INVALID_PAGE_SIZE", 400)]
+    [InlineData("INVALID_FILTER_FIELD", 400)]
+    [InlineData("USER_PARISH_SCOPE_REQUIRED", 403)]
+    [InlineData("USER_NOT_FOUND", 404)]
+    [InlineData("USER_ALREADY_LOCKED", 409)]
+    [InlineData("USER_CANNOT_LOCK_SELF", 409)]
+    [InlineData("USER_VERSION_MISMATCH", 412)]
+    [InlineData("AUTH_RESET_TOKEN_INVALID", 422)]
+    [InlineData("AVAILABILITY_OVERLAP", 422)]
+    [InlineData("VOLUNTEER_SKILL_UNKNOWN", 422)]
+    [InlineData("ROLE_UNKNOWN", 422)]
+    [InlineData("REASON_INVALID", 422)]
+    public async Task Maps_code_to_status(string code, int expectedStatus)
+    {
+        var context = new DefaultHttpContext { Response = { Body = new MemoryStream() } };
+        var middleware = new ExceptionHandlingMiddleware(
+            _ => throw new DomainException(code, "detail"),
+            NullLogger<ExceptionHandlingMiddleware>.Instance);
+
+        await middleware.InvokeAsync(context);
+
+        context.Response.StatusCode.Should().Be(expectedStatus);
+        context.Response.ContentType.Should().StartWith("application/problem+json");
+    }
+}

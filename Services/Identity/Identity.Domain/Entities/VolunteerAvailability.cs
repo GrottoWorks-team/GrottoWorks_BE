@@ -18,8 +18,8 @@ public sealed class VolunteerAvailability
     {
         VolunteerAvailabilityId = volunteerAvailabilityId;
         VolunteerUserId = volunteerUserId;
-        AvailableFrom = availableFrom;
-        AvailableTo = availableTo;
+        AvailableFrom = availableFrom.ToUniversalTime();
+        AvailableTo = availableTo.ToUniversalTime();
         AvailabilityNote = availabilityNote;
     }
 
@@ -42,13 +42,24 @@ public sealed class VolunteerAvailability
                 "Available to must be after available from.");
         }
 
+        var note = string.IsNullOrWhiteSpace(availabilityNote) ? null : availabilityNote.Trim();
+        if (note is { Length: > MaxNoteLength })
+        {
+            throw new DomainException(
+                "AVAILABILITY_NOTE_TOO_LONG",
+                $"Availability note must not exceed {MaxNoteLength} characters.");
+        }
+
+        // timestamptz columns only accept UTC offsets through Npgsql; all server times are UTC (spec 2.1).
         return new VolunteerAvailability(
             Guid.NewGuid(),
             volunteerUserId,
-            availableFrom,
-            availableTo,
-            string.IsNullOrWhiteSpace(availabilityNote) ? null : availabilityNote.Trim());
+            availableFrom.ToUniversalTime(),
+            availableTo.ToUniversalTime(),
+            note);
     }
+
+    public const int MaxNoteLength = 500;
 
     public Guid VolunteerAvailabilityId { get; private set; }
 
@@ -69,8 +80,8 @@ public sealed class VolunteerAvailability
                 "Available to must be after available from.");
         }
 
-        AvailableFrom = availableFrom;
-        AvailableTo = availableTo;
+        AvailableFrom = availableFrom.ToUniversalTime();
+        AvailableTo = availableTo.ToUniversalTime();
 
         if (availabilityNote is not null)
         {

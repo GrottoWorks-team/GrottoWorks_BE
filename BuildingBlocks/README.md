@@ -54,3 +54,41 @@ Tuy nhiên `Identity.Api` **vẫn còn** bản địa phương `Identity.Api.Com
 CurrentUser) — di chuyển sang package chung được ghi nhận ở đây để không phá 49 test
 unit đang xanh; refactor Identity sang `BuildingBlocks.Web` + `BuildingBlocks.Security`
 là việc còn lại của F-PLT-03/04, xóa bản địa phương sau khi test xanh.
+
+## 5. Gọi service-to-service (`/internal/**`) — đề xuất của Vũ, cần Lâm review
+
+Áp dụng cho `GET /internal/users` (F-IDN-09, đã có) và sau này `POST /internal/tasks`,
+`POST /internal/support-transfers`, `GET /internal/files/{id}`.
+
+| Mục | Quy ước |
+|---|---|
+| Xác thực | Header `X-Internal-Api-Key: <key>`; key chung cấu hình `InternalApi:ApiKey` (env `InternalApi__ApiKey`, compose lấy từ `INTERNAL_API_KEY` trong `.env`), tối thiểu 32 ký tự, so sánh constant-time. Thiếu cấu hình → mọi call bị 401 `INTERNAL_AUTH_REQUIRED` |
+| Mạng | Gateway **không** có route `/internal/**` (gọi qua gateway → 404); chỉ service trong compose network gọi trực tiếp `http://identity.api:8080/internal/...` |
+| OpenAPI | Endpoint internal `ExcludeFromDescription()` — không lộ cho FE/Mobile |
+| Response | Cùng envelope `{ data, meta }` và ProblemDetails như API public |
+| Client | Typed `HttpClient`, timeout, retry chỉ cho GET, circuit breaker (spec §6.2) |
+
+### `GET /internal/users?ids=<uuid>,<uuid>` (Identity)
+
+`ids` phân tách bằng dấu phẩy và/hoặc lặp tham số; 1–100 id (sai → 400). Id không tồn tại bị **bỏ qua**
+(caller tự so sánh danh sách trả về). Thứ tự theo thứ tự `ids` gửi lên.
+
+```json
+{
+  "data": [
+    {
+      "userId": "uuid",
+      "displayName": "Nguyễn Văn A",
+      "status": "ACTIVE",
+      "role": "LEADER",
+      "parishId": "uuid",
+      "communityId": "uuid | null",
+      "skillIds": ["uuid"]
+    }
+  ],
+  "meta": { "correlationId": "uuid" }
+}
+```
+
+Parish (F-PAR-08) kiểm tra `status == ACTIVE`, `role` đúng (LEADER/MO) và `parishId` khớp; Task (F-TSK-06)
+dùng thêm `communityId`, `skillIds`. Không trả email/sđt (giảm dữ liệu cá nhân qua service khác).

@@ -23,5 +23,8 @@ public interface IRefreshTokenStore
     /// <summary>Revokes every token of a family — used on logout and on reuse detection.</summary>
     Task RevokeFamilyAsync(Guid familyId, string reason, DateTimeOffset now, CancellationToken cancellationToken = default);
 
+    /// <summary>Revokes every live token of the user — used on password reset, lock and deactivation.</summary>
+    Task RevokeAllForUserAsync(Guid userId, string reason, DateTimeOffset now, CancellationToken cancellationToken = default);
+
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

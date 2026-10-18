@@ -84,3 +84,126 @@ Authorization: Bearer {{accessToken}}
 }
 
 ###
+
+# =====================================================================================
+# S2 — F-IDN-04, 07, 08, 09, 10
+# =====================================================================================
+@adminToken = {{adminLogin.response.body.$.data.accessToken}}
+@newUserId = {{createUser.response.body.$.data.id}}
+@newUserVersion = {{createUser.response.body.$.data.version}}
+@internalApiKey = dev-internal-api-key-change-me-0123456789
+
+### F-IDN-04 — request a reset code (always 202; in Development the code is written to the log)
+POST {{Identity.Api_HostAddress}}/api/v1/auth/password/forgot
+Content-Type: application/json
+
+{
+  "email": "volunteer@grottoworks.local"
+}
+
+### F-IDN-04 — set a new password with the code (204; revokes every refresh token)
+POST {{Identity.Api_HostAddress}}/api/v1/auth/password/reset
+Content-Type: application/json
+
+{
+  "token": "<code from the log>",
+  "newPassword": "Volunteer456"
+}
+
+### F-IDN-07 — replace my skills (VOLUNTEER; ids from GET /skills)
+PUT {{Identity.Api_HostAddress}}/api/v1/users/me/skills
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "skillIds": ["00000000-0000-0000-0000-000000000000"]
+}
+
+### F-IDN-07 — replace my availability (VOLUNTEER; BR-70, no overlap; [] clears)
+PUT {{Identity.Api_HostAddress}}/api/v1/users/me/availability
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+[
+  { "availableFrom": "2026-12-20T08:00:00+07:00", "availableTo": "2026-12-20T11:30:00+07:00", "note": "Buổi sáng" },
+  { "availableFrom": "2026-12-21T18:00:00+07:00", "availableTo": "2026-12-21T21:00:00+07:00" }
+]
+
+### F-IDN-08 — admin login
+# @name adminLogin
+POST {{Identity.Api_HostAddress}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@grottoworks.local",
+  "password": "<Seed:AdminPassword>"
+}
+
+### F-IDN-08 — list assignable roles
+GET {{Identity.Api_HostAddress}}/api/v1/roles
+Authorization: Bearer {{adminToken}}
+
+### F-IDN-08 — create a LEADER (omit password → the owner sets it through password reset)
+# @name createUser
+POST {{Identity.Api_HostAddress}}/api/v1/admin/users
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "email": "leader@grottoworks.local",
+  "displayName": "Trưởng khu vực Hang đá",
+  "role": "LEADER",
+  "parishId": "00000000-0000-0000-0000-000000000001",
+  "password": "Leader1234"
+}
+
+### F-IDN-08 — list users (filters: parishId, role, status, communityId, skillId, q; sort displayName|email|createdAt)
+GET {{Identity.Api_HostAddress}}/api/v1/admin/users?role=LEADER&status=ACTIVE&sort=createdAt,desc&page=1&size=20
+Authorization: Bearer {{adminToken}}
+
+### F-IDN-08 — update account data (version or If-Match → 412 when stale)
+PATCH {{Identity.Api_HostAddress}}/api/v1/admin/users/{{newUserId}}
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+If-Match: "{{newUserVersion}}"
+
+{
+  "phone": "0900000002"
+}
+
+### F-IDN-08 — lock (revokes refresh tokens, publishes identity.user.locked)
+POST {{Identity.Api_HostAddress}}/api/v1/admin/users/{{newUserId}}/lock
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "reason": "Tạm khóa để kiểm tra"
+}
+
+### F-IDN-08 — unlock
+POST {{Identity.Api_HostAddress}}/api/v1/admin/users/{{newUserId}}/unlock
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "reason": "Đã kiểm tra xong"
+}
+
+### F-IDN-08 — assign the single role (send parishId when the new role needs one, BR-67)
+PUT {{Identity.Api_HostAddress}}/api/v1/admin/users/{{newUserId}}/role
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "role": "MO"
+}
+
+### F-IDN-10 — users of my parish (PARISH, LEADER, MO; filters: role, status, communityId, skillId, q)
+GET {{Identity.Api_HostAddress}}/api/v1/users?role=VOLUNTEER&status=ACTIVE&size=20
+Authorization: Bearer {{accessToken}}
+
+### F-IDN-09 — internal lookup (service-to-service; not routed by the gateway)
+GET {{Identity.Api_HostAddress}}/internal/users?ids={{newUserId}}
+X-Internal-Api-Key: {{internalApiKey}}
+
+###

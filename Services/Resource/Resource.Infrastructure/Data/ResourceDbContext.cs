@@ -16,6 +16,8 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
 
     public DbSet<MaterialRequirement> MaterialRequirements => Set<MaterialRequirement>();
 
+    public DbSet<MaterialTransaction> MaterialTransactions => Set<MaterialTransaction>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ResourceDbContext).Assembly);

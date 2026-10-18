@@ -175,6 +175,74 @@ namespace Resource.Infrastructure.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Resource.Domain.Inventory.MaterialTransaction", b =>
+                {
+                    b.Property<Guid>("MaterialTransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_transaction_id");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_id");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("transaction_note");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("transaction_quantity");
+
+                    b.Property<Guid?>("ReferenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reference_id");
+
+                    b.Property<string>("ReferenceType")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("reference_type");
+
+                    b.Property<DateTimeOffset>("TransactionDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("transaction_date");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("transaction_type");
+
+                    b.Property<Guid>("WorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_id");
+
+                    b.HasKey("MaterialTransactionId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("ReferenceType", "ReferenceId", "Type")
+                        .IsUnique()
+                        .HasDatabaseName("ux_material_transaction_reference");
+
+                    b.HasIndex(new[] { "WorkAreaId", "MaterialId" }, "ix_material_transaction_work_area_material");
+
+                    b.HasIndex(new[] { "WorkAreaId", "MaterialId" }, "ux_material_transaction_opening_stock")
+                        .IsUnique()
+                        .HasFilter("\"transaction_type\" = 'OPENING_STOCK'");
+
+                    b.ToTable("material_transaction", null, t =>
+                        {
+                            t.HasCheckConstraint("material_transaction_quantity_non_zero", "\"transaction_quantity\" <> 0");
+
+                            t.HasCheckConstraint("material_transaction_quantity_sign", "(\"transaction_type\" IN ('OPENING_STOCK','PURCHASE_DELIVERY','DONATION_RECEIPT','TASK_RETURN','TRANSFER_IN') AND \"transaction_quantity\" > 0) OR (\"transaction_type\" IN ('TRANSFER_OUT','ADJUSTMENT_DAMAGED','ADJUSTMENT_LOST','ADJUSTMENT_DISPOSED') AND \"transaction_quantity\" < 0)");
+                        });
+                });
+
             modelBuilder.Entity("Resource.Domain.Scope.WorkAreaScope", b =>
                 {
                     b.Property<Guid>("WorkAreaId")
@@ -248,6 +316,15 @@ namespace Resource.Infrastructure.Data.Migrations
                 });
 
             modelBuilder.Entity("Resource.Domain.Inventory.MaterialRequirement", b =>
+                {
+                    b.HasOne("Resource.Domain.Catalog.Material", null)
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Resource.Domain.Inventory.MaterialTransaction", b =>
                 {
                     b.HasOne("Resource.Domain.Catalog.Material", null)
                         .WithMany()

@@ -9,6 +9,10 @@ internal static class EnumText
         where TEnum : struct, Enum =>
         new(value => ToText(value), text => FromText<TEnum>(text));
 
+    public static ValueConverter<TEnum?, string?> NullableConverter<TEnum>()
+        where TEnum : struct, Enum =>
+        new(value => value == null ? null : ToText(value.Value), text => text == null ? null : FromText<TEnum>(text));
+
     public static string ToText<TEnum>(TEnum value)
         where TEnum : struct, Enum
     {

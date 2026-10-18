@@ -8,6 +8,8 @@ using Resource.Application.Scope;
 using Resource.Infrastructure.Scope;
 using Resource.Application.Requirements;
 using Resource.Infrastructure.Requirements;
+using Resource.Application.Inventory;
+using Resource.Infrastructure.Inventory;
 using Resource.Infrastructure.Data;
 using Resource.Infrastructure.Observability;
 
@@ -28,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<IMaterialCatalogStore, MaterialCatalogStore>();
         services.AddScoped<IWorkAreaScopeStore, WorkAreaScopeStore>();
         services.AddScoped<IMaterialRequirementStore, MaterialRequirementStore>();
+        services.AddScoped<IInventoryStore, InventoryStore>();
 
         return services;
     }

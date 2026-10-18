@@ -176,3 +176,48 @@ public sealed class FakeRequirementStore : Resource.Application.Requirements.IMa
         return Task.CompletedTask;
     }
 }
+
+/// <summary>In-memory ledger; required totals are read from the shared requirement fake (same unit of work).</summary>
+public sealed class FakeInventoryStore(FakeRequirementStore requirements) : Resource.Application.Inventory.IInventoryStore
+{
+    public List<Resource.Domain.Inventory.MaterialTransaction> Ledger { get; } = [];
+
+    public int SaveChangesCount { get; private set; }
+
+    public void Append(Resource.Domain.Inventory.MaterialTransaction transaction) => Ledger.Add(transaction);
+
+    public Task<bool> OpeningStockExistsAsync(Guid workAreaId, Guid materialId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Ledger.Any(t => t.WorkAreaId == workAreaId && t.MaterialId == materialId &&
+                                        t.Type == Resource.Domain.Inventory.TransactionType.OpeningStock));
+
+    public Task<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>> GetLedgerTotalsAsync(
+        IReadOnlyCollection<Guid> workAreaIds, Guid? materialId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>>(Ledger
+            .Where(t => workAreaIds.Contains(t.WorkAreaId) && (materialId is null || t.MaterialId == materialId))
+            .GroupBy(t => (t.WorkAreaId, t.MaterialId))
+            .Select(g => new Resource.Application.Inventory.QuantityByMaterial(g.Key.WorkAreaId, g.Key.MaterialId, g.Sum(t => t.Quantity)))
+            .ToList());
+
+    public Task<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>> GetRequiredTotalsAsync(
+        IReadOnlyCollection<Guid> workAreaIds, Guid? materialId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>>(requirements.Requirements
+            .Where(r => workAreaIds.Contains(r.WorkAreaId) && r.Status == Resource.Domain.Inventory.RequirementStatus.Active &&
+                        (materialId is null || r.MaterialId == materialId))
+            .Select(r => new Resource.Application.Inventory.QuantityByMaterial(r.WorkAreaId, r.MaterialId, r.RequiredQuantity))
+            .ToList());
+
+    public Task<IReadOnlyList<Resource.Domain.Inventory.MaterialTransaction>> ListTransactionsAsync(
+        Resource.Application.Inventory.TransactionQuery query, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Inventory.MaterialTransaction>>(Ledger
+            .Where(t => t.MaterialId == query.MaterialId && query.WorkAreaIds.Contains(t.WorkAreaId) &&
+                        (query.From is null || t.TransactionDate >= query.From) && (query.To is null || t.TransactionDate <= query.To))
+            .OrderByDescending(t => t.TransactionDate)
+            .Take(query.Limit)
+            .ToList());
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+        return Task.CompletedTask;
+    }
+}

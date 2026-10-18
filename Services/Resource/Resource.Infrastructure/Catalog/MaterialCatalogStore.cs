@@ -99,9 +99,9 @@ public sealed class MaterialCatalogStore(ResourceDbContext dbContext) : IMateria
     public Task<bool> MaterialCodeExistsAsync(string normalizedCode, CancellationToken cancellationToken = default) =>
         dbContext.Materials.AnyAsync(material => material.Code == normalizedCode, cancellationToken);
 
-    public Task<bool> IsMaterialReferencedAsync(Guid materialId, CancellationToken cancellationToken = default) =>
-        // Extended with the stock ledger in F-RES-04.
-        dbContext.MaterialRequirements.AnyAsync(requirement => requirement.MaterialId == materialId, cancellationToken);
+    public async Task<bool> IsMaterialReferencedAsync(Guid materialId, CancellationToken cancellationToken = default) =>
+        await dbContext.MaterialRequirements.AnyAsync(requirement => requirement.MaterialId == materialId, cancellationToken) ||
+        await dbContext.MaterialTransactions.AnyAsync(transaction => transaction.MaterialId == materialId, cancellationToken);
 
     public void AddMaterial(Material material) => dbContext.Materials.Add(material);
 

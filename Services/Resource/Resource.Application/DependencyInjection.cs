@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Resource.Application.Catalog;
 using Resource.Application.Scope;
 using Resource.Application.Requirements;
+using Resource.Application.Inventory;
 
 namespace Resource.Application;
 
@@ -29,6 +30,12 @@ public static class DependencyInjection
         services.AddScoped<ListMaterialRequirementsQueryHandler>();
         services.AddScoped<CreateMaterialRequirementCommandHandler>();
         services.AddScoped<UpdateMaterialRequirementCommandHandler>();
+
+        // F-RES-04 stock ledger
+        services.AddScoped<InventoryReader>();
+        services.AddScoped<RecordOpeningStockCommandHandler>();
+        services.AddScoped<ListInventoryQueryHandler>();
+        services.AddScoped<GetMaterialHistoryQueryHandler>();
 
         return services;
     }

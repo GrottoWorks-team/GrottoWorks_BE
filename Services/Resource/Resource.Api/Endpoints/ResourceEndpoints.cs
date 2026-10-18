@@ -8,6 +8,7 @@ public static class ResourceEndpoints
         app.MapCatalogEndpoints();
         app.MapInternalScopeEndpoints();
         app.MapRequirementEndpoints();
+        app.MapInventoryEndpoints();
         return app;
     }
 }

@@ -28,9 +28,14 @@ public sealed class RequirementTests
     private WorkAreaAccess Access(Guid? userId = null, string role = GrottoWorksRoles.MaterialOfficer, Guid? parish = null) =>
         new(_scopes, new FakeCurrentUser(userId ?? _officer, role, parish ?? Parish));
 
-    private CreateMaterialRequirementCommandHandler Create(WorkAreaAccess? access = null) => new(access ?? Access(), _requirements, _catalog);
+    private readonly FakeIntegrationEventPublisher _events = new();
 
-    private UpdateMaterialRequirementCommandHandler Update(WorkAreaAccess? access = null) => new(access ?? Access(), _requirements, _catalog);
+    private Resource.Application.Shortages.ShortageTracker Tracker() =>
+        new(new Resource.Application.Inventory.InventoryReader(new FakeInventoryStore(_requirements), _catalog), _events);
+
+    private CreateMaterialRequirementCommandHandler Create(WorkAreaAccess? access = null) => new(access ?? Access(), _requirements, _catalog, Tracker());
+
+    private UpdateMaterialRequirementCommandHandler Update(WorkAreaAccess? access = null) => new(access ?? Access(), _requirements, _catalog, Tracker());
 
     private static async Task<DomainRuleException> Fails(Func<Task> act) =>
         (await act.Should().ThrowAsync<DomainRuleException>()).Which;

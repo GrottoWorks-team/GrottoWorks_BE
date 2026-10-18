@@ -1,6 +1,7 @@
 using BuildingBlocks.Security;
 using Resource.Application.Catalog;
 using Resource.Application.Scope;
+using Resource.Application.Shortages;
 using Resource.Domain;
 using Resource.Domain.Catalog;
 using Resource.Domain.Inventory;
@@ -33,13 +34,14 @@ public sealed class RecordOpeningStockCommandHandler(
     WorkAreaAccess access,
     ICurrentUser currentUser,
     IInventoryStore inventory,
-    IMaterialCatalogStore catalog)
+    IMaterialCatalogStore catalog,
+    ShortageTracker shortages)
 {
     public async Task<InventoryTransactionDto> HandleAsync(
         RecordOpeningStockCommand command,
         CancellationToken cancellationToken = default)
     {
-        await access.ForMaterialOfficerWriteAsync(command.WorkAreaId, cancellationToken);
+        var scope = await access.ForMaterialOfficerWriteAsync(command.WorkAreaId, cancellationToken);
 
         var material = await catalog.GetMaterialAsync(command.MaterialId, cancellationToken)
             ?? throw DomainRuleException.Validation("MATERIAL_UNKNOWN", "The material does not exist.");
@@ -71,8 +73,10 @@ public sealed class RecordOpeningStockCommandHandler(
                 "Opening stock was already recorded for this material in this work area. Use an inventory adjustment.");
         }
 
+        var before = await shortages.CaptureAsync(scope, command.MaterialId, cancellationToken);
         inventory.Append(transaction);
         await inventory.SaveChangesAsync(cancellationToken);
+        await shortages.PublishIfChangedAsync(before, cancellationToken);
         return InventoryTransactionDto.From(transaction);
     }
 }

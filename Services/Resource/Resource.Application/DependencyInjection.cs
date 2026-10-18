@@ -3,6 +3,7 @@ using Resource.Application.Catalog;
 using Resource.Application.Scope;
 using Resource.Application.Requirements;
 using Resource.Application.Inventory;
+using Resource.Application.Shortages;
 
 namespace Resource.Application;
 
@@ -36,6 +37,11 @@ public static class DependencyInjection
         services.AddScoped<RecordOpeningStockCommandHandler>();
         services.AddScoped<ListInventoryQueryHandler>();
         services.AddScoped<GetMaterialHistoryQueryHandler>();
+
+        // F-RES-05 shortages
+        services.AddScoped<ShortageTracker>();
+        services.AddScoped<GetWorkAreaShortagesQueryHandler>();
+        services.AddScoped<ListMaterialNeedsQueryHandler>();
 
         return services;
     }

@@ -34,8 +34,11 @@ public sealed class InventoryHandlerTests
     private WorkAreaAccess Access(Guid? user = null, string role = GrottoWorksRoles.MaterialOfficer, Guid? parish = null) =>
         new(_scopes, new FakeCurrentUser(user ?? _officer, role, parish ?? Parish));
 
+    private readonly FakeIntegrationEventPublisher _events = new();
+
     private RecordOpeningStockCommandHandler Opening() =>
-        new(Access(), new FakeCurrentUser(_officer, GrottoWorksRoles.MaterialOfficer, Parish), _inventory, _catalog);
+        new(Access(), new FakeCurrentUser(_officer, GrottoWorksRoles.MaterialOfficer, Parish), _inventory, _catalog,
+            new Resource.Application.Shortages.ShortageTracker(new InventoryReader(_inventory, _catalog), _events));
 
     private ListInventoryQueryHandler List(string role = GrottoWorksRoles.Parish) =>
         new(Access(Guid.NewGuid(), role), _scopes, new InventoryReader(_inventory, _catalog));

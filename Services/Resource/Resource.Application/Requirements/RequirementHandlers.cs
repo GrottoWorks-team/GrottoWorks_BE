@@ -1,5 +1,6 @@
 using Resource.Application.Catalog;
 using Resource.Application.Scope;
+using Resource.Application.Shortages;
 using Resource.Domain;
 using Resource.Domain.Catalog;
 using Resource.Domain.Inventory;
@@ -82,13 +83,14 @@ public sealed class ListMaterialRequirementsQueryHandler(
 public sealed class CreateMaterialRequirementCommandHandler(
     WorkAreaAccess access,
     IMaterialRequirementStore store,
-    IMaterialCatalogStore catalog)
+    IMaterialCatalogStore catalog,
+    ShortageTracker shortages)
 {
     public async Task<MaterialRequirementDto> HandleAsync(
         CreateMaterialRequirementCommand command,
         CancellationToken cancellationToken = default)
     {
-        await access.ForMaterialOfficerWriteAsync(command.WorkAreaId, cancellationToken);
+        var scope = await access.ForMaterialOfficerWriteAsync(command.WorkAreaId, cancellationToken);
 
         var material = await catalog.GetMaterialAsync(command.MaterialId, cancellationToken)
             ?? throw DomainRuleException.Validation("MATERIAL_UNKNOWN", "The material does not exist.");
@@ -113,8 +115,10 @@ public sealed class CreateMaterialRequirementCommandHandler(
                 "This work area already has a requirement for the material. Update it instead.");
         }
 
+        var before = await shortages.CaptureAsync(scope, command.MaterialId, cancellationToken);
         store.Add(requirement);
         await store.SaveChangesAsync(cancellationToken);
+        await shortages.PublishIfChangedAsync(before, cancellationToken);
         return MaterialRequirementDto.From(requirement, material);
     }
 }
@@ -123,7 +127,8 @@ public sealed class CreateMaterialRequirementCommandHandler(
 public sealed class UpdateMaterialRequirementCommandHandler(
     WorkAreaAccess access,
     IMaterialRequirementStore store,
-    IMaterialCatalogStore catalog)
+    IMaterialCatalogStore catalog,
+    ShortageTracker shortages)
 {
     public async Task<MaterialRequirementDto> HandleAsync(
         UpdateMaterialRequirementCommand command,
@@ -133,7 +138,7 @@ public sealed class UpdateMaterialRequirementCommandHandler(
             ?? throw DomainRuleException.NotFound("REQUIREMENT_NOT_FOUND", "The material requirement does not exist.");
 
         // Scope first: an officer of another parish must not learn that the id exists.
-        await access.ForMaterialOfficerWriteAsync(requirement.WorkAreaId, cancellationToken);
+        var scope = await access.ForMaterialOfficerWriteAsync(requirement.WorkAreaId, cancellationToken);
         requirement.EnsureVersion(command.Version);
 
         var material = await catalog.GetMaterialAsync(requirement.MaterialId, cancellationToken)
@@ -146,8 +151,10 @@ public sealed class UpdateMaterialRequirementCommandHandler(
             throw DomainRuleException.Validation("MATERIAL_INACTIVE", "An inactive material cannot be required again.");
         }
 
+        var before = await shortages.CaptureAsync(scope, requirement.MaterialId, cancellationToken);
         requirement.Update(command.RequiredQuantity, command.ExistingQuantity, command.Note, command.Status, DateTimeOffset.UtcNow);
         await store.SaveChangesAsync(cancellationToken);
+        await shortages.PublishIfChangedAsync(before, cancellationToken);
         return MaterialRequirementDto.From(requirement, material);
     }
 }

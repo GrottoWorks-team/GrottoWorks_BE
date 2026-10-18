@@ -5,6 +5,7 @@ public static class ResourceEndpoints
 {
     public static IEndpointRouteBuilder MapResourceEndpoints(this IEndpointRouteBuilder app)
     {
+        app.MapCatalogEndpoints();
         return app;
     }
 }

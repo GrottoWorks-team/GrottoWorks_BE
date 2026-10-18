@@ -243,6 +243,158 @@ namespace Resource.Infrastructure.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Resource.Domain.Purchases.PurchaseRequest", b =>
+                {
+                    b.Property<Guid>("PurchaseRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_request_id");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DecisionNote")
+                        .HasColumnType("text")
+                        .HasColumnName("decision_note");
+
+                    b.Property<DateTimeOffset?>("RejectedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("rejected_at");
+
+                    b.Property<string>("RequestReason")
+                        .HasColumnType("text")
+                        .HasColumnName("request_reason");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by_user_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("request_status");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<Guid>("WorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_id");
+
+                    b.HasKey("PurchaseRequestId");
+
+                    b.HasIndex(new[] { "WorkAreaId", "Status" }, "ix_purchase_request_work_area_status");
+
+                    b.ToTable("purchase_request", null, t =>
+                        {
+                            t.HasCheckConstraint("purchase_request_rejection_note", "\"request_status\" <> 'REJECTED' OR \"decision_note\" IS NOT NULL");
+                        });
+                });
+
+            modelBuilder.Entity("Resource.Domain.Purchases.PurchaseRequestItem", b =>
+                {
+                    b.Property<Guid>("PurchaseRequestItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_request_item_id");
+
+                    b.Property<decimal?>("EstimatedCost")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("estimated_cost");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_id");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("item_note");
+
+                    b.Property<Guid>("PurchaseRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_request_id");
+
+                    b.Property<decimal>("RequestedQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("requested_quantity");
+
+                    b.Property<string>("ShortageOverrideReason")
+                        .HasColumnType("text")
+                        .HasColumnName("shortage_override_reason");
+
+                    b.HasKey("PurchaseRequestItemId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("PurchaseRequestId", "MaterialId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_purchase_request_item_request_material");
+
+                    b.ToTable("purchase_request_item", null, t =>
+                        {
+                            t.HasCheckConstraint("purchase_request_item_nonnegative_cost", "\"estimated_cost\" IS NULL OR \"estimated_cost\" >= 0");
+
+                            t.HasCheckConstraint("purchase_request_item_positive_quantity", "\"requested_quantity\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Resource.Domain.Purchases.PurchaseRequestStateChange", b =>
+                {
+                    b.Property<Guid>("PurchaseRequestStateChangeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_request_state_change_id");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<Guid>("ChangedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("changed_by_user_id");
+
+                    b.Property<string>("FromStatus")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("from_status");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("change_note");
+
+                    b.Property<Guid>("PurchaseRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_request_id");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("to_status");
+
+                    b.HasKey("PurchaseRequestStateChangeId");
+
+                    b.HasIndex(new[] { "PurchaseRequestId", "ChangedAt" }, "ix_purchase_request_state_change_request");
+
+                    b.ToTable("purchase_request_state_change", (string)null);
+                });
+
             modelBuilder.Entity("Resource.Domain.Scope.WorkAreaScope", b =>
                 {
                     b.Property<Guid>("WorkAreaId")
@@ -331,6 +483,37 @@ namespace Resource.Infrastructure.Data.Migrations
                         .HasForeignKey("MaterialId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Resource.Domain.Purchases.PurchaseRequestItem", b =>
+                {
+                    b.HasOne("Resource.Domain.Catalog.Material", null)
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Resource.Domain.Purchases.PurchaseRequest", null)
+                        .WithMany("Items")
+                        .HasForeignKey("PurchaseRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Resource.Domain.Purchases.PurchaseRequestStateChange", b =>
+                {
+                    b.HasOne("Resource.Domain.Purchases.PurchaseRequest", null)
+                        .WithMany("StateChanges")
+                        .HasForeignKey("PurchaseRequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Resource.Domain.Purchases.PurchaseRequest", b =>
+                {
+                    b.Navigation("Items");
+
+                    b.Navigation("StateChanges");
                 });
 #pragma warning restore 612, 618
         }

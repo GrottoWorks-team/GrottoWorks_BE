@@ -221,3 +221,55 @@ public sealed class FakeInventoryStore(FakeRequirementStore requirements) : Reso
         return Task.CompletedTask;
     }
 }
+
+public sealed class FakePurchaseRequestStore : Resource.Application.Purchases.IPurchaseRequestStore
+{
+    public List<Resource.Domain.Purchases.PurchaseRequest> Requests { get; } = [];
+
+    public List<Resource.Domain.Purchases.PurchaseRequestStateChange> History { get; } = [];
+
+    public int SaveChangesCount { get; private set; }
+
+    public Task<Resource.Domain.Purchases.PurchaseRequest?> GetAsync(Guid purchaseRequestId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Requests.FirstOrDefault(r => r.PurchaseRequestId == purchaseRequestId));
+
+    public Task<PagedResult<Resource.Domain.Purchases.PurchaseRequest>> SearchAsync(
+        Resource.Application.Purchases.PurchaseRequestSearch search, CancellationToken cancellationToken = default)
+    {
+        var filtered = Requests
+            .Where(r => search.WorkAreaIds.Contains(r.WorkAreaId) && (search.Status is null || r.Status == search.Status))
+            .ToList();
+        var ordered = search.NewestFirst ? filtered.OrderByDescending(r => r.CreatedAt) : filtered.OrderBy(r => r.CreatedAt);
+        return Task.FromResult(new PagedResult<Resource.Domain.Purchases.PurchaseRequest>(
+            ordered.Skip((search.Page - 1) * search.Size).Take(search.Size).ToList(), filtered.Count));
+    }
+
+    public Task<IReadOnlyList<Resource.Domain.Purchases.PurchaseRequestStateChange>> ListStateChangesAsync(
+        Guid purchaseRequestId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Purchases.PurchaseRequestStateChange>>(
+            History.Where(c => c.PurchaseRequestId == purchaseRequestId).ToList());
+
+    public Task<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>> GetOpenRequestedQuantitiesAsync(
+        Guid workAreaId, Guid excludePurchaseRequestId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>>(Requests
+            .Where(r => r.WorkAreaId == workAreaId && r.PurchaseRequestId != excludePurchaseRequestId &&
+                        Resource.Application.Purchases.PurchaseRequestRules.OpenStatuses.Contains(r.Status))
+            .SelectMany(r => r.Items)
+            .GroupBy(i => i.MaterialId)
+            .Select(g => new Resource.Application.Inventory.QuantityByMaterial(workAreaId, g.Key, g.Sum(i => i.RequestedQuantity)))
+            .ToList());
+
+    public void Add(Resource.Domain.Purchases.PurchaseRequest request) => Requests.Add(request);
+
+    /// <summary>Like EF: new state changes of tracked requests are inserted once.</summary>
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+        foreach (var change in Requests.SelectMany(r => r.StateChanges).Where(c => !History.Contains(c)))
+        {
+            History.Add(change);
+        }
+
+        return Task.CompletedTask;
+    }
+}

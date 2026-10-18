@@ -4,6 +4,7 @@ using Resource.Application.Scope;
 using Resource.Application.Requirements;
 using Resource.Application.Inventory;
 using Resource.Application.Shortages;
+using Resource.Application.Purchases;
 
 namespace Resource.Application;
 
@@ -42,6 +43,16 @@ public static class DependencyInjection
         services.AddScoped<ShortageTracker>();
         services.AddScoped<GetWorkAreaShortagesQueryHandler>();
         services.AddScoped<ListMaterialNeedsQueryHandler>();
+
+        // F-RES-06 purchase requests
+        services.AddScoped<PurchaseRequestLoader>();
+        services.AddScoped<PurchaseShortageGuard>();
+        services.AddScoped<ListPurchaseRequestsQueryHandler>();
+        services.AddScoped<GetPurchaseRequestQueryHandler>();
+        services.AddScoped<GetPurchaseRequestHistoryQueryHandler>();
+        services.AddScoped<CreatePurchaseRequestCommandHandler>();
+        services.AddScoped<UpdatePurchaseRequestCommandHandler>();
+        services.AddScoped<SubmitPurchaseRequestCommandHandler>();
 
         return services;
     }

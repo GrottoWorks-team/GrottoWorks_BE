@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Resource.Domain.Catalog;
 using Resource.Domain.Scope;
 using Resource.Domain.Inventory;
+using Resource.Domain.Purchases;
 
 namespace Resource.Infrastructure.Data;
 
@@ -17,6 +18,10 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
     public DbSet<MaterialRequirement> MaterialRequirements => Set<MaterialRequirement>();
 
     public DbSet<MaterialTransaction> MaterialTransactions => Set<MaterialTransaction>();
+
+    public DbSet<PurchaseRequest> PurchaseRequests => Set<PurchaseRequest>();
+
+    public DbSet<PurchaseRequestStateChange> PurchaseRequestStateChanges => Set<PurchaseRequestStateChange>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

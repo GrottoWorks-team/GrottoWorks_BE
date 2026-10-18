@@ -6,6 +6,9 @@
 @seasonId = 00000000-0000-0000-0000-0000000000b1
 @parishId = 00000000-0000-0000-0000-000000000001
 @moUserId = <sub of the MO token>
+# leaderAccessToken: a LEADER of the same parish; its sub goes into leaderUserId of the work-area scope.
+@leaderAccessToken = <LEADER access token>
+@leaderUserId = <sub of the LEADER token>
 
 ### F-RES-01 — (interim) project a work area until planning.work-area.* events exist
 PUT {{host}}/internal/work-area-scopes/{{workAreaId}}
@@ -18,6 +21,7 @@ X-Internal-Api-Key: {{internalApiKey}}
   "name": "Hang đá chính",
   "status": "IN_PROGRESS",
   "seasonStatus": "ACTIVE",
+  "leaderUserId": "{{leaderUserId}}",
   "materialOfficerUserId": "{{moUserId}}",
   "version": 1
 }
@@ -79,6 +83,44 @@ Authorization: Bearer {{accessToken}}
 
 ### F-RES-05 — material needs of the season (any role)
 GET {{host}}/api/v1/seasons/{{seasonId}}/material-needs?page=1&size=20
+Authorization: Bearer {{accessToken}}
+
+###
+
+### F-RES-06 — draft purchase request (MO of the work area). A line above the uncovered shortage needs shortageOverrideReason.
+# @name purchaseRequest
+POST {{host}}/api/v1/purchase-requests
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "workAreaId": "{{workAreaId}}",
+  "reason": "Thiếu dây đèn cho mái hang đá",
+  "items": [{ "materialId": "{{material.response.body.$.data.id}}", "requestedQuantity": 8, "estimatedCost": 400000 }]
+}
+
+### F-RES-06 — edit the draft (items, when given, replace every line)
+PATCH {{host}}/api/v1/purchase-requests/{{purchaseRequest.response.body.$.data.id}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+If-Match: "{{purchaseRequest.response.body.$.data.version}}"
+
+{ "reason": "Thiếu dây đèn cho mái và lối vào hang đá" }
+
+### F-RES-06 — submit to the work-area leader (use the latest version)
+# @name submittedRequest
+POST {{host}}/api/v1/purchase-requests/{{purchaseRequest.response.body.$.data.id}}/submit
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{}
+
+### F-RES-06 — purchase requests waiting for approval
+GET {{host}}/api/v1/purchase-requests?workAreaId={{workAreaId}}&status=PENDING_APPROVAL
+Authorization: Bearer {{accessToken}}
+
+### F-RES-06 — status and approval history
+GET {{host}}/api/v1/purchase-requests/{{purchaseRequest.response.body.$.data.id}}/history
 Authorization: Bearer {{accessToken}}
 
 ###

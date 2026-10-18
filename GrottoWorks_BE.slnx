@@ -21,9 +21,17 @@
     <Project Path="Services/Identity/Identity.Domain/Identity.Domain.csproj" />
     <Project Path="Services/Identity/Identity.Infrastructure/Identity.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/Services/Resource/">
+    <Project Path="Services/Resource/Resource.Api/Resource.Api.csproj" />
+    <Project Path="Services/Resource/Resource.Application/Resource.Application.csproj" />
+    <Project Path="Services/Resource/Resource.Contracts/Resource.Contracts.csproj" />
+    <Project Path="Services/Resource/Resource.Domain/Resource.Domain.csproj" />
+    <Project Path="Services/Resource/Resource.Infrastructure/Resource.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Identity.UnitTests/Identity.UnitTests.csproj" />
     <Project Path="tests/ParishCoordination.UnitTests/ParishCoordination.UnitTests.csproj" />
+    <Project Path="tests/Resource.UnitTests/Resource.UnitTests.csproj" />
   </Folder>
   <Project Path="docker-compose.dcproj">
     <Build />

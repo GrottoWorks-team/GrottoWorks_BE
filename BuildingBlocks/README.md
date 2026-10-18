@@ -92,3 +92,16 @@ là việc còn lại của F-PLT-03/04, xóa bản địa phương sau khi test
 
 Parish (F-PAR-08) kiểm tra `status == ACTIVE`, `role` đúng (LEADER/MO) và `parishId` khớp; Task (F-TSK-06)
 dùng thêm `communityId`, `skillIds`. Không trả email/sđt (giảm dữ liệu cá nhân qua service khác).
+
+### 5.2 Resource — feed tạm cho projection `work_area_scope` (F-RES-01)
+
+Cho tới khi ParishCoordination publish `planning.work-area.*` / `planning.season.*`, Parish (hoặc script seed) gọi:
+
+- `PUT http://resource.api:8080/internal/work-area-scopes/{workAreaId}` — body
+  `{ seasonId, parishId, name, status, seasonStatus, communityId?, leaderUserId?, materialOfficerUserId?, version }`
+  (`status`: `PLANNED|IN_PROGRESS|READINESS_REVIEW|NEEDS_CORRECTION|READY|COMPLETED`; `seasonStatus`:
+  `PLANNING|ACTIVE|READY|COMPLETED|ARCHIVED`; snapshot có `version` nhỏ hơn bản đã lưu bị bỏ qua).
+- `PUT http://resource.api:8080/internal/season-scopes/{seasonId}` — body `{ status }`.
+
+**Đề nghị payload event của Lâm** chứa đúng các trường trên (+ envelope Mục 8), để consumer của Resource /
+Readiness / Task chỉ map 1–1. Header `X-Internal-Api-Key` như §5.

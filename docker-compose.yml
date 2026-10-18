@@ -23,6 +23,12 @@ services:
       context: .
       dockerfile: Services/ParishCoordination/ParishCoordination.Api/Dockerfile
 
+  resource.api:
+    image: ${DOCKER_REGISTRY-}resourceapi
+    build:
+      context: .
+      dockerfile: Services/Resource/Resource.Api/Dockerfile
+
   yarpapigateway:
     image: ${DOCKER_REGISTRY-}yarpapigateway
     build:

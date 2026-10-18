@@ -176,13 +176,13 @@ Khởi tạo (S2): `Services/Resource/*`, `resource_db`, outbox/inbox.
 
 | Thứ tự | Function | Việc chính | Phụ thuộc | Sprint |
 |---|---|---|---|---|
-| 1 | F-RES-01 | `work_area_scope`, `task_projection`; consumer `planning.*`, `task.materials.changed`, `task.completion.reviewed`, `task.purchase-task.assigned` (lưu buyer, PR → `BUYER_ASSIGNED`) | PAR-07/08 (Lâm) | S2 |
-| 2 | F-RES-02 | `material_category`, `material` (code unique, đơn vị tính) | — | S2 |
-| 3 | F-RES-03 | `material_requirement` unique (work_area, material), quantity > 0, MO đúng work area | RES-01 | S3 |
-| 4 | F-RES-04 | `material_transaction` + `recordOpeningStock`, `listInventory`, `getAllocationHistory`; BR-23, BR-24 | thiết kế ledger | S3 |
-| 5 | F-RES-05 | `getWorkAreaShortages`, `listMaterialNeeds`; BR-25; event `material.shortage.changed` | RES-03/04 | S3 |
-| 6 | F-RES-06 | `purchase_request` + items; CRUD/submit/history; BR-27; shortage = 0 → cần override + lý do | RES-05 | S4 |
-| 7 | F-RES-07 | `approvePurchaseRequest`, `rejectPurchaseRequest` — **role LEADER** đúng work area (D-01); reject cần lý do (BR-31); event `purchase.request.submitted/decided` | RES-06 | S4 (**giữa S4 chốt với Lâm**) |
+| 1 | F-RES-01 | `work_area_scope`, `task_projection`; consumer `planning.*`, `task.materials.changed`, `task.completion.reviewed`, `task.purchase-task.assigned` (lưu buyer, PR → `BUYER_ASSIGNED`) | PAR-07/08 (Lâm) | S2 · 🟨 18/10 — `work_area_scope` + feed `/internal/*-scopes`; consumer & `task_projection` chờ event |
+| 2 | F-RES-02 | `material_category`, `material` (code unique, đơn vị tính) | — | S2 · ✅ 18/10 |
+| 3 | F-RES-03 | `material_requirement` unique (work_area, material), quantity > 0, MO đúng work area | RES-01 | S3 · ✅ 18/10 |
+| 4 | F-RES-04 | `material_transaction` + `recordOpeningStock`, `listInventory`, `getAllocationHistory`; BR-23, BR-24 | thiết kế ledger | S3 · ✅ 18/10 |
+| 5 | F-RES-05 | `getWorkAreaShortages`, `listMaterialNeeds`; BR-25; event `material.shortage.changed` | RES-03/04 | S3 · ✅ 18/10 |
+| 6 | F-RES-06 | `purchase_request` + items; CRUD/submit/history; BR-27; shortage = 0 → cần override + lý do | RES-05 | S4 · ✅ 18/10 |
+| 7 | F-RES-07 | `approvePurchaseRequest`, `rejectPurchaseRequest` — **role LEADER** đúng work area (D-01); reject cần lý do (BR-31); event `purchase.request.submitted/decided` | RES-06 | S4 (**giữa S4 chốt với Lâm**) · ✅ 18/10, payload event chờ Lâm review |
 | 8 | F-RES-12 | `listDonors`, `createDonor`, `updateDonor`; không auto-merge; link `user_id` tùy chọn | — | S5 |
 | 9 | F-RES-09 | `purchase`, `purchase_item`; `recordPurchase`, `attachPurchaseReceipt`; chỉ buyer (assignee ACCEPTED của task PURCHASE); status PURCHASED, stock **chưa** tăng (BR-26); Idempotency-Key | TSK-17, NTF-01, PLT-07 | S5 |
 | 10 | F-RES-10 | `confirmPurchaseDelivery` (usable qty → ledger + tính lại shortage trong 1 transaction; giao thiếu → còn phần dở), `requestPurchaseInfo`; event `purchase.delivery.confirmed` | RES-09 | S5 |
@@ -308,7 +308,7 @@ Kịch bản nghiệm thu theo owner (Mục 8 spec): Lâm #1–4, #11, #16; Vũ 
 | TaskExecution | Lâm | TSK-01..04, 06..11, 17 | TSK-05, 12..15, 15b | TSK-16 | 0 / 18 |
 | NotificationAudit | Lâm | NTF-01 | NTF-02..04 | NTF-05, 06 | 0 / 6 |
 | Identity | Vũ | IDN-01..03, 05..09 | IDN-04, 10 | — | ✅ 10 / 10 (S0+S1: IDN-01, 02, 03, 05, 06 · S2 sớm 18/10: IDN-04, 07, 08, 09, 10 — chờ review/merge) |
-| Resource | Vũ | RES-01..07, 09, 10, 12, 13, 15, 17 | RES-11, 13b, 13c, 16, 18, 20 | RES-14 | 0 / 20 |
+| Resource | Vũ | RES-01..07, 09, 10, 12, 13, 15, 17 | RES-11, 13b, 13c, 16, 18, 20 | RES-14 | 🟨 6 / 20 + RES-01 một phần (18/10: scaffold, RES-02, 03, 04, 05, 06, 07; RES-01 projection + feed tạm, chờ event Parish/Task) |
 | Readiness | Vũ | — | RDY-02..06 | — | 0 / 5 |
 | Reporting | Vũ | — | RPT-01..05 | RPT-06 | 0 / 6 |
 

@@ -1,0 +1,133 @@
+@host = http://localhost:5183
+# accessToken: login through Identity (POST /api/v1/auth/login) as a user with role MO.
+@accessToken = <MO access token>
+@internalApiKey = dev-internal-api-key-change-me-0123456789
+@workAreaId = 00000000-0000-0000-0000-0000000000a1
+@seasonId = 00000000-0000-0000-0000-0000000000b1
+@parishId = 00000000-0000-0000-0000-000000000001
+@moUserId = <sub of the MO token>
+# leaderAccessToken: a LEADER of the same parish; its sub goes into leaderUserId of the work-area scope.
+@leaderAccessToken = <LEADER access token>
+@leaderUserId = <sub of the LEADER token>
+
+### F-RES-01 — (interim) project a work area until planning.work-area.* events exist
+PUT {{host}}/internal/work-area-scopes/{{workAreaId}}
+Content-Type: application/json
+X-Internal-Api-Key: {{internalApiKey}}
+
+{
+  "seasonId": "{{seasonId}}",
+  "parishId": "{{parishId}}",
+  "name": "Hang đá chính",
+  "status": "IN_PROGRESS",
+  "seasonStatus": "ACTIVE",
+  "leaderUserId": "{{leaderUserId}}",
+  "materialOfficerUserId": "{{moUserId}}",
+  "version": 1
+}
+
+### F-RES-02 — create a category
+# @name category
+POST {{host}}/api/v1/material-categories
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "code": "LIGHTING", "name": "Đèn & điện" }
+
+### F-RES-02 — create a material (unit of every quantity)
+# @name material
+POST {{host}}/api/v1/materials
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "categoryId": "{{category.response.body.$.data.id}}", "code": "LED-WARM-10M", "name": "Dây LED vàng 10m", "unit": "cuộn" }
+
+### F-RES-02 — list materials
+GET {{host}}/api/v1/materials?q=led&sort=name,asc&page=1&size=20
+Authorization: Bearer {{accessToken}}
+
+### F-RES-03 — require 12 rolls for the work area
+# @name requirement
+POST {{host}}/api/v1/work-areas/{{workAreaId}}/material-requirements
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "materialId": "{{material.response.body.$.data.id}}", "requiredQuantity": 12, "note": "Trang trí mái hang đá" }
+
+### F-RES-03 — change quantity (If-Match = version)
+PATCH {{host}}/api/v1/material-requirements/{{requirement.response.body.$.data.id}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+If-Match: "{{requirement.response.body.$.data.version}}"
+
+{ "requiredQuantity": 15 }
+
+### F-RES-04 — opening stock (once per work area + material)
+POST {{host}}/api/v1/inventory/opening-stock
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "workAreaId": "{{workAreaId}}", "materialId": "{{material.response.body.$.data.id}}", "quantity": 4, "note": "Kiểm kê đầu mùa" }
+
+### F-RES-04 — inventory balances of my parish
+GET {{host}}/api/v1/inventory?seasonId={{seasonId}}&onlyShortage=false
+Authorization: Bearer {{accessToken}}
+
+### F-RES-04 — ledger history of a material
+GET {{host}}/api/v1/materials/{{material.response.body.$.data.id}}/allocation-history?from=2026-10-01T00:00:00Z
+Authorization: Bearer {{accessToken}}
+
+### F-RES-05 — shortages of the work area
+GET {{host}}/api/v1/work-areas/{{workAreaId}}/shortages
+Authorization: Bearer {{accessToken}}
+
+### F-RES-05 — material needs of the season (any role)
+GET {{host}}/api/v1/seasons/{{seasonId}}/material-needs?page=1&size=20
+Authorization: Bearer {{accessToken}}
+
+###
+
+### F-RES-06 — draft purchase request (MO of the work area). A line above the uncovered shortage needs shortageOverrideReason.
+# @name purchaseRequest
+POST {{host}}/api/v1/purchase-requests
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "workAreaId": "{{workAreaId}}",
+  "reason": "Thiếu dây đèn cho mái hang đá",
+  "items": [{ "materialId": "{{material.response.body.$.data.id}}", "requestedQuantity": 8, "estimatedCost": 400000 }]
+}
+
+### F-RES-06 — edit the draft (items, when given, replace every line)
+PATCH {{host}}/api/v1/purchase-requests/{{purchaseRequest.response.body.$.data.id}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+If-Match: "{{purchaseRequest.response.body.$.data.version}}"
+
+{ "reason": "Thiếu dây đèn cho mái và lối vào hang đá" }
+
+### F-RES-06 — submit to the work-area leader (use the latest version)
+# @name submittedRequest
+POST {{host}}/api/v1/purchase-requests/{{purchaseRequest.response.body.$.data.id}}/submit
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{}
+
+### F-RES-07 — leader of the work area approves (or POST .../reject with { "version": n, "reason": "..." })
+POST {{host}}/api/v1/purchase-requests/{{purchaseRequest.response.body.$.data.id}}/approve
+Content-Type: application/json
+Authorization: Bearer {{leaderAccessToken}}
+
+{ "version": {{submittedRequest.response.body.$.data.version}}, "note": "Đồng ý mua." }
+
+### F-RES-06 — purchase requests waiting for approval
+GET {{host}}/api/v1/purchase-requests?workAreaId={{workAreaId}}&status=PENDING_APPROVAL
+Authorization: Bearer {{accessToken}}
+
+### F-RES-06 — status and approval history
+GET {{host}}/api/v1/purchase-requests/{{purchaseRequest.response.body.$.data.id}}/history
+Authorization: Bearer {{accessToken}}
+
+###

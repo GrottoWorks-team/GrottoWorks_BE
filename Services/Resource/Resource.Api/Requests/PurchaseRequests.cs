@@ -49,3 +49,22 @@ public sealed class VersionedCommandRequest
 {
     public long? Version { get; init; }
 }
+
+/// <summary><c>ApprovalCommand</c>: version and an optional note.</summary>
+public sealed class ApprovalCommandRequest
+{
+    public long? Version { get; init; }
+
+    [StringLength(500, ErrorMessage = "Note must not exceed 500 characters.")]
+    public string? Note { get; init; }
+}
+
+/// <summary><c>ReasonCommand</c>: version and a required reason of 1–500 characters.</summary>
+public sealed class ReasonCommandRequest
+{
+    public long? Version { get; init; }
+
+    [Required(ErrorMessage = "Reason is required.")]
+    [StringLength(500, MinimumLength = 1, ErrorMessage = "Reason must be 1–500 characters.")]
+    public string? Reason { get; init; }
+}

@@ -37,6 +37,7 @@ public sealed class PurchaseRequest
 {
     public const int MaxItems = 50;
     public const int MaxReasonLength = 2000;
+    public const int MaxDecisionNoteLength = 500;
 
     private readonly List<PurchaseRequestItem> _items = [];
     private readonly List<PurchaseRequestStateChange> _stateChanges = [];
@@ -148,6 +149,30 @@ public sealed class PurchaseRequest
         Transition(PurchaseRequestStatus.PendingApproval, userId, null, now);
     }
 
+    public void Approve(Guid leaderUserId, string? note, DateTimeOffset now)
+    {
+        EnsureStatus(PurchaseRequestStatus.PendingApproval, "Only a purchase request waiting for approval can be approved.");
+
+        var cleaned = CleanDecisionNote(note);
+        ApprovedByUserId = leaderUserId;
+        ApprovedAt = now.ToUniversalTime();
+        DecisionNote = cleaned;
+        Transition(PurchaseRequestStatus.Approved, leaderUserId, cleaned, now);
+    }
+
+    /// <summary>BR-31: a rejection always carries a reason.</summary>
+    public void Reject(Guid leaderUserId, string? reason, DateTimeOffset now)
+    {
+        EnsureStatus(PurchaseRequestStatus.PendingApproval, "Only a purchase request waiting for approval can be rejected.");
+
+        var cleaned = CleanDecisionNote(reason)
+            ?? throw DomainRuleException.Validation("PURCHASE_REQUEST_REJECT_REASON_REQUIRED", "A reason is required to reject.");
+        ApprovedByUserId = leaderUserId;
+        RejectedAt = now.ToUniversalTime();
+        DecisionNote = cleaned;
+        Transition(PurchaseRequestStatus.Rejected, leaderUserId, cleaned, now);
+    }
+
     private void SetItems(IReadOnlyCollection<PurchaseRequestItemInput> items)
     {
         if (items.Count > MaxItems)
@@ -192,6 +217,19 @@ public sealed class PurchaseRequest
         if (cleaned is { Length: > MaxReasonLength })
         {
             throw DomainRuleException.Validation("PURCHASE_REQUEST_REASON_TOO_LONG", $"Reason must not exceed {MaxReasonLength} characters.");
+        }
+
+        return cleaned;
+    }
+
+    private static string? CleanDecisionNote(string? value)
+    {
+        var cleaned = Clean(value);
+        if (cleaned is { Length: > MaxDecisionNoteLength })
+        {
+            throw DomainRuleException.Validation(
+                "PURCHASE_REQUEST_DECISION_NOTE_TOO_LONG",
+                $"The decision note must not exceed {MaxDecisionNoteLength} characters.");
         }
 
         return cleaned;

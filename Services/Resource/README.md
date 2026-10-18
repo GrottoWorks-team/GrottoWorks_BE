@@ -1,14 +1,14 @@
 # Resource Service
 
 Vật tư, tồn kho, mua sắm, quyên góp, đồ mượn (owner: Vũ — spec §5.2, tag `Materials`, `Purchases`, `Contributions`).
-Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06 — S4.
+Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4.
 
 ## Kiến trúc
 
 ```
 Services/Resource/
 ├── Resource.Domain/          # Catalog, Scope (projection), Inventory (requirement, ledger, InventoryCalculator), Purchases
-├── Resource.Contracts/       # Event contract-first: material.shortage.changed, purchase.request.submitted
+├── Resource.Contracts/       # Event contract-first: material.shortage.changed, purchase.request.submitted/decided
 ├── Resource.Application/     # Handler thường (không MediatR), WorkAreaAccess, InventoryReader, ShortageTracker
 ├── Resource.Infrastructure/  # EF Core + Npgsql (resource_db), store, migration
 └── Resource.Api/             # Minimal API + BuildingBlocks.Web/Security
@@ -51,6 +51,8 @@ Mẫu request: `Resource.Api.http`.
 | `GET /api/v1/purchase-requests/{id}` | `getPurchaseRequest` | PARISH, LEADER, MO cùng parish (VOLUNTEER: xem "Việc còn mở") | F-RES-06 |
 | `PATCH /api/v1/purchase-requests/{id}` | `updatePurchaseRequest` | MO của work area; chỉ DRAFT; `items` thay toàn bộ dòng; `version`/`If-Match` | F-RES-06 |
 | `POST /api/v1/purchase-requests/{id}/submit` | `submitPurchaseRequest` | MO của work area: DRAFT → PENDING_APPROVAL | F-RES-06 |
+| `POST /api/v1/purchase-requests/{id}/approve` | `approvePurchaseRequest` | LEADER **của work area** (D-01, BR-29) | F-RES-07 |
+| `POST /api/v1/purchase-requests/{id}/reject` | `rejectPurchaseRequest` | LEADER của work area; `reason` bắt buộc (BR-31) | F-RES-07 |
 | `GET /api/v1/purchase-requests/{id}/history` | `getPurchaseRequestHistory` | PARISH, LEADER, MO — `StateChange[]` cũ → mới | F-RES-06 |
 | `PUT /internal/work-area-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/season-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
@@ -64,23 +66,25 @@ Mẫu request: `Resource.Api.http`.
   `shortage = max(0, required − available)` (BR-25). `existing_quantity` của requirement chỉ để hiển thị.
 - `material.shortage.changed` (v1) chỉ phát khi shortage của (work area, material) thực sự đổi.
 
-## Purchase request (F-RES-06, BA 8.6 + 9.5)
+## Purchase request (F-RES-06/07, BA 8.6 + 9.5, D-01)
 
-- `DRAFT` → `PENDING_APPROVAL` (submit); Leader duyệt/từ chối ở F-RES-07. Chỉ sửa khi DRAFT; DRAFT được
-  phép chưa có dòng/lý do, submit thì bắt buộc ≥ 1 dòng + lý do (BR-27).
+- `DRAFT` → `PENDING_APPROVAL` (submit) → `APPROVED` / `REJECTED` (Leader của work area). Chỉ sửa khi DRAFT; DRAFT được
+  phép chưa có dòng/lý do, submit thì bắt buộc ≥ 1 dòng + lý do (BR-27). Phê duyệt áp dụng cho cả request.
 - Dòng: material ACTIVE, mỗi material 1 lần/request, `requestedQuantity > 0` (2 số lẻ), `estimatedCost` = chi phí cả dòng
   (VND, ≥ 0, null = chưa ước tính). `estimatedTotal` = tổng các dòng, trả về dạng `Money { amount, currency: "VND" }`.
 - **Chặn vượt shortage** (BA 8.6 "không tạo khi shortage = 0 trừ override + lý do"): mỗi dòng ≤ `shortage − phần đã xin ở
   request mở khác` (PENDING_APPROVAL, APPROVED, BUYER_ASSIGNED, PURCHASED) của cùng work area; vượt → 409
   `PURCHASE_EXCEEDS_SHORTAGE` trừ khi dòng có `shortageOverrideReason`. Kiểm tra lúc tạo/sửa dòng **và** lại lúc submit.
-- Event `purchase.request.submitted` (kèm `leaderUserId` để báo Leader) — payload:
-  `Resource.Contracts/Events/PurchaseRequestSubmitted.cs`.
+- Event: `purchase.request.submitted` (kèm `leaderUserId` để báo Leader), `purchase.request.decided` (`decision` =
+  `APPROVED|REJECTED`, `decidedByUserId`, `note`) — Task (F-TSK-17) chỉ cho tạo task PURCHASE khi APPROVED.
+  Payload: `Resource.Contracts/Events/PurchaseRequest*.cs`, cần Lâm review (plan §4.2 "giữa S4 chốt với Lâm").
 - Bổ sung so với ERD v3.6 (đã ghi ở spec §3): bảng kỹ thuật `purchase_request_state_change` (nguồn của
   `getPurchaseRequestHistory`) và cột `purchase_request_item.shortage_override_reason`.
 
 ## Phạm vi (scope)
 
-- Đọc: mọi user cùng parish (parish khác → 404). Ghi: MO được gán cho work area (403 `WORK_AREA_SCOPE_DENIED`).
+- Đọc: mọi user cùng parish (parish khác → 404). Ghi: MO được gán cho work area; duyệt purchase request: Leader được gán
+  cho work area (403 `WORK_AREA_SCOPE_DENIED`).
   Season `ARCHIVED` → 409 `SEASON_READ_ONLY` (BR-07).
 - Scope lấy từ projection `work_area_scope` (spec §2.2). **Tạm thời** nạp qua `/internal/*-scopes` vì Parish chưa
   publish `planning.work-area.*` / `planning.season.*`; consumer MassTransit sau này gọi đúng các handler

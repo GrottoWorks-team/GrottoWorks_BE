@@ -44,7 +44,7 @@ public static class DependencyInjection
         services.AddScoped<GetWorkAreaShortagesQueryHandler>();
         services.AddScoped<ListMaterialNeedsQueryHandler>();
 
-        // F-RES-06 purchase requests
+        // F-RES-06/07 purchase requests
         services.AddScoped<PurchaseRequestLoader>();
         services.AddScoped<PurchaseShortageGuard>();
         services.AddScoped<ListPurchaseRequestsQueryHandler>();
@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<CreatePurchaseRequestCommandHandler>();
         services.AddScoped<UpdatePurchaseRequestCommandHandler>();
         services.AddScoped<SubmitPurchaseRequestCommandHandler>();
+        services.AddScoped<DecidePurchaseRequestCommandHandler>();
 
         return services;
     }

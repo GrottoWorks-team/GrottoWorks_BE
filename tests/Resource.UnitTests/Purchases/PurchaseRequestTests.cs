@@ -11,7 +11,7 @@ using Resource.Domain.Scope;
 
 namespace Resource.UnitTests.Purchases;
 
-/// <summary>F-RES-06: purchase requests — draft, shortage guard, submit, history.</summary>
+/// <summary>F-RES-06/07: purchase requests — draft, shortage guard, submit, leader approve/reject, history.</summary>
 public sealed class PurchaseRequestTests
 {
     private static readonly Guid Parish = Guid.NewGuid();
@@ -69,6 +69,12 @@ public sealed class PurchaseRequestTests
     {
         var current = user ?? User();
         return new(Access(current), _store, Guard(), Loader(current), _events, current);
+    }
+
+    private DecidePurchaseRequestCommandHandler Decide(FakeCurrentUser? user = null)
+    {
+        var current = user ?? Leader();
+        return new(Access(current), _store, Loader(current), _events, current);
     }
 
     private static PurchaseRequestItemInput Line(Material material, decimal quantity, decimal? cost = null, string? overrideReason = null) =>
@@ -169,9 +175,11 @@ public sealed class PurchaseRequestTests
     }
 
     [Fact]
-    public async Task Drafts_do_not_reserve_the_shortage()
+    public async Task Drafts_and_rejected_requests_do_not_reserve_the_shortage()
     {
         await Draft(Line(_cable, 30));
+        var rejected = await Pending(Line(_cable, 30));
+        await Decide().RejectAsync(new PurchaseRequestCommand(rejected.Id, rejected.Version, "Đã có người tặng"));
 
         (await Draft(Line(_cable, 30))).Items.Should().ContainSingle();
     }
@@ -245,16 +253,70 @@ public sealed class PurchaseRequestTests
     }
 
     [Fact]
-    public async Task History_lists_every_transition_in_order()
+    public async Task Leader_of_the_work_area_approves_and_Task_is_told()
+    {
+        var pending = await Pending(Line(_cable, 5));
+        _events.Events.Clear();
+
+        var approved = await Decide().ApproveAsync(new PurchaseRequestCommand(pending.Id, pending.Version, " Đồng ý "));
+
+        approved.Status.Should().Be(PurchaseRequestStatus.Approved);
+        approved.ApprovedBy.Should().Be(_leader);
+        approved.ApprovedAt.Should().NotBeNull();
+        approved.DecisionNote.Should().Be("Đồng ý");
+        var payload = _events.Events.Should().ContainSingle(e => e.EventType == "purchase.request.decided")
+            .Which.Payload.Should().BeOfType<PurchaseRequestDecided>().Which;
+        payload.Decision.Should().Be("APPROVED");
+        payload.DecidedByUserId.Should().Be(_leader);
+        payload.WorkAreaId.Should().Be(_area.WorkAreaId);
+    }
+
+    [Fact]
+    public async Task Another_leader_cannot_decide_and_a_draft_cannot_be_approved()
+    {
+        var pending = await Pending(Line(_cable, 5));
+        (await Fails(() => Decide(Leader(Guid.NewGuid())).ApproveAsync(new PurchaseRequestCommand(pending.Id, null))))
+            .Code.Should().Be("WORK_AREA_SCOPE_DENIED");
+
+        var draft = await Draft(Line(_cable, 5));
+        (await Fails(() => Decide().ApproveAsync(new PurchaseRequestCommand(draft.Id, null)))).Code.Should().Be("PURCHASE_REQUEST_INVALID_STATE");
+
+        await Decide().ApproveAsync(new PurchaseRequestCommand(pending.Id, null));
+        (await Fails(() => Decide().RejectAsync(new PurchaseRequestCommand(pending.Id, null, "Muộn"))))
+            .Code.Should().Be("PURCHASE_REQUEST_INVALID_STATE");
+    }
+
+    [Fact]
+    public async Task Rejection_needs_a_reason()
     {
         var pending = await Pending(Line(_cable, 5));
 
+        (await Fails(() => Decide().RejectAsync(new PurchaseRequestCommand(pending.Id, null, "   "))))
+            .Code.Should().Be("PURCHASE_REQUEST_REJECT_REASON_REQUIRED");
+
+        var rejected = await Decide().RejectAsync(new PurchaseRequestCommand(pending.Id, null, "Vượt ngân sách"));
+
+        rejected.Status.Should().Be(PurchaseRequestStatus.Rejected);
+        rejected.ApprovedBy.Should().Be(_leader);
+        rejected.RejectedAt.Should().NotBeNull();
+        rejected.DecisionNote.Should().Be("Vượt ngân sách");
+        _events.Events.Last().Payload.Should().BeOfType<PurchaseRequestDecided>().Which.Decision.Should().Be("REJECTED");
+    }
+
+    [Fact]
+    public async Task History_lists_every_transition_in_order()
+    {
+        var pending = await Pending(Line(_cable, 5));
+        await Decide().ApproveAsync(new PurchaseRequestCommand(pending.Id, null, "OK"));
+
         var history = await new GetPurchaseRequestHistoryQueryHandler(Loader(Leader()), _store).HandleAsync(pending.Id);
 
-        history.Select(change => change.ToStatus).Should().Equal(PurchaseRequestStatus.Draft, PurchaseRequestStatus.PendingApproval);
+        history.Select(change => change.ToStatus).Should().Equal(
+            PurchaseRequestStatus.Draft, PurchaseRequestStatus.PendingApproval, PurchaseRequestStatus.Approved);
         history[0].FromStatus.Should().BeNull();
-        history[1].FromStatus.Should().Be(PurchaseRequestStatus.Draft);
         history[1].ChangedBy.Should().Be(_officer);
+        history[2].ChangedBy.Should().Be(_leader);
+        history[2].Note.Should().Be("OK");
     }
 
     [Fact]

@@ -115,6 +115,13 @@ Authorization: Bearer {{accessToken}}
 
 {}
 
+### F-RES-07 — leader of the work area approves (or POST .../reject with { "version": n, "reason": "..." })
+POST {{host}}/api/v1/purchase-requests/{{purchaseRequest.response.body.$.data.id}}/approve
+Content-Type: application/json
+Authorization: Bearer {{leaderAccessToken}}
+
+{ "version": {{submittedRequest.response.body.$.data.version}}, "note": "Đồng ý mua." }
+
 ### F-RES-06 — purchase requests waiting for approval
 GET {{host}}/api/v1/purchase-requests?workAreaId={{workAreaId}}&status=PENDING_APPROVAL
 Authorization: Bearer {{accessToken}}

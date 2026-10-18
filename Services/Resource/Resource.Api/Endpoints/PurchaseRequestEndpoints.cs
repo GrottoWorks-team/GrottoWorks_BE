@@ -7,7 +7,7 @@ using Resource.Domain.Purchases;
 
 namespace Resource.Api.Endpoints;
 
-/// <summary>F-RES-06: purchase requests (tag Purchases).</summary>
+/// <summary>F-RES-06/07: purchase requests and the leader decision (tag Purchases).</summary>
 public static class PurchaseRequestEndpoints
 {
     private const string VersionMismatch = "PURCHASE_REQUEST_VERSION_MISMATCH";
@@ -56,6 +56,27 @@ public static class PurchaseRequestEndpoints
             .WithName("submitPurchaseRequest")
             .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer))
             .Accepts<VersionedCommandRequest>("application/json")
+            .Produces<ApiResponse<PurchaseRequestDto>>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapPost("/{requestId:guid}/approve", ApproveAsync)
+            .WithName("approvePurchaseRequest")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
+            .Accepts<ApprovalCommandRequest>("application/json")
+            .Produces<ApiResponse<PurchaseRequestDto>>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed);
+
+        group.MapPost("/{requestId:guid}/reject", RejectAsync)
+            .WithName("rejectPurchaseRequest")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
+            .Accepts<ReasonCommandRequest>("application/json")
             .Produces<ApiResponse<PurchaseRequestDto>>()
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -134,6 +155,32 @@ public static class PurchaseRequestEndpoints
             new PurchaseRequestCommand(requestId, VersionHeader.Resolve(request.Version, httpContext, VersionMismatch)),
             cancellationToken);
         return Results.Ok(ApiResults.Ok(submitted, httpContext));
+    }
+
+    private static async Task<IResult> ApproveAsync(
+        Guid requestId,
+        ApprovalCommandRequest request,
+        HttpContext httpContext,
+        DecidePurchaseRequestCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var approved = await handler.ApproveAsync(
+            new PurchaseRequestCommand(requestId, VersionHeader.Resolve(request.Version, httpContext, VersionMismatch), request.Note),
+            cancellationToken);
+        return Results.Ok(ApiResults.Ok(approved, httpContext));
+    }
+
+    private static async Task<IResult> RejectAsync(
+        Guid requestId,
+        ReasonCommandRequest request,
+        HttpContext httpContext,
+        DecidePurchaseRequestCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var rejected = await handler.RejectAsync(
+            new PurchaseRequestCommand(requestId, VersionHeader.Resolve(request.Version, httpContext, VersionMismatch), request.Reason),
+            cancellationToken);
+        return Results.Ok(ApiResults.Ok(rejected, httpContext));
     }
 
     private static async Task<IResult> HistoryAsync(

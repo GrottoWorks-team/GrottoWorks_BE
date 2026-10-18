@@ -102,6 +102,22 @@ public sealed class WorkAreaAccess(IWorkAreaScopeStore store, BuildingBlocks.Sec
         return scope;
     }
 
+    /// <summary>The leader assigned to this work area, while the season is not archived (BR-29, BR-07).</summary>
+    public async Task<WorkAreaScope> ForLeaderWriteAsync(Guid workAreaId, CancellationToken cancellationToken = default)
+    {
+        var scope = await ForReadAsync(workAreaId, cancellationToken);
+
+        if (scope.LeaderUserId != currentUser.UserId)
+        {
+            throw DomainRuleException.Forbidden(
+                "WORK_AREA_SCOPE_DENIED",
+                "Only the leader assigned to this work area can decide on it.");
+        }
+
+        EnsureWritable(scope);
+        return scope;
+    }
+
     public static void EnsureWritable(WorkAreaScope scope)
     {
         if (scope.IsReadOnly)

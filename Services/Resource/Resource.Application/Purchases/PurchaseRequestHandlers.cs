@@ -348,3 +348,53 @@ public sealed class SubmitPurchaseRequestCommandHandler(
             .Select(item => new PurchaseRequestLine(item.PurchaseRequestItemId, item.MaterialId, item.RequestedQuantity, item.EstimatedCost))
             .ToList();
 }
+
+/// <summary>
+/// F-RES-07 <c>approvePurchaseRequest</c> / <c>rejectPurchaseRequest</c> (LEADER of the request's work area — D-01,
+/// BR-28/29): PENDING_APPROVAL → APPROVED or REJECTED (reason required, BR-31), then <c>purchase.request.decided</c>
+/// so Task lets the leader create the PURCHASE task.
+/// </summary>
+public sealed class DecidePurchaseRequestCommandHandler(
+    WorkAreaAccess access,
+    IPurchaseRequestStore store,
+    PurchaseRequestLoader loader,
+    IIntegrationEventPublisher publisher,
+    ICurrentUser currentUser)
+{
+    public Task<PurchaseRequestDto> ApproveAsync(PurchaseRequestCommand command, CancellationToken cancellationToken = default) =>
+        DecideAsync(command, approve: true, cancellationToken);
+
+    public Task<PurchaseRequestDto> RejectAsync(PurchaseRequestCommand command, CancellationToken cancellationToken = default) =>
+        DecideAsync(command, approve: false, cancellationToken);
+
+    private async Task<PurchaseRequestDto> DecideAsync(PurchaseRequestCommand command, bool approve, CancellationToken cancellationToken)
+    {
+        var (request, _) = await loader.ForReadAsync(command.PurchaseRequestId, cancellationToken);
+        var scope = await access.ForLeaderWriteAsync(request.WorkAreaId, cancellationToken);
+        request.EnsureVersion(command.Version);
+
+        var now = DateTimeOffset.UtcNow;
+        if (approve)
+        {
+            request.Approve(currentUser.UserId, command.Note, now);
+        }
+        else
+        {
+            request.Reject(currentUser.UserId, command.Note, now);
+        }
+
+        await store.SaveChangesAsync(cancellationToken);
+
+        await publisher.PublishAsync(
+            PurchaseRequestDecided.EventType,
+            PurchaseRequestDecided.Version,
+            new PurchaseRequestDecided(
+                request.PurchaseRequestId, scope.WorkAreaId, scope.SeasonId, scope.ParishId, request.RequestedByUserId,
+                approve ? PurchaseRequestDecided.Approved : PurchaseRequestDecided.Rejected, currentUser.UserId,
+                request.DecisionNote, request.EstimatedTotal, MoneyDto.Vnd, SubmitPurchaseRequestCommandHandler.Lines(request), now),
+            "purchase_request",
+            request.PurchaseRequestId,
+            cancellationToken);
+        return await loader.ToDtoAsync(request, scope, cancellationToken);
+    }
+}

@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Resource.Application.Abstractions;
 using Resource.Application.Catalog;
 using Resource.Infrastructure.Catalog;
+using Resource.Application.Scope;
+using Resource.Infrastructure.Scope;
 using Resource.Infrastructure.Data;
 using Resource.Infrastructure.Observability;
 
@@ -22,6 +24,7 @@ public static class DependencyInjection
         services.AddDbContext<ResourceDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IIntegrationEventPublisher, LoggingIntegrationEventPublisher>();
         services.AddScoped<IMaterialCatalogStore, MaterialCatalogStore>();
+        services.AddScoped<IWorkAreaScopeStore, WorkAreaScopeStore>();
 
         return services;
     }

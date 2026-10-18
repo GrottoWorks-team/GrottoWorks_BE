@@ -109,6 +109,69 @@ namespace Resource.Infrastructure.Data.Migrations
                     b.ToTable("material_category", (string)null);
                 });
 
+            modelBuilder.Entity("Resource.Domain.Scope.WorkAreaScope", b =>
+                {
+                    b.Property<Guid>("WorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_id");
+
+                    b.Property<Guid?>("CommunityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("community_id");
+
+                    b.Property<Guid?>("LeaderUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("leader_user_id");
+
+                    b.Property<Guid?>("MaterialOfficerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_officer_user_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("work_area_name");
+
+                    b.Property<Guid>("ParishId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_id");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<string>("SeasonStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("season_status");
+
+                    b.Property<long>("SourceVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_version");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("work_area_status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("WorkAreaId");
+
+                    b.HasIndex("ParishId")
+                        .HasDatabaseName("ix_work_area_scope_parish_id");
+
+                    b.HasIndex("SeasonId")
+                        .HasDatabaseName("ix_work_area_scope_season_id");
+
+                    b.ToTable("work_area_scope", (string)null);
+                });
+
             modelBuilder.Entity("Resource.Domain.Catalog.Material", b =>
                 {
                     b.HasOne("Resource.Domain.Catalog.MaterialCategory", null)

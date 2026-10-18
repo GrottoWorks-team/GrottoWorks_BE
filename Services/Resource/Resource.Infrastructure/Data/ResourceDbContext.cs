@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Resource.Domain.Catalog;
+using Resource.Domain.Scope;
 
 namespace Resource.Infrastructure.Data;
 
@@ -9,6 +10,8 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
     public DbSet<MaterialCategory> MaterialCategories => Set<MaterialCategory>();
 
     public DbSet<Material> Materials => Set<Material>();
+
+    public DbSet<WorkAreaScope> WorkAreaScopes => Set<WorkAreaScope>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

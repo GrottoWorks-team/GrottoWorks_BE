@@ -107,3 +107,48 @@ public sealed class FakeCurrentUser(Guid userId, string role, Guid? parishId = n
 
     public Guid? CommunityId => null;
 }
+
+public sealed class FakeScopeStore : Resource.Application.Scope.IWorkAreaScopeStore
+{
+    public List<Resource.Domain.Scope.WorkAreaScope> Scopes { get; } = [];
+
+    public int SaveChangesCount { get; private set; }
+
+    public Task<Resource.Domain.Scope.WorkAreaScope?> GetAsync(Guid workAreaId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Scopes.FirstOrDefault(s => s.WorkAreaId == workAreaId));
+
+    public Task<IReadOnlyList<Resource.Domain.Scope.WorkAreaScope>> ListBySeasonAsync(Guid seasonId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Scope.WorkAreaScope>>(Scopes.Where(s => s.SeasonId == seasonId).ToList());
+
+    public Task<IReadOnlyList<Resource.Domain.Scope.WorkAreaScope>> ListByIdsAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Scope.WorkAreaScope>>(Scopes.Where(s => workAreaIds.Contains(s.WorkAreaId)).ToList());
+
+    public Task<IReadOnlyList<Resource.Domain.Scope.WorkAreaScope>> ListByParishAsync(Guid parishId, Guid? seasonId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Scope.WorkAreaScope>>(
+            Scopes.Where(s => s.ParishId == parishId && (seasonId is null || s.SeasonId == seasonId)).OrderBy(s => s.Name).ToList());
+
+    public void Add(Resource.Domain.Scope.WorkAreaScope scope) => Scopes.Add(scope);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Adds an ACTIVE work area of an ACTIVE season with the given officer.</summary>
+    public Resource.Domain.Scope.WorkAreaScope Seed(
+        Guid parishId,
+        Guid? materialOfficerId,
+        Guid? seasonId = null,
+        string name = "Hang đá",
+        Resource.Domain.Scope.SeasonStatus seasonStatus = Resource.Domain.Scope.SeasonStatus.Active)
+    {
+        var scope = Resource.Domain.Scope.WorkAreaScope.FromSnapshot(
+            new Resource.Domain.Scope.WorkAreaSnapshot(
+                Guid.NewGuid(), seasonId ?? Guid.NewGuid(), parishId, name,
+                Resource.Domain.Scope.WorkAreaStatus.InProgress, seasonStatus, null, Guid.NewGuid(), materialOfficerId, 1),
+            DateTimeOffset.UtcNow);
+        Scopes.Add(scope);
+        return scope;
+    }
+}

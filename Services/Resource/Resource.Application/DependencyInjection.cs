@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Resource.Application.Catalog;
+using Resource.Application.Scope;
 
 namespace Resource.Application;
 
@@ -17,6 +18,11 @@ public static class DependencyInjection
         services.AddScoped<ListMaterialsQueryHandler>();
         services.AddScoped<CreateMaterialCommandHandler>();
         services.AddScoped<UpdateMaterialCommandHandler>();
+
+        // F-RES-01 work-area scope projection
+        services.AddScoped<ApplyWorkAreaSnapshotHandler>();
+        services.AddScoped<ApplySeasonStatusHandler>();
+        services.AddScoped<WorkAreaAccess>();
 
         return services;
     }

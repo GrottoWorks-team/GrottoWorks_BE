@@ -1,0 +1,38 @@
+using System.ComponentModel.DataAnnotations;
+using Resource.Domain.Scope;
+
+namespace Resource.Api.Requests;
+
+/// <summary>
+/// Interim feed of the work-area projection (F-RES-01) until ParishCoordination publishes
+/// <c>planning.work-area.*</c>. Same fields the event payload must carry.
+/// </summary>
+public sealed class WorkAreaSnapshotRequest
+{
+    [Required] public Guid? SeasonId { get; init; }
+
+    [Required] public Guid? ParishId { get; init; }
+
+    [Required]
+    [StringLength(150)]
+    public string? Name { get; init; }
+
+    [Required] public WorkAreaStatus? Status { get; init; }
+
+    [Required] public SeasonStatus? SeasonStatus { get; init; }
+
+    public Guid? CommunityId { get; init; }
+
+    public Guid? LeaderUserId { get; init; }
+
+    public Guid? MaterialOfficerUserId { get; init; }
+
+    /// <summary>Source aggregate version; older snapshots are ignored.</summary>
+    [Range(0, long.MaxValue)]
+    public long Version { get; init; }
+}
+
+public sealed class SeasonStatusRequest
+{
+    [Required] public SeasonStatus? Status { get; init; }
+}

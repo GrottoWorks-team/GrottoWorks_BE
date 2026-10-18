@@ -109,6 +109,72 @@ namespace Resource.Infrastructure.Data.Migrations
                     b.ToTable("material_category", (string)null);
                 });
 
+            modelBuilder.Entity("Resource.Domain.Inventory.MaterialRequirement", b =>
+                {
+                    b.Property<Guid>("MaterialRequirementId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_requirement_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<decimal>("ExistingQuantity")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("existing_quantity");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_id");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("requirement_note");
+
+                    b.Property<decimal>("RequiredQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("required_quantity");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("requirement_status");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<Guid>("WorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_id");
+
+                    b.HasKey("MaterialRequirementId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("WorkAreaId", "MaterialId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_material_requirement_work_area_material");
+
+                    b.ToTable("material_requirement", null, t =>
+                        {
+                            t.HasCheckConstraint("material_requirement_existing_non_negative", "\"existing_quantity\" >= 0");
+
+                            t.HasCheckConstraint("material_requirement_required_positive", "\"required_quantity\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("Resource.Domain.Scope.WorkAreaScope", b =>
                 {
                     b.Property<Guid>("WorkAreaId")
@@ -177,6 +243,15 @@ namespace Resource.Infrastructure.Data.Migrations
                     b.HasOne("Resource.Domain.Catalog.MaterialCategory", null)
                         .WithMany()
                         .HasForeignKey("MaterialCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Resource.Domain.Inventory.MaterialRequirement", b =>
+                {
+                    b.HasOne("Resource.Domain.Catalog.Material", null)
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

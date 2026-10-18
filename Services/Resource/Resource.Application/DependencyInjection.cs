@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Resource.Application.Catalog;
 using Resource.Application.Scope;
+using Resource.Application.Requirements;
 
 namespace Resource.Application;
 
@@ -23,6 +24,11 @@ public static class DependencyInjection
         services.AddScoped<ApplyWorkAreaSnapshotHandler>();
         services.AddScoped<ApplySeasonStatusHandler>();
         services.AddScoped<WorkAreaAccess>();
+
+        // F-RES-03 material requirements
+        services.AddScoped<ListMaterialRequirementsQueryHandler>();
+        services.AddScoped<CreateMaterialRequirementCommandHandler>();
+        services.AddScoped<UpdateMaterialRequirementCommandHandler>();
 
         return services;
     }

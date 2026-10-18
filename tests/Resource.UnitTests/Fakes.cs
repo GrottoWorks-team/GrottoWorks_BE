@@ -152,3 +152,27 @@ public sealed class FakeScopeStore : Resource.Application.Scope.IWorkAreaScopeSt
         return scope;
     }
 }
+
+public sealed class FakeRequirementStore : Resource.Application.Requirements.IMaterialRequirementStore
+{
+    public List<Resource.Domain.Inventory.MaterialRequirement> Requirements { get; } = [];
+
+    public int SaveChangesCount { get; private set; }
+
+    public Task<IReadOnlyList<Resource.Domain.Inventory.MaterialRequirement>> ListByWorkAreaAsync(Guid workAreaId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Inventory.MaterialRequirement>>(Requirements.Where(r => r.WorkAreaId == workAreaId).ToList());
+
+    public Task<Resource.Domain.Inventory.MaterialRequirement?> GetAsync(Guid requirementId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Requirements.FirstOrDefault(r => r.MaterialRequirementId == requirementId));
+
+    public Task<bool> ExistsAsync(Guid workAreaId, Guid materialId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Requirements.Any(r => r.WorkAreaId == workAreaId && r.MaterialId == materialId));
+
+    public void Add(Resource.Domain.Inventory.MaterialRequirement requirement) => Requirements.Add(requirement);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+        return Task.CompletedTask;
+    }
+}

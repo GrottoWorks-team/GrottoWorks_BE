@@ -7,6 +7,7 @@ public static class ResourceEndpoints
     {
         app.MapCatalogEndpoints();
         app.MapInternalScopeEndpoints();
+        app.MapRequirementEndpoints();
         return app;
     }
 }

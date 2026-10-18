@@ -100,8 +100,8 @@ public sealed class MaterialCatalogStore(ResourceDbContext dbContext) : IMateria
         dbContext.Materials.AnyAsync(material => material.Code == normalizedCode, cancellationToken);
 
     public Task<bool> IsMaterialReferencedAsync(Guid materialId, CancellationToken cancellationToken = default) =>
-        // Requirements and the stock ledger arrive with F-RES-03/04 and extend this check.
-        Task.FromResult(false);
+        // Extended with the stock ledger in F-RES-04.
+        dbContext.MaterialRequirements.AnyAsync(requirement => requirement.MaterialId == materialId, cancellationToken);
 
     public void AddMaterial(Material material) => dbContext.Materials.Add(material);
 

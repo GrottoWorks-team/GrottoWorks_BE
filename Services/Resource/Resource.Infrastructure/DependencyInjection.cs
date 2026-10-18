@@ -6,6 +6,8 @@ using Resource.Application.Catalog;
 using Resource.Infrastructure.Catalog;
 using Resource.Application.Scope;
 using Resource.Infrastructure.Scope;
+using Resource.Application.Requirements;
+using Resource.Infrastructure.Requirements;
 using Resource.Infrastructure.Data;
 using Resource.Infrastructure.Observability;
 
@@ -25,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<IIntegrationEventPublisher, LoggingIntegrationEventPublisher>();
         services.AddScoped<IMaterialCatalogStore, MaterialCatalogStore>();
         services.AddScoped<IWorkAreaScopeStore, WorkAreaScopeStore>();
+        services.AddScoped<IMaterialRequirementStore, MaterialRequirementStore>();
 
         return services;
     }

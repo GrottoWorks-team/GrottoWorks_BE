@@ -9,6 +9,9 @@ public interface ISkillStore
 
     Task<Skill?> GetByIdAsync(Guid skillId, CancellationToken cancellationToken = default);
 
+    /// <summary>Tracked load of the given skills; unknown ids are simply absent from the result.</summary>
+    Task<IReadOnlyList<Skill>> GetByIdsAsync(IReadOnlyCollection<Guid> skillIds, CancellationToken cancellationToken = default);
+
     Task<bool> CodeExistsAsync(string normalizedCode, CancellationToken cancellationToken = default);
 
     void Add(Skill skill);

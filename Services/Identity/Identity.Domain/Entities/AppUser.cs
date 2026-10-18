@@ -11,6 +11,10 @@ public sealed class AppUser
     /// <summary>API Contract: User.displayName is 1–120 characters (DB column allows 150).</summary>
     public const int MaxFullNameLength = 120;
 
+    public const int MaxSkills = 50;
+
+    public const int MaxAvailabilitySlots = 100;
+
     private AppUser()
     {
     }
@@ -94,6 +98,12 @@ public sealed class AppUser
 
     public DateTimeOffset? UpdatedAt { get; private set; }
 
+    /// <summary>
+    /// Optimistic concurrency token (API Contract 4.5) mapped to PostgreSQL <c>xmin</c>, so no extra column
+    /// is needed in <c>app_user</c>. Exposed to ADMIN clients as <c>version</c>; a stale value returns 412.
+    /// </summary>
+    public uint Version { get; private set; }
+
     public VolunteerProfile? VolunteerProfile { get; private set; }
 
     public List<VolunteerSkill> VolunteerSkills { get; private set; } = [];
@@ -102,6 +112,17 @@ public sealed class AppUser
 
     /// <summary>Only an ACTIVE account may authenticate (F-IDN-02).</summary>
     public bool CanAuthenticate => Status == UserStatus.Active && PasswordHash is not null;
+
+    /// <summary>Optimistic concurrency guard: <c>null</c> means the client did not send a version.</summary>
+    public void EnsureVersion(long? expectedVersion)
+    {
+        if (expectedVersion is { } expected && expected != Version)
+        {
+            throw new DomainException(
+                "USER_VERSION_MISMATCH",
+                "The account was changed by someone else. Reload it and try again.");
+        }
+    }
 
     public void SetPasswordHash(string passwordHash, DateTimeOffset now)
     {
@@ -157,21 +178,148 @@ public sealed class AppUser
         UpdatedAt = now;
     }
 
+    /// <summary>F-IDN-08: an administrator locks an ACTIVE or INACTIVE account. Locking twice is a state conflict.</summary>
     public void Lock(DateTimeOffset now)
     {
+        if (Status == UserStatus.Locked)
+        {
+            throw new DomainException("USER_ALREADY_LOCKED", "The account is already locked.");
+        }
+
         Status = UserStatus.Locked;
         UpdatedAt = now;
     }
 
+    /// <summary>F-IDN-08: only a LOCKED account can be unlocked; it returns to ACTIVE.</summary>
     public void Unlock(DateTimeOffset now)
     {
+        if (Status != UserStatus.Locked)
+        {
+            throw new DomainException("USER_NOT_LOCKED", "The account is not locked.");
+        }
+
         Status = UserStatus.Active;
         UpdatedAt = now;
     }
 
     public void Deactivate(DateTimeOffset now)
     {
+        if (Status == UserStatus.Locked)
+        {
+            throw new DomainException(
+                "USER_LOCKED_USE_UNLOCK",
+                "A locked account must be unlocked before its status can be changed.");
+        }
+
         Status = UserStatus.Inactive;
+        UpdatedAt = now;
+    }
+
+    /// <summary>INACTIVE → ACTIVE through updateUser. A LOCKED account goes through <see cref="Unlock"/> instead.</summary>
+    public void Activate(DateTimeOffset now)
+    {
+        if (Status == UserStatus.Locked)
+        {
+            throw new DomainException(
+                "USER_LOCKED_USE_UNLOCK",
+                "A locked account must be unlocked before its status can be changed.");
+        }
+
+        Status = UserStatus.Active;
+        UpdatedAt = now;
+    }
+
+    /// <summary>F-IDN-08: an administrator corrects the login email (normalized, uniqueness checked by the handler).</summary>
+    public void ChangeEmail(string email, DateTimeOffset now)
+    {
+        Email = NormalizeEmail(email);
+        UpdatedAt = now;
+    }
+
+    /// <summary>Changes role and parish together so BR-67 is checked against the final pair, not an intermediate one.</summary>
+    public void AssignRole(Role role, Guid? parishId, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(role);
+
+        var resultingParishId = parishId ?? ParishId;
+        EnsureParishRule(resultingParishId, role.Code);
+
+        Role = role;
+        RoleId = role.RoleId;
+        ParishId = resultingParishId;
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// F-IDN-07 <c>replaceMySkills</c>: the declared skill set becomes exactly <paramref name="skillIds"/>.
+    /// Links that stay are kept as-is (their level/note survive); unique (user, skill) holds by construction.
+    /// </summary>
+    public void ReplaceSkills(IReadOnlyCollection<Guid> skillIds, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(skillIds);
+
+        if (skillIds.Any(skillId => skillId == Guid.Empty))
+        {
+            throw new DomainException("VOLUNTEER_SKILL_INVALID", "Skill ids must not be empty.");
+        }
+
+        var requested = skillIds.ToHashSet();
+        if (requested.Count != skillIds.Count)
+        {
+            throw new DomainException("VOLUNTEER_SKILL_DUPLICATE", "Each skill can be declared only once.");
+        }
+
+        if (requested.Count > MaxSkills)
+        {
+            throw new DomainException(
+                "VOLUNTEER_SKILL_LIMIT",
+                $"A volunteer can declare at most {MaxSkills} skills.");
+        }
+
+        VolunteerSkills.RemoveAll(link => !requested.Contains(link.SkillId));
+
+        var existing = VolunteerSkills.Select(link => link.SkillId).ToHashSet();
+        foreach (var skillId in requested.Where(skillId => !existing.Contains(skillId)))
+        {
+            VolunteerSkills.Add(VolunteerSkill.Create(UserId, skillId));
+        }
+
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// F-IDN-07 <c>replaceMyAvailability</c>: replaces every structured slot. Each slot must satisfy
+    /// <c>available_to &gt; available_from</c> (BR-70, DB check) and slots must not overlap, so matching
+    /// (BR-15) never sees ambiguous ranges.
+    /// </summary>
+    public void ReplaceAvailability(IReadOnlyList<AvailabilitySlot> slots, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(slots);
+
+        if (slots.Count > MaxAvailabilitySlots)
+        {
+            throw new DomainException(
+                "AVAILABILITY_LIMIT",
+                $"At most {MaxAvailabilitySlots} availability slots can be declared.");
+        }
+
+        var created = slots
+            .Select(slot => VolunteerAvailability.Create(UserId, slot.AvailableFrom, slot.AvailableTo, slot.Note))
+            .OrderBy(slot => slot.AvailableFrom)
+            .ToList();
+
+        for (var index = 1; index < created.Count; index++)
+        {
+            if (created[index].AvailableFrom < created[index - 1].AvailableTo)
+            {
+                throw new DomainException(
+                    "AVAILABILITY_OVERLAP",
+                    "Availability slots must not overlap.");
+            }
+        }
+
+        VolunteerAvailabilities.Clear();
+        VolunteerAvailabilities.AddRange(created);
         UpdatedAt = now;
     }
 

@@ -44,3 +44,23 @@ public sealed class LogoutRequest
     [Required(ErrorMessage = "Refresh token is required.")]
     public string? RefreshToken { get; init; }
 }
+
+/// <summary>F-IDN-04 <c>ForgotPasswordRequest</c>.</summary>
+public sealed class ForgotPasswordRequest
+{
+    [Required(ErrorMessage = "Email is required.")]
+    [StringLength(255, ErrorMessage = "Email must not exceed 255 characters.")]
+    public string? Email { get; init; }
+}
+
+/// <summary>F-IDN-04 <c>ResetPasswordRequest</c>: the code received out of band plus the new password.</summary>
+public sealed class ResetPasswordRequest
+{
+    [Required(ErrorMessage = "Reset token is required.")]
+    [StringLength(200, ErrorMessage = "Reset token must not exceed 200 characters.")]
+    public string? Token { get; init; }
+
+    [Required(ErrorMessage = "New password is required.")]
+    [StringLength(128, MinimumLength = 8, ErrorMessage = "Password must be 8-128 characters.")]
+    public string? NewPassword { get; init; }
+}

@@ -20,6 +20,16 @@ public interface IUserAccountStore
 
     Task<Role?> GetRoleByCodeAsync(string roleCode, CancellationToken cancellationToken = default);
 
+    /// <summary>Loads the given users with role, profile and skills; unknown ids are absent (F-IDN-09).</summary>
+    Task<IReadOnlyList<AppUser>> GetDetailsByIdsAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Filtered, sorted, paged read of users with role, profile and skills (F-IDN-08, F-IDN-10).</summary>
+    Task<PagedResult<AppUser>> SearchAsync(UserSearchCriteria criteria, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Role>> ListRolesAsync(CancellationToken cancellationToken = default);
+
     void Add(AppUser user);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);

@@ -12,4 +12,7 @@ public interface IParishDirectory
         Guid communityId,
         Guid parishId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Used when an ADMIN assigns a parish to an account (BR-67).</summary>
+    Task<bool> ParishExistsAsync(Guid parishId, CancellationToken cancellationToken = default);
 }

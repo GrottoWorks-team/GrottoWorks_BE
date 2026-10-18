@@ -15,7 +15,7 @@
 | Thành phần | Trạng thái |
 |---|---|
 | `Services/ParishCoordination` | 12 API: `listParishes`, `createParish`, `getParish`, `updateParish`, `listCommunities`, `createCommunity`, `listSeasons`, `createSeason`, `getSeason`, `listWorkAreas`, `createWorkArea`, `getWorkArea`; role ADMIN/PARISH; season tạo ở PLANNING (không DRAFT), unique tên + năm; seed demo (1 parish, 2 community, 1 season, 1 work area); `tests/ParishCoordination.UnitTests` |
-| `Services/Identity` | 9 API (F-IDN-01, 02, 03, 05, 06) + event contract `identity.user.registered/locked/unlocked`; 49 unit test. Còn dùng bản local `Identity.Api.Common` |
+| `Services/Identity` | 22 API public + `GET /internal/users` (F-IDN-01 → F-IDN-10, xong S2 sớm trên nhánh `feat/identity/F-IDN-S2`, 18/10) + event contract `identity.user.registered/locked/unlocked`; 144 unit test + smoke E2E 63 kịch bản trên PostgreSQL. Còn dùng bản local `Identity.Api.Common` |
 | `BuildingBlocks/` | `.Web`, `.Security`, `.Messaging` — bản đầu do Vũ commit `09170a5`; `IntegrationEventEnvelope` **chưa đủ field Contract §8** |
 | `ApiGateway/` | YARP, route theo path Contract cho identity + parish; thiếu `/admin/**`, `/roles` |
 | docker-compose | Có |
@@ -149,13 +149,19 @@ Khởi tạo (F-IDN-01, S0): copy template Parish → `Services/Identity/Identit
 | 3 | F-IDN-03 | `refresh_token` (hash, family, `replaced_by`, `revoked_at`) | `refreshToken`, `logout` | Access 15'; rotate; reuse → revoke cả family; denylist Redis | S1 (**giao JWT giữa S1**) |
 | 4 | F-IDN-05 | `volunteer_profile` | `getMyProfile`, `updateMyProfile` | — | S1 |
 | 5 | F-IDN-06 | `Skill` | `listSkills`, `createSkill`, `updateSkill` | Đã tham chiếu → deactivate | S1 |
-| 6 | F-IDN-04 | `password_reset_token` (hash, 1 lần, hết hạn) | `requestPasswordReset`, `resetPassword` | Luôn trả 202 dù email không tồn tại; revoke refresh token sau reset | S2 |
-| 7 | F-IDN-07 | `volunteer_skill`, `volunteer_availability` | `replaceMySkills`, `replaceMyAvailability` | Unique (user, skill); BR-70 `available_to > available_from`, không chồng lấn | S2 |
-| 8 | F-IDN-08 | Admin user | `listUsers`, `createUser`, `updateUser`, `lockUser`, `unlockUser`, `assignUserRole`, `listAssignableRoles` | 1 role/account; BR-67 `parish_id` bắt buộc trừ ADMIN; lock → revoke token | S2 |
-| 9 | F-IDN-09 | Query | `GET /internal/users?ids=` | Chỉ service-to-service (policy client credential/API key nội bộ); trả status, role, communityId, skills | S2 (**mốc cho Lâm**) |
-| 10 | F-IDN-10 | Query | `listParishUsers` | Chỉ user cùng parish; filter community/role/skill | S2 |
+| 6 | F-IDN-04 | `password_reset_token` (hash, 1 lần, hết hạn) | `requestPasswordReset`, `resetPassword` | Luôn trả 202 dù email không tồn tại; revoke refresh token sau reset | S2 · ✅ 18/10 |
+| 7 | F-IDN-07 | `volunteer_skill`, `volunteer_availability` | `replaceMySkills`, `replaceMyAvailability` | Unique (user, skill); BR-70 `available_to > available_from`, không chồng lấn | S2 · ✅ 18/10 |
+| 8 | F-IDN-08 | Admin user | `listUsers`, `createUser`, `updateUser`, `lockUser`, `unlockUser`, `assignUserRole`, `listAssignableRoles` | 1 role/account; BR-67 `parish_id` bắt buộc trừ ADMIN; lock → revoke token | S2 · ✅ 18/10 |
+| 9 | F-IDN-09 | Query | `GET /internal/users?ids=` | Chỉ service-to-service (policy client credential/API key nội bộ); trả status, role, communityId, skills | S2 (**mốc cho Lâm**) · ✅ 18/10 — contract ở BuildingBlocks README §5 |
+| 10 | F-IDN-10 | Query | `listParishUsers` | Chỉ user cùng parish; filter community/role/skill | S2 · ✅ 18/10 |
 
 Event publish: `identity.user.registered`, `identity.user.locked/unlocked`.
+
+**Ghi chú triển khai S2 (18/10/2026)**
+- `password_reset_token` (bảng kỹ thuật) + `xmin` làm `version` của `app_user` — migration `F-IDN-04-08_PasswordResetToken_UserVersion` (xmin là cột hệ thống, migration không thêm cột).
+- `/internal/users` xác thực bằng `X-Internal-Api-Key` (`InternalApi:ApiKey`), gateway không route `/internal/**` → **Lâm review BuildingBlocks README §5** trước khi viết client cho F-PAR-08/F-TSK-06.
+- Gateway thêm route `/api/v1/admin/users/**`, `/api/v1/roles`.
+- Interim: mã reset chỉ log (dev), `ParishExistsAsync` chưa kiểm tra thật — xem `Services/Identity/README.md` "Việc còn mở".
 
 ### 4.2 Resource — S2 → S8
 
@@ -301,7 +307,7 @@ Kịch bản nghiệm thu theo owner (Mục 8 spec): Lâm #1–4, #11, #16; Vũ 
 | ParishCoordination | Lâm | PAR-01, 02, 05..08 | PAR-04, 09, 10 | — | ✅ PAR-01 · 🟨 PAR-02 (thiếu update), PAR-05 (thiếu update), PAR-07 (thiếu update) |
 | TaskExecution | Lâm | TSK-01..04, 06..11, 17 | TSK-05, 12..15, 15b | TSK-16 | 0 / 18 |
 | NotificationAudit | Lâm | NTF-01 | NTF-02..04 | NTF-05, 06 | 0 / 6 |
-| Identity | Vũ | IDN-01..03, 05..09 | IDN-04, 10 | — | 5 / 10 (S0+S1: IDN-01, 02, 03, 05, 06) |
+| Identity | Vũ | IDN-01..03, 05..09 | IDN-04, 10 | — | ✅ 10 / 10 (S0+S1: IDN-01, 02, 03, 05, 06 · S2 sớm 18/10: IDN-04, 07, 08, 09, 10 — chờ review/merge) |
 | Resource | Vũ | RES-01..07, 09, 10, 12, 13, 15, 17 | RES-11, 13b, 13c, 16, 18, 20 | RES-14 | 0 / 20 |
 | Readiness | Vũ | — | RDY-02..06 | — | 0 / 5 |
 | Reporting | Vũ | — | RPT-01..05 | RPT-06 | 0 / 6 |

@@ -16,3 +16,24 @@ public sealed class UpdateProfileRequest
 
     public Guid? CommunityId { get; init; }
 }
+
+/// <summary>F-IDN-07 <c>SkillIdList</c>: the complete set of declared skills (empty clears them).</summary>
+public sealed class ReplaceSkillsRequest
+{
+    [Required(ErrorMessage = "skillIds is required (send an empty array to clear).")]
+    [MaxLength(50, ErrorMessage = "At most 50 skills can be declared.")]
+    public List<Guid>? SkillIds { get; init; }
+}
+
+/// <summary>F-IDN-07 <c>AvailabilitySlot</c>: UTC date-time range, <c>availableTo</c> after <c>availableFrom</c>.</summary>
+public sealed class AvailabilitySlotRequest
+{
+    [Required(ErrorMessage = "availableFrom is required.")]
+    public DateTimeOffset? AvailableFrom { get; init; }
+
+    [Required(ErrorMessage = "availableTo is required.")]
+    public DateTimeOffset? AvailableTo { get; init; }
+
+    [StringLength(500, ErrorMessage = "Note must not exceed 500 characters.")]
+    public string? Note { get; init; }
+}

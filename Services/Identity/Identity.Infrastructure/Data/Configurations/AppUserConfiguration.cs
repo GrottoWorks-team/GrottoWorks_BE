@@ -63,6 +63,11 @@ public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
             .HasColumnName("updated_at")
             .HasColumnType("timestamp with time zone");
 
+        // Optimistic concurrency (API Contract 4.5) on PostgreSQL's system column xmin: no schema change,
+        // and every UPDATE of the row bumps it. Npgsql maps a uint row version to xmin by convention.
+        builder.Property(user => user.Version)
+            .IsRowVersion();
+
         builder.HasOne(user => user.Role)
             .WithMany()
             .HasForeignKey(user => user.RoleId)

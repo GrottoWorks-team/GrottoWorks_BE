@@ -1,6 +1,7 @@
 using Identity.Application.Abstractions;
 using Identity.Application.Accounts;
 using Identity.Application.Auth;
+using Identity.Application.Auth.PasswordReset;
 using Identity.Application.Skills;
 using Identity.Infrastructure.Accounts;
 using Identity.Infrastructure.Authentication;
@@ -8,6 +9,7 @@ using Identity.Infrastructure.Auth;
 using Identity.Infrastructure.Data;
 using Identity.Infrastructure.Observability;
 using Identity.Infrastructure.Parish;
+using Identity.Infrastructure.PasswordReset;
 using Identity.Infrastructure.Passwording;
 using Identity.Infrastructure.Skills;
 using Microsoft.EntityFrameworkCore;
@@ -55,6 +57,15 @@ public static class DependencyInjection
         // INTERIM until ParishCoordination exposes communities (F-PAR-02) — see PendingParishDirectory.
         services.AddScoped<IParishDirectory, PendingParishDirectory>();
         services.AddScoped<IIdentityDataSeeder, IdentityDataSeeder>();
+
+        // F-IDN-04 password reset.
+        var passwordResetSettings = configuration.GetSection(PasswordResetSettings.SectionName).Get<PasswordResetSettings>()
+            ?? new PasswordResetSettings();
+        services.AddSingleton(passwordResetSettings);
+        services.AddSingleton<IOpaqueTokenGenerator, OpaqueTokenGenerator>();
+        services.AddScoped<IPasswordResetTokenStore, PasswordResetTokenStore>();
+        // INTERIM until NotificationAudit offers an email channel — see LoggingPasswordResetNotifier.
+        services.AddScoped<IPasswordResetNotifier, LoggingPasswordResetNotifier>();
 
         return services;
     }

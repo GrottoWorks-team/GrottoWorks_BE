@@ -4,6 +4,7 @@ using Identity.Application.Accounts;
 using Identity.Application.Auth;
 using Identity.Application.Auth.Login;
 using Identity.Application.Auth.Logout;
+using Identity.Application.Auth.PasswordReset;
 using Identity.Application.Auth.TokenRefresh;
 using Identity.Application.Auth.RegisterUser;
 using Microsoft.AspNetCore.Builder;
@@ -49,6 +50,45 @@ public static class AuthEndpoints
             .Produces(StatusCodes.Status204NoContent)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        app.MapPost("/api/v1/auth/password/forgot", RequestPasswordResetAsync)
+            .WithName("requestPasswordReset")
+            .WithTags("User")
+            .AllowAnonymous()
+            .Accepts<ForgotPasswordRequest>("application/json")
+            .Produces(StatusCodes.Status202Accepted)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        app.MapPost("/api/v1/auth/password/reset", ResetPasswordAsync)
+            .WithName("resetPassword")
+            .WithTags("User")
+            .AllowAnonymous()
+            .Accepts<ResetPasswordRequest>("application/json")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+    }
+
+    /// <summary>Always 202 — the response never reveals whether the email belongs to an account.</summary>
+    private static async Task<IResult> RequestPasswordResetAsync(
+        ForgotPasswordRequest request,
+        RequestPasswordResetCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        await handler.HandleAsync(new RequestPasswordResetCommand(request.Email!.Trim()), cancellationToken);
+
+        return Results.Accepted();
+    }
+
+    private static async Task<IResult> ResetPasswordAsync(
+        ResetPasswordRequest request,
+        ResetPasswordCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        await handler.HandleAsync(
+            new ResetPasswordCommand(request.Token!.Trim(), request.NewPassword!),
+            cancellationToken);
+
+        return Results.NoContent();
     }
 
     private static async Task<IResult> RegisterAsync(

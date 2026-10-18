@@ -16,7 +16,10 @@ public sealed class VolunteerAvailabilityConfiguration : IEntityTypeConfiguratio
 
         builder.HasKey(slot => slot.VolunteerAvailabilityId);
 
+        // Ids are created in the domain (Guid.NewGuid). Without ValueGeneratedNever EF treats a new child
+        // found through the AppUser collection as an existing row and issues an UPDATE (0 rows → concurrency error).
         builder.Property(slot => slot.VolunteerAvailabilityId)
+            .ValueGeneratedNever()
             .HasColumnName("volunteer_availability_id");
 
         builder.Property(slot => slot.VolunteerUserId)

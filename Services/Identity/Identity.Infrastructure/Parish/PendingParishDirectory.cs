@@ -24,4 +24,13 @@ public sealed class PendingParishDirectory(ILogger<PendingParishDirectory> logge
 
         return Task.FromResult(true);
     }
+
+    public Task<bool> ParishExistsAsync(Guid parishId, CancellationToken cancellationToken = default)
+    {
+        logger.LogWarning(
+            "Parish {ParishId} accepted WITHOUT verification (Parish integration pending, F-PAR-01).",
+            parishId);
+
+        return Task.FromResult(true);
+    }
 }

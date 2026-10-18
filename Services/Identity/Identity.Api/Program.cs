@@ -103,6 +103,7 @@ app.UseAuthorization();
 app.MapAuthEndpoints();
 app.MapUserEndpoints();
 app.MapSkillEndpoints();
+app.MapAdminEndpoints();
 app.MapHealthEndpoints();
 
 // Apply migrations and seed the 5 roles + default ADMIN (F-IDN-01).

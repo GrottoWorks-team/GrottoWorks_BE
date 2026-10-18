@@ -1,0 +1,84 @@
+@host = http://localhost:5183
+# accessToken: login through Identity (POST /api/v1/auth/login) as a user with role MO.
+@accessToken = <MO access token>
+@internalApiKey = dev-internal-api-key-change-me-0123456789
+@workAreaId = 00000000-0000-0000-0000-0000000000a1
+@seasonId = 00000000-0000-0000-0000-0000000000b1
+@parishId = 00000000-0000-0000-0000-000000000001
+@moUserId = <sub of the MO token>
+
+### F-RES-01 — (interim) project a work area until planning.work-area.* events exist
+PUT {{host}}/internal/work-area-scopes/{{workAreaId}}
+Content-Type: application/json
+X-Internal-Api-Key: {{internalApiKey}}
+
+{
+  "seasonId": "{{seasonId}}",
+  "parishId": "{{parishId}}",
+  "name": "Hang đá chính",
+  "status": "IN_PROGRESS",
+  "seasonStatus": "ACTIVE",
+  "materialOfficerUserId": "{{moUserId}}",
+  "version": 1
+}
+
+### F-RES-02 — create a category
+# @name category
+POST {{host}}/api/v1/material-categories
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "code": "LIGHTING", "name": "Đèn & điện" }
+
+### F-RES-02 — create a material (unit of every quantity)
+# @name material
+POST {{host}}/api/v1/materials
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "categoryId": "{{category.response.body.$.data.id}}", "code": "LED-WARM-10M", "name": "Dây LED vàng 10m", "unit": "cuộn" }
+
+### F-RES-02 — list materials
+GET {{host}}/api/v1/materials?q=led&sort=name,asc&page=1&size=20
+Authorization: Bearer {{accessToken}}
+
+### F-RES-03 — require 12 rolls for the work area
+# @name requirement
+POST {{host}}/api/v1/work-areas/{{workAreaId}}/material-requirements
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "materialId": "{{material.response.body.$.data.id}}", "requiredQuantity": 12, "note": "Trang trí mái hang đá" }
+
+### F-RES-03 — change quantity (If-Match = version)
+PATCH {{host}}/api/v1/material-requirements/{{requirement.response.body.$.data.id}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+If-Match: "{{requirement.response.body.$.data.version}}"
+
+{ "requiredQuantity": 15 }
+
+### F-RES-04 — opening stock (once per work area + material)
+POST {{host}}/api/v1/inventory/opening-stock
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "workAreaId": "{{workAreaId}}", "materialId": "{{material.response.body.$.data.id}}", "quantity": 4, "note": "Kiểm kê đầu mùa" }
+
+### F-RES-04 — inventory balances of my parish
+GET {{host}}/api/v1/inventory?seasonId={{seasonId}}&onlyShortage=false
+Authorization: Bearer {{accessToken}}
+
+### F-RES-04 — ledger history of a material
+GET {{host}}/api/v1/materials/{{material.response.body.$.data.id}}/allocation-history?from=2026-10-01T00:00:00Z
+Authorization: Bearer {{accessToken}}
+
+### F-RES-05 — shortages of the work area
+GET {{host}}/api/v1/work-areas/{{workAreaId}}/shortages
+Authorization: Bearer {{accessToken}}
+
+### F-RES-05 — material needs of the season (any role)
+GET {{host}}/api/v1/seasons/{{seasonId}}/material-needs?page=1&size=20
+Authorization: Bearer {{accessToken}}
+
+###

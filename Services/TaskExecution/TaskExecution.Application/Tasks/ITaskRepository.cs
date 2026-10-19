@@ -15,4 +15,7 @@ public interface ITaskRepository
         int size,
         string? sort,
         CancellationToken cancellationToken = default);
+
+    void Add(WorkTask task);
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

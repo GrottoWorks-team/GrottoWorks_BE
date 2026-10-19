@@ -23,4 +23,30 @@ public sealed class TaskScopeAccess(IScopeProjectionStore scopes, ICurrentUser c
 
         return workArea;
     }
+
+    public async Task<(WorkAreaScope WorkArea, SeasonScope Season)> GetWorkAreaForLeaderWriteAsync(
+        Guid workAreaId,
+        CancellationToken cancellationToken = default)
+    {
+        var workArea = await GetWorkAreaForReadAsync(workAreaId, cancellationToken);
+        if (currentUser.Role != GrottoWorksRoles.Leader || workArea.LeaderUserId != currentUser.UserId)
+        {
+            throw DomainRuleException.Forbidden(
+                "WORK_AREA_ACCESS_DENIED",
+                "Only the leader assigned to this work area can manage its tasks.");
+        }
+
+        var season = await scopes.GetSeasonAsync(workArea.SeasonId, cancellationToken);
+        if (season is null)
+        {
+            throw DomainRuleException.NotFound("SEASON_NOT_FOUND", "The owning season does not exist in TaskExecution.");
+        }
+
+        if (season.IsReadOnly)
+        {
+            throw new DomainRuleException("SEASON_READ_ONLY", "The archived season is read-only.");
+        }
+
+        return (workArea, season);
+    }
 }

@@ -13,6 +13,7 @@ public static class DependencyInjection
         services.AddScoped<TaskScopeAccess>();
         services.AddScoped<GetTasksQueryHandler>();
         services.AddScoped<GetTaskQueryHandler>();
+        services.AddScoped<CreateTaskCommandHandler>();
         return services;
     }
 }

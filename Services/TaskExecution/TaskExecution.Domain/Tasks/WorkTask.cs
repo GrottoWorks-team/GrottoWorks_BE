@@ -38,13 +38,39 @@ public sealed class WorkTask
         DateTimeOffset? deadline,
         DateTimeOffset createdAt)
     {
+        if (id == Guid.Empty || workAreaId == Guid.Empty || createdByUserId == Guid.Empty)
+        {
+            throw DomainRuleException.Validation("TASK_IDENTITY_INVALID", "Task, work area and creator IDs are required.");
+        }
+
+        var normalizedName = name?.Trim() ?? string.Empty;
+        if (normalizedName.Length is < 1 or > 160)
+        {
+            throw DomainRuleException.Validation("TASK_NAME_INVALID", "Task name must contain 1 to 160 characters.");
+        }
+
+        if (requiredVolunteerCount < 1)
+        {
+            throw DomainRuleException.Validation("TASK_VOLUNTEER_COUNT_INVALID", "At least one volunteer is required.");
+        }
+
+        if (estimatedMinutes is <= 0 or > 599999)
+        {
+            throw DomainRuleException.Validation("TASK_ESTIMATE_INVALID", "Estimated minutes must be between 1 and 599999.");
+        }
+
+        if (startAt.HasValue && deadline.HasValue && deadline.Value <= startAt.Value)
+        {
+            throw DomainRuleException.Validation("TASK_DATE_RANGE_INVALID", "Task deadline must be after its start time.");
+        }
+
         return new WorkTask
         {
             Id = id,
             WorkAreaId = workAreaId,
             CreatedByUserId = createdByUserId,
             Type = TaskType.Work,
-            Name = name.Trim(),
+            Name = normalizedName,
             Description = NormalizeOptional(description),
             CompletionCriteria = NormalizeOptional(completionCriteria),
             Priority = priority,

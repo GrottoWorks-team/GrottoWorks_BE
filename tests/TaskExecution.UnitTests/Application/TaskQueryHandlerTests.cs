@@ -118,6 +118,9 @@ public sealed class TaskQueryHandlerTests
             var matches = Items.Where(task => task.WorkAreaId == workAreaId).ToList();
             return Task.FromResult<(IReadOnlyList<WorkTask>, long)>((matches, matches.Count));
         }
+
+        public void Add(WorkTask task) => Items.Add(task);
+        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class FakeScopeStore(WorkAreaScope? workArea) : IScopeProjectionStore

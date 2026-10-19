@@ -3,6 +3,8 @@ using BuildingBlocks.Web;
 using BuildingBlocks.Web.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using TaskExecution.Application.Tasks;
+using TaskExecution.Api.Requests;
+using BuildingBlocks.Security;
 using TaskExecution.Domain.Tasks;
 using TaskState = TaskExecution.Domain.Tasks.TaskStatus;
 
@@ -31,6 +33,17 @@ public static class TaskEndpoints
             .Produces<ProblemDetails>(StatusCodes.Status401Unauthorized)
             .Produces<ProblemDetails>(StatusCodes.Status403Forbidden)
             .Produces<ProblemDetails>(StatusCodes.Status404NotFound);
+
+        group.MapPost("/work-areas/{workAreaId:guid}/tasks", CreateTaskAsync)
+            .WithName("createTask")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
+            .Produces<ApiResponse<TaskDto>>(StatusCodes.Status201Created)
+            .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
+            .Produces<ProblemDetails>(StatusCodes.Status401Unauthorized)
+            .Produces<ProblemDetails>(StatusCodes.Status403Forbidden)
+            .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
+            .Produces<ProblemDetails>(StatusCodes.Status409Conflict)
+            .Produces<ProblemDetails>(StatusCodes.Status422UnprocessableEntity);
     }
 
     private static async Task<IResult> ListTasksAsync(
@@ -63,6 +76,30 @@ public static class TaskEndpoints
         var task = await handler.HandleAsync(taskId, cancellationToken);
         httpContext.Response.Headers.ETag = $"\"{task.Version}\"";
         return Results.Ok(ApiResults.Ok(task, httpContext));
+    }
+
+    private static async Task<IResult> CreateTaskAsync(
+        Guid workAreaId,
+        CreateTaskRequest request,
+        HttpContext httpContext,
+        CreateTaskCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var task = await handler.HandleAsync(
+            new CreateTaskCommand(
+                workAreaId,
+                request.Name,
+                request.Description,
+                request.CompletionCriteria,
+                request.Priority!.Value,
+                request.EstimatedMinutes,
+                request.RequiredVolunteers,
+                request.StartAt,
+                request.Deadline),
+            cancellationToken);
+
+        httpContext.Response.Headers.ETag = $"\"{task.Version}\"";
+        return Results.Created($"/api/v1/tasks/{task.Id}", ApiResults.Ok(task, httpContext));
     }
 
     private static TEnum? ParseEnum<TEnum>(string? value, string field)

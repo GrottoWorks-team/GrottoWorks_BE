@@ -41,6 +41,11 @@ public sealed class TaskRepository(TaskExecutionDbContext dbContext) : ITaskRepo
         return (items, totalItems);
     }
 
+    public void Add(WorkTask task) => dbContext.Tasks.Add(task);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
+        dbContext.SaveChangesAsync(cancellationToken);
+
     private static IQueryable<WorkTask> ApplySorting(IQueryable<WorkTask> query, string? sort)
     {
         var parts = (sort ?? "createdAt,desc").Split(',');

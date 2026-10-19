@@ -87,6 +87,8 @@ services:
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__ParishCoordinationDatabase=Host=postgres;Port=5432;Database=parish_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
       - Jwt__SigningKey=${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY (>= 32 chars) in .env}
+      - IdentityClient__BaseAddress=http://identity.api:8080/
+      - InternalApi__ApiKey=${INTERNAL_API_KEY:-dev-internal-api-key-change-me-0123456789}
       - Database__MigrateOnStartup=true
       - MessageBroker__Host=amqp://rabbitmq:5672
       - MessageBroker__UserName=${RABBITMQ_DEFAULT_USER:-grottoworks}

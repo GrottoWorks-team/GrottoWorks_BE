@@ -4,6 +4,7 @@ using ParishCoordination.Application.Parishes;
 using ParishCoordination.Application.Seasons;
 using ParishCoordination.Application.WorkAreas;
 using ParishCoordination.Application.WorkAreaCategories;
+using ParishCoordination.Application.Users;
 using ParishCoordination.Domain.Entities;
 using ParishCoordination.Domain.Enums;
 
@@ -16,6 +17,30 @@ internal sealed class FakeCurrentUser : ICurrentUser
     public string Role { get; init; } = GrottoWorksRoles.Parish;
     public Guid? ParishId { get; init; }
     public Guid? CommunityId { get; init; }
+}
+
+internal sealed class FakeIdentityUserLookup : IIdentityUserLookup
+{
+    public List<IdentityUser> Items { get; } = [];
+    public bool ThrowUnavailable { get; set; }
+    public int CallCount { get; private set; }
+    public Guid? LastUserId { get; private set; }
+
+    public Task<IdentityUser?> GetByIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        CallCount++;
+        LastUserId = userId;
+
+        if (ThrowUnavailable)
+        {
+            throw new IdentityUserLookupUnavailableException(
+                "Simulated Identity outage.");
+        }
+
+        return Task.FromResult(Items.SingleOrDefault(user => user.UserId == userId));
+    }
 }
 
 internal sealed class FakeParishRepository : IParishRepository

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using ParishCoordination.Api.Requests;
 using ParishCoordination.Application.WorkAreas.Commands.AssignWorkAreaCommunity;
+using ParishCoordination.Application.WorkAreas.Commands.AssignWorkAreaLeader;
 using ParishCoordination.Application.WorkAreas.Commands.CreateWorkArea;
 using ParishCoordination.Application.WorkAreas.Commands.UpdateWorkArea;
 using ParishCoordination.Application.WorkAreas;
@@ -85,6 +86,23 @@ public static class WorkAreaEndpoints
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status412PreconditionFailed)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        app.MapPut("/api/v1/work-areas/{workAreaId}/leader", AssignWorkAreaLeaderAsync)
+            .WithName("assignWorkAreaLeader")
+            .WithTags("Parish")
+            .RequireAuthorization(policy => policy.RequireRole(
+                GrottoWorksRoles.Admin,
+                GrottoWorksRoles.Parish))
+            .Accepts<AssignUserRequest>("application/json")
+            .Produces<ApiResponse<WorkAreaDto>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
     }
 
     private static async Task<IResult> ListWorkAreasAsync(
@@ -379,6 +397,117 @@ public static class WorkAreaEndpoints
         }
 
         if (result.Outcome == AssignWorkAreaCommunityOutcome.VersionMismatch)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status412PreconditionFailed,
+                "Work area version mismatch",
+                "The work area was changed by another request. Load it again and retry.",
+                "WORK_AREA_VERSION_MISMATCH");
+        }
+
+        var workArea = result.WorkArea!;
+        SetETag(httpContext, workArea.Version);
+
+        return Results.Ok(ApiResults.Ok(workArea, httpContext));
+    }
+
+    private static async Task<IResult> AssignWorkAreaLeaderAsync(
+        Guid workAreaId,
+        AssignUserRequest request,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
+        HttpContext httpContext,
+        AssignWorkAreaLeaderCommandHandler commandHandler,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseExpectedVersion(ifMatch, out var expectedVersion))
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status400BadRequest,
+                "Invalid If-Match header",
+                "If-Match must contain a positive integer version.",
+                "INVALID_IF_MATCH");
+        }
+
+        var result = await commandHandler.HandleAsync(
+            new AssignWorkAreaLeaderCommand(
+                workAreaId,
+                request.UserId!.Value,
+                expectedVersion),
+            cancellationToken);
+
+        if (result.Outcome == AssignWorkAreaLeaderOutcome.WorkAreaNotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Work area not found",
+                $"Work area with ID '{workAreaId}' was not found.",
+                "WORK_AREA_NOT_FOUND");
+        }
+
+        if (result.Outcome == AssignWorkAreaLeaderOutcome.SeasonNotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Season not found",
+                "The season that owns this work area was not found.",
+                "SEASON_NOT_FOUND");
+        }
+
+        if (result.Outcome == AssignWorkAreaLeaderOutcome.SeasonInvalidState)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "Season cannot be changed",
+                "Work areas in an archived season are read-only.",
+                "SEASON_INVALID_STATE");
+        }
+
+        if (result.Outcome == AssignWorkAreaLeaderOutcome.UserNotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "User not found",
+                $"User with ID '{request.UserId}' was not found.",
+                "USER_NOT_FOUND");
+        }
+
+        if (result.Outcome == AssignWorkAreaLeaderOutcome.UserNotActive)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "User is not active",
+                "Only an active user can be assigned as a work area leader.",
+                "USER_NOT_ACTIVE");
+        }
+
+        if (result.Outcome == AssignWorkAreaLeaderOutcome.UserRoleMismatch)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "User role is not eligible",
+                "Only a user with the LEADER role can be assigned as a work area leader.",
+                "USER_ROLE_MISMATCH");
+        }
+
+        if (result.Outcome == AssignWorkAreaLeaderOutcome.IdentityServiceUnavailable)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status503ServiceUnavailable,
+                "Identity service unavailable",
+                "The leader could not be validated because Identity is unavailable.",
+                "IDENTITY_SERVICE_UNAVAILABLE");
+        }
+
+        if (result.Outcome == AssignWorkAreaLeaderOutcome.VersionMismatch)
         {
             return CreateProblem(
                 httpContext,

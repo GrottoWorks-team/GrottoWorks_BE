@@ -7,7 +7,9 @@ using ParishCoordination.Application.Seasons;
 using ParishCoordination.Application.WorkAreas;
 using ParishCoordination.Application.WorkAreaCategories;
 using ParishCoordination.Infrastructure.Data;
+using ParishCoordination.Infrastructure.Identity;
 using ParishCoordination.Infrastructure.Repositories;
+using ParishCoordination.Application.Users;
 
 namespace ParishCoordination.Infrastructure;
 
@@ -34,6 +36,18 @@ public static class DependencyInjection
         services.AddScoped<IWorkAreaRepository, WorkAreaRepository>();
         services.AddScoped<IWorkAreaCategoryRepository, WorkAreaCategoryRepository>();
         services.AddScoped<IParishCoordinationDataSeeder, ParishCoordinationDataSeeder>();
+
+        var identityClientOptions = IdentityClientOptions.FromConfiguration(configuration);
+        services.AddSingleton(identityClientOptions);
+        services.AddHttpClient<IIdentityUserLookup, IdentityUserLookupClient>(client =>
+            {
+                client.BaseAddress = identityClientOptions.BaseAddress;
+                client.Timeout = Timeout.InfiniteTimeSpan;
+            })
+            .AddStandardResilienceHandler(options =>
+            {
+                options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10);
+            });
 
         return services;
     }

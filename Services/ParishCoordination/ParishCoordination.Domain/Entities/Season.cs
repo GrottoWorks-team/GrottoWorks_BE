@@ -94,6 +94,19 @@ public sealed class Season
         Version++;
     }
 
+    public void Complete(DateTimeOffset updatedAtUtc)
+    {
+        if (Status is not SeasonStatus.Ready)
+        {
+            throw new InvalidOperationException(
+                "Only a season in READY status can be completed.");
+        }
+
+        Status = SeasonStatus.Completed;
+        UpdatedAt = updatedAtUtc;
+        Version++;
+    }
+
     public Guid Id { get; private set; }
 
     public Guid ParishId { get; private set; }

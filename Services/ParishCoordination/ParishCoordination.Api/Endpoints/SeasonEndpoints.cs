@@ -9,6 +9,7 @@ using ParishCoordination.Api.Common;
 using ParishCoordination.Api.Requests;
 using ParishCoordination.Application.Seasons;
 using ParishCoordination.Application.Seasons.Commands.ActivateSeason;
+using ParishCoordination.Application.Seasons.Commands.CompleteSeason;
 using ParishCoordination.Application.Seasons.Commands.CreateSeason;
 using ParishCoordination.Application.Seasons.Commands.UpdateSeason;
 using ParishCoordination.Application.Seasons.Queries.GetSeasons;
@@ -70,6 +71,22 @@ public static class SeasonEndpoints
 
         app.MapPost("/api/v1/seasons/{seasonId}/activate", ActivateSeasonAsync)
             .WithName("activateSeason")
+            .WithTags("Parish")
+            .RequireAuthorization(policy => policy.RequireRole(
+                GrottoWorksRoles.Admin,
+                GrottoWorksRoles.Parish))
+            .Accepts<VersionedCommandRequest>("application/json")
+            .Produces<ApiResponse<SeasonDto>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        app.MapPost("/api/v1/seasons/{seasonId}/complete", CompleteSeasonAsync)
+            .WithName("completeSeason")
             .WithTags("Parish")
             .RequireAuthorization(policy => policy.RequireRole(
                 GrottoWorksRoles.Admin,
@@ -378,6 +395,78 @@ public static class SeasonEndpoints
         }
 
         if (result.Outcome == ActivateSeasonOutcome.VersionMismatch)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status412PreconditionFailed,
+                "Season version mismatch",
+                "The season was changed by another request. Load it again and retry.",
+                "SEASON_VERSION_MISMATCH");
+        }
+
+        var season = result.Season!;
+        SetETag(httpContext, season.Version);
+
+        return Results.Ok(ApiResults.Ok(season, httpContext));
+    }
+
+    private static async Task<IResult> CompleteSeasonAsync(
+        Guid seasonId,
+        VersionedCommandRequest request,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
+        HttpContext httpContext,
+        CompleteSeasonCommandHandler commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var versionPrecondition = SeasonVersionPrecondition.Resolve(
+            request.Version,
+            ifMatch);
+
+        if (versionPrecondition.Error is SeasonVersionPreconditionError.InvalidIfMatch)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status400BadRequest,
+                "Invalid If-Match header",
+                "If-Match must contain a positive integer version.",
+                "INVALID_IF_MATCH");
+        }
+
+        if (versionPrecondition.Error is SeasonVersionPreconditionError.VersionMismatch)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status412PreconditionFailed,
+                "Season version mismatch",
+                "If-Match and body version disagree. Load the season again and retry.",
+                "SEASON_VERSION_MISMATCH");
+        }
+
+        var result = await commandHandler.HandleAsync(
+            new CompleteSeasonCommand(seasonId, versionPrecondition.Version),
+            cancellationToken);
+
+        if (result.Outcome == CompleteSeasonOutcome.NotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Season not found",
+                $"Season with ID '{seasonId}' was not found.",
+                "SEASON_NOT_FOUND");
+        }
+
+        if (result.Outcome == CompleteSeasonOutcome.InvalidState)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "Season cannot be completed",
+                "Only seasons in READY status can be completed.",
+                "SEASON_INVALID_STATE");
+        }
+
+        if (result.Outcome == CompleteSeasonOutcome.VersionMismatch)
         {
             return CreateProblem(
                 httpContext,

@@ -107,6 +107,19 @@ public sealed class Season
         Version++;
     }
 
+    public void Archive(DateTimeOffset updatedAtUtc)
+    {
+        if (Status is not SeasonStatus.Completed)
+        {
+            throw new InvalidOperationException(
+                "Only a season in COMPLETED status can be archived.");
+        }
+
+        Status = SeasonStatus.Archived;
+        UpdatedAt = updatedAtUtc;
+        Version++;
+    }
+
     public Guid Id { get; private set; }
 
     public Guid ParishId { get; private set; }

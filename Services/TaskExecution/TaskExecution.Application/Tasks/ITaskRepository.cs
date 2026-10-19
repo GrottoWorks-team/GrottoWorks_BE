@@ -6,6 +6,7 @@ namespace TaskExecution.Application.Tasks;
 public interface ITaskRepository
 {
     Task<WorkTask?> GetByIdAsync(Guid taskId, CancellationToken cancellationToken = default);
+    Task<WorkTask?> GetByIdForUpdateAsync(Guid taskId, CancellationToken cancellationToken = default);
 
     Task<(IReadOnlyList<WorkTask> Items, long TotalItems)> GetPagedByWorkAreaAsync(
         Guid workAreaId,

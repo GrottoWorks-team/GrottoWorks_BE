@@ -103,6 +103,8 @@ public sealed class TaskQueryHandlerTests
 
         public Task<WorkTask?> GetByIdAsync(Guid taskId, CancellationToken cancellationToken = default) =>
             Task.FromResult(Items.SingleOrDefault(task => task.Id == taskId));
+        public Task<WorkTask?> GetByIdForUpdateAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Items.SingleOrDefault(task => task.Id == taskId));
 
         public Task<(IReadOnlyList<WorkTask> Items, long TotalItems)> GetPagedByWorkAreaAsync(
             Guid workAreaId,

@@ -119,6 +119,8 @@ public sealed class CreateTaskCommandHandlerTests
         public int SaveCalls { get; private set; }
         public Task<WorkTask?> GetByIdAsync(Guid taskId, CancellationToken cancellationToken = default) =>
             Task.FromResult<WorkTask?>(null);
+        public Task<WorkTask?> GetByIdForUpdateAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<WorkTask?>(null);
         public Task<(IReadOnlyList<WorkTask> Items, long TotalItems)> GetPagedByWorkAreaAsync(
             Guid workAreaId, TaskState? status, TaskType? taskType, int page, int size, string? sort,
             CancellationToken cancellationToken = default) =>

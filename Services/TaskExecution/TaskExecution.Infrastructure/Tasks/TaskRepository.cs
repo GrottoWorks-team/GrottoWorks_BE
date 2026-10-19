@@ -11,6 +11,9 @@ public sealed class TaskRepository(TaskExecutionDbContext dbContext) : ITaskRepo
     public Task<WorkTask?> GetByIdAsync(Guid taskId, CancellationToken cancellationToken = default) =>
         dbContext.Tasks.AsNoTracking().SingleOrDefaultAsync(task => task.Id == taskId, cancellationToken);
 
+    public Task<WorkTask?> GetByIdForUpdateAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+        dbContext.Tasks.SingleOrDefaultAsync(task => task.Id == taskId, cancellationToken);
+
     public async Task<(IReadOnlyList<WorkTask> Items, long TotalItems)> GetPagedByWorkAreaAsync(
         Guid workAreaId,
         TaskState? status,
@@ -43,8 +46,17 @@ public sealed class TaskRepository(TaskExecutionDbContext dbContext) : ITaskRepo
 
     public void Add(WorkTask task) => dbContext.Tasks.Add(task);
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
-        dbContext.SaveChangesAsync(cancellationToken);
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new TaskConcurrencyException(exception);
+        }
+    }
 
     private static IQueryable<WorkTask> ApplySorting(IQueryable<WorkTask> query, string? sort)
     {

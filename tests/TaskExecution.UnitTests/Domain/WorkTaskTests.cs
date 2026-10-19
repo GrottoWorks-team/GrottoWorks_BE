@@ -37,4 +37,20 @@ public sealed class WorkTaskTests
 
         act.Should().Throw<DomainRuleException>();
     }
+
+    [Fact]
+    public void Planning_update_rejects_non_editable_status()
+    {
+        var task = WorkTask.CreateDraft(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, null,
+            TaskPriority.Medium, 60, 1, null, null, DateTimeOffset.UtcNow);
+        typeof(WorkTask).GetProperty(nameof(WorkTask.Status))!
+            .SetValue(task, TaskExecution.Domain.Tasks.TaskStatus.InProgress);
+
+        var act = () => task.UpdatePlanning(
+            "Changed", null, null, null, null, null, null, null, null, DateTimeOffset.UtcNow);
+
+        var exception = act.Should().Throw<DomainRuleException>().Which;
+        exception.Code.Should().Be("TASK_INVALID_STATE");
+    }
 }

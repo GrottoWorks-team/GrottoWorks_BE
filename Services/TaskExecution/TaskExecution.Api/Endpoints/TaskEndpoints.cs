@@ -1,10 +1,11 @@
 using BuildingBlocks.Pagination;
+using BuildingBlocks.Security;
 using BuildingBlocks.Web;
 using BuildingBlocks.Web.Exceptions;
 using Microsoft.AspNetCore.Mvc;
-using TaskExecution.Application.Tasks;
+using TaskExecution.Api.Common;
 using TaskExecution.Api.Requests;
-using BuildingBlocks.Security;
+using TaskExecution.Application.Tasks;
 using TaskExecution.Domain.Tasks;
 using TaskState = TaskExecution.Domain.Tasks.TaskStatus;
 
@@ -43,6 +44,18 @@ public static class TaskEndpoints
             .Produces<ProblemDetails>(StatusCodes.Status403Forbidden)
             .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
             .Produces<ProblemDetails>(StatusCodes.Status409Conflict)
+            .Produces<ProblemDetails>(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapPatch("/tasks/{taskId:guid}", UpdateTaskAsync)
+            .WithName("updateTask")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
+            .Produces<ApiResponse<TaskDto>>()
+            .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
+            .Produces<ProblemDetails>(StatusCodes.Status401Unauthorized)
+            .Produces<ProblemDetails>(StatusCodes.Status403Forbidden)
+            .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
+            .Produces<ProblemDetails>(StatusCodes.Status409Conflict)
+            .Produces<ProblemDetails>(StatusCodes.Status412PreconditionFailed)
             .Produces<ProblemDetails>(StatusCodes.Status422UnprocessableEntity);
     }
 
@@ -100,6 +113,46 @@ public static class TaskEndpoints
 
         httpContext.Response.Headers.ETag = $"\"{task.Version}\"";
         return Results.Created($"/api/v1/tasks/{task.Id}", ApiResults.Ok(task, httpContext));
+    }
+
+    private static async Task<IResult> UpdateTaskAsync(
+        Guid taskId,
+        UpdateTaskRequest request,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
+        HttpContext httpContext,
+        UpdateTaskCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (!TaskVersionPrecondition.TryParse(ifMatch, out var expectedVersion))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid If-Match header",
+                detail: "If-Match must contain a positive integer version.",
+                extensions: new Dictionary<string, object?>
+                {
+                    ["code"] = "INVALID_IF_MATCH",
+                    ["correlationId"] = CorrelationIdMiddlewareExtensions.GetCorrelationId(httpContext),
+                    ["traceId"] = httpContext.TraceIdentifier
+                });
+        }
+
+        var task = await handler.HandleAsync(
+            new UpdateTaskCommand(
+                taskId,
+                request.Name,
+                request.Description,
+                request.CompletionCriteria,
+                request.Priority,
+                request.EstimatedMinutes,
+                request.RequiredVolunteers,
+                request.StartAt,
+                request.Deadline,
+                expectedVersion),
+            cancellationToken);
+
+        httpContext.Response.Headers.ETag = $"\"{task.Version}\"";
+        return Results.Ok(ApiResults.Ok(task, httpContext));
     }
 
     private static TEnum? ParseEnum<TEnum>(string? value, string field)

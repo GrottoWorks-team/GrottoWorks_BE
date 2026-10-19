@@ -29,6 +29,12 @@ services:
       context: .
       dockerfile: Services/Resource/Resource.Api/Dockerfile
 
+  taskexecution.api:
+    image: ${DOCKER_REGISTRY-}taskexecutionapi
+    build:
+      context: .
+      dockerfile: Services/TaskExecution/TaskExecution.Api/Dockerfile
+
   yarpapigateway:
     image: ${DOCKER_REGISTRY-}yarpapigateway
     build:

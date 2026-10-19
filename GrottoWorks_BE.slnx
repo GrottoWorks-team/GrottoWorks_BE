@@ -28,10 +28,18 @@
     <Project Path="Services/Resource/Resource.Domain/Resource.Domain.csproj" />
     <Project Path="Services/Resource/Resource.Infrastructure/Resource.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/Services/TaskExecution/">
+    <Project Path="Services/TaskExecution/TaskExecution.Api/TaskExecution.Api.csproj" />
+    <Project Path="Services/TaskExecution/TaskExecution.Application/TaskExecution.Application.csproj" />
+    <Project Path="Services/TaskExecution/TaskExecution.Contracts/TaskExecution.Contracts.csproj" />
+    <Project Path="Services/TaskExecution/TaskExecution.Domain/TaskExecution.Domain.csproj" />
+    <Project Path="Services/TaskExecution/TaskExecution.Infrastructure/TaskExecution.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Identity.UnitTests/Identity.UnitTests.csproj" />
     <Project Path="tests/ParishCoordination.UnitTests/ParishCoordination.UnitTests.csproj" />
     <Project Path="tests/Resource.UnitTests/Resource.UnitTests.csproj" />
+    <Project Path="tests/TaskExecution.UnitTests/TaskExecution.UnitTests.csproj" />
   </Folder>
   <Project Path="docker-compose.dcproj">
     <Build />

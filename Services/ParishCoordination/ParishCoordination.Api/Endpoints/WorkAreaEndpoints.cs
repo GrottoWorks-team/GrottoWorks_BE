@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using ParishCoordination.Api.Requests;
+using ParishCoordination.Application.WorkAreas.Commands.AssignMaterialOfficer;
 using ParishCoordination.Application.WorkAreas.Commands.AssignWorkAreaCommunity;
 using ParishCoordination.Application.WorkAreas.Commands.AssignWorkAreaLeader;
 using ParishCoordination.Application.WorkAreas.Commands.CreateWorkArea;
@@ -89,6 +90,23 @@ public static class WorkAreaEndpoints
 
         app.MapPut("/api/v1/work-areas/{workAreaId}/leader", AssignWorkAreaLeaderAsync)
             .WithName("assignWorkAreaLeader")
+            .WithTags("Parish")
+            .RequireAuthorization(policy => policy.RequireRole(
+                GrottoWorksRoles.Admin,
+                GrottoWorksRoles.Parish))
+            .Accepts<AssignUserRequest>("application/json")
+            .Produces<ApiResponse<WorkAreaDto>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+
+        app.MapPut("/api/v1/work-areas/{workAreaId}/material-officer", AssignMaterialOfficerAsync)
+            .WithName("assignMaterialOfficer")
             .WithTags("Parish")
             .RequireAuthorization(policy => policy.RequireRole(
                 GrottoWorksRoles.Admin,
@@ -508,6 +526,117 @@ public static class WorkAreaEndpoints
         }
 
         if (result.Outcome == AssignWorkAreaLeaderOutcome.VersionMismatch)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status412PreconditionFailed,
+                "Work area version mismatch",
+                "The work area was changed by another request. Load it again and retry.",
+                "WORK_AREA_VERSION_MISMATCH");
+        }
+
+        var workArea = result.WorkArea!;
+        SetETag(httpContext, workArea.Version);
+
+        return Results.Ok(ApiResults.Ok(workArea, httpContext));
+    }
+
+    private static async Task<IResult> AssignMaterialOfficerAsync(
+        Guid workAreaId,
+        AssignUserRequest request,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
+        HttpContext httpContext,
+        AssignMaterialOfficerCommandHandler commandHandler,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseExpectedVersion(ifMatch, out var expectedVersion))
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status400BadRequest,
+                "Invalid If-Match header",
+                "If-Match must contain a positive integer version.",
+                "INVALID_IF_MATCH");
+        }
+
+        var result = await commandHandler.HandleAsync(
+            new AssignMaterialOfficerCommand(
+                workAreaId,
+                request.UserId!.Value,
+                expectedVersion),
+            cancellationToken);
+
+        if (result.Outcome == AssignMaterialOfficerOutcome.WorkAreaNotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Work area not found",
+                $"Work area with ID '{workAreaId}' was not found.",
+                "WORK_AREA_NOT_FOUND");
+        }
+
+        if (result.Outcome == AssignMaterialOfficerOutcome.SeasonNotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Season not found",
+                "The season that owns this work area was not found.",
+                "SEASON_NOT_FOUND");
+        }
+
+        if (result.Outcome == AssignMaterialOfficerOutcome.SeasonInvalidState)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "Season cannot be changed",
+                "Work areas in an archived season are read-only.",
+                "SEASON_INVALID_STATE");
+        }
+
+        if (result.Outcome == AssignMaterialOfficerOutcome.UserNotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "User not found",
+                $"User with ID '{request.UserId}' was not found.",
+                "USER_NOT_FOUND");
+        }
+
+        if (result.Outcome == AssignMaterialOfficerOutcome.UserNotActive)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "User is not active",
+                "Only an active user can be assigned as a work area material officer.",
+                "USER_NOT_ACTIVE");
+        }
+
+        if (result.Outcome == AssignMaterialOfficerOutcome.UserRoleMismatch)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "User role is not eligible",
+                "Only a user with the MO role can be assigned as a work area material officer.",
+                "USER_ROLE_MISMATCH");
+        }
+
+        if (result.Outcome == AssignMaterialOfficerOutcome.IdentityServiceUnavailable)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status503ServiceUnavailable,
+                "Identity service unavailable",
+                "The material officer could not be validated because Identity is unavailable.",
+                "IDENTITY_SERVICE_UNAVAILABLE");
+        }
+
+        if (result.Outcome == AssignMaterialOfficerOutcome.VersionMismatch)
         {
             return CreateProblem(
                 httpContext,

@@ -21,6 +21,7 @@ using ParishCoordination.Application.WorkAreas.Queries.GetWorkArea;
 using ParishCoordination.Application.WorkAreas.Queries.ListWorkAreas;
 using ParishCoordination.Application.WorkAreas.Commands.AssignWorkAreaCommunity;
 using ParishCoordination.Application.WorkAreas.Commands.AssignWorkAreaLeader;
+using ParishCoordination.Application.WorkAreas.Commands.AssignMaterialOfficer;
 using ParishCoordination.Application.WorkAreas.Commands.CreateWorkArea;
 using ParishCoordination.Application.WorkAreas.Commands.UpdateWorkArea;
 using ParishCoordination.Application.WorkAreaCategories.Queries.ListWorkAreaCategories;
@@ -58,6 +59,7 @@ public sealed class RouteAuthorizationTests
         builder.Services.AddScoped<GetWorkAreaQueryHandler>();
         builder.Services.AddScoped<AssignWorkAreaCommunityCommandHandler>();
         builder.Services.AddScoped<AssignWorkAreaLeaderCommandHandler>();
+        builder.Services.AddScoped<AssignMaterialOfficerCommandHandler>();
         builder.Services.AddScoped<CreateWorkAreaCommandHandler>();
         builder.Services.AddScoped<UpdateWorkAreaCommandHandler>();
         builder.Services.AddScoped<ListWorkAreaCategoriesQueryHandler>();
@@ -90,6 +92,7 @@ public sealed class RouteAuthorizationTests
         var createWorkArea = FindByName(app, "createWorkArea");
         var assignWorkAreaCommunity = FindByName(app, "assignWorkAreaCommunity");
         var assignWorkAreaLeader = FindByName(app, "assignWorkAreaLeader");
+        var assignMaterialOfficer = FindByName(app, "assignMaterialOfficer");
         var updateWorkArea = FindByName(app, "updateWorkArea");
         var listWorkAreaCategories = FindByName(app, "listWorkAreaCategories");
         var createWorkAreaCategory = FindByName(app, "createWorkAreaCategory");
@@ -107,6 +110,9 @@ public sealed class RouteAuthorizationTests
             GrottoWorksRoles.Admin,
             GrottoWorksRoles.Parish);
         GetRoles(assignWorkAreaLeader).Should().BeEquivalentTo(
+            GrottoWorksRoles.Admin,
+            GrottoWorksRoles.Parish);
+        GetRoles(assignMaterialOfficer).Should().BeEquivalentTo(
             GrottoWorksRoles.Admin,
             GrottoWorksRoles.Parish);
         GetRoles(updateWorkArea).Should().BeEquivalentTo(
@@ -163,6 +169,21 @@ public sealed class RouteAuthorizationTests
         assignLeaderStatusCodes.Should().Contain(StatusCodes.Status412PreconditionFailed);
         assignLeaderStatusCodes.Should().Contain(StatusCodes.Status422UnprocessableEntity);
         assignLeaderStatusCodes.Should().Contain(StatusCodes.Status503ServiceUnavailable);
+        assignMaterialOfficer.RoutePattern.RawText.Should()
+            .Be("/api/v1/work-areas/{workAreaId}/material-officer");
+        var assignMaterialOfficerStatusCodes = assignMaterialOfficer.Metadata
+            .GetOrderedMetadata<IProducesResponseTypeMetadata>()
+            .Select(metadata => metadata.StatusCode)
+            .ToArray();
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status200OK);
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status400BadRequest);
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status401Unauthorized);
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status403Forbidden);
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status404NotFound);
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status409Conflict);
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status412PreconditionFailed);
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status422UnprocessableEntity);
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status503ServiceUnavailable);
         updateWorkArea.RoutePattern.RawText.Should().Be("/api/v1/work-areas/{workAreaId}");
         var updateWorkAreaStatusCodes = updateWorkArea.Metadata
             .GetOrderedMetadata<IProducesResponseTypeMetadata>()

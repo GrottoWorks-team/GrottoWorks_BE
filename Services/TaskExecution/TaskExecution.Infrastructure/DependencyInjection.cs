@@ -2,8 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TaskExecution.Application.Scopes;
+using TaskExecution.Application.Tasks;
 using TaskExecution.Infrastructure.Data;
 using TaskExecution.Infrastructure.Scopes;
+using TaskExecution.Infrastructure.Tasks;
 
 namespace TaskExecution.Infrastructure;
 
@@ -21,6 +23,7 @@ public static class DependencyInjection
 
         services.AddDbContext<TaskExecutionDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IScopeProjectionStore, ScopeProjectionStore>();
+        services.AddScoped<ITaskRepository, TaskRepository>();
         return services;
     }
 }

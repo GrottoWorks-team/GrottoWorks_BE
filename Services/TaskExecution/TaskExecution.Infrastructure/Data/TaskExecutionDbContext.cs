@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TaskExecution.Domain.Scopes;
+using TaskExecution.Domain.Tasks;
 
 namespace TaskExecution.Infrastructure.Data;
 
@@ -8,6 +9,7 @@ public sealed class TaskExecutionDbContext(DbContextOptions<TaskExecutionDbConte
 {
     public DbSet<SeasonScope> SeasonScopes => Set<SeasonScope>();
     public DbSet<WorkAreaScope> WorkAreaScopes => Set<WorkAreaScope>();
+    public DbSet<WorkTask> Tasks => Set<WorkTask>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

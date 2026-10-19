@@ -16,6 +16,7 @@ using ParishCoordination.Application.Parishes.Commands.CreateParish;
 using ParishCoordination.Application.Seasons.Queries.GetSeasons;
 using ParishCoordination.Application.Seasons.Queries.GetSeason;
 using ParishCoordination.Application.Seasons.Commands.CreateSeason;
+using ParishCoordination.Application.Seasons.Commands.ActivateSeason;
 using ParishCoordination.Application.Seasons.Commands.UpdateSeason;
 using ParishCoordination.Application.WorkAreas.Queries.GetWorkArea;
 using ParishCoordination.Application.WorkAreas.Queries.ListWorkAreas;
@@ -54,6 +55,7 @@ public sealed class RouteAuthorizationTests
         builder.Services.AddScoped<GetSeasonsQueryHandler>();
         builder.Services.AddScoped<GetSeasonQueryHandler>();
         builder.Services.AddScoped<CreateSeasonCommandHandler>();
+        builder.Services.AddScoped<ActivateSeasonCommandHandler>();
         builder.Services.AddScoped<UpdateSeasonCommandHandler>();
         builder.Services.AddScoped<ListWorkAreasQueryHandler>();
         builder.Services.AddScoped<GetWorkAreaQueryHandler>();
@@ -86,6 +88,7 @@ public sealed class RouteAuthorizationTests
         var seasons = FindByName(app, "listSeasons");
         var getSeason = FindByName(app, "getSeason");
         var createSeason = FindByName(app, "createSeason");
+        var activateSeason = FindByName(app, "activateSeason");
         var updateSeason = FindByName(app, "updateSeason");
         var listWorkAreas = FindByName(app, "listWorkAreas");
         var getWorkArea = FindByName(app, "getWorkArea");
@@ -104,6 +107,7 @@ public sealed class RouteAuthorizationTests
         GetRoles(createCommunity).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(updateCommunity).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
+        GetRoles(activateSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(updateSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createWorkArea).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(assignWorkAreaCommunity).Should().BeEquivalentTo(
@@ -120,6 +124,19 @@ public sealed class RouteAuthorizationTests
             GrottoWorksRoles.Parish,
             GrottoWorksRoles.Leader);
         createSeason.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Should().Contain(metadata => metadata.StatusCode == 201);
+        activateSeason.RoutePattern.RawText.Should().Be("/api/v1/seasons/{seasonId}/activate");
+        var activateSeasonStatusCodes = activateSeason.Metadata
+            .GetOrderedMetadata<IProducesResponseTypeMetadata>()
+            .Select(metadata => metadata.StatusCode)
+            .ToArray();
+        activateSeasonStatusCodes.Should().Contain(StatusCodes.Status200OK);
+        activateSeasonStatusCodes.Should().Contain(StatusCodes.Status400BadRequest);
+        activateSeasonStatusCodes.Should().Contain(StatusCodes.Status401Unauthorized);
+        activateSeasonStatusCodes.Should().Contain(StatusCodes.Status403Forbidden);
+        activateSeasonStatusCodes.Should().Contain(StatusCodes.Status404NotFound);
+        activateSeasonStatusCodes.Should().Contain(StatusCodes.Status409Conflict);
+        activateSeasonStatusCodes.Should().Contain(StatusCodes.Status412PreconditionFailed);
+        activateSeasonStatusCodes.Should().Contain(StatusCodes.Status422UnprocessableEntity);
         updateSeason.RoutePattern.RawText.Should().Be("/api/v1/seasons/{seasonId}");
         var updateSeasonStatusCodes = updateSeason.Metadata
             .GetOrderedMetadata<IProducesResponseTypeMetadata>()

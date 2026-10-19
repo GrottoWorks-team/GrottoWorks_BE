@@ -183,6 +183,19 @@ internal sealed class FakeSeasonRepository : ISeasonRepository
             season.SeasonYear == seasonYear &&
             (!excludeSeasonId.HasValue || season.Id != excludeSeasonId.Value)));
 
+    public Task<bool> HasOverlappingActiveSeasonAsync(
+        Guid parishId,
+        DateOnly startDate,
+        DateOnly endDate,
+        Guid excludeSeasonId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(season =>
+            season.ParishId == parishId &&
+            season.Id != excludeSeasonId &&
+            season.Status == SeasonStatus.Active &&
+            season.StartDate <= endDate &&
+            season.EndDate >= startDate));
+
     public void Add(Season season) => Items.Add(season);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -284,6 +297,22 @@ internal sealed class FakeWorkAreaRepository : IWorkAreaRepository
         Guid workAreaId,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.SingleOrDefault(workArea => workArea.Id == workAreaId));
+
+    public Task<WorkAreaActivationReadiness> GetActivationReadinessAsync(
+        Guid seasonId,
+        CancellationToken cancellationToken = default)
+    {
+        var workAreas = Items
+            .Where(workArea => workArea.SeasonId == seasonId)
+            .ToList();
+        var incompleteAssignments = workAreas.Count(workArea =>
+            workArea.LeaderUserId is null ||
+            workArea.MaterialOfficerUserId is null);
+
+        return Task.FromResult(new WorkAreaActivationReadiness(
+            workAreas.Count,
+            incompleteAssignments));
+    }
 
     public Task<(IReadOnlyList<WorkArea> Items, long TotalItems)> GetPagedBySeasonIdAsync(
         Guid seasonId,

@@ -84,4 +84,28 @@ public sealed class WorkAreaRepository(ParishCoordinationDbContext dbContext)
                 workArea => workArea.Id == workAreaId,
                 cancellationToken);
     }
+
+    public async Task<WorkAreaActivationReadiness> GetActivationReadinessAsync(
+        Guid seasonId,
+        CancellationToken cancellationToken = default)
+    {
+        var seasonWorkAreas = dbContext.WorkAreas
+            .AsNoTracking()
+            .Where(workArea => workArea.SeasonId == seasonId);
+
+        var totalWorkAreas = await seasonWorkAreas.CountAsync(cancellationToken);
+        if (totalWorkAreas == 0)
+        {
+            return new WorkAreaActivationReadiness(0, 0);
+        }
+
+        var incompleteAssignments = await seasonWorkAreas.CountAsync(
+            workArea => workArea.LeaderUserId == null ||
+                workArea.MaterialOfficerUserId == null,
+            cancellationToken);
+
+        return new WorkAreaActivationReadiness(
+            totalWorkAreas,
+            incompleteAssignments);
+    }
 }

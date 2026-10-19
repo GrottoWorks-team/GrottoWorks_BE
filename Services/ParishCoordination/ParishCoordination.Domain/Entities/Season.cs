@@ -81,6 +81,19 @@ public sealed class Season
         Version++;
     }
 
+    public void Activate(DateTimeOffset updatedAtUtc)
+    {
+        if (Status is not SeasonStatus.Planning)
+        {
+            throw new InvalidOperationException(
+                "Only a season in PLANNING status can be activated.");
+        }
+
+        Status = SeasonStatus.Active;
+        UpdatedAt = updatedAtUtc;
+        Version++;
+    }
+
     public Guid Id { get; private set; }
 
     public Guid ParishId { get; private set; }

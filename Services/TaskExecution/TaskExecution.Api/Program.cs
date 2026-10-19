@@ -4,6 +4,7 @@ using BuildingBlocks.Security;
 using BuildingBlocks.Web;
 using Microsoft.EntityFrameworkCore;
 using TaskExecution.Api.Common;
+using TaskExecution.Api.Endpoints;
 using TaskExecution.Application;
 using TaskExecution.Infrastructure;
 using TaskExecution.Infrastructure.Data;
@@ -54,6 +55,7 @@ app.UseMiddleware<DomainRuleTranslationMiddleware>();
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapTaskExecutionEndpoints();
 app.MapGrottoWorksHealthEndpoints();
 
 if (app.Configuration.GetValue("Database:MigrateOnStartup", true))

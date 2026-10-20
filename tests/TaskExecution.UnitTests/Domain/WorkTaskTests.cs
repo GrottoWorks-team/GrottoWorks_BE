@@ -53,4 +53,34 @@ public sealed class WorkTaskTests
         var exception = act.Should().Throw<DomainRuleException>().Which;
         exception.Code.Should().Be("TASK_INVALID_STATE");
     }
+
+    [Fact]
+    public void Replace_completion_criteria_normalizes_and_updates_audit_fields()
+    {
+        var task = WorkTask.CreateDraft(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, "Old",
+            TaskPriority.Medium, 60, 1, null, null, DateTimeOffset.UtcNow);
+        var updatedAt = DateTimeOffset.UtcNow.AddMinutes(1);
+
+        var changed = task.ReplaceCompletionCriteria("  New criteria  ", 1, updatedAt);
+
+        changed.Should().BeTrue();
+        task.CompletionCriteria.Should().Be("New criteria");
+        task.Version.Should().Be(2);
+        task.UpdatedAt.Should().Be(updatedAt);
+    }
+
+    [Fact]
+    public void Replace_completion_criteria_rejects_text_over_limit()
+    {
+        var task = WorkTask.CreateDraft(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, null,
+            TaskPriority.Medium, 60, 1, null, null, DateTimeOffset.UtcNow);
+
+        var act = () => task.ReplaceCompletionCriteria(
+            new string('a', 4001), null, DateTimeOffset.UtcNow);
+
+        act.Should().Throw<DomainRuleException>()
+            .Which.Code.Should().Be("TASK_COMPLETION_CRITERIA_INVALID");
+    }
 }

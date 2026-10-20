@@ -15,6 +15,7 @@ public static class DependencyInjection
         services.AddScoped<GetTaskQueryHandler>();
         services.AddScoped<CreateTaskCommandHandler>();
         services.AddScoped<UpdateTaskCommandHandler>();
+        services.AddScoped<ReplaceCompletionCriteriaCommandHandler>();
         return services;
     }
 }

@@ -154,6 +154,32 @@ public sealed class WorkTask
         }
     }
 
+    public bool ReplaceCompletionCriteria(
+        string? completionCriteria,
+        int? expectedVersion,
+        DateTimeOffset updatedAt)
+    {
+        EnsurePlanningCanBeUpdated(expectedVersion);
+
+        var normalizedCriteria = NormalizeOptional(completionCriteria);
+        if (normalizedCriteria?.Length > 4000)
+        {
+            throw DomainRuleException.Validation(
+                "TASK_COMPLETION_CRITERIA_INVALID",
+                "Completion criteria must not exceed 4000 characters.");
+        }
+
+        if (CompletionCriteria == normalizedCriteria)
+        {
+            return false;
+        }
+
+        CompletionCriteria = normalizedCriteria;
+        UpdatedAt = updatedAt.ToUniversalTime();
+        Version++;
+        return true;
+    }
+
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

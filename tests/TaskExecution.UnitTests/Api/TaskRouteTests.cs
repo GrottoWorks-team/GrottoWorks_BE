@@ -21,6 +21,7 @@ public sealed class TaskRouteTests
         builder.Services.AddScoped<GetTaskQueryHandler>();
         builder.Services.AddScoped<CreateTaskCommandHandler>();
         builder.Services.AddScoped<UpdateTaskCommandHandler>();
+        builder.Services.AddScoped<ReplaceCompletionCriteriaCommandHandler>();
         using var app = builder.Build();
         app.MapTaskEndpoints();
         await app.StartAsync();
@@ -34,6 +35,8 @@ public sealed class TaskRouteTests
             endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == "createTask");
         var update = endpoints.Single(endpoint =>
             endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == "updateTask");
+        var criteria = endpoints.Single(endpoint =>
+            endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == "replaceCompletionCriteria");
 
         list.RoutePattern.RawText.Should().Be("/api/v1/work-areas/{workAreaId}/tasks");
         detail.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId}");
@@ -52,6 +55,11 @@ public sealed class TaskRouteTests
         update.Metadata.GetOrderedMetadata<IAuthorizeData>()
             .Should().Contain(data => data.Roles == GrottoWorksRoles.Leader);
         update.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
+            .Select(metadata => metadata.StatusCode).Should().Contain([200, 400, 401, 403, 404, 409, 412, 422]);
+        criteria.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId}/completion-criteria");
+        criteria.Metadata.GetOrderedMetadata<IAuthorizeData>()
+            .Should().Contain(data => data.Roles == GrottoWorksRoles.Leader);
+        criteria.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
             .Select(metadata => metadata.StatusCode).Should().Contain([200, 400, 401, 403, 404, 409, 412, 422]);
     }
 }

@@ -57,6 +57,18 @@ public static class TaskEndpoints
             .Produces<ProblemDetails>(StatusCodes.Status409Conflict)
             .Produces<ProblemDetails>(StatusCodes.Status412PreconditionFailed)
             .Produces<ProblemDetails>(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapPut("/tasks/{taskId:guid}/completion-criteria", ReplaceCompletionCriteriaAsync)
+            .WithName("replaceCompletionCriteria")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
+            .Produces<ApiResponse<TaskDto>>()
+            .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
+            .Produces<ProblemDetails>(StatusCodes.Status401Unauthorized)
+            .Produces<ProblemDetails>(StatusCodes.Status403Forbidden)
+            .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
+            .Produces<ProblemDetails>(StatusCodes.Status409Conflict)
+            .Produces<ProblemDetails>(StatusCodes.Status412PreconditionFailed)
+            .Produces<ProblemDetails>(StatusCodes.Status422UnprocessableEntity);
     }
 
     private static async Task<IResult> ListTasksAsync(
@@ -154,6 +166,42 @@ public static class TaskEndpoints
         httpContext.Response.Headers.ETag = $"\"{task.Version}\"";
         return Results.Ok(ApiResults.Ok(task, httpContext));
     }
+
+    private static async Task<IResult> ReplaceCompletionCriteriaAsync(
+        Guid taskId,
+        ReplaceCompletionCriteriaRequest request,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
+        HttpContext httpContext,
+        ReplaceCompletionCriteriaCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (!TaskVersionPrecondition.TryParse(ifMatch, out var expectedVersion))
+        {
+            return InvalidIfMatch(httpContext);
+        }
+
+        var task = await handler.HandleAsync(
+            new ReplaceCompletionCriteriaCommand(
+                taskId,
+                request.CompletionCriteria,
+                expectedVersion),
+            cancellationToken);
+
+        httpContext.Response.Headers.ETag = $"\"{task.Version}\"";
+        return Results.Ok(ApiResults.Ok(task, httpContext));
+    }
+
+    private static IResult InvalidIfMatch(HttpContext httpContext) =>
+        Results.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            title: "Invalid If-Match header",
+            detail: "If-Match must contain a positive integer version.",
+            extensions: new Dictionary<string, object?>
+            {
+                ["code"] = "INVALID_IF_MATCH",
+                ["correlationId"] = CorrelationIdMiddlewareExtensions.GetCorrelationId(httpContext),
+                ["traceId"] = httpContext.TraceIdentifier
+            });
 
     private static TEnum? ParseEnum<TEnum>(string? value, string field)
         where TEnum : struct, Enum

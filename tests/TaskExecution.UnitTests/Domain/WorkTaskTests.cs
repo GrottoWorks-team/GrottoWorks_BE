@@ -83,4 +83,49 @@ public sealed class WorkTaskTests
         act.Should().Throw<DomainRuleException>()
             .Which.Code.Should().Be("TASK_COMPLETION_CRITERIA_INVALID");
     }
+
+    [Fact]
+    public void Replace_skills_normalizes_values_and_replaces_existing_set()
+    {
+        var task = WorkTask.CreateDraft(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, null,
+            TaskPriority.Medium, 60, 1, null, null, DateTimeOffset.UtcNow);
+        var firstSkill = Guid.NewGuid();
+        task.ReplaceSkills(
+            [new TaskSkillRequirement(firstSkill, null, null)],
+            1,
+            DateTimeOffset.UtcNow);
+        var secondSkill = Guid.NewGuid();
+
+        var changed = task.ReplaceSkills(
+            [new TaskSkillRequirement(secondSkill, "  ADVANCED  ", 2)],
+            2,
+            DateTimeOffset.UtcNow.AddMinutes(1));
+
+        changed.Should().BeTrue();
+        task.Skills.Should().ContainSingle();
+        task.Skills.Single().SkillId.Should().Be(secondSkill);
+        task.Skills.Single().RequiredSkillLevel.Should().Be("ADVANCED");
+        task.Version.Should().Be(3);
+    }
+
+    [Fact]
+    public void Replace_skills_rejects_duplicate_skill_ids()
+    {
+        var task = WorkTask.CreateDraft(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, null,
+            TaskPriority.Medium, 60, 1, null, null, DateTimeOffset.UtcNow);
+        var skillId = Guid.NewGuid();
+
+        var act = () => task.ReplaceSkills(
+            [
+                new TaskSkillRequirement(skillId, null, null),
+                new TaskSkillRequirement(skillId, "BASIC", 1)
+            ],
+            null,
+            DateTimeOffset.UtcNow);
+
+        act.Should().Throw<DomainRuleException>()
+            .Which.Code.Should().Be("TASK_SKILL_DUPLICATE");
+    }
 }

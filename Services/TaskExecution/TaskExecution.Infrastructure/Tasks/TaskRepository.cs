@@ -12,7 +12,9 @@ public sealed class TaskRepository(TaskExecutionDbContext dbContext) : ITaskRepo
         dbContext.Tasks.AsNoTracking().SingleOrDefaultAsync(task => task.Id == taskId, cancellationToken);
 
     public Task<WorkTask?> GetByIdForUpdateAsync(Guid taskId, CancellationToken cancellationToken = default) =>
-        dbContext.Tasks.SingleOrDefaultAsync(task => task.Id == taskId, cancellationToken);
+        dbContext.Tasks
+            .Include(task => task.Skills)
+            .SingleOrDefaultAsync(task => task.Id == taskId, cancellationToken);
 
     public async Task<(IReadOnlyList<WorkTask> Items, long TotalItems)> GetPagedByWorkAreaAsync(
         Guid workAreaId,

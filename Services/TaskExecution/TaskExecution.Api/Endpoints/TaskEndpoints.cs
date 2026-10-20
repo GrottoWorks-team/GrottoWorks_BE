@@ -69,6 +69,18 @@ public static class TaskEndpoints
             .Produces<ProblemDetails>(StatusCodes.Status409Conflict)
             .Produces<ProblemDetails>(StatusCodes.Status412PreconditionFailed)
             .Produces<ProblemDetails>(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapPut("/tasks/{taskId:guid}/skills", ReplaceTaskSkillsAsync)
+            .WithName("replaceTaskSkills")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
+            .Produces<ApiResponse<TaskDto>>()
+            .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
+            .Produces<ProblemDetails>(StatusCodes.Status401Unauthorized)
+            .Produces<ProblemDetails>(StatusCodes.Status403Forbidden)
+            .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
+            .Produces<ProblemDetails>(StatusCodes.Status409Conflict)
+            .Produces<ProblemDetails>(StatusCodes.Status412PreconditionFailed)
+            .Produces<ProblemDetails>(StatusCodes.Status422UnprocessableEntity);
     }
 
     private static async Task<IResult> ListTasksAsync(
@@ -185,6 +197,34 @@ public static class TaskEndpoints
                 taskId,
                 request.CompletionCriteria,
                 expectedVersion),
+            cancellationToken);
+
+        httpContext.Response.Headers.ETag = $"\"{task.Version}\"";
+        return Results.Ok(ApiResults.Ok(task, httpContext));
+    }
+
+    private static async Task<IResult> ReplaceTaskSkillsAsync(
+        Guid taskId,
+        IReadOnlyList<TaskSkillRequest> request,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
+        HttpContext httpContext,
+        ReplaceTaskSkillsCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (!TaskVersionPrecondition.TryParse(ifMatch, out var expectedVersion))
+        {
+            return InvalidIfMatch(httpContext);
+        }
+
+        var requirements = request
+            .Select(item => new TaskSkillRequirement(
+                item.SkillId,
+                item.RequiredSkillLevel,
+                item.RequiredVolunteerCount))
+            .ToList();
+
+        var task = await handler.HandleAsync(
+            new ReplaceTaskSkillsCommand(taskId, requirements, expectedVersion),
             cancellationToken);
 
         httpContext.Response.Headers.ETag = $"\"{task.Version}\"";

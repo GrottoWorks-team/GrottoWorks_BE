@@ -97,5 +97,33 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
                 "ck_task_purchase_link",
                 "(task_type = 'PURCHASE' AND purchase_request_id IS NOT NULL) OR (task_type <> 'PURCHASE' AND purchase_request_id IS NULL)"));
         });
+
+        modelBuilder.Entity("TaskExecution.Domain.Tasks.TaskSkill", builder =>
+        {
+            builder.Property<Guid>("Id").HasColumnType("uuid").HasColumnName("task_skill_id");
+            builder.Property<int?>("RequiredVolunteerCount").HasColumnType("integer").HasColumnName("required_volunteer_count");
+            builder.Property<string>("RequiredSkillLevel").HasMaxLength(30)
+                .HasColumnType("character varying(30)").HasColumnName("required_skill_level");
+            builder.Property<Guid>("SkillId").HasColumnType("uuid").HasColumnName("skill_id");
+            builder.Property<Guid>("TaskId").HasColumnType("uuid").HasColumnName("task_id");
+            builder.HasKey("Id");
+            builder.HasIndex("TaskId", "SkillId").IsUnique()
+                .HasDatabaseName("ux_task_skill_task_id_skill_id");
+            builder.ToTable("task_skill", (string)null);
+        });
+
+        modelBuilder.Entity("TaskExecution.Domain.Tasks.TaskSkill", builder =>
+        {
+            builder.HasOne("TaskExecution.Domain.Tasks.WorkTask", null)
+                .WithMany("Skills")
+                .HasForeignKey("TaskId")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+        });
+
+        modelBuilder.Entity("TaskExecution.Domain.Tasks.WorkTask", builder =>
+        {
+            builder.Navigation("Skills");
+        });
     }
 }

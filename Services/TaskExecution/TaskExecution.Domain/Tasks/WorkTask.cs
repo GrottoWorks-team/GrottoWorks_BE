@@ -2,6 +2,8 @@ namespace TaskExecution.Domain.Tasks;
 
 public sealed class WorkTask
 {
+    private readonly List<TaskSkill> _skills = [];
+
     private WorkTask()
     {
     }
@@ -23,6 +25,7 @@ public sealed class WorkTask
     public int Version { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
+    public IReadOnlyCollection<TaskSkill> Skills => _skills;
 
     public static WorkTask CreateDraft(
         Guid id,
@@ -177,6 +180,99 @@ public sealed class WorkTask
         CompletionCriteria = normalizedCriteria;
         UpdatedAt = updatedAt.ToUniversalTime();
         Version++;
+        return true;
+    }
+
+    public bool ReplaceSkills(
+        IReadOnlyCollection<TaskSkillRequirement> requirements,
+        int? expectedVersion,
+        DateTimeOffset updatedAt)
+    {
+        EnsurePlanningCanBeUpdated(expectedVersion);
+
+        var normalizedRequirements = NormalizeSkillRequirements(requirements);
+        if (HasSameSkillRequirements(normalizedRequirements))
+        {
+            return false;
+        }
+
+        _skills.Clear();
+        foreach (var requirement in normalizedRequirements)
+        {
+            _skills.Add(TaskSkill.Create(Id, requirement));
+        }
+
+        UpdatedAt = updatedAt.ToUniversalTime();
+        Version++;
+        return true;
+    }
+
+    private static IReadOnlyList<TaskSkillRequirement> NormalizeSkillRequirements(
+        IReadOnlyCollection<TaskSkillRequirement> requirements)
+    {
+        ArgumentNullException.ThrowIfNull(requirements);
+
+        var skillIds = new HashSet<Guid>();
+        var normalized = new List<TaskSkillRequirement>(requirements.Count);
+
+        foreach (var requirement in requirements)
+        {
+            if (requirement.SkillId == Guid.Empty)
+            {
+                throw DomainRuleException.Validation(
+                    "TASK_SKILL_ID_INVALID",
+                    "Skill ID must not be empty.");
+            }
+
+            if (!skillIds.Add(requirement.SkillId))
+            {
+                throw DomainRuleException.Validation(
+                    "TASK_SKILL_DUPLICATE",
+                    "A skill can only appear once in a task requirement.");
+            }
+
+            var level = NormalizeOptional(requirement.RequiredSkillLevel);
+            if (level?.Length > 30)
+            {
+                throw DomainRuleException.Validation(
+                    "TASK_SKILL_LEVEL_INVALID",
+                    "Required skill level must not exceed 30 characters.");
+            }
+
+            if (requirement.RequiredVolunteerCount is <= 0)
+            {
+                throw DomainRuleException.Validation(
+                    "TASK_SKILL_VOLUNTEER_COUNT_INVALID",
+                    "Required volunteer count must be greater than zero when provided.");
+            }
+
+            normalized.Add(new TaskSkillRequirement(
+                requirement.SkillId,
+                level,
+                requirement.RequiredVolunteerCount));
+        }
+
+        return normalized.OrderBy(requirement => requirement.SkillId).ToList();
+    }
+
+    private bool HasSameSkillRequirements(IReadOnlyList<TaskSkillRequirement> requirements)
+    {
+        if (_skills.Count != requirements.Count)
+        {
+            return false;
+        }
+
+        var current = _skills.OrderBy(skill => skill.SkillId).ToList();
+        for (var index = 0; index < current.Count; index++)
+        {
+            if (current[index].SkillId != requirements[index].SkillId ||
+                current[index].RequiredSkillLevel != requirements[index].RequiredSkillLevel ||
+                current[index].RequiredVolunteerCount != requirements[index].RequiredVolunteerCount)
+            {
+                return false;
+            }
+        }
+
         return true;
     }
 

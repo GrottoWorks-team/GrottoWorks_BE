@@ -10,6 +10,7 @@ public sealed class TaskExecutionDbContext(DbContextOptions<TaskExecutionDbConte
     public DbSet<SeasonScope> SeasonScopes => Set<SeasonScope>();
     public DbSet<WorkAreaScope> WorkAreaScopes => Set<WorkAreaScope>();
     public DbSet<WorkTask> Tasks => Set<WorkTask>();
+    public DbSet<TaskSkill> TaskSkills => Set<TaskSkill>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

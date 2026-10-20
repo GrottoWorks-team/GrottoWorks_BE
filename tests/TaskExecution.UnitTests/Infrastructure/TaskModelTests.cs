@@ -23,4 +23,24 @@ public sealed class TaskModelTests
         entity.FindProperty(nameof(WorkTask.Version))!.IsConcurrencyToken.Should().BeTrue();
         entity.GetForeignKeys().Should().BeEmpty("TaskExecution stores external ownership as IDs only");
     }
+
+    [Fact]
+    public void Task_skill_mapping_uses_expected_table_columns_and_unique_index()
+    {
+        var options = new DbContextOptionsBuilder<TaskExecutionDbContext>()
+            .UseNpgsql("Host=localhost;Database=task_skill_model_test;Username=test;Password=test")
+            .Options;
+        using var dbContext = new TaskExecutionDbContext(options);
+
+        var entity = dbContext.Model.FindEntityType(typeof(TaskSkill))!;
+
+        entity.GetTableName().Should().Be("task_skill");
+        entity.FindProperty(nameof(TaskSkill.RequiredSkillLevel))!.GetMaxLength().Should().Be(30);
+        entity.GetIndexes().Should().ContainSingle(index =>
+            index.IsUnique &&
+            index.Properties.Select(property => property.Name)
+                .SequenceEqual(new[] { nameof(TaskSkill.TaskId), nameof(TaskSkill.SkillId) }));
+        entity.GetForeignKeys().Should().ContainSingle(foreignKey =>
+            foreignKey.PrincipalEntityType.ClrType == typeof(WorkTask));
+    }
 }

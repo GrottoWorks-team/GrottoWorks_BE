@@ -16,10 +16,15 @@ using ParishCoordination.Application.Parishes.Commands.CreateParish;
 using ParishCoordination.Application.Seasons.Queries.GetSeasons;
 using ParishCoordination.Application.Seasons.Queries.GetSeason;
 using ParishCoordination.Application.Seasons.Commands.CreateSeason;
+using ParishCoordination.Application.Seasons.Commands.ActivateSeason;
+using ParishCoordination.Application.Seasons.Commands.ArchiveSeason;
+using ParishCoordination.Application.Seasons.Commands.CompleteSeason;
 using ParishCoordination.Application.Seasons.Commands.UpdateSeason;
 using ParishCoordination.Application.WorkAreas.Queries.GetWorkArea;
 using ParishCoordination.Application.WorkAreas.Queries.ListWorkAreas;
 using ParishCoordination.Application.WorkAreas.Commands.AssignWorkAreaCommunity;
+using ParishCoordination.Application.WorkAreas.Commands.AssignWorkAreaLeader;
+using ParishCoordination.Application.WorkAreas.Commands.AssignMaterialOfficer;
 using ParishCoordination.Application.WorkAreas.Commands.CreateWorkArea;
 using ParishCoordination.Application.WorkAreas.Commands.UpdateWorkArea;
 using ParishCoordination.Application.WorkAreaCategories.Queries.ListWorkAreaCategories;
@@ -52,10 +57,15 @@ public sealed class RouteAuthorizationTests
         builder.Services.AddScoped<GetSeasonsQueryHandler>();
         builder.Services.AddScoped<GetSeasonQueryHandler>();
         builder.Services.AddScoped<CreateSeasonCommandHandler>();
+        builder.Services.AddScoped<ActivateSeasonCommandHandler>();
+        builder.Services.AddScoped<ArchiveSeasonCommandHandler>();
+        builder.Services.AddScoped<CompleteSeasonCommandHandler>();
         builder.Services.AddScoped<UpdateSeasonCommandHandler>();
         builder.Services.AddScoped<ListWorkAreasQueryHandler>();
         builder.Services.AddScoped<GetWorkAreaQueryHandler>();
         builder.Services.AddScoped<AssignWorkAreaCommunityCommandHandler>();
+        builder.Services.AddScoped<AssignWorkAreaLeaderCommandHandler>();
+        builder.Services.AddScoped<AssignMaterialOfficerCommandHandler>();
         builder.Services.AddScoped<CreateWorkAreaCommandHandler>();
         builder.Services.AddScoped<UpdateWorkAreaCommandHandler>();
         builder.Services.AddScoped<ListWorkAreaCategoriesQueryHandler>();
@@ -82,11 +92,16 @@ public sealed class RouteAuthorizationTests
         var seasons = FindByName(app, "listSeasons");
         var getSeason = FindByName(app, "getSeason");
         var createSeason = FindByName(app, "createSeason");
+        var activateSeason = FindByName(app, "activateSeason");
+        var archiveSeason = FindByName(app, "archiveSeason");
+        var completeSeason = FindByName(app, "completeSeason");
         var updateSeason = FindByName(app, "updateSeason");
         var listWorkAreas = FindByName(app, "listWorkAreas");
         var getWorkArea = FindByName(app, "getWorkArea");
         var createWorkArea = FindByName(app, "createWorkArea");
         var assignWorkAreaCommunity = FindByName(app, "assignWorkAreaCommunity");
+        var assignWorkAreaLeader = FindByName(app, "assignWorkAreaLeader");
+        var assignMaterialOfficer = FindByName(app, "assignMaterialOfficer");
         var updateWorkArea = FindByName(app, "updateWorkArea");
         var listWorkAreaCategories = FindByName(app, "listWorkAreaCategories");
         var createWorkAreaCategory = FindByName(app, "createWorkAreaCategory");
@@ -98,9 +113,18 @@ public sealed class RouteAuthorizationTests
         GetRoles(createCommunity).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(updateCommunity).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
+        GetRoles(activateSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
+        GetRoles(archiveSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
+        GetRoles(completeSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(updateSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createWorkArea).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(assignWorkAreaCommunity).Should().BeEquivalentTo(
+            GrottoWorksRoles.Admin,
+            GrottoWorksRoles.Parish);
+        GetRoles(assignWorkAreaLeader).Should().BeEquivalentTo(
+            GrottoWorksRoles.Admin,
+            GrottoWorksRoles.Parish);
+        GetRoles(assignMaterialOfficer).Should().BeEquivalentTo(
             GrottoWorksRoles.Admin,
             GrottoWorksRoles.Parish);
         GetRoles(updateWorkArea).Should().BeEquivalentTo(
@@ -108,6 +132,47 @@ public sealed class RouteAuthorizationTests
             GrottoWorksRoles.Parish,
             GrottoWorksRoles.Leader);
         createSeason.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Should().Contain(metadata => metadata.StatusCode == 201);
+        activateSeason.RoutePattern.RawText.Should().Be("/api/v1/seasons/{seasonId}/activate");
+        var activateSeasonStatusCodes = activateSeason.Metadata
+            .GetOrderedMetadata<IProducesResponseTypeMetadata>()
+            .Select(metadata => metadata.StatusCode)
+            .ToArray();
+        activateSeasonStatusCodes.Should().Contain(StatusCodes.Status200OK);
+        activateSeasonStatusCodes.Should().Contain(StatusCodes.Status400BadRequest);
+        activateSeasonStatusCodes.Should().Contain(StatusCodes.Status401Unauthorized);
+        activateSeasonStatusCodes.Should().Contain(StatusCodes.Status403Forbidden);
+        activateSeasonStatusCodes.Should().Contain(StatusCodes.Status404NotFound);
+        activateSeasonStatusCodes.Should().Contain(StatusCodes.Status409Conflict);
+        activateSeasonStatusCodes.Should().Contain(StatusCodes.Status412PreconditionFailed);
+        activateSeasonStatusCodes.Should().Contain(StatusCodes.Status422UnprocessableEntity);
+        completeSeason.RoutePattern.RawText.Should().Be("/api/v1/seasons/{seasonId}/complete");
+        var completeSeasonStatusCodes = completeSeason.Metadata
+            .GetOrderedMetadata<IProducesResponseTypeMetadata>()
+            .Select(metadata => metadata.StatusCode)
+            .ToArray();
+        completeSeasonStatusCodes.Should().Contain(StatusCodes.Status200OK);
+        completeSeasonStatusCodes.Should().Contain(StatusCodes.Status400BadRequest);
+        completeSeasonStatusCodes.Should().Contain(StatusCodes.Status401Unauthorized);
+        completeSeasonStatusCodes.Should().Contain(StatusCodes.Status403Forbidden);
+        completeSeasonStatusCodes.Should().Contain(StatusCodes.Status404NotFound);
+        completeSeasonStatusCodes.Should().Contain(StatusCodes.Status409Conflict);
+        completeSeasonStatusCodes.Should().Contain(StatusCodes.Status412PreconditionFailed);
+        completeSeasonStatusCodes.Should().Contain(StatusCodes.Status422UnprocessableEntity);
+        archiveSeason.RoutePattern.RawText.Should().Be("/api/v1/seasons/{seasonId}/archive");
+        archiveSeason.Metadata.GetMetadata<IAcceptsMetadata>()!.RequestType.Should()
+            .Be(typeof(ParishCoordination.Api.Requests.VersionedCommandRequest));
+        var archiveSeasonStatusCodes = archiveSeason.Metadata
+            .GetOrderedMetadata<IProducesResponseTypeMetadata>()
+            .Select(metadata => metadata.StatusCode)
+            .ToArray();
+        archiveSeasonStatusCodes.Should().Contain(StatusCodes.Status200OK);
+        archiveSeasonStatusCodes.Should().Contain(StatusCodes.Status400BadRequest);
+        archiveSeasonStatusCodes.Should().Contain(StatusCodes.Status401Unauthorized);
+        archiveSeasonStatusCodes.Should().Contain(StatusCodes.Status403Forbidden);
+        archiveSeasonStatusCodes.Should().Contain(StatusCodes.Status404NotFound);
+        archiveSeasonStatusCodes.Should().Contain(StatusCodes.Status409Conflict);
+        archiveSeasonStatusCodes.Should().Contain(StatusCodes.Status412PreconditionFailed);
+        archiveSeasonStatusCodes.Should().Contain(StatusCodes.Status422UnprocessableEntity);
         updateSeason.RoutePattern.RawText.Should().Be("/api/v1/seasons/{seasonId}");
         var updateSeasonStatusCodes = updateSeason.Metadata
             .GetOrderedMetadata<IProducesResponseTypeMetadata>()
@@ -142,6 +207,36 @@ public sealed class RouteAuthorizationTests
         assignCommunityStatusCodes.Should().Contain(StatusCodes.Status409Conflict);
         assignCommunityStatusCodes.Should().Contain(StatusCodes.Status412PreconditionFailed);
         assignCommunityStatusCodes.Should().Contain(StatusCodes.Status422UnprocessableEntity);
+        assignWorkAreaLeader.RoutePattern.RawText.Should()
+            .Be("/api/v1/work-areas/{workAreaId}/leader");
+        var assignLeaderStatusCodes = assignWorkAreaLeader.Metadata
+            .GetOrderedMetadata<IProducesResponseTypeMetadata>()
+            .Select(metadata => metadata.StatusCode)
+            .ToArray();
+        assignLeaderStatusCodes.Should().Contain(StatusCodes.Status200OK);
+        assignLeaderStatusCodes.Should().Contain(StatusCodes.Status400BadRequest);
+        assignLeaderStatusCodes.Should().Contain(StatusCodes.Status401Unauthorized);
+        assignLeaderStatusCodes.Should().Contain(StatusCodes.Status403Forbidden);
+        assignLeaderStatusCodes.Should().Contain(StatusCodes.Status404NotFound);
+        assignLeaderStatusCodes.Should().Contain(StatusCodes.Status409Conflict);
+        assignLeaderStatusCodes.Should().Contain(StatusCodes.Status412PreconditionFailed);
+        assignLeaderStatusCodes.Should().Contain(StatusCodes.Status422UnprocessableEntity);
+        assignLeaderStatusCodes.Should().Contain(StatusCodes.Status503ServiceUnavailable);
+        assignMaterialOfficer.RoutePattern.RawText.Should()
+            .Be("/api/v1/work-areas/{workAreaId}/material-officer");
+        var assignMaterialOfficerStatusCodes = assignMaterialOfficer.Metadata
+            .GetOrderedMetadata<IProducesResponseTypeMetadata>()
+            .Select(metadata => metadata.StatusCode)
+            .ToArray();
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status200OK);
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status400BadRequest);
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status401Unauthorized);
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status403Forbidden);
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status404NotFound);
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status409Conflict);
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status412PreconditionFailed);
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status422UnprocessableEntity);
+        assignMaterialOfficerStatusCodes.Should().Contain(StatusCodes.Status503ServiceUnavailable);
         updateWorkArea.RoutePattern.RawText.Should().Be("/api/v1/work-areas/{workAreaId}");
         var updateWorkAreaStatusCodes = updateWorkArea.Metadata
             .GetOrderedMetadata<IProducesResponseTypeMetadata>()

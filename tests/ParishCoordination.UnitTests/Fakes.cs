@@ -4,6 +4,7 @@ using ParishCoordination.Application.Parishes;
 using ParishCoordination.Application.Seasons;
 using ParishCoordination.Application.WorkAreas;
 using ParishCoordination.Application.WorkAreaCategories;
+using ParishCoordination.Application.Users;
 using ParishCoordination.Domain.Entities;
 using ParishCoordination.Domain.Enums;
 
@@ -16,6 +17,30 @@ internal sealed class FakeCurrentUser : ICurrentUser
     public string Role { get; init; } = GrottoWorksRoles.Parish;
     public Guid? ParishId { get; init; }
     public Guid? CommunityId { get; init; }
+}
+
+internal sealed class FakeIdentityUserLookup : IIdentityUserLookup
+{
+    public List<IdentityUser> Items { get; } = [];
+    public bool ThrowUnavailable { get; set; }
+    public int CallCount { get; private set; }
+    public Guid? LastUserId { get; private set; }
+
+    public Task<IdentityUser?> GetByIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        CallCount++;
+        LastUserId = userId;
+
+        if (ThrowUnavailable)
+        {
+            throw new IdentityUserLookupUnavailableException(
+                "Simulated Identity outage.");
+        }
+
+        return Task.FromResult(Items.SingleOrDefault(user => user.UserId == userId));
+    }
 }
 
 internal sealed class FakeParishRepository : IParishRepository
@@ -158,6 +183,19 @@ internal sealed class FakeSeasonRepository : ISeasonRepository
             season.SeasonYear == seasonYear &&
             (!excludeSeasonId.HasValue || season.Id != excludeSeasonId.Value)));
 
+    public Task<bool> HasOverlappingActiveSeasonAsync(
+        Guid parishId,
+        DateOnly startDate,
+        DateOnly endDate,
+        Guid excludeSeasonId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(season =>
+            season.ParishId == parishId &&
+            season.Id != excludeSeasonId &&
+            season.Status == SeasonStatus.Active &&
+            season.StartDate <= endDate &&
+            season.EndDate >= startDate));
+
     public void Add(Season season) => Items.Add(season);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -259,6 +297,22 @@ internal sealed class FakeWorkAreaRepository : IWorkAreaRepository
         Guid workAreaId,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.SingleOrDefault(workArea => workArea.Id == workAreaId));
+
+    public Task<WorkAreaActivationReadiness> GetActivationReadinessAsync(
+        Guid seasonId,
+        CancellationToken cancellationToken = default)
+    {
+        var workAreas = Items
+            .Where(workArea => workArea.SeasonId == seasonId)
+            .ToList();
+        var incompleteAssignments = workAreas.Count(workArea =>
+            workArea.LeaderUserId is null ||
+            workArea.MaterialOfficerUserId is null);
+
+        return Task.FromResult(new WorkAreaActivationReadiness(
+            workAreas.Count,
+            incompleteAssignments));
+    }
 
     public Task<(IReadOnlyList<WorkArea> Items, long TotalItems)> GetPagedBySeasonIdAsync(
         Guid seasonId,

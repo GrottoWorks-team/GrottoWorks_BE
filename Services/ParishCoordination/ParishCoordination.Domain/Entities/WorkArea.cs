@@ -102,6 +102,36 @@ public sealed class WorkArea
         return true;
     }
 
+    public bool AssignLeader(
+        Guid leaderUserId,
+        DateTimeOffset updatedAtUtc)
+    {
+        if (LeaderUserId == leaderUserId)
+        {
+            return false;
+        }
+
+        LeaderUserId = leaderUserId;
+        UpdatedAt = updatedAtUtc;
+        Version++;
+        return true;
+    }
+
+    public bool AssignMaterialOfficer(
+        Guid materialOfficerUserId,
+        DateTimeOffset updatedAtUtc)
+    {
+        if (MaterialOfficerUserId == materialOfficerUserId)
+        {
+            return false;
+        }
+
+        MaterialOfficerUserId = materialOfficerUserId;
+        UpdatedAt = updatedAtUtc;
+        Version++;
+        return true;
+    }
+
     public Guid Id { get; private set; }
 
     public Guid SeasonId { get; private set; }

@@ -24,6 +24,13 @@ public interface ISeasonRepository
         CancellationToken cancellationToken = default,
         Guid? excludeSeasonId = null);
 
+    Task<bool> HasOverlappingActiveSeasonAsync(
+        Guid parishId,
+        DateOnly startDate,
+        DateOnly endDate,
+        Guid excludeSeasonId,
+        CancellationToken cancellationToken = default);
+
     void Add(Season season);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using ParishCoordination.Application.Seasons;
 using ParishCoordination.Domain.Entities;
+using ParishCoordination.Domain.Enums;
 using ParishCoordination.Infrastructure.Data;
 
 namespace ParishCoordination.Infrastructure.Repositories;
@@ -57,6 +58,24 @@ public sealed class SeasonRepository(ParishCoordinationDbContext dbContext)
                 season => season.ParishId == parishId &&
                     season.SeasonYear == seasonYear &&
                     (!excludeSeasonId.HasValue || season.Id != excludeSeasonId.Value),
+                cancellationToken);
+    }
+
+    public async Task<bool> HasOverlappingActiveSeasonAsync(
+        Guid parishId,
+        DateOnly startDate,
+        DateOnly endDate,
+        Guid excludeSeasonId,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Seasons
+            .AsNoTracking()
+            .AnyAsync(
+                season => season.ParishId == parishId &&
+                    season.Id != excludeSeasonId &&
+                    season.Status == SeasonStatus.Active &&
+                    season.StartDate <= endDate &&
+                    season.EndDate >= startDate,
                 cancellationToken);
     }
 

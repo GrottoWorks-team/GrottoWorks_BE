@@ -2,6 +2,10 @@ using ParishCoordination.Domain.Entities;
 
 namespace ParishCoordination.Application.WorkAreas;
 
+public sealed record WorkAreaActivationReadiness(
+    int TotalWorkAreas,
+    int IncompleteAssignments);
+
 public interface IWorkAreaRepository
 {
     void Add(WorkArea workArea);
@@ -21,5 +25,9 @@ public interface IWorkAreaRepository
 
     Task<WorkArea?> GetByIdForUpdateAsync(
         Guid workAreaId,
+        CancellationToken cancellationToken = default);
+
+    Task<WorkAreaActivationReadiness> GetActivationReadinessAsync(
+        Guid seasonId,
         CancellationToken cancellationToken = default);
 }

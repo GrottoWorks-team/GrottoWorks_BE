@@ -232,6 +232,68 @@ public sealed class AssignWorkAreaCommunityHandlerTests
     }
 
     [Fact]
+    public async Task Null_community_unassigns_work_area_and_preserves_other_fields()
+    {
+        var categoryId = Guid.NewGuid();
+        var leaderId = Guid.NewGuid();
+        var officerId = Guid.NewGuid();
+        var workArea = BuildWorkArea(
+            communityId: CommunityNorth,
+            categoryId: categoryId,
+            leaderId: leaderId,
+            officerId: officerId);
+        var workAreas = WorkAreas(workArea);
+        var originalName = workArea.Name;
+        var originalDescription = workArea.Description;
+        var originalStartDate = workArea.StartDate;
+        var originalDeadline = workArea.Deadline;
+        var originalStatus = workArea.Status;
+
+        var result = await Handler(
+                workAreas,
+                Seasons(BuildSeason()),
+                Communities(),
+                User(GrottoWorksRoles.Parish, ParishNorth))
+            .HandleAsync(Command(null, expectedVersion: 1));
+
+        result.Outcome.Should().Be(AssignWorkAreaCommunityOutcome.Success);
+        result.WorkArea!.CommunityId.Should().BeNull();
+        workArea.CommunityId.Should().BeNull();
+        workArea.Version.Should().Be(2);
+        workArea.UpdatedAt.Should().NotBeNull();
+        workAreas.SaveChangesCount.Should().Be(1);
+        workArea.Name.Should().Be(originalName);
+        workArea.Description.Should().Be(originalDescription);
+        workArea.WorkAreaCategoryId.Should().Be(categoryId);
+        workArea.LeaderUserId.Should().Be(leaderId);
+        workArea.MaterialOfficerUserId.Should().Be(officerId);
+        workArea.StartDate.Should().Be(originalStartDate);
+        workArea.Deadline.Should().Be(originalDeadline);
+        workArea.Status.Should().Be(originalStatus);
+    }
+
+    [Fact]
+    public async Task Unassigning_work_area_without_community_is_an_idempotent_no_op()
+    {
+        var workArea = BuildWorkArea();
+        var workAreas = WorkAreas(workArea);
+        var originalUpdatedAt = workArea.UpdatedAt;
+
+        var result = await Handler(
+                workAreas,
+                Seasons(BuildSeason()),
+                Communities(),
+                User(GrottoWorksRoles.Parish, ParishNorth))
+            .HandleAsync(Command(null, expectedVersion: 1));
+
+        result.Outcome.Should().Be(AssignWorkAreaCommunityOutcome.Success);
+        result.WorkArea!.CommunityId.Should().BeNull();
+        workArea.Version.Should().Be(1);
+        workArea.UpdatedAt.Should().Be(originalUpdatedAt);
+        workAreas.SaveChangesCount.Should().Be(0);
+    }
+
+    [Fact]
     public async Task Stale_version_and_database_concurrency_race_return_version_mismatch()
     {
         var staleRepository = WorkAreas(BuildWorkArea());
@@ -257,17 +319,18 @@ public sealed class AssignWorkAreaCommunityHandlerTests
     }
 
     [Fact]
-    public void Request_requires_non_empty_community_id()
+    public void Request_requires_property_but_allows_null_to_unassign()
     {
         Validate(new AssignWorkAreaCommunityRequest()).Should().Contain(result =>
             result.MemberNames.Contains(nameof(AssignWorkAreaCommunityRequest.CommunityId)));
+        Validate(new AssignWorkAreaCommunityRequest { CommunityId = null }).Should().BeEmpty();
         Validate(new AssignWorkAreaCommunityRequest { CommunityId = Guid.Empty }).Should().Contain(result =>
             result.MemberNames.Contains(nameof(AssignWorkAreaCommunityRequest.CommunityId)));
         Validate(new AssignWorkAreaCommunityRequest { CommunityId = CommunityNorth }).Should().BeEmpty();
     }
 
     private static AssignWorkAreaCommunityCommand Command(
-        Guid communityId,
+        Guid? communityId,
         int? expectedVersion = null) =>
         new(WorkAreaId, communityId, expectedVersion);
 

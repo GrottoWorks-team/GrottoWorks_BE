@@ -380,7 +380,7 @@ public static class WorkAreaEndpoints
         var result = await commandHandler.HandleAsync(
             new AssignWorkAreaCommunityCommand(
                 workAreaId,
-                request.CommunityId!.Value,
+                request.CommunityId,
                 expectedVersion),
             cancellationToken);
 

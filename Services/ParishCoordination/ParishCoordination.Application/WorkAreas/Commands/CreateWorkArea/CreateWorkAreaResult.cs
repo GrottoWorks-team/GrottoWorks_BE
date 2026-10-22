@@ -5,7 +5,9 @@ public enum CreateWorkAreaOutcome
     Success,
     SeasonNotFound,
     SeasonInvalidState,
-    CommunityNotFound
+    CommunityNotFound,
+    CategoryNotFound,
+    CategoryInactive
 }
 
 public sealed record CreateWorkAreaResult(
@@ -23,4 +25,10 @@ public sealed record CreateWorkAreaResult(
 
     public static CreateWorkAreaResult CommunityNotFound() =>
         new(CreateWorkAreaOutcome.CommunityNotFound, null);
+
+    public static CreateWorkAreaResult CategoryNotFound() =>
+        new(CreateWorkAreaOutcome.CategoryNotFound, null);
+
+    public static CreateWorkAreaResult CategoryInactive() =>
+        new(CreateWorkAreaOutcome.CategoryInactive, null);
 }

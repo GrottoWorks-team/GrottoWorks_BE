@@ -14,6 +14,7 @@ public sealed class CreateWorkAreaHandlerTests
     private static readonly Guid SeasonNorth = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
     private static readonly Guid CommunityNorth = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000010");
     private static readonly Guid CommunitySouth = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000010");
+    private static readonly Guid CategoryNorth = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000020");
 
     [Fact]
     public async Task Parish_user_can_create_work_area_in_current_season()
@@ -25,7 +26,7 @@ public sealed class CreateWorkAreaHandlerTests
             SeasonNorth,
             "  Lighting Area  ",
             "  Description  ",
-            Guid.NewGuid(),
+            CategoryNorth,
             CommunityNorth,
             new DateOnly(2026, 10, 10),
             new DateOnly(2026, 12, 10)));
@@ -64,6 +65,7 @@ public sealed class CreateWorkAreaHandlerTests
         var handler = new CreateWorkAreaCommandHandler(
             seasons,
             Communities(),
+            Categories(),
             new FakeWorkAreaRepository(),
             User(GrottoWorksRoles.Admin));
 
@@ -109,6 +111,7 @@ public sealed class CreateWorkAreaHandlerTests
         var handler = new CreateWorkAreaCommandHandler(
             new FakeSeasonRepository(),
             Communities(),
+            Categories(),
             new FakeWorkAreaRepository(),
             User(GrottoWorksRoles.Admin));
 
@@ -128,6 +131,7 @@ public sealed class CreateWorkAreaHandlerTests
         var handler = new CreateWorkAreaCommandHandler(
             seasons,
             Communities(),
+            Categories(),
             new FakeWorkAreaRepository(),
             User(GrottoWorksRoles.Admin));
 
@@ -159,6 +163,59 @@ public sealed class CreateWorkAreaHandlerTests
     }
 
     [Fact]
+    public async Task Active_category_can_be_assigned_when_creating_work_area()
+    {
+        var workAreas = new FakeWorkAreaRepository();
+        var handler = Handler(workAreas, User(GrottoWorksRoles.Admin));
+
+        var result = await handler.HandleAsync(Command(categoryId: CategoryNorth));
+
+        result.Outcome.Should().Be(CreateWorkAreaOutcome.Success);
+        workAreas.Items.Single().WorkAreaCategoryId.Should().Be(CategoryNorth);
+    }
+
+    [Fact]
+    public async Task Missing_category_returns_not_found_outcome()
+    {
+        var handler = Handler(
+            new FakeWorkAreaRepository(),
+            User(GrottoWorksRoles.Admin),
+            new FakeWorkAreaCategoryRepository());
+
+        var result = await handler.HandleAsync(Command(categoryId: Guid.NewGuid()));
+
+        result.Outcome.Should().Be(CreateWorkAreaOutcome.CategoryNotFound);
+    }
+
+    [Fact]
+    public async Task Inactive_category_returns_inactive_outcome()
+    {
+        var handler = Handler(
+            new FakeWorkAreaRepository(),
+            User(GrottoWorksRoles.Admin),
+            Categories(WorkAreaCategoryStatus.Inactive));
+
+        var result = await handler.HandleAsync(Command(categoryId: CategoryNorth));
+
+        result.Outcome.Should().Be(CreateWorkAreaOutcome.CategoryInactive);
+    }
+
+    [Fact]
+    public async Task Category_is_optional_when_creating_work_area()
+    {
+        var workAreas = new FakeWorkAreaRepository();
+        var handler = Handler(
+            workAreas,
+            User(GrottoWorksRoles.Admin),
+            new FakeWorkAreaCategoryRepository());
+
+        var result = await handler.HandleAsync(Command(includeCategory: false));
+
+        result.Outcome.Should().Be(CreateWorkAreaOutcome.Success);
+        workAreas.Items.Single().WorkAreaCategoryId.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Dates_must_be_in_season_and_deadline_must_follow_start()
     {
         var handler = Handler(new FakeWorkAreaRepository(), User(GrottoWorksRoles.Admin));
@@ -180,8 +237,9 @@ public sealed class CreateWorkAreaHandlerTests
 
     private static CreateWorkAreaCommandHandler Handler(
         FakeWorkAreaRepository workAreas,
-        FakeCurrentUser user) =>
-        new(Seasons(), Communities(), workAreas, user);
+        FakeCurrentUser user,
+        FakeWorkAreaCategoryRepository? categories = null) =>
+        new(Seasons(), Communities(), categories ?? Categories(), workAreas, user);
 
     private static FakeCurrentUser User(string role, Guid? parishId = null) =>
         new()
@@ -195,12 +253,14 @@ public sealed class CreateWorkAreaHandlerTests
         Guid? seasonId = null,
         Guid? communityId = null,
         DateOnly? startDate = null,
-        DateOnly? deadline = null) =>
+        DateOnly? deadline = null,
+        Guid? categoryId = null,
+        bool includeCategory = true) =>
         new(
             seasonId ?? SeasonNorth,
             "Work Area",
             null,
-            Guid.NewGuid(),
+            includeCategory ? categoryId ?? CategoryNorth : null,
             communityId ?? CommunityNorth,
             startDate ?? new DateOnly(2026, 10, 1),
             deadline ?? new DateOnly(2026, 12, 1));
@@ -238,6 +298,19 @@ public sealed class CreateWorkAreaHandlerTests
             "South Community",
             null,
             DateTimeOffset.UtcNow));
+        return repository;
+    }
+
+    private static FakeWorkAreaCategoryRepository Categories(
+        WorkAreaCategoryStatus status = WorkAreaCategoryStatus.Active)
+    {
+        var repository = new FakeWorkAreaCategoryRepository();
+        repository.Items.Add(WorkAreaCategory.Create(
+            CategoryNorth,
+            "CONSTRUCTION",
+            "Construction",
+            null,
+            status));
         return repository;
     }
 }

@@ -3,6 +3,7 @@ using BuildingBlocks.Web.Exceptions;
 using Microsoft.AspNetCore.Http;
 using ParishCoordination.Application.Communities;
 using ParishCoordination.Application.Seasons;
+using ParishCoordination.Application.WorkAreaCategories;
 using ParishCoordination.Domain.Entities;
 using ParishCoordination.Domain.Enums;
 
@@ -11,6 +12,7 @@ namespace ParishCoordination.Application.WorkAreas.Commands.CreateWorkArea;
 public sealed class CreateWorkAreaCommandHandler(
     ISeasonRepository seasonRepository,
     ICommunityRepository communityRepository,
+    IWorkAreaCategoryRepository categoryRepository,
     IWorkAreaRepository workAreaRepository,
     ICurrentUser currentUser)
 {
@@ -53,6 +55,23 @@ public sealed class CreateWorkAreaCommandHandler(
                 "WORK_AREA_INVALID_DATE_RANGE",
                 "Deadline must not be before start date.",
                 StatusCodes.Status422UnprocessableEntity);
+        }
+
+        if (command.CategoryId.HasValue)
+        {
+            var category = await categoryRepository.GetByIdAsync(
+                command.CategoryId.Value,
+                cancellationToken);
+
+            if (category is null)
+            {
+                return CreateWorkAreaResult.CategoryNotFound();
+            }
+
+            if (category.Status is not WorkAreaCategoryStatus.Active)
+            {
+                return CreateWorkAreaResult.CategoryInactive();
+            }
         }
 
         Community? community = null;

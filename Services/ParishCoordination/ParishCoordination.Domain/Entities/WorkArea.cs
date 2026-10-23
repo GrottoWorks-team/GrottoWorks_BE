@@ -88,7 +88,7 @@ public sealed class WorkArea
     }
 
     public bool AssignCommunity(
-        Guid communityId,
+        Guid? communityId,
         DateTimeOffset updatedAtUtc)
     {
         if (CommunityId == communityId)

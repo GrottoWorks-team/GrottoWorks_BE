@@ -225,13 +225,33 @@ public static class WorkAreaEndpoints
                 "COMMUNITY_NOT_FOUND");
         }
 
+        if (result.Outcome == CreateWorkAreaOutcome.CategoryNotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Work area category not found",
+                $"Work area category with ID '{request.CategoryId}' was not found.",
+                "WORK_AREA_CATEGORY_NOT_FOUND");
+        }
+
+        if (result.Outcome == CreateWorkAreaOutcome.CategoryInactive)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "Work area category is inactive",
+                "An inactive work area category cannot be assigned to a new work area.",
+                "WORK_AREA_CATEGORY_INACTIVE");
+        }
+
         if (result.Outcome == CreateWorkAreaOutcome.SeasonInvalidState)
         {
             return CreateProblem(
                 httpContext,
                 StatusCodes.Status409Conflict,
                 "Season state does not allow work areas",
-                "Work areas can only be created for DRAFT or PLANNING seasons.",
+                "Work areas can only be created for PLANNING seasons.",
                 "SEASON_INVALID_STATE");
         }
 
@@ -360,7 +380,7 @@ public static class WorkAreaEndpoints
         var result = await commandHandler.HandleAsync(
             new AssignWorkAreaCommunityCommand(
                 workAreaId,
-                request.CommunityId!.Value,
+                request.CommunityId,
                 expectedVersion),
             cancellationToken);
 

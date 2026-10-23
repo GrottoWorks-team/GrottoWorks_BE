@@ -2,5 +2,5 @@ namespace ParishCoordination.Application.WorkAreas.Commands.AssignWorkAreaCommun
 
 public sealed record AssignWorkAreaCommunityCommand(
     Guid WorkAreaId,
-    Guid CommunityId,
+    Guid? CommunityId,
     int? ExpectedVersion);

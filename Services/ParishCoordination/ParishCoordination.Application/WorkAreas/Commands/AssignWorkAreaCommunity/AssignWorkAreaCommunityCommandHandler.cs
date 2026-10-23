@@ -49,30 +49,33 @@ public sealed class AssignWorkAreaCommunityCommandHandler(
             return AssignWorkAreaCommunityResult.VersionMismatch();
         }
 
-        var community = await communityRepository.GetByIdAsync(
-            command.CommunityId,
-            cancellationToken);
-
-        if (community is null)
+        if (command.CommunityId.HasValue)
         {
-            return AssignWorkAreaCommunityResult.CommunityNotFound();
-        }
+            var community = await communityRepository.GetByIdAsync(
+                command.CommunityId.Value,
+                cancellationToken);
 
-        if (community.ParishId != season.ParishId)
-        {
-            throw new DomainException(
-                "PARISH_ACCESS_DENIED",
-                "The community and work area must belong to the same parish.",
-                StatusCodes.Status403Forbidden);
-        }
+            if (community is null)
+            {
+                return AssignWorkAreaCommunityResult.CommunityNotFound();
+            }
 
-        if (community.Status is not CommunityStatus.Active)
-        {
-            return AssignWorkAreaCommunityResult.CommunityInactive();
+            if (community.ParishId != season.ParishId)
+            {
+                throw new DomainException(
+                    "PARISH_ACCESS_DENIED",
+                    "The community and work area must belong to the same parish.",
+                    StatusCodes.Status403Forbidden);
+            }
+
+            if (community.Status is not CommunityStatus.Active)
+            {
+                return AssignWorkAreaCommunityResult.CommunityInactive();
+            }
         }
 
         var assignmentChanged = workArea.AssignCommunity(
-            community.Id,
+            command.CommunityId,
             DateTimeOffset.UtcNow);
 
         if (!assignmentChanged)

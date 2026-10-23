@@ -193,23 +193,64 @@ public sealed class WorkAreaHandlerTests
     }
 
     [Fact]
-    public void Dto_exposes_only_the_contract_fields()
+    public void Dto_exposes_complete_work_area_response_fields()
     {
         var dtoProperties = typeof(WorkAreaDto).GetProperties().Select(property => property.Name);
 
         dtoProperties.Should().BeEquivalentTo(
             nameof(WorkAreaDto.Id),
             nameof(WorkAreaDto.SeasonId),
+            nameof(WorkAreaDto.Name),
+            nameof(WorkAreaDto.Description),
             nameof(WorkAreaDto.CommunityId),
+            nameof(WorkAreaDto.CategoryId),
             nameof(WorkAreaDto.LeaderId),
             nameof(WorkAreaDto.MaterialOfficerId),
+            nameof(WorkAreaDto.StartDate),
+            nameof(WorkAreaDto.Deadline),
             nameof(WorkAreaDto.Status),
             nameof(WorkAreaDto.Version));
-        dtoProperties.Should().NotContain("Name");
-        dtoProperties.Should().NotContain("Description");
-        dtoProperties.Should().NotContain("StartDate");
-        dtoProperties.Should().NotContain("Deadline");
         dtoProperties.Should().NotContain("WorkAreaCategoryId");
+    }
+
+    [Fact]
+    public void Dto_maps_all_public_work_area_fields()
+    {
+        var workAreaId = Guid.NewGuid();
+        var communityId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var leaderId = Guid.NewGuid();
+        var materialOfficerId = Guid.NewGuid();
+        var startDate = new DateOnly(2026, 10, 15);
+        var deadline = new DateOnly(2026, 12, 20);
+        var workArea = WorkArea.Create(
+            workAreaId,
+            SeasonNorth,
+            communityId,
+            categoryId,
+            leaderId,
+            materialOfficerId,
+            "Main Grotto",
+            "Build the central grotto area",
+            startDate,
+            deadline,
+            WorkAreaStatus.InProgress,
+            DateTimeOffset.UtcNow);
+
+        var dto = WorkAreaDto.From(workArea);
+
+        dto.Id.Should().Be(workAreaId);
+        dto.SeasonId.Should().Be(SeasonNorth);
+        dto.Name.Should().Be("Main Grotto");
+        dto.Description.Should().Be("Build the central grotto area");
+        dto.CommunityId.Should().Be(communityId);
+        dto.CategoryId.Should().Be(categoryId);
+        dto.LeaderId.Should().Be(leaderId);
+        dto.MaterialOfficerId.Should().Be(materialOfficerId);
+        dto.StartDate.Should().Be(startDate);
+        dto.Deadline.Should().Be(deadline);
+        dto.Status.Should().Be(WorkAreaStatus.InProgress);
+        dto.Version.Should().Be(1);
     }
 
     [Fact]

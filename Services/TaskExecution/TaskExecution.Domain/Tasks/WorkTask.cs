@@ -27,7 +27,7 @@ public sealed class WorkTask
     public DateTimeOffset? UpdatedAt { get; private set; }
     public IReadOnlyCollection<TaskSkill> Skills => _skills;
 
-    public static WorkTask CreateDraft(
+    public static WorkTask CreateOpen(
         Guid id,
         Guid workAreaId,
         Guid createdByUserId,
@@ -81,7 +81,7 @@ public sealed class WorkTask
             RequiredVolunteerCount = requiredVolunteerCount,
             StartAt = startAt?.ToUniversalTime(),
             Deadline = deadline?.ToUniversalTime(),
-            Status = TaskStatus.Draft,
+            Status = TaskStatus.Open,
             Version = 1,
             CreatedAt = createdAt.ToUniversalTime()
         };
@@ -143,9 +143,9 @@ public sealed class WorkTask
 
     public void EnsurePlanningCanBeUpdated(int? expectedVersion)
     {
-        if (Status is not (TaskStatus.Draft or TaskStatus.Open))
+        if (Status is not TaskStatus.Open)
         {
-            throw new DomainRuleException("TASK_INVALID_STATE", "Only DRAFT or OPEN tasks can be edited.");
+            throw new DomainRuleException("TASK_INVALID_STATE", "Only OPEN tasks can be edited.");
         }
 
         if (expectedVersion.HasValue && expectedVersion.Value != Version)

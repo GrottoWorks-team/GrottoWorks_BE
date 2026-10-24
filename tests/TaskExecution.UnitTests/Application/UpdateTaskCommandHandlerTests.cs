@@ -121,7 +121,7 @@ public sealed class UpdateTaskCommandHandlerTests
             Guid.NewGuid(), season.SeasonId, parishId, "Area", null, assignedLeaderId ?? userId, null,
             new DateOnly(2026, 11, 1), new DateOnly(2026, 12, 20),
             WorkAreaScopeStatus.InProgress, 1, DateTimeOffset.UtcNow);
-        var task = WorkTask.CreateDraft(
+        var task = WorkTask.CreateOpen(
             Guid.NewGuid(), workArea.WorkAreaId, userId, "Original", "Description", "Criteria",
             TaskPriority.Medium, 120, 2,
             new DateTimeOffset(2026, 12, 10, 8, 0, 0, TimeSpan.Zero),

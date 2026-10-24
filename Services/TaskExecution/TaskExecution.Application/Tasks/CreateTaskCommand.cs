@@ -32,7 +32,7 @@ public sealed class CreateTaskCommandHandler(
 
         TaskScheduleRules.EnsureFitsScope(command.StartAt, command.Deadline, workArea, season);
 
-        var task = WorkTask.CreateDraft(
+        var task = WorkTask.CreateOpen(
             Guid.NewGuid(),
             command.WorkAreaId,
             currentUser.UserId,

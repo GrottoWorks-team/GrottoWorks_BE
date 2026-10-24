@@ -23,11 +23,11 @@ public sealed class TaskQueryHandlerTests
             CreateAccess(workArea, GrottoWorksRoles.Volunteer, parishId));
 
         var result = await handler.HandleAsync(new GetTasksQuery(
-            workArea.WorkAreaId, TaskState.Draft, TaskType.Work, 1, 20, "name,asc"));
+            workArea.WorkAreaId, TaskState.Open, TaskType.Work, 1, 20, "name,asc"));
 
         result.Items.Should().ContainSingle().Which.Name.Should().Be("Lighting");
         result.Page.TotalItems.Should().Be(1);
-        repository.LastStatus.Should().Be(TaskState.Draft);
+        repository.LastStatus.Should().Be(TaskState.Open);
         repository.LastType.Should().Be(TaskType.Work);
     }
 
@@ -90,7 +90,7 @@ public sealed class TaskQueryHandlerTests
             null, null, WorkAreaScopeStatus.Planned, 1, DateTimeOffset.UtcNow);
 
     private static WorkTask CreateTask(Guid workAreaId, string name) =>
-        WorkTask.CreateDraft(
+        WorkTask.CreateOpen(
             Guid.NewGuid(), workAreaId, Guid.NewGuid(), name, "Description", "Done safely",
             TaskPriority.High, 120, 2, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(1),
             DateTimeOffset.UtcNow);

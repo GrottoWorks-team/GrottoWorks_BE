@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using TaskExecution.Domain.Tasks;
 using TaskExecution.Infrastructure.Data;
 
@@ -16,11 +17,23 @@ public sealed class TaskModelTests
         using var dbContext = new TaskExecutionDbContext(options);
 
         var entity = dbContext.Model.FindEntityType(typeof(WorkTask))!;
+        var table = StoreObjectIdentifier.Table("task", null);
 
         entity.GetTableName().Should().Be("task");
-        entity.FindProperty(nameof(WorkTask.Name))!.GetMaxLength().Should().Be(200);
-        entity.FindProperty(nameof(WorkTask.EstimatedHours))!.GetPrecision().Should().Be(6);
+        entity.FindProperty(nameof(WorkTask.Name))!.GetMaxLength().Should().Be(160);
+        entity.FindProperty(nameof(WorkTask.Description))!.GetMaxLength().Should().Be(2000);
+        entity.FindProperty(nameof(WorkTask.CompletionCriteria))!.GetMaxLength().Should().Be(4000);
+        entity.FindProperty(nameof(WorkTask.EstimatedMinutes))!.GetColumnName(table)
+            .Should().Be("estimated_minutes");
+        entity.FindProperty(nameof(WorkTask.EstimatedMinutes))!.IsNullable.Should().BeFalse();
+        entity.FindProperty(nameof(WorkTask.RequiredVolunteerCount))!.GetColumnName(table)
+            .Should().Be("required_volunteers");
+        entity.FindProperty(nameof(WorkTask.StartAt))!.GetColumnName(table).Should().Be("start_at");
+        entity.FindProperty(nameof(WorkTask.Deadline))!.IsNullable.Should().BeFalse();
         entity.FindProperty(nameof(WorkTask.Version))!.IsConcurrencyToken.Should().BeTrue();
+        entity.GetCheckConstraints().Select(constraint => constraint.Name).Should().Contain(
+            "ck_task_positive_estimate",
+            "ck_task_positive_volunteer_count");
         entity.GetForeignKeys().Should().BeEmpty("TaskExecution stores external ownership as IDs only");
     }
 

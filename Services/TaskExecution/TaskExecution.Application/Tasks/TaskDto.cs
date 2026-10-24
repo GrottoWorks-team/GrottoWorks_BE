@@ -12,10 +12,10 @@ public sealed record TaskDto(
     TaskType TaskType,
     Guid? PurchaseRequestId,
     TaskPriority Priority,
-    int? EstimatedMinutes,
+    int EstimatedMinutes,
     int RequiredVolunteers,
     DateTimeOffset? StartAt,
-    DateTimeOffset? Deadline,
+    DateTimeOffset Deadline,
     TaskState Status,
     int Version,
     DateTimeOffset CreatedAt,
@@ -31,9 +31,7 @@ public sealed record TaskDto(
             task.Type,
             task.PurchaseRequestId,
             task.Priority,
-            task.EstimatedHours.HasValue
-                ? (int)Math.Round(task.EstimatedHours.Value * 60m, MidpointRounding.AwayFromZero)
-                : null,
+            task.EstimatedMinutes,
             task.RequiredVolunteerCount,
             task.StartAt,
             task.Deadline,

@@ -12,10 +12,10 @@ public sealed record CreateTaskCommand(
     string? Description,
     string? CompletionCriteria,
     TaskPriority Priority,
-    int? EstimatedMinutes,
+    int EstimatedMinutes,
     int RequiredVolunteers,
     DateTimeOffset? StartAt,
-    DateTimeOffset? Deadline);
+    DateTimeOffset Deadline);
 
 public sealed class CreateTaskCommandHandler(
     ITaskRepository tasks,

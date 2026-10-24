@@ -7,7 +7,7 @@ namespace TaskExecution.UnitTests.Domain;
 public sealed class WorkTaskTests
 {
     [Fact]
-    public void Create_open_normalizes_fields_and_converts_minutes()
+    public void Create_open_normalizes_fields_and_stores_minutes()
     {
         var task = WorkTask.CreateOpen(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "  Install lights  ", "  Safe circuit  ",
@@ -18,7 +18,7 @@ public sealed class WorkTaskTests
 
         task.Name.Should().Be("Install lights");
         task.Description.Should().Be("Safe circuit");
-        task.EstimatedHours.Should().Be(1.5m);
+        task.EstimatedMinutes.Should().Be(90);
         task.Status.Should().Be(TaskExecution.Domain.Tasks.TaskStatus.Open);
         task.Type.Should().Be(TaskType.Work);
         task.Version.Should().Be(1);
@@ -33,7 +33,7 @@ public sealed class WorkTaskTests
     {
         var act = () => WorkTask.CreateOpen(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), name, null, null,
-            TaskPriority.Medium, minutes, volunteers, null, null, DateTimeOffset.UtcNow);
+            TaskPriority.Medium, minutes, volunteers, null, ValidDeadline(), DateTimeOffset.UtcNow);
 
         act.Should().Throw<DomainRuleException>();
     }
@@ -43,7 +43,7 @@ public sealed class WorkTaskTests
     {
         var task = WorkTask.CreateOpen(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, null,
-            TaskPriority.Medium, 60, 1, null, null, DateTimeOffset.UtcNow);
+            TaskPriority.Medium, 60, 1, null, ValidDeadline(), DateTimeOffset.UtcNow);
         typeof(WorkTask).GetProperty(nameof(WorkTask.Status))!
             .SetValue(task, TaskExecution.Domain.Tasks.TaskStatus.InProgress);
 
@@ -59,7 +59,7 @@ public sealed class WorkTaskTests
     {
         var task = WorkTask.CreateOpen(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, "Old",
-            TaskPriority.Medium, 60, 1, null, null, DateTimeOffset.UtcNow);
+            TaskPriority.Medium, 60, 1, null, ValidDeadline(), DateTimeOffset.UtcNow);
         var updatedAt = DateTimeOffset.UtcNow.AddMinutes(1);
 
         var changed = task.ReplaceCompletionCriteria("  New criteria  ", 1, updatedAt);
@@ -75,7 +75,7 @@ public sealed class WorkTaskTests
     {
         var task = WorkTask.CreateOpen(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, null,
-            TaskPriority.Medium, 60, 1, null, null, DateTimeOffset.UtcNow);
+            TaskPriority.Medium, 60, 1, null, ValidDeadline(), DateTimeOffset.UtcNow);
 
         var act = () => task.ReplaceCompletionCriteria(
             new string('a', 4001), null, DateTimeOffset.UtcNow);
@@ -89,7 +89,7 @@ public sealed class WorkTaskTests
     {
         var task = WorkTask.CreateOpen(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, null,
-            TaskPriority.Medium, 60, 1, null, null, DateTimeOffset.UtcNow);
+            TaskPriority.Medium, 60, 1, null, ValidDeadline(), DateTimeOffset.UtcNow);
         var firstSkill = Guid.NewGuid();
         task.ReplaceSkills(
             [new TaskSkillRequirement(firstSkill, null, null)],
@@ -114,7 +114,7 @@ public sealed class WorkTaskTests
     {
         var task = WorkTask.CreateOpen(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, null,
-            TaskPriority.Medium, 60, 1, null, null, DateTimeOffset.UtcNow);
+            TaskPriority.Medium, 60, 1, null, ValidDeadline(), DateTimeOffset.UtcNow);
         var skillId = Guid.NewGuid();
 
         var act = () => task.ReplaceSkills(
@@ -128,4 +128,5 @@ public sealed class WorkTaskTests
         act.Should().Throw<DomainRuleException>()
             .Which.Code.Should().Be("TASK_SKILL_DUPLICATE");
     }
+    private static DateTimeOffset ValidDeadline() => DateTimeOffset.UtcNow.AddDays(1);
 }

@@ -136,7 +136,7 @@ public sealed class ReplaceCompletionCriteriaCommandHandlerTests
             WorkAreaScopeStatus.InProgress, 1, DateTimeOffset.UtcNow);
         var task = WorkTask.CreateOpen(
             Guid.NewGuid(), workArea.WorkAreaId, userId, "Task", null, "Original criteria",
-            TaskPriority.Medium, 60, 1, null, null, DateTimeOffset.UtcNow);
+            TaskPriority.Medium, 60, 1, null, DateTimeOffset.UtcNow.AddDays(1), DateTimeOffset.UtcNow);
         var repository = new FakeTaskRepository(task);
         var access = new TaskScopeAccess(
             new FakeScopeStore(season, workArea),

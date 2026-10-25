@@ -128,5 +128,54 @@ public sealed class WorkTaskTests
         act.Should().Throw<DomainRuleException>()
             .Which.Code.Should().Be("TASK_SKILL_DUPLICATE");
     }
+
+    [Fact]
+    public void Mark_ready_transitions_open_task_and_preserves_planning_data()
+    {
+        var task = WorkTask.CreateOpen(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", "Description", "Criteria",
+            TaskPriority.High, 90, 3, DateTimeOffset.UtcNow.AddHours(1),
+            ValidDeadline(), DateTimeOffset.UtcNow);
+        var originalName = task.Name;
+        var originalDeadline = task.Deadline;
+        var updatedAt = DateTimeOffset.UtcNow.AddMinutes(1);
+
+        task.MarkReady(1, updatedAt);
+
+        task.Status.Should().Be(TaskExecution.Domain.Tasks.TaskStatus.NotStarted);
+        task.Version.Should().Be(2);
+        task.UpdatedAt.Should().Be(updatedAt);
+        task.Name.Should().Be(originalName);
+        task.Deadline.Should().Be(originalDeadline);
+    }
+
+    [Fact]
+    public void Mark_ready_rejects_task_that_is_not_open()
+    {
+        var task = WorkTask.CreateOpen(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, null,
+            TaskPriority.Medium, 60, 1, null, ValidDeadline(), DateTimeOffset.UtcNow);
+        task.MarkReady(1, DateTimeOffset.UtcNow);
+
+        var act = () => task.MarkReady(2, DateTimeOffset.UtcNow);
+
+        act.Should().Throw<DomainRuleException>()
+            .Which.Code.Should().Be("TASK_INVALID_STATE");
+    }
+
+    [Fact]
+    public void Mark_ready_rejects_stale_version()
+    {
+        var task = WorkTask.CreateOpen(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, null,
+            TaskPriority.Medium, 60, 1, null, ValidDeadline(), DateTimeOffset.UtcNow);
+
+        var act = () => task.MarkReady(9, DateTimeOffset.UtcNow);
+
+        var error = act.Should().Throw<DomainRuleException>().Which;
+        error.Code.Should().Be("TASK_VERSION_MISMATCH");
+        error.Kind.Should().Be(DomainErrorKind.PreconditionFailed);
+    }
+
     private static DateTimeOffset ValidDeadline() => DateTimeOffset.UtcNow.AddDays(1);
 }

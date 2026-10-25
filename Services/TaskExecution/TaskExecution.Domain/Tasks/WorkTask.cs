@@ -217,6 +217,28 @@ public sealed class WorkTask
         return true;
     }
 
+    public void MarkReady(int? expectedVersion, DateTimeOffset updatedAt)
+    {
+        if (expectedVersion.HasValue && expectedVersion.Value != Version)
+        {
+            throw new DomainRuleException(
+                "TASK_VERSION_MISMATCH",
+                "The task version does not match the current version.",
+                DomainErrorKind.PreconditionFailed);
+        }
+
+        if (Status is not TaskStatus.Open)
+        {
+            throw new DomainRuleException(
+                "TASK_INVALID_STATE",
+                "Only an OPEN task can be marked ready.");
+        }
+
+        Status = TaskStatus.NotStarted;
+        UpdatedAt = updatedAt.ToUniversalTime();
+        Version++;
+    }
+
     private static IReadOnlyList<TaskSkillRequirement> NormalizeSkillRequirements(
         IReadOnlyCollection<TaskSkillRequirement> requirements)
     {

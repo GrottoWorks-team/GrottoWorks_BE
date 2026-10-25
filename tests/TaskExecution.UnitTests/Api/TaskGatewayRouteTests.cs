@@ -35,6 +35,21 @@ public sealed class TaskGatewayRouteTests
             .Should().Be("/api/v1/tasks/{taskId}/skills");
     }
 
+    [Fact]
+    public void Ready_task_route_targets_task_cluster_with_high_priority()
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(GetGatewaySettingsPath()));
+        var route = document.RootElement
+            .GetProperty("ReverseProxy")
+            .GetProperty("Routes")
+            .GetProperty("task-ready-route");
+
+        route.GetProperty("ClusterId").GetString().Should().Be("task");
+        route.GetProperty("Order").GetInt32().Should().Be(-1);
+        route.GetProperty("Match").GetProperty("Path").GetString()
+            .Should().Be("/api/v1/tasks/{taskId}/ready");
+    }
+
     private static string GetGatewaySettingsPath()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

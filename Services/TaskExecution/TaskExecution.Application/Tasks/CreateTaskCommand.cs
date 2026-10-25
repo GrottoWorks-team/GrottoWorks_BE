@@ -12,10 +12,10 @@ public sealed record CreateTaskCommand(
     string? Description,
     string? CompletionCriteria,
     TaskPriority Priority,
-    int? EstimatedMinutes,
+    int EstimatedMinutes,
     int RequiredVolunteers,
     DateTimeOffset? StartAt,
-    DateTimeOffset? Deadline);
+    DateTimeOffset Deadline);
 
 public sealed class CreateTaskCommandHandler(
     ITaskRepository tasks,
@@ -32,7 +32,7 @@ public sealed class CreateTaskCommandHandler(
 
         TaskScheduleRules.EnsureFitsScope(command.StartAt, command.Deadline, workArea, season);
 
-        var task = WorkTask.CreateDraft(
+        var task = WorkTask.CreateOpen(
             Guid.NewGuid(),
             command.WorkAreaId,
             currentUser.UserId,

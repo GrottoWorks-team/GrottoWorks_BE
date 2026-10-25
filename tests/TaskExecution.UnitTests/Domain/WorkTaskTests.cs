@@ -7,9 +7,9 @@ namespace TaskExecution.UnitTests.Domain;
 public sealed class WorkTaskTests
 {
     [Fact]
-    public void Create_draft_normalizes_fields_and_converts_minutes()
+    public void Create_open_normalizes_fields_and_stores_minutes()
     {
-        var task = WorkTask.CreateDraft(
+        var task = WorkTask.CreateOpen(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "  Install lights  ", "  Safe circuit  ",
             "  All lights work  ", TaskPriority.High, 90, 2,
             new DateTimeOffset(2026, 12, 1, 8, 0, 0, TimeSpan.FromHours(7)),
@@ -18,8 +18,8 @@ public sealed class WorkTaskTests
 
         task.Name.Should().Be("Install lights");
         task.Description.Should().Be("Safe circuit");
-        task.EstimatedHours.Should().Be(1.5m);
-        task.Status.Should().Be(TaskExecution.Domain.Tasks.TaskStatus.Draft);
+        task.EstimatedMinutes.Should().Be(90);
+        task.Status.Should().Be(TaskExecution.Domain.Tasks.TaskStatus.Open);
         task.Type.Should().Be(TaskType.Work);
         task.Version.Should().Be(1);
         task.StartAt!.Value.Offset.Should().Be(TimeSpan.Zero);
@@ -29,11 +29,11 @@ public sealed class WorkTaskTests
     [InlineData("", 1, 60)]
     [InlineData("Valid", 0, 60)]
     [InlineData("Valid", 1, 0)]
-    public void Create_draft_rejects_invalid_planning_values(string name, int volunteers, int minutes)
+    public void Create_open_rejects_invalid_planning_values(string name, int volunteers, int minutes)
     {
-        var act = () => WorkTask.CreateDraft(
+        var act = () => WorkTask.CreateOpen(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), name, null, null,
-            TaskPriority.Medium, minutes, volunteers, null, null, DateTimeOffset.UtcNow);
+            TaskPriority.Medium, minutes, volunteers, null, ValidDeadline(), DateTimeOffset.UtcNow);
 
         act.Should().Throw<DomainRuleException>();
     }
@@ -41,9 +41,9 @@ public sealed class WorkTaskTests
     [Fact]
     public void Planning_update_rejects_non_editable_status()
     {
-        var task = WorkTask.CreateDraft(
+        var task = WorkTask.CreateOpen(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, null,
-            TaskPriority.Medium, 60, 1, null, null, DateTimeOffset.UtcNow);
+            TaskPriority.Medium, 60, 1, null, ValidDeadline(), DateTimeOffset.UtcNow);
         typeof(WorkTask).GetProperty(nameof(WorkTask.Status))!
             .SetValue(task, TaskExecution.Domain.Tasks.TaskStatus.InProgress);
 
@@ -57,9 +57,9 @@ public sealed class WorkTaskTests
     [Fact]
     public void Replace_completion_criteria_normalizes_and_updates_audit_fields()
     {
-        var task = WorkTask.CreateDraft(
+        var task = WorkTask.CreateOpen(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, "Old",
-            TaskPriority.Medium, 60, 1, null, null, DateTimeOffset.UtcNow);
+            TaskPriority.Medium, 60, 1, null, ValidDeadline(), DateTimeOffset.UtcNow);
         var updatedAt = DateTimeOffset.UtcNow.AddMinutes(1);
 
         var changed = task.ReplaceCompletionCriteria("  New criteria  ", 1, updatedAt);
@@ -73,9 +73,9 @@ public sealed class WorkTaskTests
     [Fact]
     public void Replace_completion_criteria_rejects_text_over_limit()
     {
-        var task = WorkTask.CreateDraft(
+        var task = WorkTask.CreateOpen(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, null,
-            TaskPriority.Medium, 60, 1, null, null, DateTimeOffset.UtcNow);
+            TaskPriority.Medium, 60, 1, null, ValidDeadline(), DateTimeOffset.UtcNow);
 
         var act = () => task.ReplaceCompletionCriteria(
             new string('a', 4001), null, DateTimeOffset.UtcNow);
@@ -87,9 +87,9 @@ public sealed class WorkTaskTests
     [Fact]
     public void Replace_skills_normalizes_values_and_replaces_existing_set()
     {
-        var task = WorkTask.CreateDraft(
+        var task = WorkTask.CreateOpen(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, null,
-            TaskPriority.Medium, 60, 1, null, null, DateTimeOffset.UtcNow);
+            TaskPriority.Medium, 60, 1, null, ValidDeadline(), DateTimeOffset.UtcNow);
         var firstSkill = Guid.NewGuid();
         task.ReplaceSkills(
             [new TaskSkillRequirement(firstSkill, null, null)],
@@ -112,9 +112,9 @@ public sealed class WorkTaskTests
     [Fact]
     public void Replace_skills_rejects_duplicate_skill_ids()
     {
-        var task = WorkTask.CreateDraft(
+        var task = WorkTask.CreateOpen(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, null,
-            TaskPriority.Medium, 60, 1, null, null, DateTimeOffset.UtcNow);
+            TaskPriority.Medium, 60, 1, null, ValidDeadline(), DateTimeOffset.UtcNow);
         var skillId = Guid.NewGuid();
 
         var act = () => task.ReplaceSkills(
@@ -128,4 +128,54 @@ public sealed class WorkTaskTests
         act.Should().Throw<DomainRuleException>()
             .Which.Code.Should().Be("TASK_SKILL_DUPLICATE");
     }
+
+    [Fact]
+    public void Mark_ready_transitions_open_task_and_preserves_planning_data()
+    {
+        var task = WorkTask.CreateOpen(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", "Description", "Criteria",
+            TaskPriority.High, 90, 3, DateTimeOffset.UtcNow.AddHours(1),
+            ValidDeadline(), DateTimeOffset.UtcNow);
+        var originalName = task.Name;
+        var originalDeadline = task.Deadline;
+        var updatedAt = DateTimeOffset.UtcNow.AddMinutes(1);
+
+        task.MarkReady(1, updatedAt);
+
+        task.Status.Should().Be(TaskExecution.Domain.Tasks.TaskStatus.NotStarted);
+        task.Version.Should().Be(2);
+        task.UpdatedAt.Should().Be(updatedAt);
+        task.Name.Should().Be(originalName);
+        task.Deadline.Should().Be(originalDeadline);
+    }
+
+    [Fact]
+    public void Mark_ready_rejects_task_that_is_not_open()
+    {
+        var task = WorkTask.CreateOpen(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, null,
+            TaskPriority.Medium, 60, 1, null, ValidDeadline(), DateTimeOffset.UtcNow);
+        task.MarkReady(1, DateTimeOffset.UtcNow);
+
+        var act = () => task.MarkReady(2, DateTimeOffset.UtcNow);
+
+        act.Should().Throw<DomainRuleException>()
+            .Which.Code.Should().Be("TASK_INVALID_STATE");
+    }
+
+    [Fact]
+    public void Mark_ready_rejects_stale_version()
+    {
+        var task = WorkTask.CreateOpen(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Task", null, null,
+            TaskPriority.Medium, 60, 1, null, ValidDeadline(), DateTimeOffset.UtcNow);
+
+        var act = () => task.MarkReady(9, DateTimeOffset.UtcNow);
+
+        var error = act.Should().Throw<DomainRuleException>().Which;
+        error.Code.Should().Be("TASK_VERSION_MISMATCH");
+        error.Kind.Should().Be(DomainErrorKind.PreconditionFailed);
+    }
+
+    private static DateTimeOffset ValidDeadline() => DateTimeOffset.UtcNow.AddDays(1);
 }

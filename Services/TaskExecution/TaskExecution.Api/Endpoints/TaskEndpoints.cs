@@ -81,6 +81,17 @@ public static class TaskEndpoints
             .Produces<ProblemDetails>(StatusCodes.Status409Conflict)
             .Produces<ProblemDetails>(StatusCodes.Status412PreconditionFailed)
             .Produces<ProblemDetails>(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapPost("/tasks/{taskId:guid}/ready", ReadyTaskAsync)
+            .WithName("readyTask")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
+            .Produces<ApiResponse<TaskDto>>()
+            .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
+            .Produces<ProblemDetails>(StatusCodes.Status401Unauthorized)
+            .Produces<ProblemDetails>(StatusCodes.Status403Forbidden)
+            .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
+            .Produces<ProblemDetails>(StatusCodes.Status409Conflict)
+            .Produces<ProblemDetails>(StatusCodes.Status412PreconditionFailed);
     }
 
     private static async Task<IResult> ListTasksAsync(
@@ -129,10 +140,10 @@ public static class TaskEndpoints
                 request.Description,
                 request.CompletionCriteria,
                 request.Priority!.Value,
-                request.EstimatedMinutes,
+                request.EstimatedMinutes!.Value,
                 request.RequiredVolunteers,
                 request.StartAt,
-                request.Deadline),
+                request.Deadline!.Value),
             cancellationToken);
 
         httpContext.Response.Headers.ETag = $"\"{task.Version}\"";
@@ -225,6 +236,26 @@ public static class TaskEndpoints
 
         var task = await handler.HandleAsync(
             new ReplaceTaskSkillsCommand(taskId, requirements, expectedVersion),
+            cancellationToken);
+
+        httpContext.Response.Headers.ETag = $"\"{task.Version}\"";
+        return Results.Ok(ApiResults.Ok(task, httpContext));
+    }
+
+    private static async Task<IResult> ReadyTaskAsync(
+        Guid taskId,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
+        HttpContext httpContext,
+        ReadyTaskCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (!TaskVersionPrecondition.TryParse(ifMatch, out var expectedVersion))
+        {
+            return InvalidIfMatch(httpContext);
+        }
+
+        var task = await handler.HandleAsync(
+            new ReadyTaskCommand(taskId, expectedVersion),
             cancellationToken);
 
         httpContext.Response.Headers.ETag = $"\"{task.Version}\"";

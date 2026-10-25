@@ -73,17 +73,17 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
         modelBuilder.Entity("TaskExecution.Domain.Tasks.WorkTask", builder =>
         {
             builder.Property<Guid>("Id").HasColumnType("uuid").HasColumnName("task_id");
-            builder.Property<string>("CompletionCriteria").HasColumnType("text").HasColumnName("completion_criteria");
+            builder.Property<string>("CompletionCriteria").HasMaxLength(4000).HasColumnType("character varying(4000)").HasColumnName("completion_criteria");
             builder.Property<DateTimeOffset>("CreatedAt").HasColumnType("timestamp with time zone").HasColumnName("created_at");
             builder.Property<Guid>("CreatedByUserId").HasColumnType("uuid").HasColumnName("created_by_user_id");
-            builder.Property<DateTimeOffset?>("Deadline").HasColumnType("timestamp with time zone").HasColumnName("deadline");
-            builder.Property<string>("Description").HasColumnType("text").HasColumnName("task_description");
-            builder.Property<decimal?>("EstimatedHours").HasPrecision(6, 2).HasColumnType("numeric(6,2)").HasColumnName("estimated_hours");
-            builder.Property<string>("Name").IsRequired().HasMaxLength(200).HasColumnType("character varying(200)").HasColumnName("task_name");
+            builder.Property<DateTimeOffset>("Deadline").HasColumnType("timestamp with time zone").HasColumnName("deadline");
+            builder.Property<string>("Description").HasMaxLength(2000).HasColumnType("character varying(2000)").HasColumnName("task_description");
+            builder.Property<int>("EstimatedMinutes").HasColumnType("integer").HasColumnName("estimated_minutes");
+            builder.Property<string>("Name").IsRequired().HasMaxLength(160).HasColumnType("character varying(160)").HasColumnName("task_name");
             builder.Property<string>("Priority").IsRequired().HasMaxLength(30).HasColumnType("character varying(30)").HasColumnName("task_priority");
             builder.Property<Guid?>("PurchaseRequestId").HasColumnType("uuid").HasColumnName("purchase_request_id");
-            builder.Property<int>("RequiredVolunteerCount").HasColumnType("integer").HasColumnName("required_volunteer_count");
-            builder.Property<DateTimeOffset?>("StartAt").HasColumnType("timestamp with time zone").HasColumnName("start_date");
+            builder.Property<int>("RequiredVolunteerCount").HasColumnType("integer").HasColumnName("required_volunteers");
+            builder.Property<DateTimeOffset?>("StartAt").HasColumnType("timestamp with time zone").HasColumnName("start_at");
             builder.Property<string>("Status").IsRequired().HasMaxLength(30).HasColumnType("character varying(30)").HasColumnName("task_status");
             builder.Property<string>("Type").IsRequired().HasMaxLength(30).HasColumnType("character varying(30)").HasColumnName("task_type");
             builder.Property<DateTimeOffset?>("UpdatedAt").HasColumnType("timestamp with time zone").HasColumnName("updated_at");
@@ -93,9 +93,14 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
             builder.HasIndex("PurchaseRequestId").HasDatabaseName("ix_task_purchase_request_id");
             builder.HasIndex("WorkAreaId").HasDatabaseName("ix_task_work_area_id");
             builder.HasIndex("WorkAreaId", "Status").HasDatabaseName("ix_task_work_area_status");
-            builder.ToTable("task", null, table => table.HasCheckConstraint(
-                "ck_task_purchase_link",
-                "(task_type = 'PURCHASE' AND purchase_request_id IS NOT NULL) OR (task_type <> 'PURCHASE' AND purchase_request_id IS NULL)"));
+            builder.ToTable("task", null, table =>
+            {
+                table.HasCheckConstraint("ck_task_positive_estimate", "estimated_minutes > 0");
+                table.HasCheckConstraint("ck_task_positive_volunteer_count", "required_volunteers > 0");
+                table.HasCheckConstraint(
+                    "ck_task_purchase_link",
+                    "(task_type = 'PURCHASE' AND purchase_request_id IS NOT NULL) OR (task_type <> 'PURCHASE' AND purchase_request_id IS NULL)");
+            });
         });
 
         modelBuilder.Entity("TaskExecution.Domain.Tasks.TaskSkill", builder =>

@@ -17,7 +17,6 @@ public enum TaskPriority
 
 public enum TaskStatus
 {
-    Draft,
     Open,
     NotStarted,
     InProgress,

@@ -18,7 +18,7 @@ public sealed class CreateTaskCommandHandlerTests
 
         var result = await fixture.Handler.HandleAsync(ValidCommand(fixture.WorkArea.WorkAreaId));
 
-        result.Status.Should().Be(TaskState.Draft);
+        result.Status.Should().Be(TaskState.Open);
         result.TaskType.Should().Be(TaskType.Work);
         result.RequiredVolunteers.Should().Be(2);
         fixture.Tasks.Items.Should().ContainSingle();

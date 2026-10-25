@@ -17,17 +17,17 @@ public sealed class WorkTask
     public string? Description { get; private set; }
     public string? CompletionCriteria { get; private set; }
     public TaskPriority Priority { get; private set; }
-    public decimal? EstimatedHours { get; private set; }
+    public int EstimatedMinutes { get; private set; }
     public int RequiredVolunteerCount { get; private set; }
     public DateTimeOffset? StartAt { get; private set; }
-    public DateTimeOffset? Deadline { get; private set; }
+    public DateTimeOffset Deadline { get; private set; }
     public TaskStatus Status { get; private set; }
     public int Version { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
     public IReadOnlyCollection<TaskSkill> Skills => _skills;
 
-    public static WorkTask CreateDraft(
+    public static WorkTask CreateOpen(
         Guid id,
         Guid workAreaId,
         Guid createdByUserId,
@@ -35,10 +35,10 @@ public sealed class WorkTask
         string? description,
         string? completionCriteria,
         TaskPriority priority,
-        int? estimatedMinutes,
+        int estimatedMinutes,
         int requiredVolunteerCount,
         DateTimeOffset? startAt,
-        DateTimeOffset? deadline,
+        DateTimeOffset deadline,
         DateTimeOffset createdAt)
     {
         if (id == Guid.Empty || workAreaId == Guid.Empty || createdByUserId == Guid.Empty)
@@ -62,7 +62,12 @@ public sealed class WorkTask
             throw DomainRuleException.Validation("TASK_ESTIMATE_INVALID", "Estimated minutes must be between 1 and 599999.");
         }
 
-        if (startAt.HasValue && deadline.HasValue && deadline.Value <= startAt.Value)
+        var normalizedDescription = NormalizeOptional(description);
+        var normalizedCriteria = NormalizeOptional(completionCriteria);
+        ValidateOptionalText(normalizedDescription, 2000, "TASK_DESCRIPTION_INVALID", "Task description");
+        ValidateOptionalText(normalizedCriteria, 4000, "TASK_COMPLETION_CRITERIA_INVALID", "Completion criteria");
+
+        if (startAt.HasValue && deadline <= startAt.Value)
         {
             throw DomainRuleException.Validation("TASK_DATE_RANGE_INVALID", "Task deadline must be after its start time.");
         }
@@ -74,14 +79,14 @@ public sealed class WorkTask
             CreatedByUserId = createdByUserId,
             Type = TaskType.Work,
             Name = normalizedName,
-            Description = NormalizeOptional(description),
-            CompletionCriteria = NormalizeOptional(completionCriteria),
+            Description = normalizedDescription,
+            CompletionCriteria = normalizedCriteria,
             Priority = priority,
-            EstimatedHours = estimatedMinutes.HasValue ? estimatedMinutes.Value / 60m : null,
+            EstimatedMinutes = estimatedMinutes,
             RequiredVolunteerCount = requiredVolunteerCount,
             StartAt = startAt?.ToUniversalTime(),
-            Deadline = deadline?.ToUniversalTime(),
-            Status = TaskStatus.Draft,
+            Deadline = deadline.ToUniversalTime(),
+            Status = TaskStatus.Open,
             Version = 1,
             CreatedAt = createdAt.ToUniversalTime()
         };
@@ -103,7 +108,11 @@ public sealed class WorkTask
 
         var nextName = name is null ? Name : name.Trim();
         var nextVolunteers = requiredVolunteerCount ?? RequiredVolunteerCount;
-        var nextEstimate = estimatedMinutes.HasValue ? estimatedMinutes.Value / 60m : EstimatedHours;
+        var nextDescription = description is null ? Description : NormalizeOptional(description);
+        var nextCriteria = completionCriteria is null
+            ? CompletionCriteria
+            : NormalizeOptional(completionCriteria);
+        var nextEstimate = estimatedMinutes ?? EstimatedMinutes;
         var nextStart = startAt?.ToUniversalTime() ?? StartAt;
         var nextDeadline = deadline?.ToUniversalTime() ?? Deadline;
 
@@ -122,18 +131,19 @@ public sealed class WorkTask
             throw DomainRuleException.Validation("TASK_ESTIMATE_INVALID", "Estimated minutes must be between 1 and 599999.");
         }
 
-        if (nextStart.HasValue && nextDeadline.HasValue && nextDeadline.Value <= nextStart.Value)
+        ValidateOptionalText(nextDescription, 2000, "TASK_DESCRIPTION_INVALID", "Task description");
+        ValidateOptionalText(nextCriteria, 4000, "TASK_COMPLETION_CRITERIA_INVALID", "Completion criteria");
+
+        if (nextStart.HasValue && nextDeadline <= nextStart.Value)
         {
             throw DomainRuleException.Validation("TASK_DATE_RANGE_INVALID", "Task deadline must be after its start time.");
         }
 
         Name = nextName;
-        Description = description is null ? Description : NormalizeOptional(description);
-        CompletionCriteria = completionCriteria is null
-            ? CompletionCriteria
-            : NormalizeOptional(completionCriteria);
+        Description = nextDescription;
+        CompletionCriteria = nextCriteria;
         Priority = priority ?? Priority;
-        EstimatedHours = nextEstimate;
+        EstimatedMinutes = nextEstimate;
         RequiredVolunteerCount = nextVolunteers;
         StartAt = nextStart;
         Deadline = nextDeadline;
@@ -143,9 +153,9 @@ public sealed class WorkTask
 
     public void EnsurePlanningCanBeUpdated(int? expectedVersion)
     {
-        if (Status is not (TaskStatus.Draft or TaskStatus.Open))
+        if (Status is not TaskStatus.Open)
         {
-            throw new DomainRuleException("TASK_INVALID_STATE", "Only DRAFT or OPEN tasks can be edited.");
+            throw new DomainRuleException("TASK_INVALID_STATE", "Only OPEN tasks can be edited.");
         }
 
         if (expectedVersion.HasValue && expectedVersion.Value != Version)
@@ -205,6 +215,28 @@ public sealed class WorkTask
         UpdatedAt = updatedAt.ToUniversalTime();
         Version++;
         return true;
+    }
+
+    public void MarkReady(int? expectedVersion, DateTimeOffset updatedAt)
+    {
+        if (expectedVersion.HasValue && expectedVersion.Value != Version)
+        {
+            throw new DomainRuleException(
+                "TASK_VERSION_MISMATCH",
+                "The task version does not match the current version.",
+                DomainErrorKind.PreconditionFailed);
+        }
+
+        if (Status is not TaskStatus.Open)
+        {
+            throw new DomainRuleException(
+                "TASK_INVALID_STATE",
+                "Only an OPEN task can be marked ready.");
+        }
+
+        Status = TaskStatus.NotStarted;
+        UpdatedAt = updatedAt.ToUniversalTime();
+        Version++;
     }
 
     private static IReadOnlyList<TaskSkillRequirement> NormalizeSkillRequirements(
@@ -278,4 +310,18 @@ public sealed class WorkTask
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static void ValidateOptionalText(
+        string? value,
+        int maximumLength,
+        string errorCode,
+        string fieldName)
+    {
+        if (value?.Length > maximumLength)
+        {
+            throw DomainRuleException.Validation(
+                errorCode,
+                $"{fieldName} must not exceed {maximumLength} characters.");
+        }
+    }
 }

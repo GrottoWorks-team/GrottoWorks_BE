@@ -13,7 +13,7 @@ public sealed class TaskProjectionTests
 
     public TaskProjectionTests() => _area = _scopes.Seed(Guid.NewGuid(), Guid.NewGuid());
 
-    private ApplyTaskSnapshotHandler Handler() => new(_tasks, _scopes);
+    private ApplyTaskSnapshotHandler Handler() => new(_tasks, _scopes, new Resource.Application.Purchases.PurchaseBuyerSync(new FakePurchaseRequestStore()));
 
     private TaskSnapshot Snapshot(Guid id, long version, ProjectedTaskStatus status = ProjectedTaskStatus.Open, params Guid[] assignees) =>
         new(id, _area.WorkAreaId, " Treo đèn ", ProjectedTaskType.Work, status, null, assignees, version);

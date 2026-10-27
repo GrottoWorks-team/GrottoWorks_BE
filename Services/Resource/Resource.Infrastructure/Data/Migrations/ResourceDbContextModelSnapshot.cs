@@ -965,6 +965,150 @@ namespace Resource.Infrastructure.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Resource.Domain.Purchases.Purchase", b =>
+                {
+                    b.Property<Guid>("PurchaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_id");
+
+                    b.Property<Guid>("BuyerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("buyer_user_id");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at");
+
+                    b.Property<Guid?>("ConfirmedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("confirmed_by_user_id");
+
+                    b.Property<DateTimeOffset?>("CostOverrunApprovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cost_overrun_approved_at");
+
+                    b.Property<Guid?>("CostOverrunApprovedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cost_overrun_approved_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("InfoRequestReason")
+                        .HasColumnType("text")
+                        .HasColumnName("info_request_reason");
+
+                    b.Property<DateOnly>("PurchaseDate")
+                        .HasColumnType("date")
+                        .HasColumnName("purchase_date");
+
+                    b.Property<Guid>("PurchaseRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_request_id");
+
+                    b.PrimitiveCollection<Guid[]>("ReceiptFileIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("receipt_file_ids");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("purchase_status");
+
+                    b.Property<string>("SupplierName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("supplier_name");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
+                    b.Property<decimal>("TotalCost")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("total_cost");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("PurchaseId");
+
+                    b.HasIndex(new[] { "PurchaseRequestId" }, "ix_purchase_request");
+
+                    b.ToTable("purchase", null, t =>
+                        {
+                            t.HasCheckConstraint("purchase_nonnegative_cost", "\"total_cost\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Resource.Domain.Purchases.PurchaseItem", b =>
+                {
+                    b.Property<Guid>("PurchaseItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_item_id");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_id");
+
+                    b.Property<Guid>("PurchaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_id");
+
+                    b.Property<Guid>("PurchaseRequestItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_request_item_id");
+
+                    b.Property<decimal>("PurchasedQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("purchased_quantity");
+
+                    b.Property<decimal?>("ReceivedUnusableQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("received_unusable_quantity");
+
+                    b.Property<decimal?>("ReceivedUsableQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("received_usable_quantity");
+
+                    b.Property<decimal>("TotalPrice")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("total_price");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("PurchaseItemId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("PurchaseRequestItemId");
+
+                    b.HasIndex("PurchaseId", "PurchaseRequestItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_purchase_item_purchase_request_item");
+
+                    b.ToTable("purchase_item", null, t =>
+                        {
+                            t.HasCheckConstraint("purchase_item_nonnegative_usable", "\"received_usable_quantity\" IS NULL OR \"received_usable_quantity\" >= 0");
+
+                            t.HasCheckConstraint("purchase_item_valid_amounts", "\"purchased_quantity\" > 0 AND \"unit_price\" >= 0 AND \"total_price\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Resource.Domain.Purchases.PurchaseRequest", b =>
                 {
                     b.Property<Guid>("PurchaseRequestId")
@@ -1357,6 +1501,36 @@ namespace Resource.Infrastructure.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Resource.Domain.Purchases.Purchase", b =>
+                {
+                    b.HasOne("Resource.Domain.Purchases.PurchaseRequest", null)
+                        .WithMany()
+                        .HasForeignKey("PurchaseRequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Resource.Domain.Purchases.PurchaseItem", b =>
+                {
+                    b.HasOne("Resource.Domain.Catalog.Material", null)
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Resource.Domain.Purchases.Purchase", null)
+                        .WithMany("Items")
+                        .HasForeignKey("PurchaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Resource.Domain.Purchases.PurchaseRequestItem", null)
+                        .WithMany()
+                        .HasForeignKey("PurchaseRequestItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Resource.Domain.Purchases.PurchaseRequestItem", b =>
                 {
                     b.HasOne("Resource.Domain.Catalog.Material", null)
@@ -1404,6 +1578,11 @@ namespace Resource.Infrastructure.Data.Migrations
                 });
 
             modelBuilder.Entity("Resource.Domain.Inventory.TaskMaterialReport", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Resource.Domain.Purchases.Purchase", b =>
                 {
                     b.Navigation("Items");
                 });

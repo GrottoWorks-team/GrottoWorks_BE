@@ -8,6 +8,9 @@ public interface ITaskProjectionStore
     /// <summary>Tracked.</summary>
     Task<TaskProjection?> GetAsync(Guid taskId, CancellationToken cancellationToken = default);
 
+    /// <summary>PURCHASE tasks of a purchase request.</summary>
+    Task<IReadOnlyList<TaskProjection>> ListByPurchaseRequestAsync(Guid purchaseRequestId, CancellationToken cancellationToken = default);
+
     void Add(TaskProjection task);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
@@ -28,7 +31,7 @@ public sealed record TaskProjectionDto(
 }
 
 /// <summary>F-RES-01: applies a task snapshot (internal feed today, <c>task.*</c> consumers later) — idempotent by version.</summary>
-public sealed class ApplyTaskSnapshotHandler(ITaskProjectionStore store, IWorkAreaScopeStore scopes)
+public sealed class ApplyTaskSnapshotHandler(ITaskProjectionStore store, IWorkAreaScopeStore scopes, Purchases.PurchaseBuyerSync buyers)
 {
     public async Task<(TaskProjectionDto Task, bool Applied)> HandleAsync(TaskSnapshot snapshot, CancellationToken cancellationToken = default)
     {
@@ -43,6 +46,7 @@ public sealed class ApplyTaskSnapshotHandler(ITaskProjectionStore store, IWorkAr
         {
             var created = TaskProjection.FromSnapshot(snapshot, now);
             store.Add(created);
+            await buyers.ApplyAsync(created, cancellationToken);
             await store.SaveChangesAsync(cancellationToken);
             return (TaskProjectionDto.From(created), true);
         }
@@ -50,6 +54,7 @@ public sealed class ApplyTaskSnapshotHandler(ITaskProjectionStore store, IWorkAr
         var applied = existing.Apply(snapshot, now);
         if (applied)
         {
+            await buyers.ApplyAsync(existing, cancellationToken);
             await store.SaveChangesAsync(cancellationToken);
         }
 

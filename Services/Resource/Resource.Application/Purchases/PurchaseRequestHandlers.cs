@@ -47,7 +47,8 @@ public sealed record PurchaseRequestDto(
     DateTimeOffset? RejectedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,
-    long Version)
+    long Version,
+    IReadOnlyList<PurchaseDto>? Purchases = null)
 {
     public static PurchaseRequestDto From(PurchaseRequest request, WorkAreaScope scope, IReadOnlyDictionary<Guid, Material> materials) =>
         new(request.PurchaseRequestId, request.WorkAreaId, scope.Name, scope.SeasonId, request.RequestedByUserId, request.RequestReason,
@@ -94,8 +95,8 @@ public sealed record PurchaseRequestCommand(Guid PurchaseRequestId, long? Versio
 public static class PurchaseRequestRules
 {
     /// <summary>
-    /// Requests whose quantity is asked for but not delivered yet. PARTIALLY_RECEIVED joins once F-RES-10 tracks the
-    /// delivered part per line (its delivered part is already in the ledger).
+    /// Requests whose whole quantity is asked for but not delivered yet. PARTIALLY_RECEIVED requests also reserve the
+    /// part not delivered yet (computed by the store from confirmed purchases).
     /// </summary>
     public static readonly IReadOnlySet<PurchaseRequestStatus> OpenStatuses = new HashSet<PurchaseRequestStatus>
     {
@@ -204,21 +205,28 @@ public sealed class ListPurchaseRequestsQueryHandler(
 }
 
 /// <summary>
-/// F-RES-06 <c>getPurchaseRequest</c> (PARISH, LEADER, MO, VOLUNTEER of the parish). A volunteer may only see the
-/// request of a PURCHASE task they accepted — the buyer projection arrives with <c>task.purchase-task.assigned</c>
-/// (F-RES-01), so until then volunteers get 404.
+/// F-RES-06 <c>getPurchaseRequest</c> (PARISH, LEADER, MO of the parish; VOLUNTEER only as the buyer — assignee of a
+/// PURCHASE task of this request in <c>task_projection</c>), with its purchases so the officer can confirm delivery.
 /// </summary>
-public sealed class GetPurchaseRequestQueryHandler(PurchaseRequestLoader loader, ICurrentUser currentUser)
+public sealed class GetPurchaseRequestQueryHandler(
+    PurchaseRequestLoader loader,
+    ITaskProjectionStore tasks,
+    IPurchaseStore purchases,
+    ICurrentUser currentUser)
 {
     public async Task<PurchaseRequestDto> HandleAsync(Guid requestId, CancellationToken cancellationToken = default)
     {
         var (request, scope) = await loader.ForReadAsync(requestId, cancellationToken);
-        if (currentUser.Role == GrottoWorksRoles.Volunteer)
+        if (currentUser.Role == GrottoWorksRoles.Volunteer &&
+            !(await tasks.ListByPurchaseRequestAsync(requestId, cancellationToken)).Any(task => task.AssigneeUserIds.Contains(currentUser.UserId)))
         {
             throw PurchaseRequestLoader.NotFound();
         }
 
-        return await loader.ToDtoAsync(request, scope, cancellationToken);
+        var dto = await loader.ToDtoAsync(request, scope, cancellationToken);
+        var bought = await purchases.ListByRequestAsync(requestId, cancellationToken);
+        var materials = await loader.MaterialsAsync([request], cancellationToken);
+        return dto with { Purchases = bought.Select(purchase => PurchaseDto.From(purchase, materials, null)).ToList() };
     }
 }
 

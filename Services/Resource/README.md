@@ -1,7 +1,7 @@
 # Resource Service
 
 Vật tư, tồn kho, mua sắm, quyên góp, đồ mượn (owner: Vũ — spec §5.2, tag `Materials`, `Purchases`, `Contributions`).
-Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5; F-RES-13b, 13c, 15, 16 — S6; F-RES-17, 18, 20 — S7; F-RES-14 — S8.
+Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-09, 10, 11 — S5/S6; F-RES-12, 13 — S5; F-RES-13b, 13c, 15, 16 — S6; F-RES-17, 18, 20 — S7; F-RES-14 — S8.
 
 ## Kiến trúc
 
@@ -48,7 +48,7 @@ Mẫu request: `Resource.Api.http`.
 | `GET /api/v1/seasons/{id}/material-needs` | `listMaterialNeeds` | USER cùng parish (chỉ shortage > 0) | F-RES-05 |
 | `GET /api/v1/purchase-requests` | `listPurchaseRequests` | PARISH, LEADER, MO (`seasonId,workAreaId,status`, sort `createdAt`, mặc định mới nhất trước) | F-RES-06 |
 | `POST /api/v1/purchase-requests` | `createPurchaseRequest` | MO của work area → PLANNING | F-RES-06 |
-| `GET /api/v1/purchase-requests/{id}` | `getPurchaseRequest` | PARISH, LEADER, MO cùng parish (VOLUNTEER: xem "Việc còn mở") | F-RES-06 |
+| `GET /api/v1/purchase-requests/{id}` | `getPurchaseRequest` | PARISH, LEADER, MO cùng parish; VOLUNTEER là người mua — kèm `purchases` | F-RES-06 |
 | `PATCH /api/v1/purchase-requests/{id}` | `updatePurchaseRequest` | MO của work area; chỉ PLANNING; `items` thay toàn bộ dòng; `version`/`If-Match` | F-RES-06 |
 | `POST /api/v1/purchase-requests/{id}/submit` | `submitPurchaseRequest` | MO của work area: PLANNING → PENDING_APPROVAL | F-RES-06 |
 | `POST /api/v1/purchase-requests/{id}/approve` | `approvePurchaseRequest` | LEADER **của work area** (D-01, BR-29) | F-RES-07 |
@@ -81,6 +81,11 @@ Mẫu request: `Resource.Api.http`.
 | `GET /api/v1/borrowed-items/overdue` | `listOverdueBorrowedItems` | MO — `date`, `withinDays` (mặc định 2) | F-RES-18 |
 | `POST /api/v1/borrowed-items/{id}/issue` · `PUT …/assignment` · `POST …/return` · `POST …/incidents` | `issueBorrowedItem` · `assignBorrowedItem` · `returnBorrowedItem` · `recordBorrowedItemIncident` | MO | F-RES-18 |
 | `PATCH /api/v1/donations/{id}` | `adjustDonation` | MO của work area/season — sửa một receipt, lý do bắt buộc, đối soát kho | F-RES-14 |
+| `POST /api/v1/purchase-requests/{id}/purchases` | `recordPurchase` | VOLUNTEER có assignment ACCEPTED của task PURCHASE (BR-30) — kho chưa tăng (BR-26) | F-RES-09 |
+| `POST /api/v1/purchases/{id}/receipts` | `attachPurchaseReceipt` | VOLUNTEER người mua — `FileReference[]` (≤ 5); NEEDS_INFO → SUBMITTED | F-RES-09 |
+| `POST /api/v1/purchases/{id}/confirm-delivery` | `confirmPurchaseDelivery` | MO của work area — usable → `PURCHASE_DELIVERY` | F-RES-10 |
+| `POST /api/v1/purchases/{id}/request-info` | `requestPurchaseInfo` | MO của work area — lý do bắt buộc | F-RES-10 |
+| `POST /api/v1/purchases/{id}/approve-cost-overrun` | `approveCostOverrun` | LEADER của work area (BR-32) | F-RES-11 |
 | `PUT /internal/work-area-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/season-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/task-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm `task_projection` (work area, type, status, assignee ACCEPTED) | F-RES-01 |
@@ -109,6 +114,15 @@ Mẫu request: `Resource.Api.http`.
 - Event: `purchase.request.submitted` (kèm `leaderUserId` để báo Leader), `purchase.request.decided` (`decision` =
   `APPROVED|REJECTED`, `decidedByUserId`, `note`) — Task (F-TSK-17) chỉ cho tạo task PURCHASE khi APPROVED.
   Payload: `Resource.Contracts/Events/PurchaseRequest*.cs`, cần Lâm review (plan §4.2 "giữa S4 chốt với Lâm").
+- Mua và nhận hàng (F-RES-09/10/11): request APPROVED → **BUYER_ASSIGNED** khi `task_projection` có task PURCHASE của
+  request với assignee (thay cho event `task.purchase-task.assigned`) → **PURCHASED** khi người mua ghi purchase (chỉ
+  assignee, kho chưa tăng — BR-26) → MO xác nhận giao: `usable + unusable ≤ purchased`, chỉ usable → `PURCHASE_DELIVERY`
+  (`reference = PURCHASE_ITEM`, post 1 lần); đủ mọi dòng → **COMPLETED**, thiếu → **PARTIALLY_RECEIVED** (vẫn giữ chỗ phần
+  chưa giao trong chặn vượt shortage). Event `purchase.delivery.confirmed` để Task tự đóng task PURCHASE (BR-65).
+- BR-32: `costOverrun` = chi phí purchase > dự toán còn lại (tổng `estimatedCost` − chi phí các purchase đã CONFIRMED);
+  khi đó cần LEADER `approveCostOverrun` trước khi MO xác nhận. Request không có dự toán → không chặn.
+- Hóa đơn: `receipt_file_ids` (≤ 5) lưu tạm id file — chờ F-NTF-01 kiểm tra quyền sở hữu/trạng thái file (BR-69).
+  `requestPurchaseInfo` → NEEDS_INFO (lý do ở `info_request_reason`), người mua gửi thêm hóa đơn → SUBMITTED.
 - Bổ sung so với ERD v3.6 (đã ghi ở spec §3): bảng kỹ thuật `purchase_request_state_change` (nguồn của
   `getPurchaseRequestHistory`) và cột `purchase_request_item.shortage_override_reason`.
 
@@ -214,9 +228,8 @@ Mẫu request: `Resource.Api.http`.
 - Consumer `planning.*`, `task.status.changed`, `task.materials.changed`, `task.completion.reviewed`,
   `task.purchase-task.assigned` (F-RES-01 phần còn lại; `task_projection` đã có, đang nạp qua `/internal/task-scopes`) — chờ Lâm publish event và outbox của F-PLT-05.
 - Event đang chỉ log (`LoggingIntegrationEventPublisher`) — chưa qua outbox.
-- Purchase request: VOLUNTEER đọc được request của task PURCHASE mình đã nhận — cần buyer từ `task.purchase-task.assigned`
-  (F-RES-01), tạm thời trả 404. Chưa có endpoint hủy (Contract chưa có; BA cho PLANNING/PENDING/APPROVED → CANCELLED).
-  PARTIALLY_RECEIVED sẽ trừ phần đã giao khỏi "đã xin" khi làm F-RES-10.
+- Purchase request: chưa có endpoint hủy (Contract chưa có; BA cho PLANNING/PENDING/APPROVED → CANCELLED).
+- `recordPurchase` cần `Idempotency-Key` (F-PLT-07); file hóa đơn chờ F-NTF-01.
 - `recordDirectDonation` cần `Idempotency-Key` (Contract 4.1) nhưng `IdempotencyFilter` (F-PLT-07, Lâm) chưa có → client
   retry có thể ghi trùng donation. Bằng chứng ảnh (`evidenceFileIds`) chờ F-NTF-01.
 - Gateway: `/purchase-requests/{id}/purchase-tasks` thuộc Task (F-TSK-17) — khi Lâm thêm cần route riêng `Order: -1`.

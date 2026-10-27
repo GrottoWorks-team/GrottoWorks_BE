@@ -76,6 +76,14 @@ public static class DependencyInjection
         services.AddScoped<SubmitPurchaseRequestCommandHandler>();
         services.AddScoped<DecidePurchaseRequestCommandHandler>();
 
+        // F-RES-09/10/11 purchases, delivery, cost overrun
+        services.AddScoped<PurchaseBuyerSync>();
+        services.AddScoped<PurchaseContext>();
+        services.AddScoped<RecordPurchaseCommandHandler>();
+        services.AddScoped<AttachPurchaseReceiptsCommandHandler>();
+        services.AddScoped<PurchaseReviewCommandHandler>();
+        services.AddScoped<ConfirmPurchaseDeliveryCommandHandler>();
+
         // F-RES-12 donors
         services.AddScoped<DonorAccess>();
         services.AddScoped<ListDonorsQueryHandler>();

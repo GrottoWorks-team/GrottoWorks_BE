@@ -48,14 +48,27 @@ public sealed class PurchaseRequestStore(ResourceDbContext dbContext) : IPurchas
         CancellationToken cancellationToken = default)
     {
         var open = PurchaseRequestRules.OpenStatuses.ToList();
-        return await dbContext.PurchaseRequests.AsNoTracking()
+        // PARTIALLY_RECEIVED only still reserves what was not delivered yet (the delivered part is in the ledger).
+        var rows = await dbContext.PurchaseRequests.AsNoTracking()
             .Where(request => request.WorkAreaId == workAreaId &&
                               request.PurchaseRequestId != excludePurchaseRequestId &&
-                              open.Contains(request.Status))
-            .SelectMany(request => request.Items)
-            .GroupBy(item => item.MaterialId)
-            .Select(group => new QuantityByMaterial(workAreaId, group.Key, group.Sum(item => item.RequestedQuantity)))
+                              (open.Contains(request.Status) || request.Status == PurchaseRequestStatus.PartiallyReceived))
+            .SelectMany(request => request.Items.Select(item => new
+            {
+                item.MaterialId,
+                Open = request.Status == PurchaseRequestStatus.PartiallyReceived
+                    ? item.RequestedQuantity - dbContext.Purchases
+                        .Where(purchase => purchase.Status == PurchaseStatus.Confirmed)
+                        .SelectMany(purchase => purchase.Items)
+                        .Where(bought => bought.PurchaseRequestItemId == item.PurchaseRequestItemId)
+                        .Sum(bought => bought.ReceivedUsableQuantity ?? 0)
+                    : item.RequestedQuantity
+            }))
             .ToListAsync(cancellationToken);
+        return rows
+            .GroupBy(row => row.MaterialId)
+            .Select(group => new QuantityByMaterial(workAreaId, group.Key, group.Sum(row => Math.Max(0, row.Open))))
+            .ToList();
     }
 
     public void Add(PurchaseRequest request) => dbContext.PurchaseRequests.Add(request);

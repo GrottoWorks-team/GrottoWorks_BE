@@ -320,19 +320,19 @@ public sealed class PurchaseRequestTests
     }
 
     [Fact]
-    public async Task Reads_are_limited_to_the_parish_and_hidden_from_volunteers_for_now()
+    public async Task Reads_are_limited_to_the_parish_and_hidden_from_volunteers_who_are_not_buyers()
     {
         var planning = await Planning(Line(_cable, 5));
 
         var parishUser = User(Guid.NewGuid(), GrottoWorksRoles.Parish);
-        (await new GetPurchaseRequestQueryHandler(Loader(parishUser), parishUser).HandleAsync(planning.Id)).Id.Should().Be(planning.Id);
+        (await new GetPurchaseRequestQueryHandler(Loader(parishUser), new FakeTaskProjectionStore(), new FakePurchaseStore(), parishUser).HandleAsync(planning.Id)).Id.Should().Be(planning.Id);
 
         var outsider = User(Guid.NewGuid(), GrottoWorksRoles.Parish, Guid.NewGuid());
-        (await Fails(() => new GetPurchaseRequestQueryHandler(Loader(outsider), outsider).HandleAsync(planning.Id)))
+        (await Fails(() => new GetPurchaseRequestQueryHandler(Loader(outsider), new FakeTaskProjectionStore(), new FakePurchaseStore(), outsider).HandleAsync(planning.Id)))
             .Code.Should().Be("PURCHASE_REQUEST_NOT_FOUND");
 
         var volunteer = User(Guid.NewGuid(), GrottoWorksRoles.Volunteer);
-        (await Fails(() => new GetPurchaseRequestQueryHandler(Loader(volunteer), volunteer).HandleAsync(planning.Id)))
+        (await Fails(() => new GetPurchaseRequestQueryHandler(Loader(volunteer), new FakeTaskProjectionStore(), new FakePurchaseStore(), volunteer).HandleAsync(planning.Id)))
             .Code.Should().Be("PURCHASE_REQUEST_NOT_FOUND");
     }
 

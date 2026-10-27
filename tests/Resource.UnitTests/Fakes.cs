@@ -402,6 +402,9 @@ public sealed class FakeTaskProjectionStore : Resource.Application.Scope.ITaskPr
     public Task<Resource.Domain.Scope.TaskProjection?> GetAsync(Guid taskId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Tasks.FirstOrDefault(t => t.TaskId == taskId));
 
+    public Task<IReadOnlyList<Resource.Domain.Scope.TaskProjection>> ListByPurchaseRequestAsync(Guid purchaseRequestId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Scope.TaskProjection>>(Tasks.Where(t => t.PurchaseRequestId == purchaseRequestId).ToList());
+
     public void Add(Resource.Domain.Scope.TaskProjection task) => Tasks.Add(task);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
@@ -528,6 +531,21 @@ public sealed class FakeBorrowedItemStore : Resource.Application.Contributions.I
             .ToList());
 
     public void Add(Resource.Domain.Contributions.BorrowedItem item) => Items.Add(item);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+}
+
+public sealed class FakePurchaseStore : Resource.Application.Purchases.IPurchaseStore
+{
+    public List<Resource.Domain.Purchases.Purchase> Purchases { get; } = [];
+
+    public Task<Resource.Domain.Purchases.Purchase?> GetAsync(Guid purchaseId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Purchases.FirstOrDefault(p => p.PurchaseId == purchaseId));
+
+    public Task<IReadOnlyList<Resource.Domain.Purchases.Purchase>> ListByRequestAsync(Guid purchaseRequestId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Purchases.Purchase>>(Purchases.Where(p => p.PurchaseRequestId == purchaseRequestId).ToList());
+
+    public void Add(Resource.Domain.Purchases.Purchase purchase) => Purchases.Add(purchase);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

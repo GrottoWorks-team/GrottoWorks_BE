@@ -32,6 +32,8 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
 
     public DbSet<PurchaseRequestStateChange> PurchaseRequestStateChanges => Set<PurchaseRequestStateChange>();
 
+    public DbSet<Purchase> Purchases => Set<Purchase>();
+
     public DbSet<Donor> Donors => Set<Donor>();
 
     public DbSet<Donation> Donations => Set<Donation>();

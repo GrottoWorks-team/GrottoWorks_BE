@@ -174,6 +174,50 @@ public sealed class PurchaseRequest
         Transition(PurchaseRequestStatus.Rejected, leaderUserId, cleaned, now);
     }
 
+    /// <summary>Has any line an estimate? Without one there is no approved budget to exceed (BR-32).</summary>
+    public bool HasEstimate => _items.Any(item => item.EstimatedCost is not null);
+
+    /// <summary>
+    /// <c>task.purchase-task.assigned</c>: a volunteer accepted the PURCHASE task (BR-30). Idempotent; only an approved
+    /// request moves.
+    /// </summary>
+    public bool MarkBuyerAssigned(Guid systemUserId, DateTimeOffset now)
+    {
+        if (Status != PurchaseRequestStatus.Approved)
+        {
+            return false;
+        }
+
+        Transition(PurchaseRequestStatus.BuyerAssigned, systemUserId, null, now);
+        return true;
+    }
+
+    /// <summary>F-RES-09: the buyer recorded a purchase — stock unchanged until delivery is confirmed (BR-26).</summary>
+    public void MarkPurchased(Guid buyerUserId, DateTimeOffset now)
+    {
+        if (Status is not (PurchaseRequestStatus.Approved or PurchaseRequestStatus.BuyerAssigned or PurchaseRequestStatus.Purchased
+            or PurchaseRequestStatus.PartiallyReceived))
+        {
+            throw new DomainRuleException("PURCHASE_REQUEST_INVALID_STATE", "Purchases can only be recorded for an approved request that is not completed.");
+        }
+
+        if (Status != PurchaseRequestStatus.Purchased)
+        {
+            Transition(PurchaseRequestStatus.Purchased, buyerUserId, null, now);
+        }
+    }
+
+    /// <summary>F-RES-10: after a delivery, COMPLETED when every line received its requested usable quantity, else the request stays partly open.</summary>
+    public void MarkDelivered(IReadOnlyDictionary<Guid, decimal> deliveredUsableByLine, Guid officerUserId, DateTimeOffset now)
+    {
+        var completed = _items.All(item => deliveredUsableByLine.GetValueOrDefault(item.PurchaseRequestItemId) >= item.RequestedQuantity);
+        var target = completed ? PurchaseRequestStatus.Completed : PurchaseRequestStatus.PartiallyReceived;
+        if (Status != target)
+        {
+            Transition(target, officerUserId, null, now);
+        }
+    }
+
     private void SetItems(IReadOnlyCollection<PurchaseRequestItemInput> items)
     {
         if (items.Count > MaxItems)

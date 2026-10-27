@@ -242,3 +242,39 @@ public sealed class FakeReadModelStore : Reporting.Application.ReadModels.IReadM
     public Task<IReadOnlyList<Reporting.Domain.Scope.TaskProjection>> ListTasksAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Reporting.Domain.Scope.TaskProjection>>(Tasks.Where(t => workAreaIds.Contains(t.WorkAreaId)).ToList());
 }
+
+public sealed class FakeReportExportStore : Reporting.Application.Exports.IReportExportStore
+{
+    public List<Reporting.Domain.Exports.ReportExportJob> Jobs { get; } = [];
+
+    public Task<Reporting.Domain.Exports.ReportExportJob?> GetAsync(Guid jobId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Jobs.FirstOrDefault(j => j.ReportExportJobId == jobId));
+
+    public Task<Reporting.Domain.Exports.ReportExportJob?> FindByIdempotencyKeyAsync(Guid userId, string key, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Jobs.FirstOrDefault(j => j.RequestedByUserId == userId && j.IdempotencyKey == key));
+
+    public Task<Reporting.Domain.Exports.ReportExportJob?> ClaimNextAsync(DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        var job = Jobs.Where(j => j.Status == Reporting.Domain.Exports.ExportStatus.Queued).OrderBy(j => j.CreatedAt).FirstOrDefault();
+        job?.Start(now);
+        return Task.FromResult(job);
+    }
+
+    public Task<int> RecoverStaleAsync(DateTimeOffset startedBefore, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        var stale = Jobs.Where(j => j.Status == Reporting.Domain.Exports.ExportStatus.Running && j.StartedAt < startedBefore).ToList();
+        stale.ForEach(j => j.Recover(now));
+        return Task.FromResult(stale.Count);
+    }
+
+    public void Add(Reporting.Domain.Exports.ReportExportJob job) => Jobs.Add(job);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+}
+
+public sealed class FakeExportSignal : Reporting.Application.Exports.IExportSignal
+{
+    public int Notified { get; private set; }
+
+    public void Notify() => Notified++;
+}

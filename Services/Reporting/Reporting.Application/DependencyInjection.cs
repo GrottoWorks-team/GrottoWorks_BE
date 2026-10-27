@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Reporting.Application.Exports;
 using Reporting.Application.Ingestion;
 using Reporting.Application.ReadModels;
 using Reporting.Application.Recognition;
@@ -32,6 +33,10 @@ public static class DependencyInjection
         services.AddScoped<ReportScopeResolver>();
         services.AddScoped<ReportQueryHandler>();
         services.AddScoped<DashboardQueryHandler>();
+
+        // F-RPT-06 exports
+        services.AddScoped<ReportExportHandler>();
+        services.AddScoped<ReportExportRunner>();
 
         return services;
     }

@@ -10,6 +10,7 @@ public static class ReportingEndpoints
         app.MapRecognitionCatalogEndpoints();
         app.MapRecognitionEndpoints();
         app.MapReportEndpoints();
+        app.MapExportEndpoints();
         return app;
     }
 }

@@ -1,4 +1,3 @@
-using BuildingBlocks.Security;
 using Reporting.Application.ReadModels;
 using Reporting.Domain.ReadModels;
 using Reporting.Domain.Scope;
@@ -27,14 +26,17 @@ public sealed record ReportDataDto(
     IReadOnlyList<string> Notes);
 
 /// <summary>F-RPT-05: the six operational reports, built from the read models of the caller's scope.</summary>
-public sealed class ReportQueryHandler(ReportScopeResolver resolver, IReadModelStore store, ICurrentUser currentUser)
+public sealed class ReportQueryHandler(ReportScopeResolver resolver, IReadModelStore store)
 {
     private const string Money = "VND";
 
-    public async Task<ReportDataDto> BuildAsync(ReportType type, ReportQuery query, CancellationToken cancellationToken = default)
+    public Task<ReportDataDto> BuildAsync(ReportType type, ReportQuery query, CancellationToken cancellationToken = default) =>
+        BuildAsync(type, query, resolver.Caller(), cancellationToken);
+
+    public async Task<ReportDataDto> BuildAsync(ReportType type, ReportQuery query, ReportRequester requester, CancellationToken cancellationToken = default)
     {
-        resolver.EnsureRole(type);
-        var scope = await resolver.ResolveAsync(query, cancellationToken);
+        ReportScopeResolver.EnsureRole(type, requester);
+        var scope = await resolver.ResolveAsync(query, requester, cancellationToken);
         var names = scope.WorkAreas.ToDictionary(area => area.WorkAreaId, area => area.Name);
         var (columns, rows, totals, notes) = type switch
         {
@@ -46,7 +48,7 @@ public sealed class ReportQueryHandler(ReportScopeResolver resolver, IReadModelS
             _ => await ReadinessAsync(scope, query, names, cancellationToken)
         };
 
-        return new ReportDataDto(type, scope.ParishId, scope.SeasonId, DateTimeOffset.UtcNow, currentUser.UserId, scope.Scope,
+        return new ReportDataDto(type, scope.ParishId, scope.SeasonId, DateTimeOffset.UtcNow, requester.UserId, scope.Scope,
             new ReportFiltersDto(query.SeasonId, query.WorkAreaId, query.CommunityId, query.From, query.To), columns, rows, totals, notes);
     }
 

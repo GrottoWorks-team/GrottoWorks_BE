@@ -115,3 +115,20 @@ Authorization: Bearer {{parishAccessToken}}
 ### F-RPT-05 — getReadinessReport (one work area)
 GET {{host}}/api/v1/reports/readiness?seasonId={{seasonId}}&workAreaId={{workAreaId}}
 Authorization: Bearer {{leaderAccessToken}}
+
+### F-RPT-06 — createReportExport (202 + job)
+POST {{host}}/api/v1/report-exports
+Authorization: Bearer {{parishAccessToken}}
+Content-Type: application/json
+Idempotency-Key: 6f1c2b8e-0d1a-4c55-9a7e-2f0b5f1e8c11
+
+{ "reportType": "MATERIALS", "format": "XLSX", "seasonId": "{{seasonId}}" }
+
+### F-RPT-06 — getReportExport
+@jobId = <id from createReportExport>
+GET {{host}}/api/v1/report-exports/{{jobId}}
+Authorization: Bearer {{parishAccessToken}}
+
+### F-RPT-06 — download the file once SUCCEEDED
+GET {{host}}/api/v1/report-exports/{{jobId}}/file
+Authorization: Bearer {{parishAccessToken}}

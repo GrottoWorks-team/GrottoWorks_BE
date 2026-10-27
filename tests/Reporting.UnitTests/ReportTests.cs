@@ -43,7 +43,7 @@ public sealed class ReportTests
     private FakeCurrentUser User(string role, Guid? id = null) => new(id ?? Guid.NewGuid(), role, _parishId);
 
     private ReportQueryHandler Reports(FakeCurrentUser user) =>
-        new(new ReportScopeResolver(_scopes, new WorkAreaAccess(_scopes, user), user), _readModels, user);
+        new(new ReportScopeResolver(_scopes, new WorkAreaAccess(_scopes, user), user), _readModels);
 
     private DashboardQueryHandler Dashboards(FakeCurrentUser user) =>
         new(new ReportScopeResolver(_scopes, new WorkAreaAccess(_scopes, user), user), new WorkAreaAccess(_scopes, user), _scopes, _readModels, user);

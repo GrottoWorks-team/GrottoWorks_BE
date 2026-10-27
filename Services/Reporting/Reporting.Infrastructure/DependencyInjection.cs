@@ -2,11 +2,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Reporting.Application.Abstractions;
+using Reporting.Application.Exports;
 using Reporting.Application.Ingestion;
 using Reporting.Application.ReadModels;
 using Reporting.Application.Recognition;
 using Reporting.Application.Scope;
 using Reporting.Infrastructure.Data;
+using Reporting.Infrastructure.Exports;
 using Reporting.Infrastructure.Observability;
 using Reporting.Infrastructure.ReadModels;
 using Reporting.Infrastructure.Recognition;
@@ -34,6 +36,16 @@ public static class DependencyInjection
         services.AddScoped<IInboxStore>(provider => provider.GetRequiredService<ContributionStore>());
         services.AddScoped<IRecognitionQueryStore>(provider => provider.GetRequiredService<ContributionStore>());
         services.AddScoped<IReadModelStore, ReadModelStore>();
+
+        // F-RPT-06 exports: jobs in report_export_job, rendered by the background worker.
+        services.AddScoped<IReportExportStore, ReportExportStore>();
+        services.AddSingleton<IReportFileRenderer, ReportFileRenderer>();
+        services.AddSingleton<ExportSignal>();
+        services.AddSingleton<IExportSignal>(provider => provider.GetRequiredService<ExportSignal>());
+        if (configuration.GetValue("Exports:WorkerEnabled", true))
+        {
+            services.AddHostedService<ReportExportWorker>();
+        }
         return services;
     }
 }

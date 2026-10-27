@@ -36,6 +36,9 @@ public sealed record ReportQuery(Guid SeasonId, Guid? WorkAreaId = null, Guid? C
     }
 }
 
+/// <summary>Who a report is built for: the caller, or the requester of an export job (built in the background).</summary>
+public sealed record ReportRequester(Guid UserId, string Role, Guid ParishId);
+
 /// <summary>The work areas a report or dashboard may show and how the scope was decided (BR-57).</summary>
 public sealed record ResolvedScope(Guid ParishId, Guid SeasonId, string Scope, IReadOnlyList<WorkAreaScope> WorkAreas)
 {
@@ -67,27 +70,32 @@ public sealed class ReportScopeResolver(IWorkAreaScopeStore scopes, WorkAreaAcce
 
     public static IReadOnlyList<string> RolesFor(ReportType type) => Roles[type];
 
-    public void EnsureRole(ReportType type)
+    /// <summary>The caller as a requester (parish required — BR-67).</summary>
+    public ReportRequester Caller() => new(currentUser.UserId, currentUser.Role, access.RequireParish());
+
+    public static void EnsureRole(ReportType type, ReportRequester requester)
     {
-        if (!Roles[type].Contains(currentUser.Role))
+        if (!Roles[type].Contains(requester.Role))
         {
-            throw DomainRuleException.Forbidden("REPORT_ACCESS_DENIED", $"Role {currentUser.Role} cannot read the {type.ToString().ToLowerInvariant()} report.");
+            throw DomainRuleException.Forbidden("REPORT_ACCESS_DENIED", $"Role {requester.Role} cannot read the {type.ToString().ToLowerInvariant()} report.");
         }
     }
 
-    public async Task<ResolvedScope> ResolveAsync(ReportQuery query, CancellationToken cancellationToken)
+    public Task<ResolvedScope> ResolveAsync(ReportQuery query, CancellationToken cancellationToken) => ResolveAsync(query, Caller(), cancellationToken);
+
+    public async Task<ResolvedScope> ResolveAsync(ReportQuery query, ReportRequester requester, CancellationToken cancellationToken)
     {
-        var parishId = access.RequireParish();
+        var parishId = requester.ParishId;
         var season = await scopes.ListByParishAsync(parishId, query.SeasonId, cancellationToken);
         if (season.Count == 0)
         {
             throw DomainRuleException.NotFound("SEASON_NOT_FOUND", "The season does not exist or is outside your parish.");
         }
 
-        var (scope, visible) = currentUser.Role switch
+        var (scope, visible) = requester.Role switch
         {
-            GrottoWorksRoles.Leader => (LedScope, season.Where(area => area.LeaderUserId == currentUser.UserId).ToList()),
-            GrottoWorksRoles.MaterialOfficer => (ManagedScope, season.Where(area => area.MaterialOfficerUserId == currentUser.UserId).ToList()),
+            GrottoWorksRoles.Leader => (LedScope, season.Where(area => area.LeaderUserId == requester.UserId).ToList()),
+            GrottoWorksRoles.MaterialOfficer => (ManagedScope, season.Where(area => area.MaterialOfficerUserId == requester.UserId).ToList()),
             _ => (ParishScope, season.ToList())
         };
 

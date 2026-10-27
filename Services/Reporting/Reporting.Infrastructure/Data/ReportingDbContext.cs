@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Reporting.Domain.Exports;
 using Reporting.Domain.Inbox;
 using Reporting.Domain.ReadModels;
 using Reporting.Domain.Recognition;
@@ -34,6 +35,8 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
     public DbSet<ReadinessAreaView> ReadinessAreaViews => Set<ReadinessAreaView>();
 
     public DbSet<ReadinessHistoryEntry> ReadinessHistory => Set<ReadinessHistoryEntry>();
+
+    public DbSet<ReportExportJob> ReportExportJobs => Set<ReportExportJob>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

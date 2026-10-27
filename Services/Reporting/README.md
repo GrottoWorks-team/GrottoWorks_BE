@@ -1,7 +1,7 @@
 # Reporting Service
 
 Contribution, điểm ghi nhận, dashboard, báo cáo và export (owner: Vũ — spec §5.4, tag `Reports`).
-Trạng thái: F-RPT-01 — S6; F-RPT-02, 03 — S7; F-RPT-04, 05 — S8 (làm 27/10).
+Trạng thái: F-RPT-01 — S6; F-RPT-02, 03 — S7; F-RPT-04, 05 — S8; F-RPT-06 — S9 (làm 27/10).
 
 ## Kiến trúc
 
@@ -45,6 +45,9 @@ Mẫu request: `Reporting.Api.http`.
 | `GET /api/v1/reports/contributions` | `getContributionReport` | PARISH, MO | F-RPT-05 |
 | `GET /api/v1/reports/attendance` | `getAttendanceReport` | PARISH, LEADER | F-RPT-05 |
 | `GET /api/v1/reports/readiness` | `getReadinessReport` | PARISH, LEADER | F-RPT-05 |
+| `POST /api/v1/report-exports` | `createReportExport` | PARISH (`Idempotency-Key` tùy chọn) → 202 + job | F-RPT-06 |
+| `GET /api/v1/report-exports/{id}` | `getReportExport` | PARISH cùng parish | F-RPT-06 |
+| `GET /api/v1/report-exports/{id}/file` | `downloadReportExport` (ngoài Contract) | PARISH cùng parish | F-RPT-06 |
 | `POST /internal/events` | — | `X-Internal-Api-Key` (feed event tạm, BuildingBlocks README §5.5) | F-RPT-02 |
 
 ## Contribution type & recognition rule (F-RPT-01, BA 13, BR-56, BR-68)
@@ -105,6 +108,19 @@ Mẫu request: `Reporting.Api.http`.
   đã nhận, volunteer (được giao, có giờ duyệt, tổng giờ, tỷ lệ), readiness. `notAvailable` liệt kê chỉ số chờ event của Task
   (support request đang mở, check-in chờ duyệt).
 
+## Export (F-RPT-06)
+
+- `CreateReportExport { reportType: TASKS|MATERIALS|PURCHASES|CONTRIBUTIONS|ATTENDANCE|READINESS, format: XLSX|PDF|CSV
+  (mặc định XLSX), seasonId, workAreaId?, communityId?, from?, to? }` → kiểm tra ngay (season của parish, bộ lọc) rồi trả
+  `202 ExportJob { status: QUEUED }` + header `Location`. Cùng `Idempotency-Key` + cùng yêu cầu → trả lại job cũ; khác yêu
+  cầu → 409 `IDEMPOTENCY_KEY_REUSED`.
+- `ReportExportWorker` (BackgroundService, tắt bằng `Exports:WorkerEnabled=false`) chạy lần lượt job QUEUED (được đánh thức
+  ngay khi có job, poll 5 s), dựng báo cáo **dưới quyền người yêu cầu** (cùng phạm vi BR-57 như màn hình), render xlsx
+  (ClosedXML) / pdf (QuestPDF, giấy phép Community) / csv (UTF-8 BOM, chặn công thức `= + - @`). Lỗi → FAILED với
+  `errorCode`; job RUNNING quá 10 phút (worker chết) được xếp lại, tối đa 3 lần. `xmin` bảo đảm một job chỉ một worker chạy.
+- File nằm tạm trong `report_export_job.content` (bảng kỹ thuật) và tải qua `/report-exports/{id}/file` cho tới khi
+  NotificationAudit lưu file (MinIO, `file_object` — F-NTF-01).
+
 ## Việc còn mở
 
 - Lý do `deactivateRecognitionRule` chưa có cột lưu (ERD không có) — chờ activity log F-NTF-04.
@@ -112,6 +128,9 @@ Mẫu request: `Reporting.Api.http`.
 - Payload `task.completion.reviewed`, `attendance.hours.approved`, `support.member.completed` là đề nghị (BuildingBlocks
   README §5.5) — chờ Lâm chốt. Consumer MassTransit chờ outbox F-PLT-05; hiện nhận qua `/internal/events`.
 - BA "mỗi 5 giờ làm = 20 điểm": rule hiện tính theo contribution (mỗi lần duyệt giờ), chưa có điểm theo số giờ.
+- Export: file lưu trong DB (chưa MinIO / `file_object`, chờ F-NTF-01); endpoint tải file chưa có trong Contract; chưa có
+  dọn job / file cũ; `Idempotency-Key` tự xử lý (chưa dùng `IdempotencyFilter` F-PLT-07). Kiểm tra QuestPDF chạy trong
+  image `aspnet:10.0` khi build Docker.
 - Read model chỉ có dữ liệu từ khi event bắt đầu chảy; chưa có job dựng lại từ đầu (replay). Chưa cache Redis (NFR < 3s:
   query theo index parish/season/work area).
 - Vật tư cần / đã có / thiếu là số liệu ở lần shortage đổi gần nhất (Resource chỉ publish khi shortage đổi); đồ mượn,

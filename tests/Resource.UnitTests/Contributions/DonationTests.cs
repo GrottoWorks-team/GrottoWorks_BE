@@ -52,7 +52,7 @@ public sealed class DonationTests
     private RecordDirectDonationCommandHandler Record(FakeCurrentUser? user = null)
     {
         var current = user ?? Officer();
-        return new(new WorkAreaAccess(_scopes, current), _scopes, _donors, _store, _inventory, _catalog,
+        return new(new DonationOfficerScope(new WorkAreaAccess(_scopes, current), _scopes, current), _donors, _store, _inventory, _catalog,
             new ShortageTracker(new InventoryReader(_inventory, _catalog), _events), Projector(), _events, current);
     }
 

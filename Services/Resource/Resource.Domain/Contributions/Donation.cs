@@ -28,6 +28,9 @@ public enum DonationItemStatus
     Cancelled
 }
 
+/// <summary>One material promised by a volunteer (F-RES-13b).</summary>
+public sealed record PledgedMaterialInput(Guid MaterialId, decimal PledgedQuantity, string? Note);
+
 /// <summary>One material actually received: <paramref name="UnusableQuantity"/> is checked on arrival (BR-38).</summary>
 public sealed record ReceivedMaterialInput(Guid MaterialId, decimal ReceivedQuantity, decimal UnusableQuantity, string? Note);
 
@@ -41,6 +44,7 @@ public sealed class Donation
     public const decimal MaxAmount = 999_999_999_999.99m;
     public const int MaxItems = 50;
     public const int MaxNoteLength = 2000;
+    public const int MaxCancelReasonLength = 500;
 
     /// <summary>Clock skew tolerated for "received now" timestamps sent by clients.</summary>
     public static readonly TimeSpan FutureTolerance = TimeSpan.FromMinutes(5);
@@ -178,6 +182,108 @@ public sealed class Donation
         return donation;
     }
 
+    /// <summary>
+    /// F-RES-13b <c>pledgeMaterialDonation</c>: a volunteer promises materials for a work area (BR-37). PLEDGED; nothing
+    /// is posted to stock until a receipt (BR-39).
+    /// </summary>
+    public static Donation PledgeMaterial(
+        Guid donorId,
+        Guid seasonId,
+        Guid workAreaId,
+        IReadOnlyCollection<PledgedMaterialInput> items,
+        string? note,
+        Guid volunteerUserId,
+        DateTimeOffset now)
+    {
+        if (items.Count == 0)
+        {
+            throw DomainRuleException.Validation("DONATION_ITEMS_REQUIRED", "A MATERIAL pledge needs at least one item (BR-37).");
+        }
+
+        if (items.Count > MaxItems)
+        {
+            throw DomainRuleException.Validation("DONATION_TOO_MANY_ITEMS", $"A donation holds at most {MaxItems} materials.");
+        }
+
+        if (items.GroupBy(item => item.MaterialId).Any(group => group.Count() > 1))
+        {
+            throw DomainRuleException.Validation("DONATION_DUPLICATE_MATERIAL", "Each material can appear only once in a donation.");
+        }
+
+        var donation = Pledged(donorId, seasonId, workAreaId, DonationType.Material, note, volunteerUserId, now);
+        foreach (var input in items)
+        {
+            donation._items.Add(DonationItem.Pledged(donation.DonationId, input.MaterialId, input.PledgedQuantity, input.Note));
+        }
+
+        return donation;
+    }
+
+    /// <summary>F-RES-13b <c>pledgeMonetarySupport</c>: promised money in VND — never counted as received (BR-39).</summary>
+    public static Donation PledgeMoney(
+        Guid donorId,
+        Guid seasonId,
+        Guid? workAreaId,
+        decimal amount,
+        string? note,
+        Guid volunteerUserId,
+        DateTimeOffset now)
+    {
+        var donation = Pledged(donorId, seasonId, workAreaId, DonationType.Money, note, volunteerUserId, now);
+        donation.PledgedAmount = Money(amount);
+        return donation;
+    }
+
+    /// <summary>
+    /// F-RES-13b <c>cancelDonationPledge</c>: cancels the outstanding part of a pledge (reason required); receipts
+    /// already recorded stay as they are (BA 8.7 step 10).
+    /// </summary>
+    public void CancelPledge(string? reason, DateTimeOffset now)
+    {
+        if (Status is not (DonationStatus.Pledged or DonationStatus.PartiallyReceived))
+        {
+            throw new DomainRuleException("DONATION_INVALID_STATE", "Only an outstanding pledge can be cancelled.");
+        }
+
+        var cleaned = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        if (cleaned is null || cleaned.Length > MaxCancelReasonLength)
+        {
+            throw DomainRuleException.Validation(
+                "DONATION_CANCEL_REASON_REQUIRED",
+                $"A reason of at most {MaxCancelReasonLength} characters is required to cancel a pledge.");
+        }
+
+        Status = DonationStatus.Cancelled;
+        CancelReason = cleaned;
+        UpdatedAt = now.ToUniversalTime();
+    }
+
+    public void EnsureVersion(long? expected)
+    {
+        if (expected is { } value && value != Version)
+        {
+            throw new DomainRuleException(
+                "DONATION_VERSION_MISMATCH",
+                "The donation was changed by someone else. Reload it and try again.",
+                DomainErrorKind.PreconditionFailed);
+        }
+    }
+
+    private static Donation Pledged(Guid donorId, Guid seasonId, Guid? workAreaId, DonationType type, string? note, Guid userId, DateTimeOffset now) =>
+        new()
+        {
+            DonationId = Guid.NewGuid(),
+            DonorId = donorId,
+            SeasonId = seasonId,
+            WorkAreaId = workAreaId,
+            Type = type,
+            Status = DonationStatus.Pledged,
+            DonationDate = now.ToUniversalTime(),
+            CreatedByUserId = userId,
+            CreatedAt = now.ToUniversalTime(),
+            Note = CleanNote(note)
+        };
+
     internal static decimal Money(decimal value)
     {
         if (value <= 0 || value > MaxAmount || decimal.Round(value, 2) != value)
@@ -246,6 +352,19 @@ public sealed class DonationItem
 
         return ReceivedQuantity > 0 ? DonationItemStatus.PartiallyReceived : DonationItemStatus.Pledged;
     }
+
+    internal static DonationItem Pledged(Guid donationId, Guid materialId, decimal pledgedQuantity, string? note) =>
+        new()
+        {
+            DonationItemId = Guid.NewGuid(),
+            DonationId = donationId,
+            MaterialId = materialId,
+            PledgedQuantity = Quantity.Positive(pledgedQuantity, "DONATION_PLEDGED_QUANTITY_INVALID", "Pledged quantity"),
+            Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim()
+        };
+
+    /// <summary>Promised but not yet received; 0 for direct receipts or once fully received.</summary>
+    public decimal OutstandingQuantity => PledgedQuantity is { } pledged ? Math.Max(0, pledged - ReceivedQuantity) : 0;
 
     internal static DonationItem Direct(Guid donationId, Guid materialId, string? note) =>
         new()

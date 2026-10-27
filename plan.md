@@ -188,7 +188,7 @@ Khởi tạo (S2): `Services/Resource/*`, `resource_db`, outbox/inbox.
 | 10 | F-RES-10 | `confirmPurchaseDelivery` (usable qty → ledger + tính lại shortage trong 1 transaction; giao thiếu → còn phần dở), `requestPurchaseInfo`; event `purchase.delivery.confirmed` | RES-09 | S5 |
 | 11 | F-RES-13 | `donation`, `donation_item`, `donation_receipt(_item)`; `recordDirectDonation` (RECEIVED + 1 receipt, 1 transaction); `listDonations`, `getDonation`, `listMyContributions`; event `contribution.receipt.confirmed` | RES-12 | S5 · ✅ 27/10 (chưa Idempotency-Key, chờ PLT-07) |
 | 12 | F-RES-11 | `approveCostOverrun` (LEADER); BR-32 chặn confirm khi vượt dự toán | RES-10 | S6 |
-| 13 | F-RES-13b | Pledge: `listContributionNeeds`, `pledgeMaterialDonation`, `pledgeMonetarySupport`, `cancelDonationPledge`; pledge không tăng stock (BR-39); event `contribution.pledged` | RES-13 | S6 |
+| 13 | F-RES-13b | Pledge: `listContributionNeeds`, `pledgeMaterialDonation`, `pledgeMonetarySupport`, `cancelDonationPledge`; pledge không tăng stock (BR-39); event `contribution.pledged` | RES-13 | S6 · ✅ 27/10 |
 | 14 | F-RES-13c | `recordDonationReceipt`; BR-38 cộng dồn, PARTIALLY_RECEIVED → RECEIVED, nhận vượt → cảnh báo; event `contribution.receipt.confirmed` | RES-13b | S6 |
 | 15 | F-RES-15 | `material_allocation(_item)`; `allocateMaterial`, `listMaterialAllocations`; BR-33; test 2 MO song song → 1 thành công, 1 `MATERIAL_INSUFFICIENT_AVAILABLE` | RES-04, task_projection | S6 |
 | 16 | F-RES-16 | `createInventoryAdjustment`; damaged/lost/disposed không quay lại usable (BR-43) | RES-04 | S6 |
@@ -308,7 +308,7 @@ Kịch bản nghiệm thu theo owner (Mục 8 spec): Lâm #1–4, #11, #16; Vũ 
 | TaskExecution | Lâm | TSK-01..04, 06..11, 17 | TSK-05, 12..15, 15b | TSK-16 | 0 / 18 |
 | NotificationAudit | Lâm | NTF-01 | NTF-02..04 | NTF-05, 06 | 0 / 6 |
 | Identity | Vũ | IDN-01..03, 05..09 | IDN-04, 10 | — | ✅ 10 / 10 (S0+S1: IDN-01, 02, 03, 05, 06 · S2 sớm 18/10: IDN-04, 07, 08, 09, 10 — chờ review/merge) |
-| Resource | Vũ | RES-01..07, 09, 10, 12, 13, 15, 17 | RES-11, 13b, 13c, 16, 18, 20 | RES-14 | 🟨 8 / 20 + RES-01 một phần (18/10: scaffold, RES-02..07 · 27/10: RES-12, 13; RES-01 projection + feed tạm, chờ event Parish/Task) |
+| Resource | Vũ | RES-01..07, 09, 10, 12, 13, 15, 17 | RES-11, 13b, 13c, 16, 18, 20 | RES-14 | 🟨 9 / 20 + RES-01 một phần (18/10: scaffold, RES-02..07 · 27/10: RES-12, 13, 13b; RES-01 projection + feed tạm, chờ event Parish/Task) |
 | Readiness | Vũ | — | RDY-02..06 | — | 0 / 5 |
 | Reporting | Vũ | — | RPT-01..05 | RPT-06 | 0 / 6 |
 

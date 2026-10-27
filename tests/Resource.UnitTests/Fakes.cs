@@ -364,6 +364,16 @@ public sealed class FakeDonationStore : Resource.Application.Contributions.IDona
             filtered.Skip((search.Page - 1) * search.Size).Take(search.Size).ToList(), filtered.Count));
     }
 
+    public Task<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>> GetOutstandingPledgesAsync(
+        IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>>(Donations
+            .Where(d => d.WorkAreaId is { } area && workAreaIds.Contains(area) &&
+                        d.Status is Resource.Domain.Contributions.DonationStatus.Pledged or Resource.Domain.Contributions.DonationStatus.PartiallyReceived)
+            .SelectMany(d => d.Items.Where(i => i.OutstandingQuantity > 0).Select(i => (d.WorkAreaId!.Value, i.MaterialId, i.OutstandingQuantity)))
+            .GroupBy(row => (row.Item1, row.MaterialId))
+            .Select(g => new Resource.Application.Inventory.QuantityByMaterial(g.Key.Item1, g.Key.MaterialId, g.Sum(row => row.OutstandingQuantity)))
+            .ToList());
+
     public void Add(Resource.Domain.Contributions.Donation donation) => Donations.Add(donation);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)

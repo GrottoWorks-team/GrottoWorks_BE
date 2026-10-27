@@ -20,6 +20,14 @@ public interface IDonationStore
     /// <summary>Newest donation date first; items included, receipts not.</summary>
     Task<PagedResult<Donation>> SearchAsync(DonationSearch search, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Pledged but not yet received quantity per (work area, material) of PLEDGED / PARTIALLY_RECEIVED MATERIAL
+    /// donations — shown next to the shortage so volunteers do not over-pledge.
+    /// </summary>
+    Task<IReadOnlyList<Inventory.QuantityByMaterial>> GetOutstandingPledgesAsync(
+        IReadOnlyCollection<Guid> workAreaIds,
+        CancellationToken cancellationToken = default);
+
     void Add(Donation donation);
 
     /// <summary>Saves the unit of work — together with ledger rows appended to the same context (one transaction).</summary>

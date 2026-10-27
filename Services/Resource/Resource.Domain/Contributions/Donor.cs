@@ -74,6 +74,13 @@ public sealed class Donor
         };
     }
 
+    /// <summary>
+    /// BA 8.7 step 3: a volunteer who pledges through the app gets a donor linked to their account (created once,
+    /// reused afterwards); the volunteer records it themself.
+    /// </summary>
+    public static Donor ForVolunteer(Guid parishId, Guid userId, string? displayName, DateTimeOffset now) =>
+        Create(parishId, userId, string.IsNullOrWhiteSpace(displayName) ? "Tình nguyện viên" : displayName, null, null, null, null, userId, now);
+
     public void EnsureVersion(long? expected)
     {
         if (expected is { } value && value != Version)

@@ -43,3 +43,43 @@ public sealed class CreateDonationRequest
     [StringLength(2000, ErrorMessage = "Note must not exceed 2000 characters.")]
     public string? Note { get; init; }
 }
+
+public sealed class PledgedMaterialRequest
+{
+    [Required(ErrorMessage = "Material is required.")]
+    public Guid? MaterialId { get; init; }
+
+    [Required(ErrorMessage = "Pledged quantity is required.")]
+    public decimal? PledgedQuantity { get; init; }
+
+    [StringLength(2000, ErrorMessage = "Note must not exceed 2000 characters.")]
+    public string? Note { get; init; }
+}
+
+/// <summary><c>MaterialPledgeRequest</c> (F-RES-13b): materials promised to a work area.</summary>
+public sealed class MaterialPledgeRequest
+{
+    [Required(ErrorMessage = "Work area is required.")]
+    public Guid? WorkAreaId { get; init; }
+
+    [Required(ErrorMessage = "Items are required.")]
+    public List<PledgedMaterialRequest>? Items { get; init; }
+
+    [StringLength(2000, ErrorMessage = "Note must not exceed 2000 characters.")]
+    public string? Note { get; init; }
+}
+
+/// <summary><c>MonetaryPledgeRequest</c> (F-RES-13b): money promised for a season (VND), optionally a work area.</summary>
+public sealed class MonetaryPledgeRequest
+{
+    [Required(ErrorMessage = "Season is required.")]
+    public Guid? SeasonId { get; init; }
+
+    public Guid? WorkAreaId { get; init; }
+
+    [Required(ErrorMessage = "Amount is required.")]
+    public decimal? Amount { get; init; }
+
+    [StringLength(2000, ErrorMessage = "Note must not exceed 2000 characters.")]
+    public string? Note { get; init; }
+}

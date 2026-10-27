@@ -1,7 +1,7 @@
 # Resource Service
 
 Vật tư, tồn kho, mua sắm, quyên góp, đồ mượn (owner: Vũ — spec §5.2, tag `Materials`, `Purchases`, `Contributions`).
-Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5.
+Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5; F-RES-13b — S6.
 
 ## Kiến trúc
 
@@ -61,6 +61,10 @@ Mẫu request: `Resource.Api.http`.
 | `POST /api/v1/donations` | `recordDirectDonation` | MO: MATERIAL → MO của work area nhận; MONEY → MO của work area (nếu có) hoặc MO của season | F-RES-13 |
 | `GET /api/v1/donations/{id}` | `getDonation` | MO cùng parish; VOLUNTEER chỉ donation của donor gắn với tài khoản mình | F-RES-13 |
 | `GET /api/v1/users/me/contributions` | `listMyContributions` | VOLUNTEER — donation của donor gắn với tài khoản (`seasonId`) | F-RES-13 |
+| `GET /api/v1/seasons/{id}/contribution-needs` | `listContributionNeeds` | USER cùng parish — shortage trừ phần đã pledge chưa giao | F-RES-13b |
+| `POST /api/v1/donations/material-pledges` | `pledgeMaterialDonation` | VOLUNTEER — vật tư work area đang có requirement | F-RES-13b |
+| `POST /api/v1/donations/monetary-pledges` | `pledgeMonetarySupport` | VOLUNTEER — tiền cho season (work area tùy chọn) | F-RES-13b |
+| `POST /api/v1/donations/{id}/cancel` | `cancelDonationPledge` | VOLUNTEER chủ pledge, MO của work area/season; `reason` bắt buộc | F-RES-13b |
 | `PUT /internal/work-area-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/season-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 
@@ -112,6 +116,17 @@ Mẫu request: `Resource.Api.http`.
 - Event: `contribution.receipt.confirmed` cho **mọi** receipt (`isDirect`, `isFirstReceipt`, `donorUserId` null với donor
   ngoài — không có điểm) + `material.shortage.changed` khi shortage đổi. Payload: `Resource.Contracts/Events/ContributionReceiptConfirmed.cs`.
 - `listMyContributions`: Contract chưa có schema `Contribution` → tạm trả `Donation` của donor gắn với tài khoản.
+
+## Pledge (F-RES-13b, D-02, BA 8.7)
+
+- Pledge đầu tiên tự tạo donor gắn tài khoản volunteer (tên lấy từ Identity; Identity lỗi → tên tạm "Tình nguyện viên",
+  MO sửa sau), các pledge sau dùng lại. Donation `PLEDGED`, **không** đụng kho hay tiền đã nhận (BR-39).
+- MATERIAL: chỉ vật tư work area đang có requirement ACTIVE (422 `PLEDGE_MATERIAL_NOT_REQUIRED`), `pledgedQuantity > 0`.
+  MONEY: `amount > 0`, season bắt buộc, work area tùy chọn.
+- `listContributionNeeds`: `remainingNeed = max(0, shortage − pledgedOutstanding)` để volunteer không pledge trùng.
+  Nhu cầu tiền cần ngân sách season (ParishCoordination) → chưa liệt kê.
+- Hủy: chỉ PLEDGED / PARTIALLY_RECEIVED, lý do 1–500 ký tự; receipt đã nhận giữ nguyên. Event `contribution.pledged`
+  (kèm `materialOfficerUserId` để báo MO).
 
 ## Phạm vi (scope)
 

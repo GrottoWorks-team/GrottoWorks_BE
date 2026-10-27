@@ -117,6 +117,53 @@ public sealed record RecordDirectDonationCommand(
     DateTimeOffset? ReceivedAt,
     string? Note);
 
+/// <summary>
+/// Which donations a material officer may record or change: MATERIAL (and MONEY with a work area) → the MO of that work
+/// area; MONEY for the whole season → the MO of any work area of the season. Archived seasons are read-only (BR-07).
+/// </summary>
+public sealed class DonationOfficerScope(WorkAreaAccess access, IWorkAreaScopeStore scopes, ICurrentUser currentUser)
+{
+    public async Task<(WorkAreaScope? Scope, Guid SeasonId, Guid ParishId)> ResolveAsync(
+        DonationType type,
+        Guid? workAreaId,
+        Guid? seasonId,
+        CancellationToken cancellationToken)
+    {
+        if (workAreaId is { } areaId)
+        {
+            var scope = await access.ForMaterialOfficerWriteAsync(areaId, cancellationToken);
+            if (seasonId is { } season && season != scope.SeasonId)
+            {
+                throw DomainRuleException.Validation("DONATION_SEASON_MISMATCH", "The work area belongs to another season.");
+            }
+
+            return (scope, scope.SeasonId, scope.ParishId);
+        }
+
+        if (type == DonationType.Material)
+        {
+            throw DomainRuleException.Validation("DONATION_WORK_AREA_REQUIRED", "A MATERIAL donation needs the receiving work area (BR-37).");
+        }
+
+        var requiredSeason = seasonId
+            ?? throw DomainRuleException.Validation("DONATION_SEASON_REQUIRED", "Choose the season (or a work area) the money is for.");
+        var parishId = access.RequireParish();
+        var areas = await scopes.ListByParishAsync(parishId, requiredSeason, cancellationToken);
+        if (areas.Count == 0)
+        {
+            throw DomainRuleException.NotFound("SEASON_NOT_FOUND", "The season does not exist or is outside your parish.");
+        }
+
+        if (!areas.Any(area => area.MaterialOfficerUserId == currentUser.UserId))
+        {
+            throw DomainRuleException.Forbidden("WORK_AREA_SCOPE_DENIED", "Only a material officer of this season can record its donations.");
+        }
+
+        WorkAreaAccess.EnsureWritable(areas[0]);
+        return (null, requiredSeason, parishId);
+    }
+}
+
 /// <summary>Builds <see cref="DonationDto"/>s: donors and catalog fields in two batched reads.</summary>
 public sealed class DonationProjector(IDonorStore donors, IMaterialCatalogStore catalog)
 {
@@ -144,8 +191,7 @@ public sealed class DonationProjector(IDonorStore donors, IMaterialCatalogStore 
 /// area. MONEY: MO of that work area when given, otherwise MO of any work area of the season.
 /// </summary>
 public sealed class RecordDirectDonationCommandHandler(
-    WorkAreaAccess access,
-    IWorkAreaScopeStore scopes,
+    DonationOfficerScope officers,
     IDonorStore donors,
     IDonationStore store,
     IInventoryStore inventory,
@@ -157,7 +203,7 @@ public sealed class RecordDirectDonationCommandHandler(
 {
     public async Task<DonationDto> HandleAsync(RecordDirectDonationCommand command, CancellationToken cancellationToken = default)
     {
-        var (scope, seasonId, parishId) = await ResolveTargetAsync(command, cancellationToken);
+        var (scope, seasonId, parishId) = await officers.ResolveAsync(command.Type, command.WorkAreaId, command.SeasonId, cancellationToken);
 
         var donor = await donors.GetAsync(command.DonorId, cancellationToken);
         if (donor is null || donor.ParishId != parishId)
@@ -201,44 +247,6 @@ public sealed class RecordDirectDonationCommandHandler(
             donation.DonationId,
             cancellationToken);
         return await projector.ToDtoAsync(donation, cancellationToken);
-    }
-
-    private async Task<(WorkAreaScope? Scope, Guid SeasonId, Guid ParishId)> ResolveTargetAsync(
-        RecordDirectDonationCommand command,
-        CancellationToken cancellationToken)
-    {
-        if (command.WorkAreaId is { } workAreaId)
-        {
-            var scope = await access.ForMaterialOfficerWriteAsync(workAreaId, cancellationToken);
-            if (command.SeasonId is { } season && season != scope.SeasonId)
-            {
-                throw DomainRuleException.Validation("DONATION_SEASON_MISMATCH", "The work area belongs to another season.");
-            }
-
-            return (scope, scope.SeasonId, scope.ParishId);
-        }
-
-        if (command.Type == DonationType.Material)
-        {
-            throw DomainRuleException.Validation("DONATION_WORK_AREA_REQUIRED", "A MATERIAL donation needs the receiving work area (BR-37).");
-        }
-
-        var seasonId = command.SeasonId
-            ?? throw DomainRuleException.Validation("DONATION_SEASON_REQUIRED", "Choose the season (or a work area) the money is for.");
-        var parishId = access.RequireParish();
-        var areas = await scopes.ListByParishAsync(parishId, seasonId, cancellationToken);
-        if (areas.Count == 0)
-        {
-            throw DomainRuleException.NotFound("SEASON_NOT_FOUND", "The season does not exist or is outside your parish.");
-        }
-
-        if (!areas.Any(area => area.MaterialOfficerUserId == currentUser.UserId))
-        {
-            throw DomainRuleException.Forbidden("WORK_AREA_SCOPE_DENIED", "Only a material officer of this season can record its donations.");
-        }
-
-        WorkAreaAccess.EnsureWritable(areas[0]);
-        return (null, seasonId, parishId);
     }
 }
 

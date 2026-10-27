@@ -57,6 +57,22 @@ public sealed class DonationStore(ResourceDbContext dbContext) : IDonationStore
         return new PagedResult<Donation>(items, total);
     }
 
+    public async Task<IReadOnlyList<Application.Inventory.QuantityByMaterial>> GetOutstandingPledgesAsync(
+        IReadOnlyCollection<Guid> workAreaIds,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.Donations.AsNoTracking()
+            .Where(donation => donation.WorkAreaId != null && workAreaIds.Contains(donation.WorkAreaId.Value) &&
+                               (donation.Status == DonationStatus.Pledged || donation.Status == DonationStatus.PartiallyReceived))
+            .SelectMany(donation => donation.Items
+                .Where(item => item.PledgedQuantity != null && item.PledgedQuantity > item.ReceivedQuantity)
+                .Select(item => new { WorkAreaId = donation.WorkAreaId!.Value, item.MaterialId, Outstanding = item.PledgedQuantity!.Value - item.ReceivedQuantity }))
+            .GroupBy(row => new { row.WorkAreaId, row.MaterialId })
+            .Select(group => new { group.Key.WorkAreaId, group.Key.MaterialId, Quantity = group.Sum(row => row.Outstanding) })
+            .ToListAsync(cancellationToken);
+        return rows.Select(row => new Application.Inventory.QuantityByMaterial(row.WorkAreaId, row.MaterialId, row.Quantity)).ToList();
+    }
+
     public void Add(Donation donation) => dbContext.Donations.Add(donation);
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)

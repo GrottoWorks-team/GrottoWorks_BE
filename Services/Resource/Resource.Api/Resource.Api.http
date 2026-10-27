@@ -9,6 +9,7 @@
 # leaderAccessToken: a LEADER of the same parish; its sub goes into leaderUserId of the work-area scope.
 @leaderAccessToken = <LEADER access token>
 @leaderUserId = <sub of the LEADER token>
+@volunteerAccessToken = <VOLUNTEER access token of the same parish>
 
 ### F-RES-01 — (interim) project a work area until planning.work-area.* events exist
 PUT {{host}}/internal/work-area-scopes/{{workAreaId}}
@@ -178,5 +179,31 @@ Authorization: Bearer {{accessToken}}
 ### F-RES-13 — donations of the season
 GET {{host}}/api/v1/donations?seasonId={{seasonId}}&type=MATERIAL
 Authorization: Bearer {{accessToken}}
+
+### F-RES-13b — what is still needed (shortage minus outstanding pledges)
+GET {{host}}/api/v1/seasons/{{seasonId}}/contribution-needs
+Authorization: Bearer {{volunteerAccessToken}}
+
+### F-RES-13b — volunteer pledges materials for a required need
+# @name pledge
+POST {{host}}/api/v1/donations/material-pledges
+Content-Type: application/json
+Authorization: Bearer {{volunteerAccessToken}}
+
+{ "workAreaId": "{{workAreaId}}", "items": [{ "materialId": "{{material.response.body.$.data.id}}", "pledgedQuantity": 5 }], "note": "Mang tới thứ Bảy" }
+
+### F-RES-13b — volunteer pledges money for the season (VND)
+POST {{host}}/api/v1/donations/monetary-pledges
+Content-Type: application/json
+Authorization: Bearer {{volunteerAccessToken}}
+
+{ "seasonId": "{{seasonId}}", "amount": 500000 }
+
+### F-RES-13b — cancel the outstanding part of a pledge
+POST {{host}}/api/v1/donations/{{pledge.response.body.$.data.id}}/cancel
+Content-Type: application/json
+Authorization: Bearer {{volunteerAccessToken}}
+
+{ "version": {{pledge.response.body.$.data.version}}, "reason": "Không mua được" }
 
 ###

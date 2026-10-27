@@ -382,3 +382,28 @@ public sealed class FakeDonationStore : Resource.Application.Contributions.IDona
         return Task.CompletedTask;
     }
 }
+
+public sealed class FakeTaskProjectionStore : Resource.Application.Scope.ITaskProjectionStore
+{
+    public List<Resource.Domain.Scope.TaskProjection> Tasks { get; } = [];
+
+    public Task<Resource.Domain.Scope.TaskProjection?> GetAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Tasks.FirstOrDefault(t => t.TaskId == taskId));
+
+    public void Add(Resource.Domain.Scope.TaskProjection task) => Tasks.Add(task);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public Resource.Domain.Scope.TaskProjection Seed(
+        Guid workAreaId,
+        Resource.Domain.Scope.ProjectedTaskStatus status = Resource.Domain.Scope.ProjectedTaskStatus.InProgress,
+        params Guid[] assignees)
+    {
+        var task = Resource.Domain.Scope.TaskProjection.FromSnapshot(
+            new Resource.Domain.Scope.TaskSnapshot(Guid.NewGuid(), workAreaId, "Treo đèn", Resource.Domain.Scope.ProjectedTaskType.Work,
+                status, null, assignees, 1),
+            DateTimeOffset.UtcNow);
+        Tasks.Add(task);
+        return task;
+    }
+}

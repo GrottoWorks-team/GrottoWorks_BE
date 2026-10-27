@@ -68,6 +68,7 @@ Mẫu request: `Resource.Api.http`.
 | `POST /api/v1/donations/{id}/receipts` | `recordDonationReceipt` | MO của work area/season — một lần nhận thực tế của pledge | F-RES-13c |
 | `PUT /internal/work-area-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/season-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
+| `PUT /internal/task-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm `task_projection` (work area, type, status, assignee ACCEPTED) | F-RES-01 |
 
 ## Quy tắc tồn kho (BA 8.5, Contract 7.1)
 
@@ -144,8 +145,8 @@ Mẫu request: `Resource.Api.http`.
 
 ## Việc còn mở
 
-- Consumer `planning.*`, `task.materials.changed`, `task.completion.reviewed`, `task.purchase-task.assigned` +
-  `task_projection` (F-RES-01 phần còn lại) — chờ Lâm publish event và outbox của F-PLT-05.
+- Consumer `planning.*`, `task.status.changed`, `task.materials.changed`, `task.completion.reviewed`,
+  `task.purchase-task.assigned` (F-RES-01 phần còn lại; `task_projection` đã có, đang nạp qua `/internal/task-scopes`) — chờ Lâm publish event và outbox của F-PLT-05.
 - Event đang chỉ log (`LoggingIntegrationEventPublisher`) — chưa qua outbox.
 - Purchase request: VOLUNTEER đọc được request của task PURCHASE mình đã nhận — cần buyer từ `task.purchase-task.assigned`
   (F-RES-01), tạm thời trả 404. Chưa có endpoint hủy (Contract chưa có; BA cho PLANNING/PENDING/APPROVED → CANCELLED).

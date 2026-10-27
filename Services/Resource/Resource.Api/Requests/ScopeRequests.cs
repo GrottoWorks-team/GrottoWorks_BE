@@ -36,3 +36,25 @@ public sealed class SeasonStatusRequest
 {
     [Required] public SeasonStatus? Status { get; init; }
 }
+
+/// <summary>Interim feed of <c>task_projection</c> (F-RES-01) until TaskExecution publishes <c>task.*</c> events.</summary>
+public sealed class TaskSnapshotRequest
+{
+    [Required] public Guid? WorkAreaId { get; init; }
+
+    [Required]
+    [StringLength(200)]
+    public string? Name { get; init; }
+
+    [Required] public ProjectedTaskType? Type { get; init; }
+
+    [Required] public ProjectedTaskStatus? Status { get; init; }
+
+    public Guid? PurchaseRequestId { get; init; }
+
+    /// <summary>Volunteers with an ACCEPTED assignment.</summary>
+    public List<Guid>? AssigneeUserIds { get; init; }
+
+    [Range(0, long.MaxValue)]
+    public long Version { get; init; }
+}

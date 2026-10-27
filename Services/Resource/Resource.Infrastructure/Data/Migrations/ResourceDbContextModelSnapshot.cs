@@ -687,6 +687,60 @@ namespace Resource.Infrastructure.Data.Migrations
                     b.ToTable("purchase_request_state_change", (string)null);
                 });
 
+            modelBuilder.Entity("Resource.Domain.Scope.TaskProjection", b =>
+                {
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
+                    b.PrimitiveCollection<Guid[]>("AssigneeUserIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("assignee_user_ids");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("task_name");
+
+                    b.Property<Guid?>("PurchaseRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_request_id");
+
+                    b.Property<long>("SourceVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_version");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("task_status");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("task_type");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_id");
+
+                    b.HasKey("TaskId");
+
+                    b.HasIndex(new[] { "PurchaseRequestId" }, "ix_task_projection_purchase_request");
+
+                    b.HasIndex(new[] { "WorkAreaId" }, "ix_task_projection_work_area");
+
+                    b.ToTable("task_projection", (string)null);
+                });
+
             modelBuilder.Entity("Resource.Domain.Scope.WorkAreaScope", b =>
                 {
                     b.Property<Guid>("WorkAreaId")

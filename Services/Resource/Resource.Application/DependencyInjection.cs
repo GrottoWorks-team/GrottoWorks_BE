@@ -27,6 +27,7 @@ public static class DependencyInjection
         // F-RES-01 work-area scope projection
         services.AddScoped<ApplyWorkAreaSnapshotHandler>();
         services.AddScoped<ApplySeasonStatusHandler>();
+        services.AddScoped<ApplyTaskSnapshotHandler>();
         services.AddScoped<WorkAreaAccess>();
 
         // F-RES-03 material requirements

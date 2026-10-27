@@ -16,6 +16,8 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
 
     public DbSet<WorkAreaScope> WorkAreaScopes => Set<WorkAreaScope>();
 
+    public DbSet<TaskProjection> TaskProjections => Set<TaskProjection>();
+
     public DbSet<MaterialRequirement> MaterialRequirements => Set<MaterialRequirement>();
 
     public DbSet<MaterialTransaction> MaterialTransactions => Set<MaterialTransaction>();

@@ -35,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<IIntegrationEventPublisher, LoggingIntegrationEventPublisher>();
         services.AddScoped<IMaterialCatalogStore, MaterialCatalogStore>();
         services.AddScoped<IWorkAreaScopeStore, WorkAreaScopeStore>();
+        services.AddScoped<ITaskProjectionStore, TaskProjectionStore>();
         services.AddScoped<IMaterialRequirementStore, MaterialRequirementStore>();
         services.AddScoped<IInventoryStore, InventoryStore>();
         services.AddScoped<IPurchaseRequestStore, PurchaseRequestStore>();

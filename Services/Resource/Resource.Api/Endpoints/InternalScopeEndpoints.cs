@@ -22,6 +22,7 @@ public static class InternalScopeEndpoints
 
         group.MapPut("/work-area-scopes/{workAreaId:guid}", PutWorkAreaAsync).WithName("internalPutWorkAreaScope");
         group.MapPut("/season-scopes/{seasonId:guid}", PutSeasonAsync).WithName("internalPutSeasonStatus");
+        group.MapPut("/task-scopes/{taskId:guid}", PutTaskAsync).WithName("internalPutTaskScope");
     }
 
     private static async Task<IResult> PutWorkAreaAsync(
@@ -47,6 +48,22 @@ public static class InternalScopeEndpoints
 
         httpContext.Response.Headers["X-Projection-Applied"] = applied ? "true" : "false";
         return Results.Ok(ApiResults.Ok(scope, httpContext));
+    }
+
+    private static async Task<IResult> PutTaskAsync(
+        Guid taskId,
+        TaskSnapshotRequest request,
+        HttpContext httpContext,
+        ApplyTaskSnapshotHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var (task, applied) = await handler.HandleAsync(
+            new TaskSnapshot(taskId, request.WorkAreaId!.Value, request.Name, request.Type!.Value, request.Status!.Value,
+                request.PurchaseRequestId, request.AssigneeUserIds ?? [], request.Version),
+            cancellationToken);
+
+        httpContext.Response.Headers["X-Projection-Applied"] = applied ? "true" : "false";
+        return Results.Ok(ApiResults.Ok(task, httpContext));
     }
 
     private static async Task<IResult> PutSeasonAsync(

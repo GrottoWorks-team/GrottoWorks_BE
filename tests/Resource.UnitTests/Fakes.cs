@@ -339,3 +339,36 @@ public sealed class FakeIdentityUserLookup : Resource.Application.Users.IIdentit
         return user;
     }
 }
+
+public sealed class FakeDonationStore : Resource.Application.Contributions.IDonationStore
+{
+    public List<Resource.Domain.Contributions.Donation> Donations { get; } = [];
+
+    public int SaveChangesCount { get; private set; }
+
+    public Task<Resource.Domain.Contributions.Donation?> GetAsync(Guid donationId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Donations.FirstOrDefault(d => d.DonationId == donationId));
+
+    public Task<PagedResult<Resource.Domain.Contributions.Donation>> SearchAsync(
+        Resource.Application.Contributions.DonationSearch search, CancellationToken cancellationToken = default)
+    {
+        var filtered = Donations
+            .Where(d => search.SeasonIds is null || search.SeasonIds.Contains(d.SeasonId))
+            .Where(d => search.WorkAreaId is null || d.WorkAreaId == search.WorkAreaId)
+            .Where(d => search.DonorId is null || d.DonorId == search.DonorId)
+            .Where(d => search.Type is null || d.Type == search.Type)
+            .Where(d => search.Status is null || d.Status == search.Status)
+            .OrderByDescending(d => d.DonationDate)
+            .ToList();
+        return Task.FromResult(new PagedResult<Resource.Domain.Contributions.Donation>(
+            filtered.Skip((search.Page - 1) * search.Size).Take(search.Size).ToList(), filtered.Count));
+    }
+
+    public void Add(Resource.Domain.Contributions.Donation donation) => Donations.Add(donation);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+        return Task.CompletedTask;
+    }
+}

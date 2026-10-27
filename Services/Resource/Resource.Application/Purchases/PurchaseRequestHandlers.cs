@@ -174,31 +174,6 @@ public sealed class PurchaseShortageGuard(InventoryReader reader, IPurchaseReque
     }
 }
 
-/// <summary>Validates the catalog side of request lines: every material exists and is ACTIVE.</summary>
-internal static class PurchaseItemCatalog
-{
-    public static async Task EnsureActiveAsync(
-        IMaterialCatalogStore catalog,
-        IReadOnlyCollection<PurchaseRequestItemInput> items,
-        CancellationToken cancellationToken)
-    {
-        var ids = items.Select(item => item.MaterialId).Distinct().ToList();
-        var materials = (await catalog.GetMaterialsAsync(ids, cancellationToken)).ToDictionary(material => material.MaterialId);
-        foreach (var id in ids)
-        {
-            if (!materials.TryGetValue(id, out var material))
-            {
-                throw DomainRuleException.Validation("MATERIAL_UNKNOWN", $"Material {id} does not exist.");
-            }
-
-            if (material.Status != CatalogStatus.Active)
-            {
-                throw DomainRuleException.Validation("MATERIAL_INACTIVE", $"Material {material.Code} is inactive.");
-            }
-        }
-    }
-}
-
 /// <summary>F-RES-06 <c>listPurchaseRequests</c> (PARISH, LEADER, MO): requests of the caller's parish, newest first.</summary>
 public sealed class ListPurchaseRequestsQueryHandler(
     WorkAreaAccess access,
@@ -273,7 +248,7 @@ public sealed class CreatePurchaseRequestCommandHandler(
         var scope = await access.ForMaterialOfficerWriteAsync(command.WorkAreaId, cancellationToken);
 
         var request = PurchaseRequest.Create(command.WorkAreaId, currentUser.UserId, command.Reason, command.Items, DateTimeOffset.UtcNow);
-        await PurchaseItemCatalog.EnsureActiveAsync(catalog, command.Items, cancellationToken);
+        await MaterialRules.EnsureActiveAsync(catalog, command.Items.Select(item => item.MaterialId), cancellationToken);
         await guard.EnsureCoveredAsync(scope, request, cancellationToken);
 
         store.Add(request);
@@ -299,7 +274,7 @@ public sealed class UpdatePurchaseRequestCommandHandler(
         request.UpdatePlanning(command.Reason, command.Items, DateTimeOffset.UtcNow);
         if (command.Items is not null)
         {
-            await PurchaseItemCatalog.EnsureActiveAsync(catalog, command.Items, cancellationToken);
+            await MaterialRules.EnsureActiveAsync(catalog, command.Items.Select(item => item.MaterialId), cancellationToken);
             await guard.EnsureCoveredAsync(scope, request, cancellationToken);
         }
 

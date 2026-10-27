@@ -62,6 +62,13 @@ public static class DependencyInjection
         services.AddScoped<CreateDonorCommandHandler>();
         services.AddScoped<UpdateDonorCommandHandler>();
 
+        // F-RES-13 direct donations
+        services.AddScoped<DonationProjector>();
+        services.AddScoped<RecordDirectDonationCommandHandler>();
+        services.AddScoped<ListDonationsQueryHandler>();
+        services.AddScoped<GetDonationQueryHandler>();
+        services.AddScoped<ListMyContributionsQueryHandler>();
+
         return services;
     }
 }

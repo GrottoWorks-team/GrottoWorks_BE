@@ -39,6 +39,7 @@ public static class DependencyInjection
         services.AddScoped<IInventoryStore, InventoryStore>();
         services.AddScoped<IPurchaseRequestStore, PurchaseRequestStore>();
         services.AddScoped<IDonorStore, DonorStore>();
+        services.AddScoped<IDonationStore, DonationStore>();
 
         // F-IDN-09 lookup (link a donor to a user account).
         var identityClientOptions = IdentityClientOptions.FromConfiguration(configuration);

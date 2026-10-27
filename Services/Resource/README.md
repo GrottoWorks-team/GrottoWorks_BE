@@ -1,7 +1,7 @@
 # Resource Service
 
 Vật tư, tồn kho, mua sắm, quyên góp, đồ mượn (owner: Vũ — spec §5.2, tag `Materials`, `Purchases`, `Contributions`).
-Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12 — S5.
+Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5.
 
 ## Kiến trúc
 
@@ -57,6 +57,10 @@ Mẫu request: `Resource.Api.http`.
 | `GET /api/v1/donors` | `listDonors` | MO (parish mình), ADMIN (`parishId` tùy chọn) — `q` (tên/sđt/email), `linked`, sort `name|createdAt` | F-RES-12 |
 | `POST /api/v1/donors` | `createDonor` | MO, ADMIN (ADMIN bắt buộc `parishId`); `userId` tùy chọn | F-RES-12 |
 | `PATCH /api/v1/donors/{id}` | `updateDonor` | MO, ADMIN; tên + liên hệ; `version`/`If-Match` | F-RES-12 |
+| `GET /api/v1/donations` | `listDonations` | PARISH, LEADER, MO — `seasonId,workAreaId,donorId,type,status`, mới nhất trước | F-RES-13 |
+| `POST /api/v1/donations` | `recordDirectDonation` | MO: MATERIAL → MO của work area nhận; MONEY → MO của work area (nếu có) hoặc MO của season | F-RES-13 |
+| `GET /api/v1/donations/{id}` | `getDonation` | MO cùng parish; VOLUNTEER chỉ donation của donor gắn với tài khoản mình | F-RES-13 |
+| `GET /api/v1/users/me/contributions` | `listMyContributions` | VOLUNTEER — donation của donor gắn với tài khoản (`seasonId`) | F-RES-13 |
 | `PUT /internal/work-area-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/season-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 
@@ -95,6 +99,20 @@ Mẫu request: `Resource.Api.http`.
 - **Bổ sung so với ERD**: cột `donor.parish_id` — ERD không có, nhưng thiếu nó thì MO parish này đọc được sđt/email donor
   parish khác. MO chỉ thấy/sửa donor parish mình (khác → 404), ADMIN thấy tất cả.
 
+## Donation ghi nhận trực tiếp (F-RES-13, BA 8.7, BR-35..39)
+
+- Tạo donation `RECEIVED` + **một** `donation_receipt` trong cùng transaction. MONEY: `amount > 0`, không có item (BR-36),
+  `workAreaId` tùy chọn (không có thì bắt buộc `seasonId`). MATERIAL: bắt buộc `workAreaId` + ≥ 1 item (BR-37), mỗi
+  material 1 lần, `receivedQuantity > 0`, `0 ≤ unusableQuantity ≤ receivedQuantity`. `receivedAt` mặc định là lúc ghi,
+  không được ở tương lai (cho lệch 5 phút).
+- Tồn kho: mỗi dòng receipt có usable > 0 ghi 1 `material_transaction` `DONATION_RECEIPT` vào work area nhận,
+  `reference = (DONATION_RECEIPT_ITEM, id dòng receipt)` → unique index ledger đảm bảo chỉ post **một lần** (BR-38). Phần
+  unusable không vào kho. Donation, receipt và ledger lưu trong **một** `SaveChanges` (một transaction).
+- Trạng thái item suy ra từ số lượng: `FULLY_RECEIVED`, `UNUSABLE` (nhận nhưng không dùng được hết)…
+- Event: `contribution.receipt.confirmed` cho **mọi** receipt (`isDirect`, `isFirstReceipt`, `donorUserId` null với donor
+  ngoài — không có điểm) + `material.shortage.changed` khi shortage đổi. Payload: `Resource.Contracts/Events/ContributionReceiptConfirmed.cs`.
+- `listMyContributions`: Contract chưa có schema `Contribution` → tạm trả `Donation` của donor gắn với tài khoản.
+
 ## Phạm vi (scope)
 
 - Đọc: mọi user cùng parish (parish khác → 404). Ghi: MO được gán cho work area; duyệt purchase request: Leader được gán
@@ -112,6 +130,8 @@ Mẫu request: `Resource.Api.http`.
 - Purchase request: VOLUNTEER đọc được request của task PURCHASE mình đã nhận — cần buyer từ `task.purchase-task.assigned`
   (F-RES-01), tạm thời trả 404. Chưa có endpoint hủy (Contract chưa có; BA cho PLANNING/PENDING/APPROVED → CANCELLED).
   PARTIALLY_RECEIVED sẽ trừ phần đã giao khỏi "đã xin" khi làm F-RES-10.
+- `recordDirectDonation` cần `Idempotency-Key` (Contract 4.1) nhưng `IdempotencyFilter` (F-PLT-07, Lâm) chưa có → client
+  retry có thể ghi trùng donation. Bằng chứng ảnh (`evidenceFileIds`) chờ F-NTF-01.
 - Gateway: `/purchase-requests/{id}/purchase-tasks` thuộc Task (F-TSK-17) — khi Lâm thêm cần route riêng `Order: -1`.
 - Allocation (F-RES-15) sẽ cộng vào `allocated` và vào lịch sử `getAllocationHistory`.
 - Chưa có integration test tự động (Testcontainers); đã smoke E2E trên PostgreSQL 16 + gateway.

@@ -109,6 +109,230 @@ namespace Resource.Infrastructure.Data.Migrations
                     b.ToTable("material_category", (string)null);
                 });
 
+            modelBuilder.Entity("Resource.Domain.Contributions.Donation", b =>
+                {
+                    b.Property<Guid>("DonationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donation_id");
+
+                    b.Property<decimal?>("Amount")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("CancelReason")
+                        .HasColumnType("text")
+                        .HasColumnName("cancel_reason");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("DonationDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("donation_date");
+
+                    b.Property<Guid>("DonorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donor_id");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("donation_note");
+
+                    b.Property<decimal?>("PledgedAmount")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("pledged_amount");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("donation_status");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("donation_type");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<Guid?>("WorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_id");
+
+                    b.HasKey("DonationId");
+
+                    b.HasIndex(new[] { "DonorId" }, "ix_donation_donor");
+
+                    b.HasIndex(new[] { "SeasonId", "DonationDate" }, "ix_donation_season_date");
+
+                    b.ToTable("donation", null, t =>
+                        {
+                            t.HasCheckConstraint("donation_cancel_reason", "\"donation_status\" <> 'CANCELLED' OR \"cancel_reason\" IS NOT NULL");
+
+                            t.HasCheckConstraint("donation_material_requires_work_area", "\"donation_type\" <> 'MATERIAL' OR \"work_area_id\" IS NOT NULL");
+
+                            t.HasCheckConstraint("donation_type_amount_consistency", "(\"donation_type\" = 'MONEY' AND (\"pledged_amount\" IS NULL OR \"pledged_amount\" > 0) AND (\"amount\" IS NULL OR \"amount\" >= 0)) OR (\"donation_type\" = 'MATERIAL' AND \"amount\" IS NULL AND \"pledged_amount\" IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Resource.Domain.Contributions.DonationItem", b =>
+                {
+                    b.Property<Guid>("DonationItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donation_item_id");
+
+                    b.Property<Guid>("DonationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donation_id");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_id");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("item_note");
+
+                    b.Property<decimal?>("PledgedQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("pledged_quantity");
+
+                    b.Property<decimal>("ReceivedQuantity")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("received_quantity");
+
+                    b.Property<decimal>("UnusableQuantity")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("unusable_quantity");
+
+                    b.HasKey("DonationItemId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("DonationId", "MaterialId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_donation_item_donation_material");
+
+                    b.ToTable("donation_item", null, t =>
+                        {
+                            t.HasCheckConstraint("donation_item_positive_pledge", "\"pledged_quantity\" IS NULL OR \"pledged_quantity\" > 0");
+
+                            t.HasCheckConstraint("donation_item_valid_receipt", "\"received_quantity\" >= 0 AND \"unusable_quantity\" >= 0 AND \"unusable_quantity\" <= \"received_quantity\"");
+                        });
+                });
+
+            modelBuilder.Entity("Resource.Domain.Contributions.DonationReceipt", b =>
+                {
+                    b.Property<Guid>("DonationReceiptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donation_receipt_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("DonationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donation_id");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("receipt_note");
+
+                    b.Property<decimal?>("ReceivedAmount")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("received_amount");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<Guid>("ReceivedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("received_by_user_id");
+
+                    b.HasKey("DonationReceiptId");
+
+                    b.HasIndex("DonationId");
+
+                    b.ToTable("donation_receipt", null, t =>
+                        {
+                            t.HasCheckConstraint("donation_receipt_positive_amount", "\"received_amount\" IS NULL OR \"received_amount\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Resource.Domain.Contributions.DonationReceiptItem", b =>
+                {
+                    b.Property<Guid>("DonationReceiptItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donation_receipt_item_id");
+
+                    b.Property<Guid>("DonationItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donation_item_id");
+
+                    b.Property<Guid>("DonationReceiptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donation_receipt_id");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("item_note");
+
+                    b.Property<decimal>("ReceivedQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("received_quantity");
+
+                    b.Property<decimal>("UnusableQuantity")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("unusable_quantity");
+
+                    b.HasKey("DonationReceiptItemId");
+
+                    b.HasIndex("DonationItemId");
+
+                    b.HasIndex("DonationReceiptId", "DonationItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_donation_receipt_item_receipt_item");
+
+                    b.ToTable("donation_receipt_item", null, t =>
+                        {
+                            t.HasCheckConstraint("donation_receipt_item_valid_quantity", "\"received_quantity\" > 0 AND \"unusable_quantity\" >= 0 AND \"unusable_quantity\" <= \"received_quantity\"");
+                        });
+                });
+
             modelBuilder.Entity("Resource.Domain.Contributions.Donor", b =>
                 {
                     b.Property<Guid>("DonorId")
@@ -535,6 +759,54 @@ namespace Resource.Infrastructure.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Resource.Domain.Contributions.Donation", b =>
+                {
+                    b.HasOne("Resource.Domain.Contributions.Donor", null)
+                        .WithMany()
+                        .HasForeignKey("DonorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Resource.Domain.Contributions.DonationItem", b =>
+                {
+                    b.HasOne("Resource.Domain.Contributions.Donation", null)
+                        .WithMany("Items")
+                        .HasForeignKey("DonationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Resource.Domain.Catalog.Material", null)
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Resource.Domain.Contributions.DonationReceipt", b =>
+                {
+                    b.HasOne("Resource.Domain.Contributions.Donation", null)
+                        .WithMany("Receipts")
+                        .HasForeignKey("DonationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Resource.Domain.Contributions.DonationReceiptItem", b =>
+                {
+                    b.HasOne("Resource.Domain.Contributions.DonationItem", null)
+                        .WithMany()
+                        .HasForeignKey("DonationItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Resource.Domain.Contributions.DonationReceipt", null)
+                        .WithMany("Items")
+                        .HasForeignKey("DonationReceiptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Resource.Domain.Inventory.MaterialRequirement", b =>
                 {
                     b.HasOne("Resource.Domain.Catalog.Material", null)
@@ -575,6 +847,18 @@ namespace Resource.Infrastructure.Data.Migrations
                         .HasForeignKey("PurchaseRequestId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Resource.Domain.Contributions.Donation", b =>
+                {
+                    b.Navigation("Items");
+
+                    b.Navigation("Receipts");
+                });
+
+            modelBuilder.Entity("Resource.Domain.Contributions.DonationReceipt", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Resource.Domain.Purchases.PurchaseRequest", b =>

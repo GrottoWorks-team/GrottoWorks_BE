@@ -150,4 +150,33 @@ If-Match: "{{donor.response.body.$.data.version}}"
 
 { "email": "lan@example.com" }
 
+### F-RES-13 — record a MATERIAL donation already received (usable = received − unusable goes to stock)
+# @name donation
+POST {{host}}/api/v1/donations
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "donorId": "{{donor.response.body.$.data.id}}",
+  "type": "MATERIAL",
+  "workAreaId": "{{workAreaId}}",
+  "items": [{ "materialId": "{{material.response.body.$.data.id}}", "receivedQuantity": 20, "unusableQuantity": 2 }],
+  "note": "Giao tận nơi"
+}
+
+### F-RES-13 — record a MONEY donation for the season (VND)
+POST {{host}}/api/v1/donations
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "donorId": "{{donor.response.body.$.data.id}}", "type": "MONEY", "seasonId": "{{seasonId}}", "amount": 2000000 }
+
+### F-RES-13 — donation with items and receipts
+GET {{host}}/api/v1/donations/{{donation.response.body.$.data.id}}
+Authorization: Bearer {{accessToken}}
+
+### F-RES-13 — donations of the season
+GET {{host}}/api/v1/donations?seasonId={{seasonId}}&type=MATERIAL
+Authorization: Bearer {{accessToken}}
+
 ###

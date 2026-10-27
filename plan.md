@@ -201,12 +201,12 @@ Khởi tạo (S2): `Services/Resource/*`, `resource_db`, outbox/inbox.
 
 | Thứ tự | Function | Việc chính | Phụ thuộc | Sprint |
 |---|---|---|---|---|
-| 0 | Setup | `Services/Readiness/*`, `readiness_db`, projection `work_area_scope` | PAR event | S6 |
-| 1 | F-RDY-02 | `readiness_checklist`, `readiness_item` (`is_required`); `createReadinessCheck`, `replaceReadinessItems`, `getReadinessCheck`; chỉ sửa item khi DRAFT (D-04) | — | S6 |
-| 2 | F-RDY-03 | `recordReadinessResult`, `attachReadinessEvidence`; failed → `readiness.item.failed` | NTF-01 | S7 |
-| 3 | F-RDY-04 | `linkCorrectiveTask` → gọi `POST /internal/tasks` (typed HttpClient + Idempotency-Key) hoặc link task có sẵn; mandatory failed bắt buộc có corrective task | `/internal/tasks` (Lâm, hết S6) | S7 |
-| 4 | F-RDY-05 | `recheckReadinessItem`, `confirmAreaReadiness` (BR-52 → 409), `reopenReadinessCheck` (BR-53 lý do); event `readiness.area.ready/reopened` | RDY-03/04 | S7 |
-| 5 | F-RDY-06 | `getSeasonReadiness` | RDY-05 | S8 |
+| 0 | Setup | `Services/Readiness/*`, `readiness_db`, projection `work_area_scope` + `task_projection` | PAR event | S6 · ✅ 27/10 (feed tạm `/internal/*-scopes`) |
+| 1 | F-RDY-02 | `readiness_checklist`, `readiness_item` (`is_required`); `createReadinessCheck`, `replaceReadinessItems`, `getReadinessCheck`; chỉ sửa item khi PLANNING (D-04, R-12) | — | S6 · ✅ 27/10 |
+| 2 | F-RDY-03 | `recordReadinessResult`, `attachReadinessEvidence`; failed → `readiness.item.failed` | NTF-01 | S7 · ✅ 27/10 (file id chưa kiểm tra, chờ NTF-01) |
+| 3 | F-RDY-04 | `linkCorrectiveTask` → gọi `POST /internal/tasks` (typed HttpClient + Idempotency-Key) hoặc link task có sẵn; mandatory failed bắt buộc có corrective task | `/internal/tasks` (Lâm, hết S6) | S7 · ✅ 27/10 link task có sẵn; tạo mới chờ `/internal/tasks` |
+| 4 | F-RDY-05 | `recheckReadinessItem`, `confirmAreaReadiness` (BR-52 → 409), `reopenReadinessCheck` (BR-53 lý do); event `readiness.area.ready/reopened` | RDY-03/04 | S7 · ✅ 27/10 |
+| 5 | F-RDY-06 | `getSeasonReadiness` | RDY-05 | S8 · ✅ 27/10 |
 
 ### 4.4 Reporting — S6 → S9
 
@@ -309,7 +309,7 @@ Kịch bản nghiệm thu theo owner (Mục 8 spec): Lâm #1–4, #11, #16; Vũ 
 | NotificationAudit | Lâm | NTF-01 | NTF-02..04 | NTF-05, 06 | 0 / 6 |
 | Identity | Vũ | IDN-01..03, 05..09 | IDN-04, 10 | — | ✅ 10 / 10 (S0+S1: IDN-01, 02, 03, 05, 06 · S2 sớm 18/10: IDN-04, 07, 08, 09, 10 — chờ review/merge) |
 | Resource | Vũ | RES-01..07, 09, 10, 12, 13, 15, 17 | RES-11, 13b, 13c, 16, 18, 20 | RES-14 | ✅ 19 / 20 + RES-01 một phần (18/10: scaffold, RES-02..07 · 27/10: RES-09..18, 13b, 13c, 20, task_projection; RES-01 projection + feed tạm, chờ event Parish/Task) |
-| Readiness | Vũ | — | RDY-02..06 | — | 0 / 5 |
+| Readiness | Vũ | — | RDY-02..06 | — | ✅ 5 / 5 (27/10; RDY-04 tạo corrective task chờ `/internal/tasks` của Lâm) |
 | Reporting | Vũ | — | RPT-01..05 | RPT-06 | 0 / 6 |
 
 ---

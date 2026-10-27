@@ -1,0 +1,122 @@
+@host = http://localhost:5185
+# leaderAccessToken: login through Identity (POST /api/v1/auth/login) as the LEADER of the work area.
+@leaderAccessToken = <LEADER access token>
+@leaderUserId = <sub of the LEADER token>
+@parishAccessToken = <PARISH access token of the same parish>
+@volunteerAccessToken = <VOLUNTEER assigned to the corrective task>
+@volunteerUserId = <sub of the VOLUNTEER token>
+@internalApiKey = dev-internal-api-key-change-me-0123456789
+@workAreaId = 00000000-0000-0000-0000-0000000000a1
+@seasonId = 00000000-0000-0000-0000-0000000000b1
+@parishId = 00000000-0000-0000-0000-000000000001
+@correctiveTaskId = 00000000-0000-0000-0000-0000000000c1
+@checkId = <id from createReadinessCheck>
+@itemId = <item id from the checklist>
+
+### (interim) project the work area until planning.work-area.* events exist
+PUT {{host}}/internal/work-area-scopes/{{workAreaId}}
+Content-Type: application/json
+X-Internal-Api-Key: {{internalApiKey}}
+
+{
+  "seasonId": "{{seasonId}}",
+  "parishId": "{{parishId}}",
+  "name": "Hang đá",
+  "status": "IN_PROGRESS",
+  "seasonStatus": "ACTIVE",
+  "leaderUserId": "{{leaderUserId}}",
+  "version": 1
+}
+
+### (interim) project the CORRECTIVE task until task.status.changed exists
+PUT {{host}}/internal/task-scopes/{{correctiveTaskId}}
+Content-Type: application/json
+X-Internal-Api-Key: {{internalApiKey}}
+
+{
+  "workAreaId": "{{workAreaId}}",
+  "name": "Sửa dây điện",
+  "type": "CORRECTIVE",
+  "status": "IN_PROGRESS",
+  "assigneeUserIds": ["{{volunteerUserId}}"],
+  "version": 1
+}
+
+### F-RDY-02 — createReadinessCheck
+POST {{host}}/api/v1/work-areas/{{workAreaId}}/readiness-checks
+Authorization: Bearer {{leaderAccessToken}}
+Content-Type: application/json
+
+{
+  "name": "Kiểm tra hang đá",
+  "items": [
+    { "name": "Điện an toàn", "description": "Không dây hở, có CB", "mandatory": true },
+    { "name": "Hoa trang trí", "mandatory": false }
+  ]
+}
+
+### F-RDY-02 — replaceReadinessItems (PLANNING only; version via If-Match)
+PUT {{host}}/api/v1/readiness-checks/{{checkId}}/items
+Authorization: Bearer {{leaderAccessToken}}
+Content-Type: application/json
+If-Match: "1"
+
+[
+  { "name": "Điện an toàn", "mandatory": true },
+  { "name": "Lối đi thông thoáng", "mandatory": true },
+  { "name": "Hoa trang trí", "mandatory": false }
+]
+
+### F-RDY-02 — getReadinessCheck
+GET {{host}}/api/v1/readiness-checks/{{checkId}}
+Authorization: Bearer {{leaderAccessToken}}
+
+### F-RDY-03 — recordReadinessResult (Contract 10.4)
+PUT {{host}}/api/v1/readiness-checks/{{checkId}}/items/{{itemId}}
+Authorization: Bearer {{leaderAccessToken}}
+Content-Type: application/json
+
+{
+  "result": "FAILED",
+  "note": "One exposed electrical connection remains.",
+  "evidenceFileIds": []
+}
+
+### F-RDY-04 — linkCorrectiveTask (existing CORRECTIVE task of the area)
+PUT {{host}}/api/v1/readiness-checks/{{checkId}}/items/{{itemId}}/corrective-task
+Authorization: Bearer {{leaderAccessToken}}
+Content-Type: application/json
+
+{ "taskId": "{{correctiveTaskId}}" }
+
+### F-RDY-03 — attachReadinessEvidence (volunteer of the corrective task)
+POST {{host}}/api/v1/readiness-checks/{{checkId}}/items/{{itemId}}/evidence
+Authorization: Bearer {{volunteerAccessToken}}
+Content-Type: application/json
+
+[ { "id": "00000000-0000-0000-0000-0000000000f1" } ]
+
+### F-RDY-05 — recheckReadinessItem
+POST {{host}}/api/v1/readiness-checks/{{checkId}}/items/{{itemId}}/recheck
+Authorization: Bearer {{leaderAccessToken}}
+Content-Type: application/json
+
+{ "result": "PASSED", "note": "Đã sửa" }
+
+### F-RDY-05 — confirmAreaReadiness (BR-52)
+POST {{host}}/api/v1/readiness-checks/{{checkId}}/confirm
+Authorization: Bearer {{leaderAccessToken}}
+Content-Type: application/json
+
+{}
+
+### F-RDY-05 — reopenReadinessCheck (BR-53)
+POST {{host}}/api/v1/readiness-checks/{{checkId}}/reopen
+Authorization: Bearer {{parishAccessToken}}
+Content-Type: application/json
+
+{ "reason": "Mưa làm hỏng đèn" }
+
+### F-RDY-06 — getSeasonReadiness
+GET {{host}}/api/v1/seasons/{{seasonId}}/readiness
+Authorization: Bearer {{parishAccessToken}}

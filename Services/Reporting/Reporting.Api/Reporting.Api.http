@@ -1,0 +1,54 @@
+@host = http://localhost:5186
+# adminAccessToken: login through Identity (POST /api/v1/auth/login) as ADMIN.
+@adminAccessToken = <ADMIN access token>
+@parishAccessToken = <PARISH access token>
+@contributionTypeId = 0f3c2a10-0000-4000-8000-000000000001
+@ruleId = <id from createRecognitionRule>
+
+### F-RPT-01 — listContributionTypes
+GET {{host}}/api/v1/contribution-types?status=ACTIVE
+Authorization: Bearer {{parishAccessToken}}
+
+### F-RPT-01 — createContributionType
+POST {{host}}/api/v1/contribution-types
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{ "code": "EMERGENCY_HELP", "name": "Hỗ trợ khẩn cấp", "description": "Hỗ trợ ngoài kế hoạch" }
+
+### F-RPT-01 — updateContributionType (deactivate)
+PATCH {{host}}/api/v1/contribution-types/{{contributionTypeId}}
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{ "status": "INACTIVE" }
+
+### F-RPT-01 — createRecognitionRule (version 1)
+POST {{host}}/api/v1/recognition-rules
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "contributionTypeId": "{{contributionTypeId}}",
+  "name": "Hoàn thành task",
+  "points": 10,
+  "effectiveFrom": "2026-12-01"
+}
+
+### F-RPT-01 — createRecognitionRule (next version, BR-68)
+POST {{host}}/api/v1/recognition-rules
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{ "points": 12, "effectiveFrom": "2026-12-15", "previousRuleId": "{{ruleId}}" }
+
+### F-RPT-01 — listRecognitionRules
+GET {{host}}/api/v1/recognition-rules?status=ACTIVE
+Authorization: Bearer {{parishAccessToken}}
+
+### F-RPT-01 — deactivateRecognitionRule
+POST {{host}}/api/v1/recognition-rules/{{ruleId}}/deactivate
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{ "reason": "Đổi chính sách tính điểm" }

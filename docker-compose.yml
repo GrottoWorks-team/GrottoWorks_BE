@@ -29,6 +29,12 @@ services:
       context: .
       dockerfile: Services/Readiness/Readiness.Api/Dockerfile
 
+  reporting.api:
+    image: ${DOCKER_REGISTRY-}reportingapi
+    build:
+      context: .
+      dockerfile: Services/Reporting/Reporting.Api/Dockerfile
+
   resource.api:
     image: ${DOCKER_REGISTRY-}resourceapi
     build:

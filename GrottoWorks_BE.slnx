@@ -28,6 +28,13 @@
     <Project Path="Services/Readiness/Readiness.Domain/Readiness.Domain.csproj" />
     <Project Path="Services/Readiness/Readiness.Infrastructure/Readiness.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/Services/Reporting/">
+    <Project Path="Services/Reporting/Reporting.Api/Reporting.Api.csproj" />
+    <Project Path="Services/Reporting/Reporting.Application/Reporting.Application.csproj" />
+    <Project Path="Services/Reporting/Reporting.Contracts/Reporting.Contracts.csproj" />
+    <Project Path="Services/Reporting/Reporting.Domain/Reporting.Domain.csproj" />
+    <Project Path="Services/Reporting/Reporting.Infrastructure/Reporting.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/Services/Resource/">
     <Project Path="Services/Resource/Resource.Api/Resource.Api.csproj" />
     <Project Path="Services/Resource/Resource.Application/Resource.Application.csproj" />
@@ -46,6 +53,7 @@
     <Project Path="tests/Identity.UnitTests/Identity.UnitTests.csproj" />
     <Project Path="tests/ParishCoordination.UnitTests/ParishCoordination.UnitTests.csproj" />
     <Project Path="tests/Readiness.UnitTests/Readiness.UnitTests.csproj" />
+    <Project Path="tests/Reporting.UnitTests/Reporting.UnitTests.csproj" />
     <Project Path="tests/Resource.UnitTests/Resource.UnitTests.csproj" />
     <Project Path="tests/TaskExecution.UnitTests/TaskExecution.UnitTests.csproj" />
   </Folder>

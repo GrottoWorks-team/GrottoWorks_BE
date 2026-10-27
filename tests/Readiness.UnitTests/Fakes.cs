@@ -55,11 +55,17 @@ public sealed class FakeScopeStore : IWorkAreaScopeStore
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-    /// <summary>Adds an IN_PROGRESS work area of an ACTIVE season led by <paramref name="leaderId"/>.</summary>
-    public WorkAreaScope Seed(Guid parishId, Guid leaderId, Guid? seasonId = null, string name = "Hang đá", SeasonStatus seasonStatus = SeasonStatus.Active)
+    /// <summary>Adds a work area (IN_PROGRESS by default) of an ACTIVE season led by <paramref name="leaderId"/>.</summary>
+    public WorkAreaScope Seed(
+        Guid parishId,
+        Guid leaderId,
+        Guid? seasonId = null,
+        string name = "Hang đá",
+        SeasonStatus seasonStatus = SeasonStatus.Active,
+        WorkAreaStatus status = WorkAreaStatus.InProgress)
     {
         var scope = WorkAreaScope.FromSnapshot(
-            new WorkAreaSnapshot(Guid.NewGuid(), seasonId ?? Guid.NewGuid(), parishId, name, WorkAreaStatus.InProgress, seasonStatus, null, leaderId, null, 1),
+            new WorkAreaSnapshot(Guid.NewGuid(), seasonId ?? Guid.NewGuid(), parishId, name, status, seasonStatus, null, leaderId, null, 1),
             DateTimeOffset.UtcNow);
         Scopes.Add(scope);
         return scope;

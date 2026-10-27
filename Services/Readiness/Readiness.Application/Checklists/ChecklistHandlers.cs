@@ -256,7 +256,8 @@ public sealed class AttachEvidenceCommandHandler(
 }
 
 /// <summary>
-/// F-RDY-05 <c>confirmAreaReadiness</c> (LEADER, BR-52 → 409 while a mandatory item is not PASSED) and
+/// F-RDY-05 <c>confirmAreaReadiness</c> (LEADER, work area in READINESS_REVIEW, BR-52 → 409 while a mandatory item is not
+/// PASSED) and
 /// <c>reopenReadinessCheck</c> (PARISH of the parish or LEADER of the work area, reason required — BR-53).
 /// </summary>
 public sealed class ReadinessDecisionHandler(
@@ -268,6 +269,14 @@ public sealed class ReadinessDecisionHandler(
     public async Task<ReadinessCheckDto> ConfirmAsync(CheckCommand command, CancellationToken cancellationToken = default)
     {
         var (checklist, scope) = await loader.ForLeaderAsync(command.CheckId, command.Version, cancellationToken);
+        // BA 9.2 / BR-73: a work area reaches READY from READINESS_REVIEW, i.e. once every non-cancelled task is COMPLETED.
+        if (scope.Status != WorkAreaStatus.ReadinessReview)
+        {
+            throw new DomainRuleException(
+                "WORK_AREA_NOT_IN_READINESS_REVIEW",
+                "Readiness can be confirmed only while the work area is in READINESS_REVIEW (every non-cancelled task COMPLETED, BR-73).");
+        }
+
         var now = DateTimeOffset.UtcNow;
         checklist.Confirm(currentUser.UserId, now);
         await store.SaveChangesAsync(cancellationToken);

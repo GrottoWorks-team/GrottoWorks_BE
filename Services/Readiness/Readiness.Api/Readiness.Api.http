@@ -103,7 +103,7 @@ Content-Type: application/json
 
 { "result": "PASSED", "note": "Đã sửa" }
 
-### F-RDY-05 — confirmAreaReadiness (BR-52)
+### F-RDY-05 — confirmAreaReadiness (work area READINESS_REVIEW — BR-73; mandatory items PASSED — BR-52)
 POST {{host}}/api/v1/readiness-checks/{{checkId}}/confirm
 Authorization: Bearer {{leaderAccessToken}}
 Content-Type: application/json

@@ -54,7 +54,8 @@ Ngoài parish → 404; season ARCHIVED → 409 `SEASON_READ_ONLY`.
 - `linkCorrectiveTask`: task phải là CORRECTIVE, cùng khu vực, chưa CANCELLED (theo `task_projection`); task đã
   COMPLETED → item sang RECHECK ngay. Khi Task báo corrective task COMPLETED (`task-scopes` feed) → item sang RECHECK
   trong cùng transaction với projection.
-- `confirmAreaReadiness`: mọi item bắt buộc PASSED, nếu không 409 `READINESS_MANDATORY_NOT_PASSED` (BR-52).
+- `confirmAreaReadiness`: work area phải ở `READINESS_REVIEW` (mọi task không CANCELLED đã COMPLETED — BA 9.2, BR-73), nếu
+  không 409 `WORK_AREA_NOT_IN_READINESS_REVIEW`; mọi item bắt buộc PASSED, nếu không 409 `READINESS_MANDATORY_NOT_PASSED` (BR-52).
   `reopenReadinessCheck`: chỉ READY, lý do bắt buộc (BR-53).
 - Version của checklist bảo vệ mọi thay đổi item (DbContext đánh dấu checklist modified khi item đổi → `xmin` tăng);
   response item trả `checkVersion` để gửi `If-Match` lần sau.
@@ -66,6 +67,6 @@ Ngoài parish → 404; season ARCHIVED → 409 `SEASON_READ_ONLY`.
   (đến khi NotificationAudit giữ liên kết file — F-NTF-01).
 - Tạo corrective task từ Readiness cần `POST /internal/tasks` của TaskExecution; hiện trả 409
   `CORRECTIVE_TASK_CREATE_UNAVAILABLE` khi không gửi `taskId`.
-- Chưa ràng buộc trạng thái work area (READINESS_REVIEW) khi confirm — Contract không nói rõ; Parish nhận
-  `readiness.area.ready` để chuyển trạng thái (F-PAR-09).
+- Trạng thái work area lấy từ projection (`/internal/work-area-scopes`); Parish (F-PAR-09) phải đẩy `READINESS_REVIEW`
+  kịp thời, nếu không Leader bị chặn confirm.
 - Projection nạp qua `/internal/*-scopes` đến khi có consumer `planning.*`, `task.status.changed`.

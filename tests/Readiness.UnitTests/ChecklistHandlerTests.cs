@@ -24,9 +24,11 @@ public sealed class ChecklistHandlerTests
     private InspectionCommandHandler Inspection(ICurrentUser user) =>
         new(new ChecklistLoader(_store, Access(user)), _store, _tasks, _publisher, user);
 
-    private async Task<(WorkAreaScope Scope, ReadinessCheckDto Check)> CreateAsync(SeasonStatus seasonStatus = SeasonStatus.Active)
+    private async Task<(WorkAreaScope Scope, ReadinessCheckDto Check)> CreateAsync(
+        SeasonStatus seasonStatus = SeasonStatus.Active,
+        WorkAreaStatus status = WorkAreaStatus.ReadinessReview)
     {
-        var scope = _scopes.Seed(_parishId, _leaderId, seasonStatus: seasonStatus);
+        var scope = _scopes.Seed(_parishId, _leaderId, seasonStatus: seasonStatus, status: status);
         var check = await new CreateReadinessCheckCommandHandler(Access(LeaderUser()), _store).HandleAsync(
             new CreateReadinessCheckCommand(scope.WorkAreaId, "Kiểm tra", [new("Điện an toàn", null, true), new("Hoa", null, false)]));
         return (scope, check);
@@ -233,5 +235,18 @@ public sealed class ChecklistHandlerTests
 
         var unknown = () => new GetSeasonReadinessQueryHandler(Access(mo), _scopes, _store).HandleAsync(Guid.NewGuid());
         (await unknown.Should().ThrowAsync<DomainRuleException>()).Which.Kind.Should().Be(DomainErrorKind.NotFound);
+    }
+
+    [Fact]
+    public async Task Confirm_needs_the_work_area_in_readiness_review()
+    {
+        var (_, check) = await CreateAsync(status: WorkAreaStatus.InProgress);
+        await Inspection(LeaderUser()).RecordResultAsync(new ItemResultCommand(check.Id, check.Items[0].Id, null, InspectionResult.Passed, null, []));
+
+        var confirm = () => new ReadinessDecisionHandler(new ChecklistLoader(_store, Access(LeaderUser())), _store, _publisher, LeaderUser())
+            .ConfirmAsync(new CheckCommand(check.Id, null));
+
+        (await confirm.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("WORK_AREA_NOT_IN_READINESS_REVIEW");
+        _store.Checklists[0].Status.Should().Be(ChecklistStatus.InReview);
     }
 }

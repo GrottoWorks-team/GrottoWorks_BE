@@ -194,7 +194,7 @@ Khởi tạo (S2): `Services/Resource/*`, `resource_db`, outbox/inbox.
 | 16 | F-RES-16 | `createInventoryAdjustment`; damaged/lost/disposed không quay lại usable (BR-43) | RES-04 | S6 · ✅ 27/10 |
 | 17 | F-RES-17 | `task_material_report(_item)`; submit (Volunteer), list, verify, revision (MO); BR-44..51; event `material-report.submitted/verified` | RES-15, `task.completion.reviewed` | S7 · ✅ 27/10 (task COMPLETED lấy từ `task_projection`, feed tạm) |
 | 18 | F-RES-18 | `borrowed_item`, `borrow_transaction`; loan offer (D-05) → accept/reject → issue/assign/return/incident; job nhắc hạn → `borrowed-item.return-due/overdue` | — | S7 |
-| 19 | F-RES-20 | `POST /internal/support-transfers` (Task gọi đồng bộ): khóa tồn kho nguồn, kiểm tra unallocated, ghi TRANSFER_OUT, idempotent theo itemId; `confirmSupportMaterialReceipt` — `POST /support-response-materials/{itemId}/confirm-receipt` (MO nhận, Resource host) → TRANSFER_IN; event `support.transfer.confirmed` | TSK-15b (Lâm) | S7 |
+| 19 | F-RES-20 | `POST /internal/support-transfers` (Task gọi đồng bộ): khóa tồn kho nguồn, kiểm tra unallocated, ghi TRANSFER_OUT, idempotent theo itemId; `confirmSupportMaterialReceipt` — `POST /support-response-materials/{itemId}/confirm-receipt` (MO nhận, Resource host) → TRANSFER_IN; event `support.transfer.confirmed` | TSK-15b (Lâm) | S7 · ✅ 27/10 (contract cho Lâm: BuildingBlocks README §5.4) |
 | 20 | F-RES-14 | `adjustDonation` — `PATCH /donations/{donationId}` reconcile delta stock + contribution; event `contribution.donation.adjusted` | RES-13c | S8 (P2) |
 
 ### 4.3 Readiness — S6 → S8
@@ -308,7 +308,7 @@ Kịch bản nghiệm thu theo owner (Mục 8 spec): Lâm #1–4, #11, #16; Vũ 
 | TaskExecution | Lâm | TSK-01..04, 06..11, 17 | TSK-05, 12..15, 15b | TSK-16 | 0 / 18 |
 | NotificationAudit | Lâm | NTF-01 | NTF-02..04 | NTF-05, 06 | 0 / 6 |
 | Identity | Vũ | IDN-01..03, 05..09 | IDN-04, 10 | — | ✅ 10 / 10 (S0+S1: IDN-01, 02, 03, 05, 06 · S2 sớm 18/10: IDN-04, 07, 08, 09, 10 — chờ review/merge) |
-| Resource | Vũ | RES-01..07, 09, 10, 12, 13, 15, 17 | RES-11, 13b, 13c, 16, 18, 20 | RES-14 | 🟨 13 / 20 + RES-01 một phần (18/10: scaffold, RES-02..07 · 27/10: RES-12, 13, 13b, 13c, 15, 16, 17, task_projection; RES-01 projection + feed tạm, chờ event Parish/Task) |
+| Resource | Vũ | RES-01..07, 09, 10, 12, 13, 15, 17 | RES-11, 13b, 13c, 16, 18, 20 | RES-14 | 🟨 14 / 20 + RES-01 một phần (18/10: scaffold, RES-02..07 · 27/10: RES-12, 13, 13b, 13c, 15, 16, 17, 20, task_projection; RES-01 projection + feed tạm, chờ event Parish/Task) |
 | Readiness | Vũ | — | RDY-02..06 | — | 0 / 5 |
 | Reporting | Vũ | — | RPT-01..05 | RPT-06 | 0 / 6 |
 

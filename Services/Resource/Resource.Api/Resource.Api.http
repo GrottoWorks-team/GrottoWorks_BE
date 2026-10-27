@@ -253,4 +253,25 @@ Authorization: Bearer {{accessToken}}
 
 { "items": [{ "reportItemId": "{{materialReport.response.body.$.data.items[0].id}}", "remainingQuantity": 1, "damagedQuantity": 0, "lostQuantity": 0 }] }
 
+### F-RES-20 — (TaskExecution) approve a support material → TRANSFER_OUT on the source work area
+POST {{host}}/internal/support-transfers
+Content-Type: application/json
+X-Internal-Api-Key: {{internalApiKey}}
+
+{
+  "supportResponseMaterialId": "00000000-0000-0000-0000-0000000000d1",
+  "sourceWorkAreaId": "{{workAreaId}}",
+  "targetWorkAreaId": "00000000-0000-0000-0000-0000000000a2",
+  "materialId": "{{material.response.body.$.data.id}}",
+  "quantity": 2,
+  "approvedByUserId": "{{leaderUserId}}"
+}
+
+### F-RES-20 — receiving officer confirms what arrived (usable → TRANSFER_IN)
+POST {{host}}/api/v1/support-response-materials/00000000-0000-0000-0000-0000000000d1/confirm-receipt
+Content-Type: application/json
+Authorization: Bearer <MO token of the receiving work area>
+
+{ "receivedUsableQuantity": 2, "receivedUnusableQuantity": 0 }
+
 ###

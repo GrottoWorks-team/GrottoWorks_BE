@@ -58,3 +58,20 @@ public sealed class TaskSnapshotRequest
     [Range(0, long.MaxValue)]
     public long Version { get; init; }
 }
+
+/// <summary>Body of <c>POST /internal/support-transfers</c> (TaskExecution, F-TSK-15b → F-RES-20).</summary>
+public sealed class StartSupportTransferRequest
+{
+    [Required] public Guid? SupportResponseMaterialId { get; init; }
+
+    [Required] public Guid? SourceWorkAreaId { get; init; }
+
+    [Required] public Guid? TargetWorkAreaId { get; init; }
+
+    [Required] public Guid? MaterialId { get; init; }
+
+    [Required] public decimal? Quantity { get; init; }
+
+    /// <summary>Leader who approved the support material.</summary>
+    [Required] public Guid? ApprovedByUserId { get; init; }
+}

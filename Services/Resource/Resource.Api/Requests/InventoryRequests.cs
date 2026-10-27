@@ -68,3 +68,17 @@ public sealed class InventoryAdjustmentRequest
     [StringLength(500, ErrorMessage = "Reason must not exceed 500 characters.")]
     public string? Reason { get; init; }
 }
+
+/// <summary><c>ConfirmTransferReceiptRequest</c> (F-RES-20): what actually arrived; only usable goes to stock.</summary>
+public sealed class ConfirmTransferReceiptRequest
+{
+    public long? Version { get; init; }
+
+    [Required(ErrorMessage = "Received usable quantity is required.")]
+    public decimal? ReceivedUsableQuantity { get; init; }
+
+    public decimal? ReceivedUnusableQuantity { get; init; }
+
+    [StringLength(2000, ErrorMessage = "Note must not exceed 2000 characters.")]
+    public string? Note { get; init; }
+}

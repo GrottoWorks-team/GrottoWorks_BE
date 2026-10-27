@@ -56,6 +56,10 @@ public static class DependencyInjection
         services.AddScoped<VerifyMaterialReportCommandHandler>();
         services.AddScoped<RequestReportRevisionCommandHandler>();
 
+        // F-RES-20 support transfers
+        services.AddScoped<StartSupportTransferCommandHandler>();
+        services.AddScoped<ConfirmTransferReceiptCommandHandler>();
+
         // F-RES-05 shortages
         services.AddScoped<ShortageTracker>();
         services.AddScoped<GetWorkAreaShortagesQueryHandler>();

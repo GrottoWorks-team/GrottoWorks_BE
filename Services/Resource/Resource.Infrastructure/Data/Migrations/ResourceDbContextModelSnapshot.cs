@@ -603,6 +603,87 @@ namespace Resource.Infrastructure.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Resource.Domain.Inventory.SupportTransfer", b =>
+                {
+                    b.Property<Guid>("SupportResponseMaterialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("support_response_material_id");
+
+                    b.Property<Guid>("ApprovedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by_user_id");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_id");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("transfer_note");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("transfer_quantity");
+
+                    b.Property<DateTimeOffset?>("ReceivedConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_confirmed_at");
+
+                    b.Property<Guid?>("ReceivedConfirmedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("received_confirmed_by_user_id");
+
+                    b.Property<decimal?>("ReceivedUnusableQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("received_unusable_quantity");
+
+                    b.Property<decimal?>("ReceivedUsableQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("received_usable_quantity");
+
+                    b.Property<Guid>("SourceWorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_work_area_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("transfer_status");
+
+                    b.Property<Guid>("TargetWorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_work_area_id");
+
+                    b.Property<DateTimeOffset>("TransferredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("transferred_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("SupportResponseMaterialId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex(new[] { "TargetWorkAreaId", "Status" }, "ix_support_transfer_target_status");
+
+                    b.ToTable("support_transfer", null, t =>
+                        {
+                            t.HasCheckConstraint("support_transfer_different_work_areas", "\"source_work_area_id\" <> \"target_work_area_id\"");
+
+                            t.HasCheckConstraint("support_transfer_positive_quantity", "\"transfer_quantity\" > 0");
+
+                            t.HasCheckConstraint("support_transfer_valid_receipt", "(\"received_usable_quantity\" IS NULL OR \"received_usable_quantity\" >= 0) AND (\"received_unusable_quantity\" IS NULL OR \"received_unusable_quantity\" >= 0)");
+                        });
+                });
+
             modelBuilder.Entity("Resource.Domain.Inventory.TaskMaterialReport", b =>
                 {
                     b.Property<Guid>("TaskMaterialReportId")
@@ -1079,6 +1160,15 @@ namespace Resource.Infrastructure.Data.Migrations
                 });
 
             modelBuilder.Entity("Resource.Domain.Inventory.MaterialTransaction", b =>
+                {
+                    b.HasOne("Resource.Domain.Catalog.Material", null)
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Resource.Domain.Inventory.SupportTransfer", b =>
                 {
                     b.HasOne("Resource.Domain.Catalog.Material", null)
                         .WithMany()

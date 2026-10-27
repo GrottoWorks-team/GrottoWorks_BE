@@ -489,3 +489,15 @@ public sealed class FakeTaskMaterialReportStore : Resource.Application.Inventory
         return Task.CompletedTask;
     }
 }
+
+public sealed class FakeSupportTransferStore : Resource.Application.Inventory.ISupportTransferStore
+{
+    public List<Resource.Domain.Inventory.SupportTransfer> Transfers { get; } = [];
+
+    public Task<Resource.Domain.Inventory.SupportTransfer?> GetAsync(Guid supportResponseMaterialId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Transfers.FirstOrDefault(t => t.SupportResponseMaterialId == supportResponseMaterialId));
+
+    public void Add(Resource.Domain.Inventory.SupportTransfer transfer) => Transfers.Add(transfer);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+}

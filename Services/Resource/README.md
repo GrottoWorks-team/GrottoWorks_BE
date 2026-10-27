@@ -1,7 +1,7 @@
 # Resource Service
 
 Vật tư, tồn kho, mua sắm, quyên góp, đồ mượn (owner: Vũ — spec §5.2, tag `Materials`, `Purchases`, `Contributions`).
-Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5; F-RES-13b, 13c, 15, 16 — S6; F-RES-17 — S7.
+Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5; F-RES-13b, 13c, 15, 16 — S6; F-RES-17, 20 — S7.
 
 ## Kiến trúc
 
@@ -73,9 +73,11 @@ Mẫu request: `Resource.Api.http`.
 | `GET /api/v1/tasks/{id}/material-reports` | `listTaskMaterialReports` | LEADER, MO cùng parish; VOLUNTEER được giao task | F-RES-17 |
 | `POST /api/v1/task-material-reports/{id}/verify` | `verifyTaskMaterialReport` | MO của work area — trả phần remaining về kho | F-RES-17 |
 | `POST /api/v1/task-material-reports/{id}/request-revision` | `requestMaterialReportRevision` | MO của work area — lý do bắt buộc | F-RES-17 |
+| `POST /api/v1/support-response-materials/{itemId}/confirm-receipt` | `confirmSupportMaterialReceipt` | MO của work area nhận — `TRANSFER_IN` phần usable | F-RES-20 |
 | `PUT /internal/work-area-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/season-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/task-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm `task_projection` (work area, type, status, assignee ACCEPTED) | F-RES-01 |
+| `POST /internal/support-transfers` | — | TaskExecution (`X-Internal-Api-Key`) — `TRANSFER_OUT`, idempotent theo `supportResponseMaterialId` (BuildingBlocks README §5.4) | F-RES-20 |
 
 ## Quy tắc tồn kho (BA 8.5, Contract 7.1)
 
@@ -164,6 +166,16 @@ Mẫu request: `Resource.Api.http`.
   Allocation giữ nguyên (BR-51); `usedQuantity = allocated − remaining − damaged − lost`. Một transaction.
 - Event `material-report.submitted` (kèm MO cần verify), `material-report.verified`.
 - **Bổ sung so với ERD**: cột `task_material_report.revision_reason` (lý do trả về cho volunteer xem).
+
+## Chuyển kho hỗ trợ vật tư (F-RES-20, D-03, BR-63/64, R-08/22/23)
+
+- Task duyệt → gọi đồng bộ `POST /internal/support-transfers`: dưới lock tồn kho work area **nguồn**, số lượng ≤ phần
+  chưa phân bổ (BR-63) → `TRANSFER_OUT`. Idempotent theo `supportResponseMaterialId` (smoke: 5 lần gọi song song y hệt →
+  1×201, 4×200, đúng 1 dòng ledger). Hai work area phải khác nhau, cùng season.
+- Bảng kỹ thuật `support_transfer` (khóa = `support_response_material_id` của Task) giữ trạng thái `IN_TRANSIT → RECEIVED`
+  và số đã gửi để MO bên nhận xác nhận đúng; `support_response_material` vẫn thuộc TaskExecution.
+- Một MO bên nhận xác nhận (R-23): `usable + unusable ≤ đã gửi`, chỉ usable → `TRANSFER_IN` (BR-64). Cả hai dòng ledger
+  `reference = (SUPPORT_RESPONSE_MATERIAL, itemId)` → mỗi loại post một lần. Event `support.transfer.confirmed`.
 
 ## Phạm vi (scope)
 

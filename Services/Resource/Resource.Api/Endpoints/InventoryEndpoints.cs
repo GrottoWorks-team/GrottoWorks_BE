@@ -62,6 +62,18 @@ public static class InventoryEndpoints
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
 
+        app.MapPost("/api/v1/support-response-materials/{itemId:guid}/confirm-receipt", ConfirmTransferReceiptAsync)
+            .WithName("confirmSupportMaterialReceipt")
+            .WithTags("Support")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer))
+            .Accepts<ConfirmTransferReceiptRequest>("application/json")
+            .Produces<ApiResponse<SupportTransferDto>>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
         app.MapGet("/api/v1/materials/{materialId:guid}/allocation-history", GetHistoryAsync)
             .WithName("getAllocationHistory")
             .WithTags("Materials")
@@ -137,6 +149,20 @@ public static class InventoryEndpoints
                 request.Quantity!.Value, request.TransactionDate, request.Reason),
             cancellationToken);
         return Results.Json(ApiResults.Ok(transaction, httpContext), statusCode: StatusCodes.Status201Created);
+    }
+
+    private static async Task<IResult> ConfirmTransferReceiptAsync(
+        Guid itemId,
+        ConfirmTransferReceiptRequest request,
+        HttpContext httpContext,
+        ConfirmTransferReceiptCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var transfer = await handler.HandleAsync(
+            new ConfirmTransferReceiptCommand(itemId, VersionHeader.Resolve(request.Version, httpContext, "SUPPORT_TRANSFER_VERSION_MISMATCH"),
+                request.ReceivedUsableQuantity!.Value, request.ReceivedUnusableQuantity ?? 0, request.Note),
+            cancellationToken);
+        return Results.Ok(ApiResults.Ok(transfer, httpContext));
     }
 
     /// <summary><c>AllocationFilter</c>: seasonId, workAreaId, taskId, materialId; newest first; paged.</summary>

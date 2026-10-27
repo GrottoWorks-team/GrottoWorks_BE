@@ -26,6 +26,8 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
 
     public DbSet<TaskMaterialReport> TaskMaterialReports => Set<TaskMaterialReport>();
 
+    public DbSet<SupportTransfer> SupportTransfers => Set<SupportTransfer>();
+
     public DbSet<PurchaseRequest> PurchaseRequests => Set<PurchaseRequest>();
 
     public DbSet<PurchaseRequestStateChange> PurchaseRequestStateChanges => Set<PurchaseRequestStateChange>();

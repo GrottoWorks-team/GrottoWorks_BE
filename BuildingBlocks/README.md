@@ -105,3 +105,25 @@ Cho tới khi ParishCoordination publish `planning.work-area.*` / `planning.seas
 
 **Đề nghị payload event của Lâm** chứa đúng các trường trên (+ envelope Mục 8), để consumer của Resource /
 Readiness / Task chỉ map 1–1. Header `X-Internal-Api-Key` như §5.
+
+### 5.3 Resource — feed tạm `task_projection` (F-RES-01)
+
+Cho tới khi TaskExecution publish `task.status.changed` / `task.assignment.responded` / `task.purchase-task.assigned`:
+
+- `PUT http://resource.api:8080/internal/task-scopes/{taskId}` — body
+  `{ workAreaId, name, type, status, purchaseRequestId?, assigneeUserIds[], version }` (`type`: `WORK|PURCHASE|CORRECTIVE`;
+  `status`: `OPEN|NOT_STARTED|IN_PROGRESS|SUBMITTED|REVISION_REQUIRED|COMPLETED|CANCELLED`; `assigneeUserIds` = volunteer có
+  assignment `ACCEPTED`; PURCHASE bắt buộc `purchaseRequestId`; work area phải được project trước).
+
+### 5.4 Resource — chuyển kho hỗ trợ vật tư (F-RES-20 ↔ F-TSK-15b, R-08)
+
+- `POST http://resource.api:8080/internal/support-transfers` — body
+  `{ supportResponseMaterialId, sourceWorkAreaId, targetWorkAreaId, materialId, quantity, approvedByUserId }`.
+  - `201` → đã ghi `TRANSFER_OUT` cho work area nguồn; `200` → gọi lại y hệt (idempotent theo `supportResponseMaterialId`,
+    không ghi thêm); `409 MATERIAL_INSUFFICIENT_AVAILABLE` → thiếu tồn chưa phân bổ (trả thẳng cho Leader);
+    `409 SUPPORT_TRANSFER_CONFLICT` → cùng id nhưng dữ liệu khác; `422` → work area khác season / trùng nhau / chưa project.
+  - Body trả về `SupportTransfer { supportResponseMaterialId, status: IN_TRANSIT|RECEIVED, quantity, ... }`.
+- MO bên nhận gọi `POST /api/v1/support-response-materials/{itemId}/confirm-receipt` (Resource host, gateway route riêng)
+  `{ receivedUsableQuantity, receivedUnusableQuantity?, note?, version? }` → `TRANSFER_IN` phần usable, event
+  `support.transfer.confirmed { supportResponseMaterialId, sentQuantity, receivedUsableQuantity, receivedUnusableQuantity, ... }`
+  để Task cập nhật FULFILLED/PARTIALLY_FULFILLED (consumer idempotent theo `supportResponseMaterialId`).

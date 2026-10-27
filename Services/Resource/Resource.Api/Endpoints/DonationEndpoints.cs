@@ -37,6 +37,17 @@ public static class DonationEndpoints
             .Produces<ApiResponse<DonationDto>>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapPatch("/{donationId:guid}", AdjustAsync)
+            .WithName("adjustDonation")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer))
+            .Accepts<AdjustDonationRequest>("application/json")
+            .Produces<ApiResponse<DonationDto>>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
         group.MapPost("/material-pledges", PledgeMaterialAsync)
             .WithName("pledgeMaterialDonation")
             .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Volunteer))
@@ -132,6 +143,27 @@ public static class DonationEndpoints
         GetDonationQueryHandler handler,
         CancellationToken cancellationToken) =>
         Results.Ok(ApiResults.Ok(await handler.HandleAsync(donationId, cancellationToken), httpContext));
+
+    private static async Task<IResult> AdjustAsync(
+        Guid donationId,
+        AdjustDonationRequest request,
+        HttpContext httpContext,
+        AdjustDonationCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var donation = await handler.HandleAsync(
+            new AdjustDonationCommand(
+                donationId,
+                VersionHeader.Resolve(request.Version, httpContext, "DONATION_VERSION_MISMATCH"),
+                request.ReceiptId!.Value,
+                request.ReceivedAmount,
+                (request.Items ?? [])
+                    .Select(item => new ReceiptLineCorrection(item.DonationReceiptItemId!.Value, item.ReceivedQuantity!.Value, item.UnusableQuantity ?? 0))
+                    .ToList(),
+                request.Reason),
+            cancellationToken);
+        return Results.Ok(ApiResults.Ok(donation, httpContext));
+    }
 
     private static async Task<IResult> PledgeMaterialAsync(
         MaterialPledgeRequest request,

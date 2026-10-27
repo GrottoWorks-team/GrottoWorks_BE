@@ -98,6 +98,9 @@ public static class DependencyInjection
         services.AddScoped<PledgeMoneyCommandHandler>();
         services.AddScoped<CancelPledgeCommandHandler>();
 
+        // F-RES-14 donation corrections
+        services.AddScoped<AdjustDonationCommandHandler>();
+
         // F-RES-18 loan offers and borrowed items
         services.AddScoped<BorrowedItemAccess>();
         services.AddScoped<OfferItemForLoanCommandHandler>();

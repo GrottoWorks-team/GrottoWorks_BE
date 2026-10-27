@@ -1,7 +1,7 @@
 # Resource Service
 
 Vật tư, tồn kho, mua sắm, quyên góp, đồ mượn (owner: Vũ — spec §5.2, tag `Materials`, `Purchases`, `Contributions`).
-Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5; F-RES-13b, 13c, 15, 16 — S6; F-RES-17, 18, 20 — S7.
+Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5; F-RES-13b, 13c, 15, 16 — S6; F-RES-17, 18, 20 — S7; F-RES-14 — S8.
 
 ## Kiến trúc
 
@@ -80,6 +80,7 @@ Mẫu request: `Resource.Api.http`.
 | `GET /api/v1/borrowed-items` | `listBorrowedItems` | PARISH, LEADER, MO — `seasonId,workAreaId,status,overdue` | F-RES-18 |
 | `GET /api/v1/borrowed-items/overdue` | `listOverdueBorrowedItems` | MO — `date`, `withinDays` (mặc định 2) | F-RES-18 |
 | `POST /api/v1/borrowed-items/{id}/issue` · `PUT …/assignment` · `POST …/return` · `POST …/incidents` | `issueBorrowedItem` · `assignBorrowedItem` · `returnBorrowedItem` · `recordBorrowedItemIncident` | MO | F-RES-18 |
+| `PATCH /api/v1/donations/{id}` | `adjustDonation` | MO của work area/season — sửa một receipt, lý do bắt buộc, đối soát kho | F-RES-14 |
 | `PUT /internal/work-area-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/season-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/task-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm `task_projection` (work area, type, status, assignee ACCEPTED) | F-RES-01 |
@@ -143,6 +144,10 @@ Mẫu request: `Resource.Api.http`.
   MONEY: `amount > 0`, season bắt buộc, work area tùy chọn.
 - `listContributionNeeds`: `remainingNeed = max(0, shortage − pledgedOutstanding)` để volunteer không pledge trùng.
   Nhu cầu tiền cần ngân sách season (ParishCoordination) → chưa liệt kê.
+- Sửa donation (F-RES-14): sửa số liệu **một receipt** (`receiptId` + dòng mới hoặc `receivedAmount`), lý do bắt buộc.
+  Chênh lệch usable: tăng → `DONATION_RECEIPT`, giảm → `ADJUSTMENT_DISPOSED` (chỉ trong phần chưa phân bổ, có lock),
+  `reference = (INVENTORY_ADJUSTMENT, id lần sửa)`, lý do ở note. Tổng/trạng thái donation tính lại. Event
+  `contribution.donation.adjusted` (delta + lý do) để Reporting sửa contribution.
 - Lần nhận (F-RES-13c, BR-38): MONEY → `receivedAmount`; MATERIAL → `items[{donationItemId, receivedQuantity,
   unusableQuantity}]`. Cộng dồn received/unusable/amount; PLEDGED → PARTIALLY_RECEIVED → RECEIVED khi đủ; nhận vượt
   cam kết vẫn ghi và trả `warnings`. Phần usable của mỗi dòng post kho đúng một lần như donation trực tiếp. Donation

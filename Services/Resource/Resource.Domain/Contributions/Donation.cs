@@ -37,6 +37,18 @@ public sealed record ReceiptLineInput(Guid DonationItemId, decimal ReceivedQuant
 /// <summary>The receipt just recorded and the non-blocking warnings it raised (BA 8.7: receiving more than pledged).</summary>
 public sealed record RecordedReceipt(DonationReceipt Receipt, bool IsFirstReceipt, IReadOnlyList<string> Warnings);
 
+/// <summary>Corrected figures of one receipt line (F-RES-14).</summary>
+public sealed record ReceiptLineCorrection(Guid DonationReceiptItemId, decimal ReceivedQuantity, decimal UnusableQuantity);
+
+/// <summary>Change of one receipt line made by a correction; <see cref="UsableDelta"/> is what stock must absorb.</summary>
+public sealed record ReceiptLineDelta(Guid DonationReceiptItemId, Guid DonationItemId, Guid MaterialId, decimal ReceivedDelta, decimal UnusableDelta)
+{
+    public decimal UsableDelta => ReceivedDelta - UnusableDelta;
+}
+
+/// <summary>Outcome of <see cref="Donation.AdjustReceipt"/>.</summary>
+public sealed record DonationAdjustment(DonationReceipt Receipt, decimal AmountDelta, IReadOnlyList<ReceiptLineDelta> Lines);
+
 /// <summary>One material actually received: <paramref name="UnusableQuantity"/> is checked on arrival (BR-38).</summary>
 public sealed record ReceivedMaterialInput(Guid MaterialId, decimal ReceivedQuantity, decimal UnusableQuantity, string? Note);
 
@@ -348,6 +360,72 @@ public sealed class Donation
         return new RecordedReceipt(receipt, isFirst, warnings);
     }
 
+    /// <summary>
+    /// F-RES-14 <c>adjustDonation</c>: corrects the recorded figures of one receipt (wrong count, unusable found later).
+    /// Cached totals and the status are recomputed; the caller reconciles stock with the returned deltas (ERD note
+    /// "changes to recorded quantities require atomic reconciliation"). A cancelled donation stays cancelled.
+    /// </summary>
+    public DonationAdjustment AdjustReceipt(Guid receiptId, decimal? amount, IReadOnlyCollection<ReceiptLineCorrection> lines, DateTimeOffset now)
+    {
+        var receipt = _receipts.FirstOrDefault(candidate => candidate.DonationReceiptId == receiptId)
+            ?? throw DomainRuleException.Validation("DONATION_RECEIPT_UNKNOWN", "The receipt does not belong to this donation.");
+
+        decimal amountDelta = 0;
+        var deltas = new List<ReceiptLineDelta>();
+        if (Type == DonationType.Money)
+        {
+            if (lines.Count > 0)
+            {
+                throw DomainRuleException.Validation("DONATION_MONEY_HAS_ITEMS", "A MONEY donation has no material items (BR-36).");
+            }
+
+            var corrected = Money(amount ?? throw DomainRuleException.Validation("DONATION_AMOUNT_REQUIRED", "Give the corrected amount."));
+            amountDelta = corrected - receipt.ReceivedAmount!.Value;
+            receipt.CorrectAmount(corrected);
+            Amount = (Amount ?? 0) + amountDelta;
+        }
+        else
+        {
+            if (amount is not null)
+            {
+                throw DomainRuleException.Validation("DONATION_MATERIAL_HAS_AMOUNT", "A MATERIAL donation has no money amount.");
+            }
+
+            if (lines.Count == 0 || lines.Select(line => line.DonationReceiptItemId).Distinct().Count() != lines.Count)
+            {
+                throw DomainRuleException.Validation("DONATION_ADJUSTMENT_ITEMS_INVALID", "List each receipt line to correct exactly once.");
+            }
+
+            foreach (var line in lines)
+            {
+                var receiptLine = receipt.Items.FirstOrDefault(candidate => candidate.DonationReceiptItemId == line.DonationReceiptItemId)
+                    ?? throw DomainRuleException.Validation("DONATION_RECEIPT_ITEM_UNKNOWN", $"Line {line.DonationReceiptItemId} is not part of this receipt.");
+                var item = _items.Single(candidate => candidate.DonationItemId == receiptLine.DonationItemId);
+                var (receivedDelta, unusableDelta) = receiptLine.Correct(line.ReceivedQuantity, line.UnusableQuantity);
+                item.AddReceived(receivedDelta, unusableDelta);
+                deltas.Add(new ReceiptLineDelta(receiptLine.DonationReceiptItemId, item.DonationItemId, item.MaterialId, receivedDelta, unusableDelta));
+            }
+        }
+
+        if (amountDelta == 0 && deltas.All(delta => delta.ReceivedDelta == 0 && delta.UnusableDelta == 0))
+        {
+            throw DomainRuleException.Validation("DONATION_ADJUSTMENT_EMPTY", "Nothing changes; the receipt already has these figures.");
+        }
+
+        if (Status != DonationStatus.Cancelled)
+        {
+            Status = IsFullyReceived() ? DonationStatus.Received : DonationStatus.PartiallyReceived;
+        }
+
+        UpdatedAt = now.ToUniversalTime();
+        return new DonationAdjustment(receipt, amountDelta, deltas);
+    }
+
+    private bool IsFullyReceived() =>
+        Type == DonationType.Money
+            ? PledgedAmount is not { } pledged || (Amount ?? 0) >= pledged
+            : _items.All(item => item.OutstandingQuantity == 0);
+
     public void EnsureVersion(long? expected)
     {
         if (expected is { } value && value != Version)
@@ -524,6 +602,8 @@ public sealed class DonationReceipt
             CreatedAt = now.ToUniversalTime()
         };
 
+    internal void CorrectAmount(decimal amount) => ReceivedAmount = amount;
+
     internal void AddLine(DonationItem item, decimal received, decimal unusable, string? note)
     {
         var line = DonationReceiptItem.Create(DonationReceiptId, item, received, unusable, note);
@@ -553,16 +633,19 @@ public sealed class DonationReceiptItem
 
     public string? Note { get; private set; }
 
+    /// <summary>Applies corrected figures and returns how much received / unusable changed.</summary>
+    internal (decimal Received, decimal Unusable) Correct(decimal received, decimal unusable)
+    {
+        Validate(received, unusable);
+        var deltas = (received - ReceivedQuantity, unusable - UnusableQuantity);
+        ReceivedQuantity = received;
+        UnusableQuantity = unusable;
+        return deltas;
+    }
+
     internal static DonationReceiptItem Create(Guid receiptId, DonationItem item, decimal received, decimal unusable, string? note)
     {
-        var receivedQuantity = Quantity.Positive(received, "DONATION_RECEIVED_QUANTITY_INVALID", "Received quantity");
-        if (unusable < 0 || unusable > receivedQuantity || decimal.Round(unusable, 2) != unusable)
-        {
-            throw DomainRuleException.Validation(
-                "DONATION_UNUSABLE_QUANTITY_INVALID",
-                "Unusable quantity must be between 0 and the received quantity, with at most 2 decimals.");
-        }
-
+        var receivedQuantity = Validate(received, unusable);
         return new DonationReceiptItem
         {
             DonationReceiptItemId = Guid.NewGuid(),
@@ -572,5 +655,18 @@ public sealed class DonationReceiptItem
             UnusableQuantity = unusable,
             Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim()
         };
+    }
+
+    private static decimal Validate(decimal received, decimal unusable)
+    {
+        var receivedQuantity = Quantity.Positive(received, "DONATION_RECEIVED_QUANTITY_INVALID", "Received quantity");
+        if (unusable < 0 || unusable > receivedQuantity || decimal.Round(unusable, 2) != unusable)
+        {
+            throw DomainRuleException.Validation(
+                "DONATION_UNUSABLE_QUANTITY_INVALID",
+                "Unusable quantity must be between 0 and the received quantity, with at most 2 decimals.");
+        }
+
+        return receivedQuantity;
     }
 }

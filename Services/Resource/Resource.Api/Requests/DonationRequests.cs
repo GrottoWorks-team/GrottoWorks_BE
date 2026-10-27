@@ -110,3 +110,33 @@ public sealed class DonationReceiptRequest
     [StringLength(2000, ErrorMessage = "Note must not exceed 2000 characters.")]
     public string? Note { get; init; }
 }
+
+public sealed class ReceiptLineCorrectionRequest
+{
+    [Required(ErrorMessage = "Receipt line is required.")]
+    public Guid? DonationReceiptItemId { get; init; }
+
+    [Required(ErrorMessage = "Received quantity is required.")]
+    public decimal? ReceivedQuantity { get; init; }
+
+    public decimal? UnusableQuantity { get; init; }
+}
+
+/// <summary><c>AdjustDonationRequest</c> (F-RES-14): corrected figures of one receipt and why.</summary>
+public sealed class AdjustDonationRequest
+{
+    public long? Version { get; init; }
+
+    [Required(ErrorMessage = "Receipt is required.")]
+    public Guid? ReceiptId { get; init; }
+
+    /// <summary>MONEY: corrected amount of the receipt (VND).</summary>
+    public decimal? ReceivedAmount { get; init; }
+
+    /// <summary>MATERIAL: corrected lines of the receipt.</summary>
+    public List<ReceiptLineCorrectionRequest>? Items { get; init; }
+
+    [Required(ErrorMessage = "Reason is required.")]
+    [StringLength(500, ErrorMessage = "Reason must not exceed 500 characters.")]
+    public string? Reason { get; init; }
+}

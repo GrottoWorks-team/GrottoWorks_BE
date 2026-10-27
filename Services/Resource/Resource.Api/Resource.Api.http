@@ -238,4 +238,19 @@ Authorization: Bearer {{accessToken}}
 
 { "workAreaId": "{{workAreaId}}", "materialId": "{{material.response.body.$.data.id}}", "type": "DAMAGED", "quantity": 1, "reason": "Mưa làm chập" }
 
+### F-RES-17 — assigned volunteer reports what is left after the task (one line per allocation item)
+# @name materialReport
+POST {{host}}/api/v1/tasks/00000000-0000-0000-0000-0000000000c1/material-reports
+Content-Type: application/json
+Authorization: Bearer {{volunteerAccessToken}}
+
+{ "items": [{ "materialAllocationItemId": "<allocation item id>", "remainingQuantity": 1, "damagedQuantity": 0, "lostQuantity": 0 }], "note": "Xong việc" }
+
+### F-RES-17 — officer verifies; verified remaining goes back to stock (TASK_RETURN)
+POST {{host}}/api/v1/task-material-reports/{{materialReport.response.body.$.data.id}}/verify
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "items": [{ "reportItemId": "{{materialReport.response.body.$.data.items[0].id}}", "remainingQuantity": 1, "damagedQuantity": 0, "lostQuantity": 0 }] }
+
 ###

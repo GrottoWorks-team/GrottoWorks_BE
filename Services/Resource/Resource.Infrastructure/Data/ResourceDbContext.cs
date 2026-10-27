@@ -24,6 +24,8 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
 
     public DbSet<MaterialAllocation> MaterialAllocations => Set<MaterialAllocation>();
 
+    public DbSet<TaskMaterialReport> TaskMaterialReports => Set<TaskMaterialReport>();
+
     public DbSet<PurchaseRequest> PurchaseRequests => Set<PurchaseRequest>();
 
     public DbSet<PurchaseRequestStateChange> PurchaseRequestStateChanges => Set<PurchaseRequestStateChange>();

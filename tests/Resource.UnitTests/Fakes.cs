@@ -468,3 +468,24 @@ public sealed class FakeStockLock : Resource.Application.Abstractions.IWorkAreaS
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }
+
+public sealed class FakeTaskMaterialReportStore : Resource.Application.Inventory.ITaskMaterialReportStore
+{
+    public List<Resource.Domain.Inventory.TaskMaterialReport> Reports { get; } = [];
+
+    public int SaveChangesCount { get; private set; }
+
+    public Task<Resource.Domain.Inventory.TaskMaterialReport?> GetAsync(Guid reportId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Reports.FirstOrDefault(r => r.TaskMaterialReportId == reportId));
+
+    public Task<Resource.Domain.Inventory.TaskMaterialReport?> GetByTaskAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Reports.FirstOrDefault(r => r.TaskId == taskId));
+
+    public void Add(Resource.Domain.Inventory.TaskMaterialReport report) => Reports.Add(report);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+        return Task.CompletedTask;
+    }
+}

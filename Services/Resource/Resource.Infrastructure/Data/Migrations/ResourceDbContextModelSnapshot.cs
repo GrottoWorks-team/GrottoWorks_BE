@@ -603,6 +603,131 @@ namespace Resource.Infrastructure.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Resource.Domain.Inventory.TaskMaterialReport", b =>
+                {
+                    b.Property<Guid>("TaskMaterialReportId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_material_report_id");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("report_note");
+
+                    b.Property<DateTimeOffset>("ReportedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reported_at");
+
+                    b.Property<Guid>("ReportedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reported_by");
+
+                    b.Property<string>("RevisionReason")
+                        .HasColumnType("text")
+                        .HasColumnName("revision_reason");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("report_status");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
+                    b.Property<DateTimeOffset?>("VerifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("verified_at");
+
+                    b.Property<Guid?>("VerifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("verified_by");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("TaskMaterialReportId");
+
+                    b.HasIndex("TaskId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_task_material_report_task");
+
+                    b.ToTable("task_material_report", (string)null);
+                });
+
+            modelBuilder.Entity("Resource.Domain.Inventory.TaskMaterialReportItem", b =>
+                {
+                    b.Property<Guid>("TaskMaterialReportItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_material_report_item_id");
+
+                    b.Property<Guid>("MaterialAllocationItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_allocation_item_id");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("item_note");
+
+                    b.Property<decimal>("ReportedDamaged")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("reported_damaged_quantity");
+
+                    b.Property<decimal>("ReportedLost")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("reported_lost_quantity");
+
+                    b.Property<decimal>("ReportedRemaining")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("reported_remaining_quantity");
+
+                    b.Property<Guid>("TaskMaterialReportId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_material_report_id");
+
+                    b.Property<decimal?>("VerifiedDamaged")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("verified_damaged_quantity");
+
+                    b.Property<decimal?>("VerifiedLost")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("verified_lost_quantity");
+
+                    b.Property<decimal?>("VerifiedRemaining")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("verified_remaining_quantity");
+
+                    b.HasKey("TaskMaterialReportItemId");
+
+                    b.HasIndex("MaterialAllocationItemId");
+
+                    b.HasIndex("TaskMaterialReportId", "MaterialAllocationItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_task_material_report_item_report_allocation_item");
+
+                    b.ToTable("task_material_report_item", null, t =>
+                        {
+                            t.HasCheckConstraint("task_material_report_item_reported_non_negative", "\"reported_remaining_quantity\" >= 0 AND \"reported_damaged_quantity\" >= 0 AND \"reported_lost_quantity\" >= 0");
+
+                            t.HasCheckConstraint("task_material_report_item_verified_non_negative", "(\"verified_remaining_quantity\" IS NULL OR \"verified_remaining_quantity\" >= 0) AND (\"verified_damaged_quantity\" IS NULL OR \"verified_damaged_quantity\" >= 0) AND (\"verified_lost_quantity\" IS NULL OR \"verified_lost_quantity\" >= 0)");
+                        });
+                });
+
             modelBuilder.Entity("Resource.Domain.Purchases.PurchaseRequest", b =>
                 {
                     b.Property<Guid>("PurchaseRequestId")
@@ -962,6 +1087,21 @@ namespace Resource.Infrastructure.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Resource.Domain.Inventory.TaskMaterialReportItem", b =>
+                {
+                    b.HasOne("Resource.Domain.Inventory.MaterialAllocationItem", null)
+                        .WithMany()
+                        .HasForeignKey("MaterialAllocationItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Resource.Domain.Inventory.TaskMaterialReport", null)
+                        .WithMany("Items")
+                        .HasForeignKey("TaskMaterialReportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Resource.Domain.Purchases.PurchaseRequestItem", b =>
                 {
                     b.HasOne("Resource.Domain.Catalog.Material", null)
@@ -999,6 +1139,11 @@ namespace Resource.Infrastructure.Data.Migrations
                 });
 
             modelBuilder.Entity("Resource.Domain.Inventory.MaterialAllocation", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Resource.Domain.Inventory.TaskMaterialReport", b =>
                 {
                     b.Navigation("Items");
                 });

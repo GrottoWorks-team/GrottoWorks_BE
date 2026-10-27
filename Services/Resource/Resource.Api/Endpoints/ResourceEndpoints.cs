@@ -13,6 +13,7 @@ public static class ResourceEndpoints
         app.MapPurchaseRequestEndpoints();
         app.MapDonorEndpoints();
         app.MapDonationEndpoints();
+        app.MapMaterialReportEndpoints();
         return app;
     }
 }

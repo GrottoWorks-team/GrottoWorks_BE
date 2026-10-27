@@ -1,7 +1,7 @@
 # Resource Service
 
 Vật tư, tồn kho, mua sắm, quyên góp, đồ mượn (owner: Vũ — spec §5.2, tag `Materials`, `Purchases`, `Contributions`).
-Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5; F-RES-13b, 13c, 15, 16 — S6.
+Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5; F-RES-13b, 13c, 15, 16 — S6; F-RES-17 — S7.
 
 ## Kiến trúc
 
@@ -69,6 +69,10 @@ Mẫu request: `Resource.Api.http`.
 | `POST /api/v1/material-allocations` | `allocateMaterial` | MO của work area — từ phần chưa phân bổ, tùy chọn gắn task đang mở | F-RES-15 |
 | `GET /api/v1/material-allocations` | `listMaterialAllocations` | PARISH, LEADER, MO — `seasonId,workAreaId,taskId,materialId` | F-RES-15 |
 | `POST /api/v1/inventory-adjustments` | `createInventoryAdjustment` | MO của work area — `DAMAGED|LOST|DISPOSED`, lý do bắt buộc, ≤ phần chưa phân bổ | F-RES-16 |
+| `POST /api/v1/tasks/{id}/material-reports` | `submitTaskMaterialReport` | VOLUNTEER được giao task (assignee ACCEPTED), task COMPLETED | F-RES-17 |
+| `GET /api/v1/tasks/{id}/material-reports` | `listTaskMaterialReports` | LEADER, MO cùng parish; VOLUNTEER được giao task | F-RES-17 |
+| `POST /api/v1/task-material-reports/{id}/verify` | `verifyTaskMaterialReport` | MO của work area — trả phần remaining về kho | F-RES-17 |
+| `POST /api/v1/task-material-reports/{id}/request-revision` | `requestMaterialReportRevision` | MO của work area — lý do bắt buộc | F-RES-17 |
 | `PUT /internal/work-area-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/season-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/task-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm `task_projection` (work area, type, status, assignee ACCEPTED) | F-RES-01 |
@@ -149,6 +153,17 @@ Mẫu request: `Resource.Api.http`.
 - Điều chỉnh tồn (F-RES-16): ghi `ADJUSTMENT_DAMAGED/LOST/DISPOSED` âm, `reference = (INVENTORY_ADJUSTMENT, id riêng)` vì
   ERD không có bảng adjustment; lý do lưu ở `transaction_note`. Không bao giờ cộng lại usable (BR-43). Chỉ trừ được phần
   chưa phân bổ (vật tư đã cấp cho task báo hỏng/mất qua material report — F-RES-17).
+
+## Task material report (F-RES-17, BR-44..51)
+
+- Chỉ khi task `COMPLETED` (BR-44), chỉ volunteer có assignee ACCEPTED (`task_projection.assignee_user_ids`). Mỗi
+  allocation item của task đúng **một** dòng, không thêm material khác (BR-45); `remaining + damaged + lost ≤ allocated`.
+- Một report/task (unique `task_id`); `REVISION_REQUIRED` → volunteer gửi lại vào chính report đó (thay dòng).
+- Verify (MO của work area, BR-47): nhập `verified_*` cho mọi dòng; `verifiedRemaining > 0` → `TASK_RETURN` vào **đúng**
+  work area, `reference = (TASK_MATERIAL_REPORT_ITEM, id dòng)` → post một lần (BR-49). Damaged/lost không vào kho (BR-50).
+  Allocation giữ nguyên (BR-51); `usedQuantity = allocated − remaining − damaged − lost`. Một transaction.
+- Event `material-report.submitted` (kèm MO cần verify), `material-report.verified`.
+- **Bổ sung so với ERD**: cột `task_material_report.revision_reason` (lý do trả về cho volunteer xem).
 
 ## Phạm vi (scope)
 

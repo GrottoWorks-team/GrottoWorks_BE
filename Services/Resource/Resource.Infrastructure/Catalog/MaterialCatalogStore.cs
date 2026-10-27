@@ -105,7 +105,8 @@ public sealed class MaterialCatalogStore(ResourceDbContext dbContext) : IMateria
         await dbContext.MaterialRequirements.AnyAsync(requirement => requirement.MaterialId == materialId, cancellationToken) ||
         await dbContext.MaterialTransactions.AnyAsync(transaction => transaction.MaterialId == materialId, cancellationToken) ||
         await dbContext.Set<PurchaseRequestItem>().AnyAsync(item => item.MaterialId == materialId, cancellationToken) ||
-        await dbContext.Set<DonationItem>().AnyAsync(item => item.MaterialId == materialId, cancellationToken);
+        await dbContext.Set<DonationItem>().AnyAsync(item => item.MaterialId == materialId, cancellationToken) ||
+        await dbContext.Set<Resource.Domain.Inventory.MaterialAllocationItem>().AnyAsync(item => item.MaterialId == materialId, cancellationToken);
 
     public void AddMaterial(Material material) => dbContext.Materials.Add(material);
 

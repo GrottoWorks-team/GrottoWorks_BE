@@ -7,7 +7,7 @@ using Resource.Domain;
 
 namespace Resource.Api.Endpoints;
 
-/// <summary>F-RES-04: stock ledger — opening stock, balances, material history (tag Materials).</summary>
+/// <summary>F-RES-04/15: stock ledger — opening stock, balances, allocations, material history (tag Materials).</summary>
 public static class InventoryEndpoints
 {
     private static readonly string[] Readers = [GrottoWorksRoles.Parish, GrottoWorksRoles.Leader, GrottoWorksRoles.MaterialOfficer];
@@ -32,6 +32,24 @@ public static class InventoryEndpoints
             .Produces<PagedResponse<InventoryBalanceDto>>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        app.MapPost("/api/v1/material-allocations", AllocateAsync)
+            .WithName("allocateMaterial")
+            .WithTags("Materials")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer))
+            .Accepts<CreateAllocationRequest>("application/json")
+            .Produces<ApiResponse<MaterialAllocationDto>>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        app.MapGet("/api/v1/material-allocations", ListAllocationsAsync)
+            .WithName("listMaterialAllocations")
+            .WithTags("Materials")
+            .RequireAuthorization(policy => policy.RequireRole(Readers))
+            .Produces<PagedResponse<MaterialAllocationDto>>()
+            .ProducesProblem(StatusCodes.Status400BadRequest);
 
         app.MapGet("/api/v1/materials/{materialId:guid}/allocation-history", GetHistoryAsync)
             .WithName("getAllocationHistory")
@@ -76,6 +94,37 @@ public static class InventoryEndpoints
 
         var result = await handler.HandleAsync(
             new InventoryFilter(page, size, reader.Guid("seasonId"), reader.Guid("workAreaId"), reader.Guid("materialId"), onlyShortage),
+            cancellationToken);
+        return Results.Ok(ApiResults.Page(result.Items, result.TotalItems, page, size, httpContext));
+    }
+
+    private static async Task<IResult> AllocateAsync(
+        CreateAllocationRequest request,
+        HttpContext httpContext,
+        AllocateMaterialCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var allocation = await handler.HandleAsync(
+            new AllocateMaterialCommand(
+                request.WorkAreaId!.Value,
+                request.TaskId,
+                request.Items!.Select(item => new Domain.Inventory.AllocationLineInput(item.MaterialId!.Value, item.Quantity!.Value)).ToList(),
+                request.AllocationDate,
+                Text.Clean(request.Note)),
+            cancellationToken);
+        return Results.Json(ApiResults.Ok(allocation, httpContext), statusCode: StatusCodes.Status201Created);
+    }
+
+    /// <summary><c>AllocationFilter</c>: seasonId, workAreaId, taskId, materialId; newest first; paged.</summary>
+    private static async Task<IResult> ListAllocationsAsync(
+        HttpContext httpContext,
+        ListMaterialAllocationsQueryHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var reader = new QueryReader(httpContext.Request.Query, "page", "size", "seasonId", "workAreaId", "taskId", "materialId");
+        var (page, size) = reader.Paging();
+        var result = await handler.HandleAsync(
+            new AllocationFilter(page, size, reader.Guid("seasonId"), reader.Guid("workAreaId"), reader.Guid("taskId"), reader.Guid("materialId")),
             cancellationToken);
         return Results.Ok(ApiResults.Page(result.Items, result.TotalItems, page, size, httpContext));
     }

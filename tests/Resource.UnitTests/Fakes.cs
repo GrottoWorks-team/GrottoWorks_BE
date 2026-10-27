@@ -182,6 +182,8 @@ public sealed class FakeInventoryStore(FakeRequirementStore requirements) : Reso
 {
     public List<Resource.Domain.Inventory.MaterialTransaction> Ledger { get; } = [];
 
+    public List<Resource.Domain.Inventory.MaterialAllocation> Allocations { get; } = [];
+
     public int SaveChangesCount { get; private set; }
 
     public void Append(Resource.Domain.Inventory.MaterialTransaction transaction) => Ledger.Add(transaction);
@@ -204,6 +206,16 @@ public sealed class FakeInventoryStore(FakeRequirementStore requirements) : Reso
             .Where(r => workAreaIds.Contains(r.WorkAreaId) && r.Status == Resource.Domain.Inventory.RequirementStatus.Active &&
                         (materialId is null || r.MaterialId == materialId))
             .Select(r => new Resource.Application.Inventory.QuantityByMaterial(r.WorkAreaId, r.MaterialId, r.RequiredQuantity))
+            .ToList());
+
+    public Task<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>> GetAllocatedTotalsAsync(
+        IReadOnlyCollection<Guid> workAreaIds, Guid? materialId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>>(Allocations
+            .Where(a => workAreaIds.Contains(a.WorkAreaId))
+            .SelectMany(a => a.Items.Select(i => (a.WorkAreaId, i.MaterialId, i.AllocatedQuantity)))
+            .Where(row => materialId is null || row.MaterialId == materialId)
+            .GroupBy(row => (row.WorkAreaId, row.MaterialId))
+            .Select(g => new Resource.Application.Inventory.QuantityByMaterial(g.Key.WorkAreaId, g.Key.MaterialId, g.Sum(row => row.AllocatedQuantity)))
             .ToList());
 
     public Task<IReadOnlyList<Resource.Domain.Inventory.MaterialTransaction>> ListTransactionsAsync(
@@ -405,5 +417,54 @@ public sealed class FakeTaskProjectionStore : Resource.Application.Scope.ITaskPr
             DateTimeOffset.UtcNow);
         Tasks.Add(task);
         return task;
+    }
+}
+
+/// <summary>Allocations live in the inventory fake so balances see them (same unit of work).</summary>
+public sealed class FakeAllocationStore(FakeInventoryStore inventory) : Resource.Application.Inventory.IAllocationStore
+{
+    public Task<PagedResult<Resource.Domain.Inventory.MaterialAllocation>> SearchAsync(
+        Resource.Application.Inventory.AllocationSearch search, CancellationToken cancellationToken = default)
+    {
+        var filtered = inventory.Allocations
+            .Where(a => search.WorkAreaIds.Contains(a.WorkAreaId))
+            .Where(a => search.TaskId is null || a.TaskId == search.TaskId)
+            .Where(a => search.MaterialId is null || a.Items.Any(i => i.MaterialId == search.MaterialId))
+            .OrderByDescending(a => a.AllocationDate)
+            .ToList();
+        return Task.FromResult(new PagedResult<Resource.Domain.Inventory.MaterialAllocation>(
+            filtered.Skip((search.Page - 1) * search.Size).Take(search.Size).ToList(), filtered.Count));
+    }
+
+    public Task<IReadOnlyList<Resource.Domain.Inventory.MaterialAllocationItem>> ListItemsOfTaskAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Inventory.MaterialAllocationItem>>(
+            inventory.Allocations.Where(a => a.TaskId == taskId).SelectMany(a => a.Items).ToList());
+
+    public void Add(Resource.Domain.Inventory.MaterialAllocation allocation) => inventory.Allocations.Add(allocation);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+}
+
+public sealed class FakeStockLock : Resource.Application.Abstractions.IWorkAreaStockLock
+{
+    public int Acquired { get; private set; }
+
+    public int Committed { get; private set; }
+
+    public Task<Resource.Application.Abstractions.IStockLease> AcquireAsync(Guid workAreaId, CancellationToken cancellationToken = default)
+    {
+        Acquired++;
+        return Task.FromResult<Resource.Application.Abstractions.IStockLease>(new Lease(this));
+    }
+
+    private sealed class Lease(FakeStockLock owner) : Resource.Application.Abstractions.IStockLease
+    {
+        public Task CommitAsync(CancellationToken cancellationToken = default)
+        {
+            owner.Committed++;
+            return Task.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

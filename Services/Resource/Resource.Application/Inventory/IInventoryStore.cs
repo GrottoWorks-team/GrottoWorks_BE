@@ -30,6 +30,12 @@ public interface IInventoryStore
         Guid? materialId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Allocated quantity per (work area, material) — every allocation item counts (Contract 7.1).</summary>
+    Task<IReadOnlyList<QuantityByMaterial>> GetAllocatedTotalsAsync(
+        IReadOnlyCollection<Guid> workAreaIds,
+        Guid? materialId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<MaterialTransaction>> ListTransactionsAsync(TransactionQuery query, CancellationToken cancellationToken = default);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);

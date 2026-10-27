@@ -1,7 +1,7 @@
 # Resource Service
 
 Vật tư, tồn kho, mua sắm, quyên góp, đồ mượn (owner: Vũ — spec §5.2, tag `Materials`, `Purchases`, `Contributions`).
-Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5; F-RES-13b, 13c — S6.
+Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5; F-RES-13b, 13c, 15 — S6.
 
 ## Kiến trúc
 
@@ -66,6 +66,8 @@ Mẫu request: `Resource.Api.http`.
 | `POST /api/v1/donations/monetary-pledges` | `pledgeMonetarySupport` | VOLUNTEER — tiền cho season (work area tùy chọn) | F-RES-13b |
 | `POST /api/v1/donations/{id}/cancel` | `cancelDonationPledge` | VOLUNTEER chủ pledge, MO của work area/season; `reason` bắt buộc | F-RES-13b |
 | `POST /api/v1/donations/{id}/receipts` | `recordDonationReceipt` | MO của work area/season — một lần nhận thực tế của pledge | F-RES-13c |
+| `POST /api/v1/material-allocations` | `allocateMaterial` | MO của work area — từ phần chưa phân bổ, tùy chọn gắn task đang mở | F-RES-15 |
+| `GET /api/v1/material-allocations` | `listMaterialAllocations` | PARISH, LEADER, MO — `seasonId,workAreaId,taskId,materialId` | F-RES-15 |
 | `PUT /internal/work-area-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/season-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/task-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm `task_projection` (work area, type, status, assignee ACCEPTED) | F-RES-01 |
@@ -75,7 +77,8 @@ Mẫu request: `Resource.Api.http`.
 - Mọi thay đổi stock chỉ qua `material_transaction` (append-only, theo work area — BR-23/24). Dấu cố định theo loại
   (nhập > 0, xuất < 0) ở Domain **và** CHECK trong DB. Mọi phát sinh trừ `OPENING_STOCK` phải có `reference_type/id`;
   unique `(reference_type, reference_id, transaction_type)` → mỗi chứng từ chỉ post một lần.
-- `InventoryCalculator`: `confirmedAvailable = SUM(ledger)`, `unallocated = available − allocated` (allocation: F-RES-15),
+- `InventoryCalculator`: `confirmedAvailable = SUM(ledger)`, `unallocated = available − allocated` (allocated = tổng
+  `material_allocation_item`, Contract 7.1; phần dư sau task quay lại qua `TASK_RETURN` khi MO verify — F-RES-17),
   `shortage = max(0, required − available)` (BR-25). `existing_quantity` của requirement chỉ để hiển thị.
 - `material.shortage.changed` (v1) chỉ phát khi shortage của (work area, material) thực sự đổi.
 
@@ -134,6 +137,15 @@ Mẫu request: `Resource.Api.http`.
 - Hủy: chỉ PLEDGED / PARTIALLY_RECEIVED, lý do 1–500 ký tự; receipt đã nhận giữ nguyên. Event `contribution.pledged`
   (kèm `materialOfficerUserId` để báo MO).
 
+## Allocation (F-RES-15, BR-33, BR-34)
+
+- Cấp từ phần **chưa phân bổ** của đúng work area (BR-24); thiếu → 409 `MATERIAL_INSUFFICIENT_AVAILABLE`. Tùy chọn
+  gắn task (phải có trong `task_projection`, cùng work area, chưa COMPLETED/CANCELLED). Không đổi ledger hay shortage.
+- Đồng thời: lệnh xuất kho của một work area chạy trong transaction có `pg_advisory_xact_lock` theo work area
+  (`IWorkAreaStockLock`) → hai MO lấy phần cuối thì chỉ một thành công (BA edge case 19; smoke: 6 request song song → 1×201,
+  5×409). Dùng lại cho chuyển kho (F-RES-20) và điều chỉnh tồn (F-RES-16).
+- `allocated_quantity` là lịch sử, không sửa/xóa (BR-34); Contract chưa có endpoint hủy allocation.
+
 ## Phạm vi (scope)
 
 - Đọc: mọi user cùng parish (parish khác → 404). Ghi: MO được gán cho work area; duyệt purchase request: Leader được gán
@@ -154,5 +166,4 @@ Mẫu request: `Resource.Api.http`.
 - `recordDirectDonation` cần `Idempotency-Key` (Contract 4.1) nhưng `IdempotencyFilter` (F-PLT-07, Lâm) chưa có → client
   retry có thể ghi trùng donation. Bằng chứng ảnh (`evidenceFileIds`) chờ F-NTF-01.
 - Gateway: `/purchase-requests/{id}/purchase-tasks` thuộc Task (F-TSK-17) — khi Lâm thêm cần route riêng `Order: -1`.
-- Allocation (F-RES-15) sẽ cộng vào `allocated` và vào lịch sử `getAllocationHistory`.
 - Chưa có integration test tự động (Testcontainers); đã smoke E2E trên PostgreSQL 16 + gateway.

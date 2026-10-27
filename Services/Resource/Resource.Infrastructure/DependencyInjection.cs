@@ -38,6 +38,8 @@ public static class DependencyInjection
         services.AddScoped<ITaskProjectionStore, TaskProjectionStore>();
         services.AddScoped<IMaterialRequirementStore, MaterialRequirementStore>();
         services.AddScoped<IInventoryStore, InventoryStore>();
+        services.AddScoped<IAllocationStore, AllocationStore>();
+        services.AddScoped<IWorkAreaStockLock, PostgresWorkAreaStockLock>();
         services.AddScoped<IPurchaseRequestStore, PurchaseRequestStore>();
         services.AddScoped<IDonorStore, DonorStore>();
         services.AddScoped<IDonationStore, DonationStore>();

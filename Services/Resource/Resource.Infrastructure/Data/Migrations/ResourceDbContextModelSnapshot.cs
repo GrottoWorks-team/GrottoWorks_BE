@@ -401,6 +401,74 @@ namespace Resource.Infrastructure.Data.Migrations
                     b.ToTable("donor", (string)null);
                 });
 
+            modelBuilder.Entity("Resource.Domain.Inventory.MaterialAllocation", b =>
+                {
+                    b.Property<Guid>("MaterialAllocationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_allocation_id");
+
+                    b.Property<Guid>("AllocatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("allocated_by_user_id");
+
+                    b.Property<DateTimeOffset>("AllocationDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("allocation_date");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("allocation_note");
+
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
+                    b.Property<Guid>("WorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_id");
+
+                    b.HasKey("MaterialAllocationId");
+
+                    b.HasIndex(new[] { "TaskId" }, "ix_material_allocation_task");
+
+                    b.HasIndex(new[] { "WorkAreaId", "AllocationDate" }, "ix_material_allocation_work_area_date");
+
+                    b.ToTable("material_allocation", (string)null);
+                });
+
+            modelBuilder.Entity("Resource.Domain.Inventory.MaterialAllocationItem", b =>
+                {
+                    b.Property<Guid>("MaterialAllocationItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_allocation_item_id");
+
+                    b.Property<decimal>("AllocatedQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("allocated_quantity");
+
+                    b.Property<Guid>("MaterialAllocationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_allocation_id");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_id");
+
+                    b.HasKey("MaterialAllocationItemId");
+
+                    b.HasIndex("MaterialAllocationId", "MaterialId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_material_allocation_item_allocation_material");
+
+                    b.HasIndex(new[] { "MaterialId" }, "ix_material_allocation_item_material");
+
+                    b.ToTable("material_allocation_item", null, t =>
+                        {
+                            t.HasCheckConstraint("material_allocation_item_positive_quantity", "\"allocated_quantity\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("Resource.Domain.Inventory.MaterialRequirement", b =>
                 {
                     b.Property<Guid>("MaterialRequirementId")
@@ -861,6 +929,21 @@ namespace Resource.Infrastructure.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Resource.Domain.Inventory.MaterialAllocationItem", b =>
+                {
+                    b.HasOne("Resource.Domain.Inventory.MaterialAllocation", null)
+                        .WithMany("Items")
+                        .HasForeignKey("MaterialAllocationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Resource.Domain.Catalog.Material", null)
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Resource.Domain.Inventory.MaterialRequirement", b =>
                 {
                     b.HasOne("Resource.Domain.Catalog.Material", null)
@@ -911,6 +994,11 @@ namespace Resource.Infrastructure.Data.Migrations
                 });
 
             modelBuilder.Entity("Resource.Domain.Contributions.DonationReceipt", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Resource.Domain.Inventory.MaterialAllocation", b =>
                 {
                     b.Navigation("Items");
                 });

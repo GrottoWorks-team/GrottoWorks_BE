@@ -213,4 +213,22 @@ Authorization: Bearer {{accessToken}}
 
 { "items": [{ "donationItemId": "{{pledge.response.body.$.data.items[0].id}}", "receivedQuantity": 3, "unusableQuantity": 1 }], "note": "Lần 1" }
 
+### F-RES-01 — (interim) project a task until task.* events exist
+PUT {{host}}/internal/task-scopes/00000000-0000-0000-0000-0000000000c1
+Content-Type: application/json
+X-Internal-Api-Key: {{internalApiKey}}
+
+{ "workAreaId": "{{workAreaId}}", "name": "Treo đèn hang đá", "type": "WORK", "status": "IN_PROGRESS", "assigneeUserIds": [], "version": 1 }
+
+### F-RES-15 — allocate unallocated stock to a task of the work area
+POST {{host}}/api/v1/material-allocations
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "workAreaId": "{{workAreaId}}", "taskId": "00000000-0000-0000-0000-0000000000c1", "items": [{ "materialId": "{{material.response.body.$.data.id}}", "quantity": 3 }] }
+
+### F-RES-15 — allocations of the work area
+GET {{host}}/api/v1/material-allocations?workAreaId={{workAreaId}}
+Authorization: Bearer {{accessToken}}
+
 ###

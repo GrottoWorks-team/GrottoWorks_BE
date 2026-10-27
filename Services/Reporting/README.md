@@ -88,7 +88,9 @@ Mẫu request: `Reporting.Api.http`.
 - `getMyRecognition`: contribution được ghi nhận cho chính mình (làm việc hoặc donation của donor liên kết account) trong
   parish, tổng điểm, theo type, từng dòng điểm kèm rule + version.
 - `getSeasonRecognition`: xếp hạng account theo điểm (bằng điểm cùng hạng 1, 1, 3), số contribution, số contribution của
-  donor ngoài; season ngoài parish → 404. Chưa trả tên người dùng (FE lấy từ Identity).
+  donor ngoài; season ngoài parish → 404. Tên (`displayName`) lấy từ Identity `GET /internal/users?ids=` (cấu hình
+  `IdentityClient:BaseAddress`, cùng `InternalApi:ApiKey`) — best effort: Identity chậm/chết thì tên để null, tối đa ~2 s;
+  báo cáo giờ làm cũng có cột tên volunteer.
 
 ## Read model, dashboard, báo cáo (F-RPT-04/05, BA 12, BR-57)
 

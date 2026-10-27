@@ -2,6 +2,7 @@ using System.Text.Json;
 using BuildingBlocks.Security;
 using Reporting.Application.Ingestion;
 using Reporting.Application.Recognition;
+using Reporting.Application.Users;
 using Reporting.Contracts.Events;
 using Reporting.Domain;
 using Reporting.Domain.Recognition;
@@ -23,6 +24,7 @@ public sealed class ContributionIngestionTests
     private readonly FakeIntegrationEventPublisher _publisher = new();
 
     private readonly FakeReadModelStore _readModels = new();
+    private readonly FakeUserDirectory _users = new();
 
     private IntegrationEventHandler Handler => new(_store, new ContributionRecorder(_store, _catalog, _publisher), new Reporting.Application.ReadModels.ReadModelProjector(_readModels));
 
@@ -225,7 +227,7 @@ public sealed class ContributionIngestionTests
 
         RecognitionQueryHandler Query(Guid user, string role) =>
             new(_store, _catalog, _scopes, new Reporting.Application.Scope.WorkAreaAccess(_scopes, new FakeCurrentUser(user, role, _parishId)),
-                new FakeCurrentUser(user, role, _parishId));
+                new FakeCurrentUser(user, role, _parishId), _users);
 
         var mine = await Query(b, GrottoWorksRoles.Volunteer).GetMineAsync(_seasonId);
         mine.TotalPoints.Should().Be(15);
@@ -234,7 +236,10 @@ public sealed class ContributionIngestionTests
             (ContributionType.MonetarySupport, 5), (ContributionType.TaskCompletion, 10));
         mine.Entries.Should().HaveCount(2).And.OnlyContain(e => e.RuleVersion == 1);
 
+        _users.Names[a] = "Nguyễn Văn A";
         var season = await Query(Guid.NewGuid(), GrottoWorksRoles.Parish).GetSeasonAsync(_seasonId);
+        season.Ranking[0].DisplayName.Should().Be("Nguyễn Văn A");
+        season.Ranking[1].DisplayName.Should().BeNull("unknown users keep no name");
         season.Contributions.Should().Be(5);
         season.ExternalDonorContributions.Should().Be(1);
         season.TotalPoints.Should().Be(35);
@@ -255,7 +260,8 @@ public sealed class ContributionIngestionTests
         await Handler.HandleAsync(Event(TaskCompletionReviewed.EventType, Review("APPROVED", b)));
         var parish = new FakeCurrentUser(Guid.NewGuid(), GrottoWorksRoles.Parish, _parishId);
 
-        var season = await new RecognitionQueryHandler(_store, _catalog, _scopes, new Reporting.Application.Scope.WorkAreaAccess(_scopes, parish), parish)
+        var season = await new RecognitionQueryHandler(_store, _catalog, _scopes, new Reporting.Application.Scope.WorkAreaAccess(_scopes, parish), parish,
+                new NoUserDirectory())
             .GetSeasonAsync(_seasonId);
 
         season.Ranking.Select(r => (r.Rank, r.TotalPoints)).Should().Equal((1, 20), (1, 20), (3, 10));

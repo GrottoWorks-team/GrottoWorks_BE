@@ -1,5 +1,6 @@
 using BuildingBlocks.Security;
 using Reporting.Application.Scope;
+using Reporting.Application.Users;
 using Reporting.Domain;
 using Reporting.Domain.Recognition;
 
@@ -30,7 +31,14 @@ public sealed record RecognitionSummaryDto(
     IReadOnlyList<RecognitionTypeSummaryDto> ByType,
     IReadOnlyList<RecognitionEntryDto> Entries);
 
-public sealed record RecognitionRankingRowDto(int Rank, Guid UserId, int TotalPoints, int Contributions, IReadOnlyList<RecognitionTypeSummaryDto> ByType);
+/// <param name="DisplayName">From Identity; null when unknown or Identity is unavailable.</param>
+public sealed record RecognitionRankingRowDto(
+    int Rank,
+    Guid UserId,
+    string? DisplayName,
+    int TotalPoints,
+    int Contributions,
+    IReadOnlyList<RecognitionTypeSummaryDto> ByType);
 
 /// <summary><c>RecognitionRanking</c> (F-RPT-03): accounts by points; external donors count as contributions only.</summary>
 public sealed record RecognitionRankingDto(
@@ -58,7 +66,8 @@ public sealed class RecognitionQueryHandler(
     IRecognitionCatalogStore catalog,
     IWorkAreaScopeStore scopes,
     WorkAreaAccess access,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IUserDirectory users)
 {
     public async Task<RecognitionSummaryDto> GetMineAsync(Guid? seasonId, CancellationToken cancellationToken = default)
     {
@@ -111,12 +120,15 @@ public sealed class RecognitionQueryHandler(
             .ThenBy(row => row.UserId)
             .ToList();
 
+        var names = await users.GetDisplayNamesAsync(rows.Select(row => row.UserId).ToList(), cancellationToken);
+
         // Competition ranking: equal points share a rank (1, 1, 3).
         var ranking = new List<RecognitionRankingRowDto>(rows.Count);
         for (var index = 0; index < rows.Count; index++)
         {
             var rank = index > 0 && rows[index].Points == rows[index - 1].Points ? ranking[index - 1].Rank : index + 1;
-            ranking.Add(new RecognitionRankingRowDto(rank, rows[index].UserId, rows[index].Points, rows[index].Contributions, rows[index].ByType));
+            ranking.Add(new RecognitionRankingRowDto(rank, rows[index].UserId, names.GetValueOrDefault(rows[index].UserId), rows[index].Points,
+                rows[index].Contributions, rows[index].ByType));
         }
 
         return new RecognitionRankingDto(seasonId, parishId, points.Sum(point => point.AwardedPoints), contributions.Count,

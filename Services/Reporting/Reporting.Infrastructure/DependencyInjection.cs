@@ -7,8 +7,10 @@ using Reporting.Application.Ingestion;
 using Reporting.Application.ReadModels;
 using Reporting.Application.Recognition;
 using Reporting.Application.Scope;
+using Reporting.Application.Users;
 using Reporting.Infrastructure.Data;
 using Reporting.Infrastructure.Exports;
+using Reporting.Infrastructure.Identity;
 using Reporting.Infrastructure.Observability;
 using Reporting.Infrastructure.ReadModels;
 using Reporting.Infrastructure.Recognition;
@@ -46,6 +48,30 @@ public static class DependencyInjection
         {
             services.AddHostedService<ReportExportWorker>();
         }
+        // F-IDN-09 names for rankings and reports; optional (best effort) so Reporting runs without Identity.
+        if (Uri.TryCreate(configuration[IdentityClientOptions.BaseAddressConfigurationKey], UriKind.Absolute, out var identity) &&
+            (identity.Scheme == Uri.UriSchemeHttp || identity.Scheme == Uri.UriSchemeHttps))
+        {
+            services.AddSingleton(new IdentityClientOptions(identity, configuration[IdentityClientOptions.InternalApiKeyConfigurationKey] ?? string.Empty));
+            services.AddHttpContextAccessor();
+            services.AddHttpClient<IUserDirectory, IdentityUserDirectoryClient>(client =>
+                {
+                    client.BaseAddress = identity;
+                    client.Timeout = Timeout.InfiniteTimeSpan;
+                })
+                .AddStandardResilienceHandler(options =>
+                {
+                    // Names are optional: a slow or dead Identity must not slow reports down (NFR < 3 s).
+                    options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(1);
+                    options.Retry.MaxRetryAttempts = 1;
+                    options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(2);
+                });
+        }
+        else
+        {
+            services.AddSingleton<IUserDirectory, NoUserDirectory>();
+        }
+
         return services;
     }
 }

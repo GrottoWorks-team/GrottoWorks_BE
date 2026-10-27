@@ -34,7 +34,7 @@ public sealed class ExportTests
 
     private ReportExportHandler Handler(FakeCurrentUser? user = null) => new(Resolver(user ?? _parish), _jobs, _signal);
 
-    private ReportExportRunner Runner() => new(_jobs, new ReportQueryHandler(Resolver(_parish), _readModels), new ReportFileRenderer());
+    private ReportExportRunner Runner() => new(_jobs, new ReportQueryHandler(Resolver(_parish), _readModels, new Reporting.Application.Users.NoUserDirectory()), new ReportFileRenderer());
 
     private CreateReportExportCommand Command(ExportFormat format = ExportFormat.Xlsx, string? key = null, Guid? season = null) =>
         new(ReportType.Materials, format, new ReportQuery(season ?? _seasonId), key);

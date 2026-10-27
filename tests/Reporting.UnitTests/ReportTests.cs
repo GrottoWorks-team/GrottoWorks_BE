@@ -25,6 +25,7 @@ public sealed class ReportTests
     private readonly FakeReadModelStore _readModels = new();
     private readonly FakeContributionStore _contributions = new();
     private readonly FakeRecognitionCatalogStore _catalog = new();
+    private readonly FakeUserDirectory _users = new();
     private readonly WorkAreaScope _grotto;
     private readonly WorkAreaScope _street;
 
@@ -43,7 +44,7 @@ public sealed class ReportTests
     private FakeCurrentUser User(string role, Guid? id = null) => new(id ?? Guid.NewGuid(), role, _parishId);
 
     private ReportQueryHandler Reports(FakeCurrentUser user) =>
-        new(new ReportScopeResolver(_scopes, new WorkAreaAccess(_scopes, user), user), _readModels);
+        new(new ReportScopeResolver(_scopes, new WorkAreaAccess(_scopes, user), user), _readModels, _users);
 
     private DashboardQueryHandler Dashboards(FakeCurrentUser user) =>
         new(new ReportScopeResolver(_scopes, new WorkAreaAccess(_scopes, user), user), new WorkAreaAccess(_scopes, user), _scopes, _readModels, user);
@@ -167,9 +168,12 @@ public sealed class ReportTests
         await SeedEventsAsync();
         var parish = Reports(User(GrottoWorksRoles.Parish));
 
+        var volunteer = _readModels.Attendance[0].VolunteerUserId;
+        _users.Names[volunteer] = "Trần Thị B";
         var all = await parish.BuildAsync(ReportType.Attendance, new ReportQuery(_seasonId));
         all.Totals["approvedHours"].Should().Be(5.5m);
         all.Rows.Should().ContainSingle().Which["sessions"].Should().Be(2);
+        all.Rows[0]["volunteer"].Should().Be("Trần Thị B");
 
         var firstDays = await parish.BuildAsync(ReportType.Attendance, new ReportQuery(_seasonId, From: new DateOnly(2026, 12, 10), To: new DateOnly(2026, 12, 12)));
         firstDays.Totals["approvedHours"].Should().Be(3.5m);

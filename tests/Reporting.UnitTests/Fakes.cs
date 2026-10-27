@@ -278,3 +278,11 @@ public sealed class FakeExportSignal : Reporting.Application.Exports.IExportSign
 
     public void Notify() => Notified++;
 }
+
+public sealed class FakeUserDirectory : Reporting.Application.Users.IUserDirectory
+{
+    public Dictionary<Guid, string> Names { get; } = [];
+
+    public Task<IReadOnlyDictionary<Guid, string>> GetDisplayNamesAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, string>>(Names.Where(pair => userIds.Contains(pair.Key)).ToDictionary());
+}

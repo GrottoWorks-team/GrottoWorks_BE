@@ -1,4 +1,5 @@
 using Reporting.Application.ReadModels;
+using Reporting.Application.Users;
 using Reporting.Domain.ReadModels;
 using Reporting.Domain.Scope;
 
@@ -26,7 +27,7 @@ public sealed record ReportDataDto(
     IReadOnlyList<string> Notes);
 
 /// <summary>F-RPT-05: the six operational reports, built from the read models of the caller's scope.</summary>
-public sealed class ReportQueryHandler(ReportScopeResolver resolver, IReadModelStore store)
+public sealed class ReportQueryHandler(ReportScopeResolver resolver, IReadModelStore store, IUserDirectory users)
 {
     private const string Money = "VND";
 
@@ -198,10 +199,12 @@ public sealed class ReportQueryHandler(ReportScopeResolver resolver, IReadModelS
         var attendance = (await store.ListAttendanceAsync(scope.Ids, cancellationToken))
             .Where(item => query.InRange(item.ApprovedAt))
             .ToList();
+        var volunteers = await users.GetDisplayNamesAsync(attendance.Select(item => item.VolunteerUserId).Distinct().ToList(), cancellationToken);
         var rows = attendance
             .GroupBy(item => (item.VolunteerUserId, item.WorkAreaId))
             .Select(group => Row(
                 ("volunteerUserId", group.Key.VolunteerUserId),
+                ("volunteer", volunteers.GetValueOrDefault(group.Key.VolunteerUserId)),
                 ("workArea", names[group.Key.WorkAreaId]),
                 ("sessions", group.Count()),
                 ("approvedHours", group.Sum(item => item.ApprovedHours))))
@@ -215,7 +218,7 @@ public sealed class ReportQueryHandler(ReportScopeResolver resolver, IReadModelS
             ["approvedHours"] = attendance.Sum(item => item.ApprovedHours)
         };
         return new Parts(
-            [new("volunteerUserId", "Volunteer"), new("workArea", "Khu vực"), new("sessions", "Số lần"), new("approvedHours", "Giờ được duyệt", "h")],
+            [new("volunteerUserId", "Mã volunteer"), new("volunteer", "Volunteer"), new("workArea", "Khu vực"), new("sessions", "Số lần"), new("approvedHours", "Giờ được duyệt", "h")],
             rows, totals, ["Chỉ giờ đã được duyệt (BR-21); bộ lọc thời gian theo ngày duyệt."]);
     }
 

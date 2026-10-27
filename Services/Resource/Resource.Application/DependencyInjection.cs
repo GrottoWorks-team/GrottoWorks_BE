@@ -46,6 +46,9 @@ public static class DependencyInjection
         services.AddScoped<AllocateMaterialCommandHandler>();
         services.AddScoped<ListMaterialAllocationsQueryHandler>();
 
+        // F-RES-16 inventory adjustments
+        services.AddScoped<CreateInventoryAdjustmentCommandHandler>();
+
         // F-RES-05 shortages
         services.AddScoped<ShortageTracker>();
         services.AddScoped<GetWorkAreaShortagesQueryHandler>();

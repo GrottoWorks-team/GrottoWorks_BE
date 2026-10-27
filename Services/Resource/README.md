@@ -1,7 +1,7 @@
 # Resource Service
 
 Vật tư, tồn kho, mua sắm, quyên góp, đồ mượn (owner: Vũ — spec §5.2, tag `Materials`, `Purchases`, `Contributions`).
-Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5; F-RES-13b, 13c, 15 — S6.
+Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5; F-RES-13b, 13c, 15, 16 — S6.
 
 ## Kiến trúc
 
@@ -68,6 +68,7 @@ Mẫu request: `Resource.Api.http`.
 | `POST /api/v1/donations/{id}/receipts` | `recordDonationReceipt` | MO của work area/season — một lần nhận thực tế của pledge | F-RES-13c |
 | `POST /api/v1/material-allocations` | `allocateMaterial` | MO của work area — từ phần chưa phân bổ, tùy chọn gắn task đang mở | F-RES-15 |
 | `GET /api/v1/material-allocations` | `listMaterialAllocations` | PARISH, LEADER, MO — `seasonId,workAreaId,taskId,materialId` | F-RES-15 |
+| `POST /api/v1/inventory-adjustments` | `createInventoryAdjustment` | MO của work area — `DAMAGED|LOST|DISPOSED`, lý do bắt buộc, ≤ phần chưa phân bổ | F-RES-16 |
 | `PUT /internal/work-area-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/season-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/task-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm `task_projection` (work area, type, status, assignee ACCEPTED) | F-RES-01 |
@@ -145,6 +146,9 @@ Mẫu request: `Resource.Api.http`.
   (`IWorkAreaStockLock`) → hai MO lấy phần cuối thì chỉ một thành công (BA edge case 19; smoke: 6 request song song → 1×201,
   5×409). Dùng lại cho chuyển kho (F-RES-20) và điều chỉnh tồn (F-RES-16).
 - `allocated_quantity` là lịch sử, không sửa/xóa (BR-34); Contract chưa có endpoint hủy allocation.
+- Điều chỉnh tồn (F-RES-16): ghi `ADJUSTMENT_DAMAGED/LOST/DISPOSED` âm, `reference = (INVENTORY_ADJUSTMENT, id riêng)` vì
+  ERD không có bảng adjustment; lý do lưu ở `transaction_note`. Không bao giờ cộng lại usable (BR-43). Chỉ trừ được phần
+  chưa phân bổ (vật tư đã cấp cho task báo hỏng/mất qua material report — F-RES-17).
 
 ## Phạm vi (scope)
 

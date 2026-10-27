@@ -46,3 +46,25 @@ public sealed class CreateAllocationRequest
     [StringLength(2000, ErrorMessage = "Note must not exceed 2000 characters.")]
     public string? Note { get; init; }
 }
+
+/// <summary><c>InventoryAdjustmentRequest</c> (F-RES-16): damaged, lost or disposed units leave usable stock.</summary>
+public sealed class InventoryAdjustmentRequest
+{
+    [Required(ErrorMessage = "Work area is required.")]
+    public Guid? WorkAreaId { get; init; }
+
+    [Required(ErrorMessage = "Material is required.")]
+    public Guid? MaterialId { get; init; }
+
+    [Required(ErrorMessage = "Adjustment type is required.")]
+    public Resource.Application.Inventory.AdjustmentKind? Type { get; init; }
+
+    [Required(ErrorMessage = "Quantity is required.")]
+    public decimal? Quantity { get; init; }
+
+    public DateTimeOffset? TransactionDate { get; init; }
+
+    [Required(ErrorMessage = "Reason is required.")]
+    [StringLength(500, ErrorMessage = "Reason must not exceed 500 characters.")]
+    public string? Reason { get; init; }
+}

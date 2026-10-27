@@ -231,4 +231,11 @@ Authorization: Bearer {{accessToken}}
 GET {{host}}/api/v1/material-allocations?workAreaId={{workAreaId}}
 Authorization: Bearer {{accessToken}}
 
+### F-RES-16 — write off damaged / lost / disposed stock (never back to usable)
+POST {{host}}/api/v1/inventory-adjustments
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "workAreaId": "{{workAreaId}}", "materialId": "{{material.response.body.$.data.id}}", "type": "DAMAGED", "quantity": 1, "reason": "Mưa làm chập" }
+
 ###

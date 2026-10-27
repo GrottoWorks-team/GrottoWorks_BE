@@ -7,7 +7,7 @@ using Resource.Domain;
 
 namespace Resource.Api.Endpoints;
 
-/// <summary>F-RES-04/15: stock ledger — opening stock, balances, allocations, material history (tag Materials).</summary>
+/// <summary>F-RES-04/15/16: stock ledger — opening stock, balances, allocations, adjustments, material history (tag Materials).</summary>
 public static class InventoryEndpoints
 {
     private static readonly string[] Readers = [GrottoWorksRoles.Parish, GrottoWorksRoles.Leader, GrottoWorksRoles.MaterialOfficer];
@@ -50,6 +50,17 @@ public static class InventoryEndpoints
             .RequireAuthorization(policy => policy.RequireRole(Readers))
             .Produces<PagedResponse<MaterialAllocationDto>>()
             .ProducesProblem(StatusCodes.Status400BadRequest);
+
+        app.MapPost("/api/v1/inventory-adjustments", AdjustAsync)
+            .WithName("createInventoryAdjustment")
+            .WithTags("Materials")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer))
+            .Accepts<InventoryAdjustmentRequest>("application/json")
+            .Produces<ApiResponse<InventoryTransactionDto>>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
 
         app.MapGet("/api/v1/materials/{materialId:guid}/allocation-history", GetHistoryAsync)
             .WithName("getAllocationHistory")
@@ -113,6 +124,19 @@ public static class InventoryEndpoints
                 Text.Clean(request.Note)),
             cancellationToken);
         return Results.Json(ApiResults.Ok(allocation, httpContext), statusCode: StatusCodes.Status201Created);
+    }
+
+    private static async Task<IResult> AdjustAsync(
+        InventoryAdjustmentRequest request,
+        HttpContext httpContext,
+        CreateInventoryAdjustmentCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var transaction = await handler.HandleAsync(
+            new CreateInventoryAdjustmentCommand(request.WorkAreaId!.Value, request.MaterialId!.Value, request.Type!.Value,
+                request.Quantity!.Value, request.TransactionDate, request.Reason),
+            cancellationToken);
+        return Results.Json(ApiResults.Ok(transaction, httpContext), statusCode: StatusCodes.Status201Created);
     }
 
     /// <summary><c>AllocationFilter</c>: seasonId, workAreaId, taskId, materialId; newest first; paged.</summary>

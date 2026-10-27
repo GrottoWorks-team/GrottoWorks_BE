@@ -106,6 +106,11 @@ Cho tới khi ParishCoordination publish `planning.work-area.*` / `planning.seas
 **Đề nghị payload event của Lâm** chứa đúng các trường trên (+ envelope Mục 8), để consumer của Resource /
 Readiness / Task chỉ map 1–1. Header `X-Internal-Api-Key` như §5.
 
+Readiness (`readiness.api`) và Reporting (`reporting.api`) có **cùng** ba endpoint `PUT /internal/work-area-scopes|season-scopes|task-scopes`
+(cùng body) cho projection của mình — Parish / Task (hoặc script seed) gọi cả ba service cho tới khi có event.
+Readiness cần `status` của work area (`confirmAreaReadiness` chỉ khi `READINESS_REVIEW`, BR-73) và task `CORRECTIVE`;
+Reporting cần thêm `dueAt` của task.
+
 ### 5.3 Resource — feed tạm `task_projection` (F-RES-01)
 
 Cho tới khi TaskExecution publish `task.status.changed` / `task.assignment.responded` / `task.purchase-task.assigned`:

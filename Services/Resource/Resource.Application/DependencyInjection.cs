@@ -5,6 +5,7 @@ using Resource.Application.Requirements;
 using Resource.Application.Inventory;
 using Resource.Application.Shortages;
 using Resource.Application.Purchases;
+using Resource.Application.Contributions;
 
 namespace Resource.Application;
 
@@ -54,6 +55,12 @@ public static class DependencyInjection
         services.AddScoped<UpdatePurchaseRequestCommandHandler>();
         services.AddScoped<SubmitPurchaseRequestCommandHandler>();
         services.AddScoped<DecidePurchaseRequestCommandHandler>();
+
+        // F-RES-12 donors
+        services.AddScoped<DonorAccess>();
+        services.AddScoped<ListDonorsQueryHandler>();
+        services.AddScoped<CreateDonorCommandHandler>();
+        services.AddScoped<UpdateDonorCommandHandler>();
 
         return services;
     }

@@ -130,4 +130,24 @@ Authorization: Bearer {{accessToken}}
 GET {{host}}/api/v1/purchase-requests/{{purchaseRequest.response.body.$.data.id}}/history
 Authorization: Bearer {{accessToken}}
 
+### F-RES-12 — create a donor (MO: own parish; optional userId links a volunteer account of the same parish)
+# @name donor
+POST {{host}}/api/v1/donors
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "donorName": "Bà Maria Lan", "phone": "0901 234 567", "address": "12 Lê Lợi" }
+
+### F-RES-12 — search donors (no automatic merge: pick the right one)
+GET {{host}}/api/v1/donors?q=Lan&sort=name
+Authorization: Bearer {{accessToken}}
+
+### F-RES-12 — update contact details (If-Match = version)
+PATCH {{host}}/api/v1/donors/{{donor.response.body.$.data.id}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+If-Match: "{{donor.response.body.$.data.version}}"
+
+{ "email": "lan@example.com" }
+
 ###

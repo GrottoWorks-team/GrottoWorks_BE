@@ -3,6 +3,7 @@ using Resource.Domain.Catalog;
 using Resource.Domain.Scope;
 using Resource.Domain.Inventory;
 using Resource.Domain.Purchases;
+using Resource.Domain.Contributions;
 
 namespace Resource.Infrastructure.Data;
 
@@ -22,6 +23,8 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
     public DbSet<PurchaseRequest> PurchaseRequests => Set<PurchaseRequest>();
 
     public DbSet<PurchaseRequestStateChange> PurchaseRequestStateChanges => Set<PurchaseRequestStateChange>();
+
+    public DbSet<Donor> Donors => Set<Donor>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

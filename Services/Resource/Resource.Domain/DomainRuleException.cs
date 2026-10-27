@@ -19,7 +19,10 @@ public enum DomainErrorKind
     BadRequest,
 
     /// <summary>412 — optimistic concurrency precondition failed.</summary>
-    PreconditionFailed
+    PreconditionFailed,
+
+    /// <summary>503 — a service this operation depends on (for example Identity) is unavailable.</summary>
+    ServiceUnavailable
 }
 
 /// <summary>

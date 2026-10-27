@@ -11,6 +11,7 @@ public static class ResourceEndpoints
         app.MapInventoryEndpoints();
         app.MapShortageEndpoints();
         app.MapPurchaseRequestEndpoints();
+        app.MapDonorEndpoints();
         return app;
     }
 }

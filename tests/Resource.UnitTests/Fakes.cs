@@ -273,3 +273,69 @@ public sealed class FakePurchaseRequestStore : Resource.Application.Purchases.IP
         return Task.CompletedTask;
     }
 }
+
+public sealed class FakeDonorStore : Resource.Application.Contributions.IDonorStore
+{
+    public List<Resource.Domain.Contributions.Donor> Donors { get; } = [];
+
+    public int SaveChangesCount { get; private set; }
+
+    public Task<Resource.Domain.Contributions.Donor?> GetAsync(Guid donorId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Donors.FirstOrDefault(d => d.DonorId == donorId));
+
+    public Task<Resource.Domain.Contributions.Donor?> FindByUserAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Donors.FirstOrDefault(d => d.UserId == userId));
+
+    public Task<IReadOnlyList<Resource.Domain.Contributions.Donor>> GetManyAsync(IReadOnlyCollection<Guid> donorIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Contributions.Donor>>(Donors.Where(d => donorIds.Contains(d.DonorId)).ToList());
+
+    public Task<PagedResult<Resource.Domain.Contributions.Donor>> SearchAsync(
+        Resource.Application.Contributions.DonorSearch search, CancellationToken cancellationToken = default)
+    {
+        var filtered = Donors
+            .Where(d => search.ParishId is null || d.ParishId == search.ParishId)
+            .Where(d => search.Linked is null || (d.UserId != null) == search.Linked)
+            .Where(d => search.Search is null ||
+                        d.DonorName.Contains(search.Search, StringComparison.OrdinalIgnoreCase) ||
+                        (d.Phone?.Contains(search.Search) ?? false) ||
+                        (d.Email?.Contains(search.Search, StringComparison.OrdinalIgnoreCase) ?? false))
+            .ToList();
+        IEnumerable<Resource.Domain.Contributions.Donor> ordered = search.SortField == Resource.Application.Contributions.DonorSortField.CreatedAt
+            ? filtered.OrderBy(d => d.CreatedAt)
+            : filtered.OrderBy(d => d.DonorName, StringComparer.Ordinal);
+        if (search.SortDescending)
+        {
+            ordered = ordered.Reverse();
+        }
+
+        return Task.FromResult(new PagedResult<Resource.Domain.Contributions.Donor>(
+            ordered.Skip((search.Page - 1) * search.Size).Take(search.Size).ToList(), filtered.Count));
+    }
+
+    public void Add(Resource.Domain.Contributions.Donor donor) => Donors.Add(donor);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class FakeIdentityUserLookup : Resource.Application.Users.IIdentityUserLookup
+{
+    public Dictionary<Guid, Resource.Application.Users.IdentityUser> Users { get; } = [];
+
+    public bool Unavailable { get; set; }
+
+    public Task<Resource.Application.Users.IdentityUser?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        Unavailable
+            ? throw new Resource.Application.Users.IdentityUserLookupUnavailableException("down")
+            : Task.FromResult(Users.GetValueOrDefault(userId));
+
+    public Resource.Application.Users.IdentityUser Seed(Guid parishId, string role = "VOLUNTEER", string name = "Nguyễn Văn A")
+    {
+        var user = new Resource.Application.Users.IdentityUser(Guid.NewGuid(), name, "ACTIVE", role, parishId);
+        Users[user.UserId] = user;
+        return user;
+    }
+}

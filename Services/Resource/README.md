@@ -1,7 +1,7 @@
 # Resource Service
 
 Vật tư, tồn kho, mua sắm, quyên góp, đồ mượn (owner: Vũ — spec §5.2, tag `Materials`, `Purchases`, `Contributions`).
-Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4.
+Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12 — S5.
 
 ## Kiến trúc
 
@@ -54,6 +54,9 @@ Mẫu request: `Resource.Api.http`.
 | `POST /api/v1/purchase-requests/{id}/approve` | `approvePurchaseRequest` | LEADER **của work area** (D-01, BR-29) | F-RES-07 |
 | `POST /api/v1/purchase-requests/{id}/reject` | `rejectPurchaseRequest` | LEADER của work area; `reason` bắt buộc (BR-31) | F-RES-07 |
 | `GET /api/v1/purchase-requests/{id}/history` | `getPurchaseRequestHistory` | PARISH, LEADER, MO — `StateChange[]` cũ → mới | F-RES-06 |
+| `GET /api/v1/donors` | `listDonors` | MO (parish mình), ADMIN (`parishId` tùy chọn) — `q` (tên/sđt/email), `linked`, sort `name|createdAt` | F-RES-12 |
+| `POST /api/v1/donors` | `createDonor` | MO, ADMIN (ADMIN bắt buộc `parishId`); `userId` tùy chọn | F-RES-12 |
+| `PATCH /api/v1/donors/{id}` | `updateDonor` | MO, ADMIN; tên + liên hệ; `version`/`If-Match` | F-RES-12 |
 | `PUT /internal/work-area-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/season-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 
@@ -81,6 +84,16 @@ Mẫu request: `Resource.Api.http`.
   Payload: `Resource.Contracts/Events/PurchaseRequest*.cs`, cần Lâm review (plan §4.2 "giữa S4 chốt với Lâm").
 - Bổ sung so với ERD v3.6 (đã ghi ở spec §3): bảng kỹ thuật `purchase_request_state_change` (nguồn của
   `getPurchaseRequestHistory`) và cột `purchase_request_item.shortage_override_reason`.
+
+## Donor (F-RES-12)
+
+- Không bao giờ tự gộp donor theo tên/sđt/email (ERD note) — trùng tên vẫn tạo bản ghi mới; MO tự chọn donor có sẵn.
+- `userId` (tùy chọn, unique) liên kết tài khoản volunteer: kiểm tra qua Identity `GET /internal/users` (cùng cách
+  ParishCoordination, config `IdentityClient:BaseAddress` + `InternalApi:ApiKey`) — không tồn tại → 422
+  `DONOR_USER_NOT_FOUND`, khác parish → 422 `DONOR_USER_OTHER_PARISH`, đã liên kết → 409 `DONOR_USER_ALREADY_LINKED`,
+  Identity lỗi → 503 `IDENTITY_UNAVAILABLE`. Liên kết chỉ đặt lúc tạo (PATCH chỉ sửa tên + liên hệ).
+- **Bổ sung so với ERD**: cột `donor.parish_id` — ERD không có, nhưng thiếu nó thì MO parish này đọc được sđt/email donor
+  parish khác. MO chỉ thấy/sửa donor parish mình (khác → 404), ADMIN thấy tất cả.
 
 ## Phạm vi (scope)
 

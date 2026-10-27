@@ -22,6 +22,110 @@ namespace Reporting.Infrastructure.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Reporting.Domain.Inbox.ProcessedEvent", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("outcome");
+
+                    b.Property<DateTimeOffset>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.HasKey("EventId")
+                        .HasName("pk_processed_event");
+
+                    b.ToTable("processed_event", (string)null);
+                });
+
+            modelBuilder.Entity("Reporting.Domain.Recognition.Contribution", b =>
+                {
+                    b.Property<Guid>("ContributionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contribution_id");
+
+                    b.Property<Guid?>("ContributedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contributed_by_user_id");
+
+                    b.Property<DateTimeOffset>("ContributionDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("contribution_date");
+
+                    b.Property<Guid>("ContributionTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contribution_type_id");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("contribution_description");
+
+                    b.Property<Guid?>("DonationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donation_id");
+
+                    b.Property<Guid?>("DonorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donor_user_id");
+
+                    b.Property<Guid>("ParishId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_id");
+
+                    b.Property<Guid?>("ReferenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reference_id");
+
+                    b.Property<string>("ReferenceType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("reference_type");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<Guid?>("WorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_id");
+
+                    b.HasKey("ContributionId");
+
+                    b.HasIndex("ContributionTypeId");
+
+                    b.HasIndex("DonationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_contribution_donation");
+
+                    b.HasIndex("ReferenceType", "ReferenceId", "ContributedByUserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_contribution_reference_user")
+                        .HasFilter("\"donation_id\" IS NULL");
+
+                    b.HasIndex(new[] { "ContributedByUserId" }, "ix_contribution_contributed_by");
+
+                    b.HasIndex(new[] { "DonorUserId" }, "ix_contribution_donor_user");
+
+                    b.HasIndex(new[] { "ParishId", "SeasonId" }, "ix_contribution_parish_season");
+
+                    b.ToTable("contribution", null, t =>
+                        {
+                            t.HasCheckConstraint("contribution_single_source", "(\"donation_id\" IS NOT NULL AND \"contributed_by_user_id\" IS NULL AND \"reference_type\" IS NULL AND \"reference_id\" IS NULL) OR (\"donation_id\" IS NULL AND \"contributed_by_user_id\" IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Reporting.Domain.Recognition.ContributionType", b =>
                 {
                     b.Property<Guid>("ContributionTypeId")
@@ -107,6 +211,53 @@ namespace Reporting.Infrastructure.Data.Migrations
                             Name = "Hỗ trợ community khác",
                             Status = "ACTIVE"
                         });
+                });
+
+            modelBuilder.Entity("Reporting.Domain.Recognition.RecognitionPoint", b =>
+                {
+                    b.Property<Guid>("RecognitionPointId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recognition_point_id");
+
+                    b.Property<int>("AwardedPoints")
+                        .HasColumnType("integer")
+                        .HasColumnName("awarded_points");
+
+                    b.Property<Guid>("AwardedToUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("awarded_to_user_id");
+
+                    b.Property<Guid>("ContributionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contribution_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("RecognitionRuleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recognition_rule_id");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.HasKey("RecognitionPointId");
+
+                    b.HasIndex("RecognitionRuleId");
+
+                    b.HasIndex("ContributionId", "RecognitionRuleId", "AwardedToUserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_recognition_point_contribution_rule_user");
+
+                    b.HasIndex(new[] { "AwardedToUserId", "SeasonId" }, "ix_recognition_point_user_season");
+
+                    b.ToTable("recognition_point", (string)null);
                 });
 
             modelBuilder.Entity("Reporting.Domain.Recognition.RecognitionRule", b =>
@@ -288,6 +439,30 @@ namespace Reporting.Infrastructure.Data.Migrations
                         .HasDatabaseName("ix_work_area_scope_season_id");
 
                     b.ToTable("work_area_scope", (string)null);
+                });
+
+            modelBuilder.Entity("Reporting.Domain.Recognition.Contribution", b =>
+                {
+                    b.HasOne("Reporting.Domain.Recognition.ContributionType", null)
+                        .WithMany()
+                        .HasForeignKey("ContributionTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Reporting.Domain.Recognition.RecognitionPoint", b =>
+                {
+                    b.HasOne("Reporting.Domain.Recognition.Contribution", null)
+                        .WithMany()
+                        .HasForeignKey("ContributionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Reporting.Domain.Recognition.RecognitionRule", null)
+                        .WithMany()
+                        .HasForeignKey("RecognitionRuleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Reporting.Domain.Recognition.RecognitionRule", b =>

@@ -13,6 +13,8 @@ COPY ["Services/Reporting/Reporting.Application/Reporting.Application.csproj", "
 COPY ["Services/Reporting/Reporting.Infrastructure/Reporting.Infrastructure.csproj", "Services/Reporting/Reporting.Infrastructure/"]
 COPY ["Services/Reporting/Reporting.Domain/Reporting.Domain.csproj", "Services/Reporting/Reporting.Domain/"]
 COPY ["Services/Reporting/Reporting.Contracts/Reporting.Contracts.csproj", "Services/Reporting/Reporting.Contracts/"]
+COPY ["Services/Resource/Resource.Contracts/Resource.Contracts.csproj", "Services/Resource/Resource.Contracts/"]
+COPY ["Services/Readiness/Readiness.Contracts/Readiness.Contracts.csproj", "Services/Readiness/Readiness.Contracts/"]
 COPY ["BuildingBlocks/BuildingBlocks.Web/BuildingBlocks.Web.csproj", "BuildingBlocks/BuildingBlocks.Web/"]
 COPY ["BuildingBlocks/BuildingBlocks.Security/BuildingBlocks.Security.csproj", "BuildingBlocks/BuildingBlocks.Security/"]
 RUN dotnet restore "./Services/Reporting/Reporting.Api/./Reporting.Api.csproj"

@@ -6,7 +6,9 @@ public static class ReportingEndpoints
     public static IEndpointRouteBuilder MapReportingEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapInternalScopeEndpoints();
+        app.MapInternalEventEndpoints();
         app.MapRecognitionCatalogEndpoints();
+        app.MapRecognitionEndpoints();
         return app;
     }
 }

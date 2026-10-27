@@ -147,4 +147,17 @@ public sealed class RecognitionCatalogTests
         all.Select(rule => (rule.Name, rule.RuleVersion)).Should().Equal(("A tiền", 1), ("B task", 2), ("B task", 1));
         (await Rules.ListAsync(null, task)).Should().HaveCount(2);
     }
+
+    [Fact]
+    public async Task A_type_has_one_rule_at_any_date_so_points_never_stack()
+    {
+        var typeId = _store.Type(ContributionType.TaskCompletion).ContributionTypeId;
+        await Rules.CreateAsync(new CreateRecognitionRuleCommand(typeId, "Task tháng 12", 10, null, Jan1, Jan1.AddDays(30), null));
+
+        var overlap = () => Rules.CreateAsync(new CreateRecognitionRuleCommand(typeId, "Task khác", 5, null, Jan1.AddDays(30), null, null));
+        (await overlap.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("RECOGNITION_RULE_OVERLAP");
+
+        var after = await Rules.CreateAsync(new CreateRecognitionRuleCommand(typeId, "Task năm sau", 5, null, Jan1.AddDays(31), null, null));
+        after.RuleVersion.Should().Be(1);
+    }
 }

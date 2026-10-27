@@ -128,6 +128,10 @@ public sealed class RecognitionRule
     public bool AppliesOn(DateOnly date) =>
         Status == RecognitionRuleStatus.Active && date >= EffectiveFrom && (EffectiveTo is null || date <= EffectiveTo);
 
+    /// <summary>Whether the effective periods of two rule versions share at least one day.</summary>
+    public bool Overlaps(RecognitionRule other) =>
+        (EffectiveTo is null || other.EffectiveFrom <= EffectiveTo) && (other.EffectiveTo is null || EffectiveFrom <= other.EffectiveTo);
+
     private void Set(int points, string? description, DateOnly effectiveFrom, DateOnly? effectiveTo)
     {
         if (points is < 1 or > MaxPoints)

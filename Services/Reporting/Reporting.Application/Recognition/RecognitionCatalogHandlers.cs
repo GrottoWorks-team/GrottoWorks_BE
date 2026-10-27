@@ -171,6 +171,16 @@ public sealed class RecognitionRuleHandler(IRecognitionCatalogStore store)
                     "RECOGNITION_RULE_NAME_EXISTS",
                     "A rule with this name exists; send previousRuleId to create its next version (BR-68).");
             }
+
+            // One rule per contribution type at any date, so a contribution earns exactly one rule's points.
+            var overlapping = (await store.ListRulesAsync(RecognitionRuleStatus.Active, type.ContributionTypeId, cancellationToken))
+                .FirstOrDefault(other => other.Overlaps(rule));
+            if (overlapping is not null)
+            {
+                throw new DomainRuleException(
+                    "RECOGNITION_RULE_OVERLAP",
+                    $"Rule '{overlapping.Name}' (v{overlapping.RuleVersion}) already covers this period for the type; create its next version instead.");
+            }
         }
 
         store.AddRule(rule);

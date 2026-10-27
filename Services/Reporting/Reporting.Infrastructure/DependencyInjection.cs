@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Reporting.Application.Abstractions;
+using Reporting.Application.Ingestion;
 using Reporting.Application.Recognition;
 using Reporting.Application.Scope;
 using Reporting.Infrastructure.Data;
@@ -26,6 +27,10 @@ public static class DependencyInjection
         services.AddScoped<IWorkAreaScopeStore, WorkAreaScopeStore>();
         services.AddScoped<ITaskProjectionStore, TaskProjectionStore>();
         services.AddScoped<IRecognitionCatalogStore, RecognitionCatalogStore>();
+        services.AddScoped<ContributionStore>();
+        services.AddScoped<IContributionStore>(provider => provider.GetRequiredService<ContributionStore>());
+        services.AddScoped<IInboxStore>(provider => provider.GetRequiredService<ContributionStore>());
+        services.AddScoped<IRecognitionQueryStore>(provider => provider.GetRequiredService<ContributionStore>());
         return services;
     }
 }

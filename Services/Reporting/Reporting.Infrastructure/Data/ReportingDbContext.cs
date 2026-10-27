@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Reporting.Domain.Inbox;
 using Reporting.Domain.Recognition;
 using Reporting.Domain.Scope;
 
@@ -14,6 +15,12 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
     public DbSet<ContributionType> ContributionTypes => Set<ContributionType>();
 
     public DbSet<RecognitionRule> RecognitionRules => Set<RecognitionRule>();
+
+    public DbSet<Contribution> Contributions => Set<Contribution>();
+
+    public DbSet<RecognitionPoint> RecognitionPoints => Set<RecognitionPoint>();
+
+    public DbSet<ProcessedEvent> ProcessedEvents => Set<ProcessedEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

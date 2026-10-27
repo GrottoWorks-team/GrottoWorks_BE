@@ -81,3 +81,98 @@ public sealed class FakeRecognitionCatalogStore : IRecognitionCatalogStore
         return Task.CompletedTask;
     }
 }
+
+public sealed class FakeScopeStore : Reporting.Application.Scope.IWorkAreaScopeStore
+{
+    public List<Reporting.Domain.Scope.WorkAreaScope> Scopes { get; } = [];
+
+    public Task<Reporting.Domain.Scope.WorkAreaScope?> GetAsync(Guid workAreaId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Scopes.FirstOrDefault(s => s.WorkAreaId == workAreaId));
+
+    public Task<IReadOnlyList<Reporting.Domain.Scope.WorkAreaScope>> ListBySeasonAsync(Guid seasonId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Reporting.Domain.Scope.WorkAreaScope>>(Scopes.Where(s => s.SeasonId == seasonId).ToList());
+
+    public Task<IReadOnlyList<Reporting.Domain.Scope.WorkAreaScope>> ListByIdsAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Reporting.Domain.Scope.WorkAreaScope>>(Scopes.Where(s => workAreaIds.Contains(s.WorkAreaId)).ToList());
+
+    public Task<IReadOnlyList<Reporting.Domain.Scope.WorkAreaScope>> ListByParishAsync(Guid parishId, Guid? seasonId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Reporting.Domain.Scope.WorkAreaScope>>(
+            Scopes.Where(s => s.ParishId == parishId && (seasonId is null || s.SeasonId == seasonId)).OrderBy(s => s.Name).ToList());
+
+    public void Add(Reporting.Domain.Scope.WorkAreaScope scope) => Scopes.Add(scope);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public Reporting.Domain.Scope.WorkAreaScope Seed(Guid parishId, Guid seasonId, Guid? leaderId = null, Guid? officerId = null, string name = "Hang đá")
+    {
+        var scope = Reporting.Domain.Scope.WorkAreaScope.FromSnapshot(
+            new Reporting.Domain.Scope.WorkAreaSnapshot(Guid.NewGuid(), seasonId, parishId, name, Reporting.Domain.Scope.WorkAreaStatus.InProgress,
+                Reporting.Domain.Scope.SeasonStatus.Active, null, leaderId, officerId, 1),
+            DateTimeOffset.UtcNow);
+        Scopes.Add(scope);
+        return scope;
+    }
+}
+
+/// <summary>Contributions, points and inbox in one fake unit of work; staged rows commit on SaveChanges.</summary>
+public sealed class FakeContributionStore :
+    Reporting.Application.Recognition.IContributionStore,
+    Reporting.Application.Ingestion.IInboxStore,
+    Reporting.Application.Recognition.IRecognitionQueryStore
+{
+    private readonly List<object> _staged = [];
+
+    public List<Contribution> Contributions { get; } = [];
+
+    public List<RecognitionPoint> Points { get; } = [];
+
+    public List<Reporting.Domain.Inbox.ProcessedEvent> Processed { get; } = [];
+
+    public Task<Contribution?> GetByDonationAsync(Guid donationId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Contributions.FirstOrDefault(c => c.DonationId == donationId));
+
+    public Task<Contribution?> GetByReferenceAsync(string referenceType, Guid referenceId, Guid userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Contributions.FirstOrDefault(c => c.DonationId == null && c.ReferenceType == referenceType && c.ReferenceId == referenceId &&
+                                                          c.ContributedByUserId == userId));
+
+    public Task<bool> PointExistsAsync(Guid contributionId, Guid ruleId, Guid userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Points.Any(p => p.ContributionId == contributionId && p.RecognitionRuleId == ruleId && p.AwardedToUserId == userId));
+
+    public void Add(Contribution contribution) => _staged.Add(contribution);
+
+    public void Add(RecognitionPoint point) => _staged.Add(point);
+
+    public Task<bool> ContainsAsync(Guid eventId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Processed.Any(p => p.EventId == eventId));
+
+    public void Add(Reporting.Domain.Inbox.ProcessedEvent processed) => _staged.Add(processed);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        foreach (var row in _staged)
+        {
+            switch (row)
+            {
+                case Contribution contribution: Contributions.Add(contribution); break;
+                case RecognitionPoint point: Points.Add(point); break;
+                case Reporting.Domain.Inbox.ProcessedEvent processed: Processed.Add(processed); break;
+            }
+        }
+
+        _staged.Clear();
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<Contribution>> ListContributionsAsync(Guid parishId, Guid? seasonId, Guid? creditedUserId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Contribution>>(Contributions
+            .Where(c => c.ParishId == parishId && (seasonId is null || c.SeasonId == seasonId))
+            .Where(c => creditedUserId is null || c.ContributedByUserId == creditedUserId || c.DonorUserId == creditedUserId)
+            .ToList());
+
+    public Task<IReadOnlyList<RecognitionPoint>> ListPointsAsync(Guid parishId, Guid? seasonId, Guid? userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<RecognitionPoint>>(Points
+            .Where(p => Contributions.Any(c => c.ContributionId == p.ContributionId && c.ParishId == parishId))
+            .Where(p => seasonId is null || p.SeasonId == seasonId)
+            .Where(p => userId is null || p.AwardedToUserId == userId)
+            .ToList());
+}

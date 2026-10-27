@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Reporting.Application.Ingestion;
 using Reporting.Application.Recognition;
 using Reporting.Application.Scope;
 
@@ -18,6 +19,11 @@ public static class DependencyInjection
         // F-RPT-01 contribution types and recognition rules
         services.AddScoped<ContributionTypeHandler>();
         services.AddScoped<RecognitionRuleHandler>();
+
+        // F-RPT-02/03 contributions, points, recognition
+        services.AddScoped<ContributionRecorder>();
+        services.AddScoped<IntegrationEventHandler>();
+        services.AddScoped<RecognitionQueryHandler>();
 
         return services;
     }

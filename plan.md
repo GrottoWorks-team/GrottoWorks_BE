@@ -214,8 +214,8 @@ Khởi tạo (S2): `Services/Resource/*`, `resource_db`, outbox/inbox.
 |---|---|---|---|---|
 | 0 | Setup | `Services/Reporting/*`, `reporting_db`, inbox | — | S6 · ✅ 27/10 (scaffold; inbox cùng RPT-02) |
 | 1 | F-RPT-01 | `contribution_type`, `recognition_rule` (version, `effective_from/to`); đổi điểm = version mới (BR-68) | — | S6 · ✅ 27/10 |
-| 2 | F-RPT-02 | Consumer `task.completion.reviewed`, `attendance.hours.approved`, `purchase.delivery.confirmed`, `contribution.receipt.confirmed`, `contribution.donation.adjusted`, `support.member.completed` → `contribution` + `recognition_point` (lưu rule version); unique theo eventId/reference (BR-54..56); event `recognition.entry.created` | Event từ Task/Resource | S7 |
-| 3 | F-RPT-03 | `getMyRecognition`, `getSeasonRecognition` | RPT-02 | S7 |
+| 2 | F-RPT-02 | Consumer `task.completion.reviewed`, `attendance.hours.approved`, `purchase.delivery.confirmed`, `contribution.receipt.confirmed`, `contribution.donation.adjusted`, `support.member.completed` → `contribution` + `recognition_point` (lưu rule version); unique theo eventId/reference (BR-54..56); event `recognition.entry.created` | Event từ Task/Resource | S7 · ✅ 27/10 (feed `/internal/events` + inbox; payload Task đề nghị ở BuildingBlocks README §5.5) |
+| 3 | F-RPT-03 | `getMyRecognition`, `getSeasonRecognition` | RPT-02 | S7 · ✅ 27/10 |
 | 4 | F-RPT-04 | Read-model dashboard (season, work area, material) cập nhật từ event; cache Redis; mục tiêu < 3s | Toàn bộ event | S8 |
 | 5 | F-RPT-05 | 6 báo cáo (task, material, purchase, contribution, attendance, readiness); BR-57 ghi parish/season/thời gian/bộ lọc | RPT-04 | S8 |
 | 6 | F-RPT-06 | `createReportExport` (202 + job), `getReportExport`; xlsx (ClosedXML) / pdf (QuestPDF) lưu MinIO | NTF-01 | S9 (P2) |
@@ -310,7 +310,7 @@ Kịch bản nghiệm thu theo owner (Mục 8 spec): Lâm #1–4, #11, #16; Vũ 
 | Identity | Vũ | IDN-01..03, 05..09 | IDN-04, 10 | — | ✅ 10 / 10 (S0+S1: IDN-01, 02, 03, 05, 06 · S2 sớm 18/10: IDN-04, 07, 08, 09, 10 — chờ review/merge) |
 | Resource | Vũ | RES-01..07, 09, 10, 12, 13, 15, 17 | RES-11, 13b, 13c, 16, 18, 20 | RES-14 | ✅ 19 / 20 + RES-01 một phần (18/10: scaffold, RES-02..07 · 27/10: RES-09..18, 13b, 13c, 20, task_projection; RES-01 projection + feed tạm, chờ event Parish/Task) |
 | Readiness | Vũ | — | RDY-02..06 | — | ✅ 5 / 5 (27/10; RDY-04 tạo corrective task chờ `/internal/tasks` của Lâm) |
-| Reporting | Vũ | — | RPT-01..05 | RPT-06 | 🟨 1 / 6 (27/10: RPT-01) |
+| Reporting | Vũ | — | RPT-01..05 | RPT-06 | 🟨 3 / 6 (27/10: RPT-01, 02, 03) |
 
 ---
 

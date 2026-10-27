@@ -4,6 +4,9 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\BuildingBlocks.Security\BuildingBlocks.Security.csproj" />
     <ProjectReference Include="..\Reporting.Domain\Reporting.Domain.csproj" />
     <ProjectReference Include="..\Reporting.Contracts\Reporting.Contracts.csproj" />
+    <!-- Consumer side of the events Resource and Readiness publish (contract-first records). -->
+    <ProjectReference Include="..\..\Resource\Resource.Contracts\Resource.Contracts.csproj" />
+    <ProjectReference Include="..\..\Readiness\Readiness.Contracts\Readiness.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

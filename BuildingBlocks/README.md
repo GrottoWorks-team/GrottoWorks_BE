@@ -127,3 +127,22 @@ Cho tới khi TaskExecution publish `task.status.changed` / `task.assignment.res
   `{ receivedUsableQuantity, receivedUnusableQuantity?, note?, version? }` → `TRANSFER_IN` phần usable, event
   `support.transfer.confirmed { supportResponseMaterialId, sentQuantity, receivedUsableQuantity, receivedUnusableQuantity, ... }`
   để Task cập nhật FULFILLED/PARTIALLY_FULFILLED (consumer idempotent theo `supportResponseMaterialId`).
+
+### 5.5 Reporting — nhận event (F-RPT-02) và payload đề nghị cho event của Task
+
+Cho tới khi có outbox (F-PLT-05) và consumer MassTransit, producer (hoặc script seed) gửi từng event:
+
+- `POST http://reporting.api:8080/internal/events` — body `{ eventId, eventType, version, occurredAt?, payload }` (envelope §2 +
+  `eventId` = message id của broker, là khóa inbox). Trả `200 { outcome: APPLIED|DUPLICATE|IGNORED, contributionsRecorded,
+  pointsAwarded }`; gửi lại cùng `eventId` → `DUPLICATE`, không tính lại (BR-55); `409 EVENT_CONCURRENT_UPDATE` → event khác
+  đang cập nhật cùng contribution, gửi lại; `422 EVENT_PAYLOAD_INVALID` / `EVENT_SEASON_MISMATCH`. Event không dùng → `IGNORED`.
+- Event của Resource dùng đúng record trong `Resource.Contracts.Events` (`purchase.delivery.confirmed`,
+  `contribution.receipt.confirmed`, `contribution.donation.adjusted`).
+- **Đề nghị payload event của Lâm** (Reporting đang đọc theo các trường này, `Reporting.Application/Ingestion/ConsumedEvents.cs`):
+  - `task.completion.reviewed { taskId, workAreaId, seasonId, parishId, taskName?, taskType, decision: APPROVED|REVISION_REQUIRED,
+    volunteerUserIds[], reviewedByUserId, reviewedAt }` — `volunteerUserIds` = assignment ACCEPTED/COMPLETED được ghi nhận;
+    task PURCHASE không tính ở đây (tính từ `purchase.delivery.confirmed`).
+  - `attendance.hours.approved { attendanceId, taskId, workAreaId, seasonId, parishId, volunteerUserId, approvedHours,
+    approvedByUserId, approvedAt }` — duyệt lại (correction) cùng `attendanceId` không tạo contribution mới.
+  - `support.member.completed { supportResponseMemberId, supportRequestId, volunteerUserId, targetWorkAreaId, seasonId, parishId,
+    completedAt }`.

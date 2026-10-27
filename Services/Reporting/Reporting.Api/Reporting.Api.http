@@ -4,6 +4,12 @@
 @parishAccessToken = <PARISH access token>
 @contributionTypeId = 0f3c2a10-0000-4000-8000-000000000001
 @ruleId = <id from createRecognitionRule>
+@internalApiKey = dev-internal-api-key-change-me-0123456789
+@volunteerAccessToken = <VOLUNTEER access token>
+@volunteerUserId = <sub of the VOLUNTEER token>
+@seasonId = 00000000-0000-0000-0000-0000000000b1
+@parishId = 00000000-0000-0000-0000-000000000001
+@workAreaId = 00000000-0000-0000-0000-0000000000a1
 
 ### F-RPT-01 — listContributionTypes
 GET {{host}}/api/v1/contribution-types?status=ACTIVE
@@ -52,3 +58,34 @@ Authorization: Bearer {{adminAccessToken}}
 Content-Type: application/json
 
 { "reason": "Đổi chính sách tính điểm" }
+
+### F-RPT-02 — (interim) deliver task.completion.reviewed
+POST {{host}}/internal/events
+Content-Type: application/json
+X-Internal-Api-Key: {{internalApiKey}}
+
+{
+  "eventId": "11111111-1111-1111-1111-111111111111",
+  "eventType": "task.completion.reviewed",
+  "version": 1,
+  "payload": {
+    "taskId": "22222222-2222-2222-2222-222222222222",
+    "workAreaId": "{{workAreaId}}",
+    "seasonId": "{{seasonId}}",
+    "parishId": "{{parishId}}",
+    "taskName": "Treo đèn",
+    "taskType": "WORK",
+    "decision": "APPROVED",
+    "volunteerUserIds": ["{{volunteerUserId}}"],
+    "reviewedByUserId": "33333333-3333-3333-3333-333333333333",
+    "reviewedAt": "2026-12-10T03:00:00Z"
+  }
+}
+
+### F-RPT-03 — getMyRecognition
+GET {{host}}/api/v1/users/me/recognition?seasonId={{seasonId}}
+Authorization: Bearer {{volunteerAccessToken}}
+
+### F-RPT-03 — getSeasonRecognition
+GET {{host}}/api/v1/seasons/{{seasonId}}/recognition
+Authorization: Bearer {{parishAccessToken}}

@@ -44,11 +44,9 @@ public sealed class ContributionStore(ReportingDbContext dbContext) : IContribut
         {
             throw new DomainRuleException(IntegrationEventHandler.AlreadyProcessed, "The event was processed concurrently.");
         }
-        catch (DbUpdateException exception) when (
-            exception.IsUniqueViolation(ContributionConfiguration.DonationIndex) ||
-            exception.IsUniqueViolation(ContributionConfiguration.ReferenceIndex) ||
-            exception.IsUniqueViolation(RecognitionPointConfiguration.UniqueIndex))
+        catch (DbUpdateException exception) when (exception is DbUpdateConcurrencyException || exception.IsAnyUniqueViolation())
         {
+            // Another event inserted or changed the same contribution, point or read-model row first.
             throw new DomainRuleException(IntegrationEventHandler.ConcurrentUpdate, "Another event updated the same contribution; deliver this event again.");
         }
     }

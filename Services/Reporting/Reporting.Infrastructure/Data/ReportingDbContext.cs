@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Reporting.Domain.Inbox;
+using Reporting.Domain.ReadModels;
 using Reporting.Domain.Recognition;
 using Reporting.Domain.Scope;
 
@@ -21,6 +22,18 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
     public DbSet<RecognitionPoint> RecognitionPoints => Set<RecognitionPoint>();
 
     public DbSet<ProcessedEvent> ProcessedEvents => Set<ProcessedEvent>();
+
+    public DbSet<MaterialLine> MaterialLines => Set<MaterialLine>();
+
+    public DbSet<PurchaseRequestView> PurchaseRequestViews => Set<PurchaseRequestView>();
+
+    public DbSet<DonationView> DonationViews => Set<DonationView>();
+
+    public DbSet<AttendanceView> AttendanceViews => Set<AttendanceView>();
+
+    public DbSet<ReadinessAreaView> ReadinessAreaViews => Set<ReadinessAreaView>();
+
+    public DbSet<ReadinessHistoryEntry> ReadinessHistory => Set<ReadinessHistoryEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

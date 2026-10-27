@@ -115,6 +115,24 @@ public sealed class QueryReader
             : throw BadRequest("INVALID_FILTER_VALUE", $"'{key}' must be an ISO 8601 date-time.");
     }
 
+    /// <summary>A calendar date <c>yyyy-MM-dd</c>.</summary>
+    public DateOnly? Date(string key)
+    {
+        var raw = String(key);
+        if (raw is null)
+        {
+            return null;
+        }
+
+        return DateOnly.TryParseExact(raw, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var value)
+            ? value
+            : throw BadRequest("INVALID_FILTER_VALUE", $"'{key}' must be a date (yyyy-MM-dd).");
+    }
+
+    /// <summary>A required UUID parameter.</summary>
+    public Guid RequiredGuid(string key) =>
+        Guid(key) ?? throw BadRequest("MISSING_FILTER_VALUE", $"'{key}' is required.");
+
     /// <summary>Parses SNAKE_CASE_UPPER enum values (e.g. <c>ACTIVE</c>, <c>OPENING_STOCK</c>).</summary>
     public TEnum? Enum<TEnum>(string key)
         where TEnum : struct, System.Enum

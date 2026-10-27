@@ -12,4 +12,7 @@ internal static class DbUpdateExceptionExtensions
             SqlState: PostgresErrorCodes.UniqueViolation
         } postgresException &&
         string.Equals(postgresException.ConstraintName, constraintName, StringComparison.Ordinal);
+
+    public static bool IsAnyUniqueViolation(this DbUpdateException exception) =>
+        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
 }

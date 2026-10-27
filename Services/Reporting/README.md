@@ -1,13 +1,13 @@
 # Reporting Service
 
 Contribution, điểm ghi nhận, dashboard, báo cáo và export (owner: Vũ — spec §5.4, tag `Reports`).
-Trạng thái: F-RPT-01 — S6; F-RPT-02, 03 — S7 (làm 27/10).
+Trạng thái: F-RPT-01 — S6; F-RPT-02, 03 — S7; F-RPT-04, 05 — S8 (làm 27/10).
 
 ## Kiến trúc
 
 ```
 Services/Reporting/
-├── Reporting.Domain/          # Recognition (ContributionType, RecognitionRule, Contribution, RecognitionPoint), Inbox, Scope
+├── Reporting.Domain/          # Recognition, Inbox, ReadModels (rm_*), Scope (work_area_scope, task_projection)
 ├── Reporting.Contracts/       # Event contract-first (recognition.entry.created)
 ├── Reporting.Application/     # Handler thường (không MediatR); Ingestion (IntegrationEventHandler, payload event của Task)
 ├── Reporting.Infrastructure/  # EF Core + Npgsql (reporting_db), store, migration (seed contribution type hệ thống)
@@ -36,6 +36,15 @@ Mẫu request: `Reporting.Api.http`.
 | `POST /api/v1/recognition-rules/{id}/deactivate` | `deactivateRecognitionRule` | ADMIN (lý do bắt buộc) | F-RPT-01 |
 | `GET /api/v1/users/me/recognition` | `getMyRecognition` | VOLUNTEER (`seasonId` tùy chọn) | F-RPT-03 |
 | `GET /api/v1/seasons/{id}/recognition` | `getSeasonRecognition` | PARISH cùng parish | F-RPT-03 |
+| `GET /api/v1/dashboards/season?seasonId=` | `viewSeasonDashboard` | PARISH | F-RPT-04 |
+| `GET /api/v1/dashboards/work-area?workAreaId=` | `viewWorkAreaDashboard` | LEADER của khu vực | F-RPT-04 |
+| `GET /api/v1/dashboards/materials?workAreaId=&seasonId=` | `viewMaterialDashboard` | MO (khu vực mình quản lý) | F-RPT-04 |
+| `GET /api/v1/reports/tasks` | `getTaskReport` | PARISH, LEADER | F-RPT-05 |
+| `GET /api/v1/reports/materials` | `getMaterialReport` | PARISH, LEADER, MO | F-RPT-05 |
+| `GET /api/v1/reports/purchases` | `getPurchaseReport` | PARISH, LEADER, MO | F-RPT-05 |
+| `GET /api/v1/reports/contributions` | `getContributionReport` | PARISH, MO | F-RPT-05 |
+| `GET /api/v1/reports/attendance` | `getAttendanceReport` | PARISH, LEADER | F-RPT-05 |
+| `GET /api/v1/reports/readiness` | `getReadinessReport` | PARISH, LEADER | F-RPT-05 |
 | `POST /internal/events` | — | `X-Internal-Api-Key` (feed event tạm, BuildingBlocks README §5.5) | F-RPT-02 |
 
 ## Contribution type & recognition rule (F-RPT-01, BA 13, BR-56, BR-68)
@@ -78,6 +87,24 @@ Mẫu request: `Reporting.Api.http`.
 - `getSeasonRecognition`: xếp hạng account theo điểm (bằng điểm cùng hạng 1, 1, 3), số contribution, số contribution của
   donor ngoài; season ngoài parish → 404. Chưa trả tên người dùng (FE lấy từ Identity).
 
+## Read model, dashboard, báo cáo (F-RPT-04/05, BA 12, BR-57)
+
+- Read model (bảng kỹ thuật `rm_*`, cập nhật trong cùng transaction với inbox, mỗi dòng có `xmin` → event đồng thời trên
+  cùng dòng: một cái 409 và được gửi lại, không mất cập nhật):
+  `rm_material_line` (`material.shortage.changed` + pledge / receipt / delivery theo vật tư), `rm_purchase_request`
+  (`purchase.request.*`, `purchase.delivery.confirmed`), `rm_donation` (`contribution.*`), `rm_attendance`
+  (`attendance.hours.approved`, duyệt lại thay số giờ), `rm_readiness_area` + `rm_readiness_history` (`readiness.*`);
+  task dùng `task_projection` (+ `due_at`) nạp qua `/internal/task-scopes`.
+- Phạm vi (BR-57): PARISH toàn bộ khu vực của season trong parish; LEADER khu vực mình lead; MO khu vực mình quản lý.
+  Season ngoài parish → 404; `workAreaId` ngoài phạm vi → 404; donation không gắn khu vực (tiền) chỉ hiện với PARISH.
+- `ReportQuery`: `seasonId` bắt buộc, `workAreaId`, `communityId`, `from`, `to` (`yyyy-MM-dd`, giờ Việt Nam; áp theo
+  hạn task / ngày gửi purchase request / ngày nhận donation / ngày duyệt giờ / thời điểm readiness). Tham số lạ → 400.
+- `ReportData` luôn có parish, season, thời gian tạo, người tạo, phạm vi, bộ lọc, cột (kèm đơn vị), dòng, tổng và ghi chú.
+- Dashboard: số khu vực theo trạng thái, task (theo trạng thái, chưa giao, trễ hạn, revision, % hoàn thành — toàn mùa,
+  theo community, theo khu vực), vật tư thiếu, purchase (chờ duyệt / đang mua / xong / chi phí), pledge đang chờ và donation
+  đã nhận, volunteer (được giao, có giờ duyệt, tổng giờ, tỷ lệ), readiness. `notAvailable` liệt kê chỉ số chờ event của Task
+  (support request đang mở, check-in chờ duyệt).
+
 ## Việc còn mở
 
 - Lý do `deactivateRecognitionRule` chưa có cột lưu (ERD không có) — chờ activity log F-NTF-04.
@@ -85,3 +112,7 @@ Mẫu request: `Reporting.Api.http`.
 - Payload `task.completion.reviewed`, `attendance.hours.approved`, `support.member.completed` là đề nghị (BuildingBlocks
   README §5.5) — chờ Lâm chốt. Consumer MassTransit chờ outbox F-PLT-05; hiện nhận qua `/internal/events`.
 - BA "mỗi 5 giờ làm = 20 điểm": rule hiện tính theo contribution (mỗi lần duyệt giờ), chưa có điểm theo số giờ.
+- Read model chỉ có dữ liệu từ khi event bắt đầu chảy; chưa có job dựng lại từ đầu (replay). Chưa cache Redis (NFR < 3s:
+  query theo index parish/season/work area).
+- Vật tư cần / đã có / thiếu là số liệu ở lần shortage đổi gần nhất (Resource chỉ publish khi shortage đổi); đồ mượn,
+  support request, check-in chờ duyệt chưa có (chờ event). Readiness: số item failed tính từ lần READY gần nhất.

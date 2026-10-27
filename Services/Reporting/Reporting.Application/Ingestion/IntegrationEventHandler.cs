@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Reporting.Application.ReadModels;
 using Reporting.Application.Recognition;
 using Reporting.Domain;
 using Reporting.Domain.Inbox;
@@ -28,11 +29,12 @@ public interface IInboxStore
 }
 
 /// <summary>
-/// F-RPT-02: applies one confirmed business event exactly once (inbox in the same transaction). The MassTransit consumers
+/// F-RPT-02 / F-RPT-04: applies one event exactly once — contributions + points and the dashboard / report read models, with
+/// the inbox row in the same transaction. The MassTransit consumers
 /// will call this handler; until the outbox exists the producers (or a seed script) post to <c>POST /internal/events</c>.
 /// Events not used by Reporting are acknowledged as IGNORED.
 /// </summary>
-public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecorder recorder)
+public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecorder recorder, ReadModelProjector projector)
 {
     /// <summary>Raised by the store when the same event id was committed concurrently.</summary>
     public const string AlreadyProcessed = "EVENT_ALREADY_PROCESSED";
@@ -63,8 +65,9 @@ public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecor
             _ => null
         };
 
+        var projected = await projector.ApplyAsync(incoming, type => Read(incoming, type), cancellationToken);
         var now = DateTimeOffset.UtcNow;
-        if (drafts is null)
+        if (drafts is null && !projected)
         {
             inbox.Add(ProcessedEvent.Record(incoming.EventId, incoming.EventType, nameof(IngestionOutcome.Ignored), now));
             return await SaveAsync(cancellationToken)
@@ -72,7 +75,7 @@ public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecor
                 : new IngestionResult(incoming.EventId, incoming.EventType, IngestionOutcome.Duplicate, 0, 0);
         }
 
-        var (contributions, points) = await recorder.RecordAsync(drafts, now, cancellationToken);
+        var (contributions, points) = await recorder.RecordAsync(drafts ?? [], now, cancellationToken);
         inbox.Add(ProcessedEvent.Record(incoming.EventId, incoming.EventType, nameof(IngestionOutcome.Applied), now));
         try
         {
@@ -110,11 +113,13 @@ public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecor
         }
     }
 
-    private static TPayload Read<TPayload>(IncomingEvent incoming)
+    private static TPayload Read<TPayload>(IncomingEvent incoming) => (TPayload)Read(incoming, typeof(TPayload));
+
+    private static object Read(IncomingEvent incoming, Type type)
     {
         try
         {
-            return incoming.Payload.Deserialize<TPayload>(JsonOptions)
+            return incoming.Payload.Deserialize(type, JsonOptions)
                 ?? throw new JsonException("Empty payload.");
         }
         catch (JsonException exception)

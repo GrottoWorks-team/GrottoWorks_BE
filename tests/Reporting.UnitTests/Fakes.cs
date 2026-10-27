@@ -176,3 +176,69 @@ public sealed class FakeContributionStore :
             .Where(p => userId is null || p.AwardedToUserId == userId)
             .ToList());
 }
+
+/// <summary>Read models applied immediately (the real store saves them with the inbox row).</summary>
+public sealed class FakeReadModelStore : Reporting.Application.ReadModels.IReadModelStore
+{
+    public List<Reporting.Domain.ReadModels.MaterialLine> Lines { get; } = [];
+
+    public List<Reporting.Domain.ReadModels.PurchaseRequestView> Requests { get; } = [];
+
+    public List<Reporting.Domain.ReadModels.DonationView> Donations { get; } = [];
+
+    public List<Reporting.Domain.ReadModels.AttendanceView> Attendance { get; } = [];
+
+    public List<Reporting.Domain.ReadModels.ReadinessAreaView> Readiness { get; } = [];
+
+    public List<Reporting.Domain.ReadModels.ReadinessHistoryEntry> History { get; } = [];
+
+    public List<Reporting.Domain.Scope.TaskProjection> Tasks { get; } = [];
+
+    public Task<Reporting.Domain.ReadModels.MaterialLine?> GetMaterialLineAsync(Guid workAreaId, Guid materialId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Lines.FirstOrDefault(l => l.WorkAreaId == workAreaId && l.MaterialId == materialId));
+
+    public Task<Reporting.Domain.ReadModels.PurchaseRequestView?> GetPurchaseRequestAsync(Guid purchaseRequestId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Requests.FirstOrDefault(r => r.PurchaseRequestId == purchaseRequestId));
+
+    public Task<Reporting.Domain.ReadModels.DonationView?> GetDonationAsync(Guid donationId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Donations.FirstOrDefault(d => d.DonationId == donationId));
+
+    public Task<Reporting.Domain.ReadModels.AttendanceView?> GetAttendanceAsync(Guid attendanceId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Attendance.FirstOrDefault(a => a.AttendanceId == attendanceId));
+
+    public Task<Reporting.Domain.ReadModels.ReadinessAreaView?> GetReadinessAreaAsync(Guid workAreaId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Readiness.FirstOrDefault(r => r.WorkAreaId == workAreaId));
+
+    public void Add(Reporting.Domain.ReadModels.MaterialLine line) => Lines.Add(line);
+
+    public void Add(Reporting.Domain.ReadModels.PurchaseRequestView request) => Requests.Add(request);
+
+    public void Add(Reporting.Domain.ReadModels.DonationView donation) => Donations.Add(donation);
+
+    public void Add(Reporting.Domain.ReadModels.AttendanceView attendance) => Attendance.Add(attendance);
+
+    public void Add(Reporting.Domain.ReadModels.ReadinessAreaView area) => Readiness.Add(area);
+
+    public void Add(Reporting.Domain.ReadModels.ReadinessHistoryEntry entry) => History.Add(entry);
+
+    public Task<IReadOnlyList<Reporting.Domain.ReadModels.MaterialLine>> ListMaterialLinesAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.MaterialLine>>(Lines.Where(l => workAreaIds.Contains(l.WorkAreaId)).ToList());
+
+    public Task<IReadOnlyList<Reporting.Domain.ReadModels.PurchaseRequestView>> ListPurchaseRequestsAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.PurchaseRequestView>>(Requests.Where(r => workAreaIds.Contains(r.WorkAreaId)).ToList());
+
+    public Task<IReadOnlyList<Reporting.Domain.ReadModels.DonationView>> ListDonationsAsync(Guid parishId, Guid seasonId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.DonationView>>(Donations.Where(d => d.ParishId == parishId && d.SeasonId == seasonId).ToList());
+
+    public Task<IReadOnlyList<Reporting.Domain.ReadModels.AttendanceView>> ListAttendanceAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.AttendanceView>>(Attendance.Where(a => workAreaIds.Contains(a.WorkAreaId)).ToList());
+
+    public Task<IReadOnlyList<Reporting.Domain.ReadModels.ReadinessAreaView>> ListReadinessAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.ReadinessAreaView>>(Readiness.Where(r => workAreaIds.Contains(r.WorkAreaId)).ToList());
+
+    public Task<IReadOnlyList<Reporting.Domain.ReadModels.ReadinessHistoryEntry>> ListReadinessHistoryAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.ReadinessHistoryEntry>>(History.Where(h => workAreaIds.Contains(h.WorkAreaId)).ToList());
+
+    public Task<IReadOnlyList<Reporting.Domain.Scope.TaskProjection>> ListTasksAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Reporting.Domain.Scope.TaskProjection>>(Tasks.Where(t => workAreaIds.Contains(t.WorkAreaId)).ToList());
+}

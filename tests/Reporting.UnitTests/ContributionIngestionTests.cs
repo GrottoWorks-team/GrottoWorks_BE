@@ -22,7 +22,9 @@ public sealed class ContributionIngestionTests
     private readonly FakeScopeStore _scopes = new();
     private readonly FakeIntegrationEventPublisher _publisher = new();
 
-    private IntegrationEventHandler Handler => new(_store, new ContributionRecorder(_store, _catalog, _publisher));
+    private readonly FakeReadModelStore _readModels = new();
+
+    private IntegrationEventHandler Handler => new(_store, new ContributionRecorder(_store, _catalog, _publisher), new Reporting.Application.ReadModels.ReadModelProjector(_readModels));
 
     private RecognitionRule Rule(string typeCode, int points, DateOnly? from = null, DateOnly? to = null, string? name = null)
     {

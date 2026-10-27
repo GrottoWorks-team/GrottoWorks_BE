@@ -21,8 +21,8 @@ public enum ProjectedTaskStatus
 }
 
 /// <summary>
-/// <c>task_projection</c> (spec §2.2): the part of a TaskExecution task Readiness needs (CORRECTIVE tasks) — owning work area,
-/// type, status and the volunteers holding an ACCEPTED assignment (material report submitter, PURCHASE buyer).
+/// <c>task_projection</c> (spec §2.2): the part of a TaskExecution task the task report and dashboards need — owning work
+/// area, type, status, deadline and the volunteers holding an ACCEPTED assignment.
 /// Fed by <c>task.*</c> events once TaskExecution publishes them; until then by the internal snapshot endpoint.
 /// Older snapshots (<see cref="SourceVersion"/>) never overwrite newer ones.
 /// </summary>
@@ -46,11 +46,16 @@ public sealed class TaskProjection
 
     public Guid[] AssigneeUserIds { get; private set; } = [];
 
+    /// <summary>Task deadline (<c>task.due_at</c>), for "overdue" (BA 12.1).</summary>
+    public DateTimeOffset? DueAt { get; private set; }
+
     public long SourceVersion { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
     public bool IsClosed => Status is ProjectedTaskStatus.Completed or ProjectedTaskStatus.Cancelled;
+
+    public bool IsOverdue(DateTimeOffset now) => !IsClosed && DueAt is { } due && due < now;
 
     public static TaskProjection FromSnapshot(TaskSnapshot snapshot, DateTimeOffset now)
     {
@@ -94,6 +99,7 @@ public sealed class TaskProjection
         Status = snapshot.Status;
         PurchaseRequestId = snapshot.PurchaseRequestId;
         AssigneeUserIds = snapshot.AssigneeUserIds.Distinct().ToArray();
+        DueAt = snapshot.DueAt?.ToUniversalTime();
         SourceVersion = snapshot.Version;
         UpdatedAt = now.ToUniversalTime();
     }
@@ -108,4 +114,5 @@ public sealed record TaskSnapshot(
     ProjectedTaskStatus Status,
     Guid? PurchaseRequestId,
     IReadOnlyList<Guid> AssigneeUserIds,
-    long Version);
+    long Version,
+    DateTimeOffset? DueAt = null);

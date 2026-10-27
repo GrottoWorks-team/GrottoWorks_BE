@@ -10,6 +10,8 @@
 @seasonId = 00000000-0000-0000-0000-0000000000b1
 @parishId = 00000000-0000-0000-0000-000000000001
 @workAreaId = 00000000-0000-0000-0000-0000000000a1
+@leaderAccessToken = <LEADER access token>
+@moAccessToken = <MO access token>
 
 ### F-RPT-01 — listContributionTypes
 GET {{host}}/api/v1/contribution-types?status=ACTIVE
@@ -89,3 +91,27 @@ Authorization: Bearer {{volunteerAccessToken}}
 ### F-RPT-03 — getSeasonRecognition
 GET {{host}}/api/v1/seasons/{{seasonId}}/recognition
 Authorization: Bearer {{parishAccessToken}}
+
+### F-RPT-04 — viewSeasonDashboard
+GET {{host}}/api/v1/dashboards/season?seasonId={{seasonId}}
+Authorization: Bearer {{parishAccessToken}}
+
+### F-RPT-04 — viewWorkAreaDashboard
+GET {{host}}/api/v1/dashboards/work-area?workAreaId={{workAreaId}}
+Authorization: Bearer {{leaderAccessToken}}
+
+### F-RPT-04 — viewMaterialDashboard
+GET {{host}}/api/v1/dashboards/materials?workAreaId={{workAreaId}}
+Authorization: Bearer {{moAccessToken}}
+
+### F-RPT-05 — getMaterialReport
+GET {{host}}/api/v1/reports/materials?seasonId={{seasonId}}
+Authorization: Bearer {{parishAccessToken}}
+
+### F-RPT-05 — getAttendanceReport (date range)
+GET {{host}}/api/v1/reports/attendance?seasonId={{seasonId}}&from=2026-12-01&to=2026-12-31
+Authorization: Bearer {{parishAccessToken}}
+
+### F-RPT-05 — getReadinessReport (one work area)
+GET {{host}}/api/v1/reports/readiness?seasonId={{seasonId}}&workAreaId={{workAreaId}}
+Authorization: Bearer {{leaderAccessToken}}

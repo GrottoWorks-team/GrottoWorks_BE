@@ -59,7 +59,7 @@ public static class InternalScopeEndpoints
     {
         var (task, applied) = await handler.HandleAsync(
             new TaskSnapshot(taskId, request.WorkAreaId!.Value, request.Name, request.Type!.Value, request.Status!.Value,
-                request.PurchaseRequestId, request.AssigneeUserIds ?? [], request.Version),
+                request.PurchaseRequestId, request.AssigneeUserIds ?? [], request.Version, request.DueAt),
             cancellationToken);
 
         httpContext.Response.Headers["X-Projection-Applied"] = applied ? "true" : "false";

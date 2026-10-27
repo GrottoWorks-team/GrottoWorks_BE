@@ -55,6 +55,9 @@ public sealed class TaskSnapshotRequest
     /// <summary>Volunteers with an ACCEPTED assignment.</summary>
     public List<Guid>? AssigneeUserIds { get; init; }
 
+    /// <summary>Task deadline (overdue on dashboards).</summary>
+    public DateTimeOffset? DueAt { get; init; }
+
     [Range(0, long.MaxValue)]
     public long Version { get; init; }
 }

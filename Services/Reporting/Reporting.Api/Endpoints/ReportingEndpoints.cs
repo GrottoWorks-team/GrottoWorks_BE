@@ -9,6 +9,7 @@ public static class ReportingEndpoints
         app.MapInternalEventEndpoints();
         app.MapRecognitionCatalogEndpoints();
         app.MapRecognitionEndpoints();
+        app.MapReportEndpoints();
         return app;
     }
 }

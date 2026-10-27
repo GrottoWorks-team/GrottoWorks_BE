@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Reporting.Application.Ingestion;
+using Reporting.Application.ReadModels;
 using Reporting.Application.Recognition;
+using Reporting.Application.Reports;
 using Reporting.Application.Scope;
 
 namespace Reporting.Application;
@@ -24,6 +26,12 @@ public static class DependencyInjection
         services.AddScoped<ContributionRecorder>();
         services.AddScoped<IntegrationEventHandler>();
         services.AddScoped<RecognitionQueryHandler>();
+
+        // F-RPT-04/05 read models, dashboards, reports
+        services.AddScoped<ReadModelProjector>();
+        services.AddScoped<ReportScopeResolver>();
+        services.AddScoped<ReportQueryHandler>();
+        services.AddScoped<DashboardQueryHandler>();
 
         return services;
     }

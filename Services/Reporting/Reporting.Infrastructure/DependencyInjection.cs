@@ -3,10 +3,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Reporting.Application.Abstractions;
 using Reporting.Application.Ingestion;
+using Reporting.Application.ReadModels;
 using Reporting.Application.Recognition;
 using Reporting.Application.Scope;
 using Reporting.Infrastructure.Data;
 using Reporting.Infrastructure.Observability;
+using Reporting.Infrastructure.ReadModels;
 using Reporting.Infrastructure.Recognition;
 using Reporting.Infrastructure.Scope;
 
@@ -31,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<IContributionStore>(provider => provider.GetRequiredService<ContributionStore>());
         services.AddScoped<IInboxStore>(provider => provider.GetRequiredService<ContributionStore>());
         services.AddScoped<IRecognitionQueryStore>(provider => provider.GetRequiredService<ContributionStore>());
+        services.AddScoped<IReadModelStore, ReadModelStore>();
         return services;
     }
 }

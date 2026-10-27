@@ -136,8 +136,11 @@ Cho tới khi có outbox (F-PLT-05) và consumer MassTransit, producer (hoặc s
   `eventId` = message id của broker, là khóa inbox). Trả `200 { outcome: APPLIED|DUPLICATE|IGNORED, contributionsRecorded,
   pointsAwarded }`; gửi lại cùng `eventId` → `DUPLICATE`, không tính lại (BR-55); `409 EVENT_CONCURRENT_UPDATE` → event khác
   đang cập nhật cùng contribution, gửi lại; `422 EVENT_PAYLOAD_INVALID` / `EVENT_SEASON_MISMATCH`. Event không dùng → `IGNORED`.
-- Event của Resource dùng đúng record trong `Resource.Contracts.Events` (`purchase.delivery.confirmed`,
-  `contribution.receipt.confirmed`, `contribution.donation.adjusted`).
+- Event của Resource / Readiness dùng đúng record trong `Resource.Contracts.Events` / `Readiness.Contracts.Events`
+  (contribution + điểm: `purchase.delivery.confirmed`, `contribution.receipt.confirmed`, `contribution.donation.adjusted`;
+  read model dashboard / báo cáo: thêm `material.shortage.changed`, `contribution.pledged`, `purchase.request.submitted/decided`,
+  `readiness.item.failed`, `readiness.area.ready/reopened`).
+- Task cho dashboard: `PUT http://reporting.api:8080/internal/task-scopes/{taskId}` như §5.3, thêm `dueAt?` (hạn task).
 - **Đề nghị payload event của Lâm** (Reporting đang đọc theo các trường này, `Reporting.Application/Ingestion/ConsumedEvents.cs`):
   - `task.completion.reviewed { taskId, workAreaId, seasonId, parishId, taskName?, taskType, decision: APPROVED|REVISION_REQUIRED,
     volunteerUserIds[], reviewedByUserId, reviewedAt }` — `volunteerUserIds` = assignment ACCEPTED/COMPLETED được ghi nhận;

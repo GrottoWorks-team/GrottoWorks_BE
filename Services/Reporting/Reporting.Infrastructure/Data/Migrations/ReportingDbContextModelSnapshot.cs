@@ -50,6 +50,408 @@ namespace Reporting.Infrastructure.Data.Migrations
                     b.ToTable("processed_event", (string)null);
                 });
 
+            modelBuilder.Entity("Reporting.Domain.ReadModels.AttendanceView", b =>
+                {
+                    b.Property<Guid>("AttendanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("attendance_id");
+
+                    b.Property<DateTimeOffset>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at");
+
+                    b.Property<decimal>("ApprovedHours")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)")
+                        .HasColumnName("approved_hours");
+
+                    b.Property<Guid>("ParishId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_id");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<Guid>("VolunteerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("volunteer_user_id");
+
+                    b.Property<Guid>("WorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_id");
+
+                    b.HasKey("AttendanceId");
+
+                    b.HasIndex(new[] { "WorkAreaId" }, "ix_rm_attendance_work_area");
+
+                    b.ToTable("rm_attendance", (string)null);
+                });
+
+            modelBuilder.Entity("Reporting.Domain.ReadModels.DonationView", b =>
+                {
+                    b.Property<Guid>("DonationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donation_id");
+
+                    b.Property<string>("DonationType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("donation_type");
+
+                    b.Property<Guid>("DonorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donor_id");
+
+                    b.Property<Guid?>("DonorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donor_user_id");
+
+                    b.Property<DateTimeOffset?>("FirstReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_received_at");
+
+                    b.Property<Guid>("ParishId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_id");
+
+                    b.Property<bool>("Pledged")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_pledged");
+
+                    b.Property<decimal?>("PledgedAmount")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("pledged_amount");
+
+                    b.Property<decimal>("PledgedQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("pledged_quantity");
+
+                    b.Property<int>("Receipts")
+                        .HasColumnType("integer")
+                        .HasColumnName("receipts");
+
+                    b.Property<decimal>("ReceivedAmount")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("received_amount");
+
+                    b.Property<decimal>("ReceivedUnusableQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("received_unusable_quantity");
+
+                    b.Property<decimal>("ReceivedUsableQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("received_usable_quantity");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<Guid?>("WorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_id");
+
+                    b.HasKey("DonationId");
+
+                    b.HasIndex(new[] { "ParishId", "SeasonId" }, "ix_rm_donation_parish_season");
+
+                    b.ToTable("rm_donation", (string)null);
+                });
+
+            modelBuilder.Entity("Reporting.Domain.ReadModels.MaterialLine", b =>
+                {
+                    b.Property<Guid>("WorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_id");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_id");
+
+                    b.Property<decimal>("ConfirmedAvailable")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("confirmed_available");
+
+                    b.Property<decimal>("DonatedUnusable")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("donated_unusable");
+
+                    b.Property<decimal>("DonatedUsable")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("donated_usable");
+
+                    b.Property<string>("MaterialCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("material_code");
+
+                    b.Property<string>("MaterialName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("material_name");
+
+                    b.Property<Guid>("ParishId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_id");
+
+                    b.Property<decimal>("Pledged")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("pledged_quantity");
+
+                    b.Property<decimal>("PurchasedUnusable")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("purchased_unusable");
+
+                    b.Property<decimal>("PurchasedUsable")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("purchased_usable");
+
+                    b.Property<decimal>("Required")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("required_quantity");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<decimal>("Shortage")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("shortage");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("unit");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("WorkAreaId", "MaterialId");
+
+                    b.HasIndex(new[] { "ParishId", "SeasonId" }, "ix_rm_material_line_parish_season");
+
+                    b.ToTable("rm_material_line", (string)null);
+                });
+
+            modelBuilder.Entity("Reporting.Domain.ReadModels.PurchaseRequestView", b =>
+                {
+                    b.Property<Guid>("PurchaseRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_request_id");
+
+                    b.Property<decimal>("ActualCost")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("actual_cost");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<int>("Deliveries")
+                        .HasColumnType("integer")
+                        .HasColumnName("deliveries");
+
+                    b.Property<decimal>("EstimatedTotal")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("estimated_total");
+
+                    b.Property<Guid>("ParishId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_id");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by_user_id");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("request_status");
+
+                    b.Property<DateTimeOffset?>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("submitted_at");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<Guid>("WorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_id");
+
+                    b.HasKey("PurchaseRequestId");
+
+                    b.HasIndex(new[] { "WorkAreaId" }, "ix_rm_purchase_request_work_area");
+
+                    b.ToTable("rm_purchase_request", (string)null);
+                });
+
+            modelBuilder.Entity("Reporting.Domain.ReadModels.ReadinessAreaView", b =>
+                {
+                    b.Property<Guid>("WorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_id");
+
+                    b.Property<int>("FailedItems")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_items");
+
+                    b.Property<int>("FailedMandatoryItems")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_mandatory_items");
+
+                    b.Property<Guid>("ParishId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_id");
+
+                    b.Property<Guid>("ReadinessChecklistId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("readiness_checklist_id");
+
+                    b.Property<DateTimeOffset?>("ReadyAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ready_at");
+
+                    b.Property<int>("ReopenCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("reopen_count");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("checklist_status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("WorkAreaId");
+
+                    b.ToTable("rm_readiness_area", (string)null);
+                });
+
+            modelBuilder.Entity("Reporting.Domain.ReadModels.ReadinessHistoryEntry", b =>
+                {
+                    b.Property<Guid>("ReadinessHistoryEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("readiness_history_id");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<string>("ItemName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("item_name");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("entry_kind");
+
+                    b.Property<bool?>("Mandatory")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("entry_note");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("ParishId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_id");
+
+                    b.Property<Guid>("ReadinessChecklistId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("readiness_checklist_id");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<Guid>("WorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_id");
+
+                    b.HasKey("ReadinessHistoryEntryId");
+
+                    b.HasIndex(new[] { "WorkAreaId" }, "ix_rm_readiness_history_work_area");
+
+                    b.ToTable("rm_readiness_history", (string)null);
+                });
+
             modelBuilder.Entity("Reporting.Domain.Recognition.Contribution", b =>
                 {
                     b.Property<Guid>("ContributionId")
@@ -334,6 +736,10 @@ namespace Reporting.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasColumnType("uuid[]")
                         .HasColumnName("assignee_user_ids");
+
+                    b.Property<DateTimeOffset?>("DueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("due_at");
 
                     b.Property<string>("Name")
                         .IsRequired()

@@ -18,6 +18,7 @@ public sealed class TaskProjectionConfiguration : IEntityTypeConfiguration<TaskP
         builder.Property(task => task.Status).HasColumnName("task_status").HasConversion(EnumText.Converter<ProjectedTaskStatus>()).HasMaxLength(30).IsRequired();
         builder.Property(task => task.PurchaseRequestId).HasColumnName("purchase_request_id");
         builder.Property(task => task.AssigneeUserIds).HasColumnName("assignee_user_ids").HasColumnType("uuid[]").IsRequired();
+        builder.Property(task => task.DueAt).HasColumnName("due_at").HasColumnType("timestamp with time zone");
         builder.Property(task => task.SourceVersion).HasColumnName("source_version").IsRequired();
         builder.Property(task => task.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone").IsRequired();
 

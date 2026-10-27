@@ -7,7 +7,7 @@ using Resource.Domain.Contributions;
 
 namespace Resource.Api.Endpoints;
 
-/// <summary>F-RES-13/13b: direct donations, pledges, contribution needs and the volunteer's own contributions (tag Contributions).</summary>
+/// <summary>F-RES-13/13b/13c: direct donations, pledges, receipts, contribution needs and the volunteer's own contributions (tag Contributions).</summary>
 public static class DonationEndpoints
 {
     public static void MapDonationEndpoints(this IEndpointRouteBuilder app)
@@ -60,6 +60,17 @@ public static class DonationEndpoints
             .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer, GrottoWorksRoles.Volunteer))
             .Accepts<ReasonCommandRequest>("application/json")
             .Produces<ApiResponse<DonationDto>>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapPost("/{donationId:guid}/receipts", RecordReceiptAsync)
+            .WithName("recordDonationReceipt")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer))
+            .Accepts<DonationReceiptRequest>("application/json")
+            .Produces<ApiResponse<RecordedReceiptDto>>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
@@ -160,6 +171,26 @@ public static class DonationEndpoints
             new CancelPledgeCommand(donationId, VersionHeader.Resolve(request.Version, httpContext, "DONATION_VERSION_MISMATCH"), request.Reason),
             cancellationToken);
         return Results.Ok(ApiResults.Ok(donation, httpContext));
+    }
+
+    private static async Task<IResult> RecordReceiptAsync(
+        Guid donationId,
+        DonationReceiptRequest request,
+        HttpContext httpContext,
+        RecordDonationReceiptCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var receipt = await handler.HandleAsync(
+            new RecordDonationReceiptCommand(
+                donationId,
+                request.ReceivedAt,
+                request.ReceivedAmount,
+                (request.Items ?? [])
+                    .Select(item => new ReceiptLineInput(item.DonationItemId!.Value, item.ReceivedQuantity!.Value, item.UnusableQuantity ?? 0, item.Note))
+                    .ToList(),
+                request.Note),
+            cancellationToken);
+        return Results.Json(ApiResults.Ok(receipt, httpContext), statusCode: StatusCodes.Status201Created);
     }
 
     /// <summary><c>MaterialNeedFilter</c>: workAreaId, materialId; most needed first; paged.</summary>

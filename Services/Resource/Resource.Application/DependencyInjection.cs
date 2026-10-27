@@ -65,6 +65,7 @@ public static class DependencyInjection
         // F-RES-13 direct donations
         services.AddScoped<DonationProjector>();
         services.AddScoped<DonationOfficerScope>();
+        services.AddScoped<DonationReceiptPoster>();
         services.AddScoped<RecordDirectDonationCommandHandler>();
         services.AddScoped<ListDonationsQueryHandler>();
         services.AddScoped<GetDonationQueryHandler>();
@@ -76,6 +77,9 @@ public static class DependencyInjection
         services.AddScoped<PledgeMaterialCommandHandler>();
         services.AddScoped<PledgeMoneyCommandHandler>();
         services.AddScoped<CancelPledgeCommandHandler>();
+
+        // F-RES-13c receipts of pledges
+        services.AddScoped<RecordDonationReceiptCommandHandler>();
 
         return services;
     }

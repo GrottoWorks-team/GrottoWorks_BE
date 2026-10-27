@@ -83,3 +83,30 @@ public sealed class MonetaryPledgeRequest
     [StringLength(2000, ErrorMessage = "Note must not exceed 2000 characters.")]
     public string? Note { get; init; }
 }
+
+public sealed class ReceiptLineRequest
+{
+    [Required(ErrorMessage = "Donation item is required.")]
+    public Guid? DonationItemId { get; init; }
+
+    [Required(ErrorMessage = "Received quantity is required.")]
+    public decimal? ReceivedQuantity { get; init; }
+
+    public decimal? UnusableQuantity { get; init; }
+
+    [StringLength(2000, ErrorMessage = "Note must not exceed 2000 characters.")]
+    public string? Note { get; init; }
+}
+
+/// <summary><c>DonationReceiptRequest</c> (F-RES-13c): MONEY → <c>receivedAmount</c>; MATERIAL → <c>items</c>.</summary>
+public sealed class DonationReceiptRequest
+{
+    public DateTimeOffset? ReceivedAt { get; init; }
+
+    public decimal? ReceivedAmount { get; init; }
+
+    public List<ReceiptLineRequest>? Items { get; init; }
+
+    [StringLength(2000, ErrorMessage = "Note must not exceed 2000 characters.")]
+    public string? Note { get; init; }
+}

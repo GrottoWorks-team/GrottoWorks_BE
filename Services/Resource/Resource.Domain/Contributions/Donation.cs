@@ -31,6 +31,12 @@ public enum DonationItemStatus
 /// <summary>One material promised by a volunteer (F-RES-13b).</summary>
 public sealed record PledgedMaterialInput(Guid MaterialId, decimal PledgedQuantity, string? Note);
 
+/// <summary>One line of a later receipt against an existing donation item (F-RES-13c).</summary>
+public sealed record ReceiptLineInput(Guid DonationItemId, decimal ReceivedQuantity, decimal UnusableQuantity, string? Note);
+
+/// <summary>The receipt just recorded and the non-blocking warnings it raised (BA 8.7: receiving more than pledged).</summary>
+public sealed record RecordedReceipt(DonationReceipt Receipt, bool IsFirstReceipt, IReadOnlyList<string> Warnings);
+
 /// <summary>One material actually received: <paramref name="UnusableQuantity"/> is checked on arrival (BR-38).</summary>
 public sealed record ReceivedMaterialInput(Guid MaterialId, decimal ReceivedQuantity, decimal UnusableQuantity, string? Note);
 
@@ -256,6 +262,90 @@ public sealed class Donation
         Status = DonationStatus.Cancelled;
         CancelReason = cleaned;
         UpdatedAt = now.ToUniversalTime();
+    }
+
+    /// <summary>
+    /// F-RES-13c <c>recordDonationReceipt</c> (BR-38): one physical receipt of a pledge. Totals are cumulated, the status
+    /// moves PLEDGED → PARTIALLY_RECEIVED → RECEIVED once everything promised arrived. Receiving more than pledged is
+    /// allowed and only warned about. A cancelled or fully received donation takes no more receipts (later deliveries
+    /// are new donations).
+    /// </summary>
+    public RecordedReceipt RecordReceipt(
+        DateTimeOffset receivedAt,
+        decimal? amount,
+        IReadOnlyCollection<ReceiptLineInput> lines,
+        string? note,
+        Guid receivedByUserId,
+        DateTimeOffset now)
+    {
+        if (Status is not (DonationStatus.Pledged or DonationStatus.PartiallyReceived))
+        {
+            throw new DomainRuleException("DONATION_INVALID_STATE", "Receipts can only be recorded for an outstanding pledge.");
+        }
+
+        if (receivedAt > now + FutureTolerance)
+        {
+            throw DomainRuleException.Validation("DONATION_RECEIVED_IN_FUTURE", "The receipt time cannot be in the future.");
+        }
+
+        var isFirst = _receipts.Count == 0;
+        var warnings = new List<string>();
+        var cleanedNote = CleanNote(note);
+        DonationReceipt receipt;
+
+        if (Type == DonationType.Money)
+        {
+            if (lines.Count > 0)
+            {
+                throw DomainRuleException.Validation("DONATION_MONEY_HAS_ITEMS", "A MONEY donation has no material items (BR-36).");
+            }
+
+            var received = Money(amount ?? throw DomainRuleException.Validation(
+                "DONATION_AMOUNT_REQUIRED", "A MONEY receipt needs the amount received."));
+            receipt = DonationReceipt.ForMoney(DonationId, received, receivedAt, receivedByUserId, cleanedNote, now);
+            Amount = (Amount ?? 0) + received;
+            if (PledgedAmount is { } pledged && Amount > pledged)
+            {
+                warnings.Add($"Received {Amount} VND in total, more than the {pledged} VND pledged.");
+            }
+
+            Status = PledgedAmount is { } promised && Amount < promised ? DonationStatus.PartiallyReceived : DonationStatus.Received;
+        }
+        else
+        {
+            if (amount is not null)
+            {
+                throw DomainRuleException.Validation("DONATION_MATERIAL_HAS_AMOUNT", "A MATERIAL donation has no money amount.");
+            }
+
+            if (lines.Count == 0)
+            {
+                throw DomainRuleException.Validation("DONATION_RECEIPT_ITEMS_REQUIRED", "A receipt needs at least one received item.");
+            }
+
+            if (lines.GroupBy(line => line.DonationItemId).Any(group => group.Count() > 1))
+            {
+                throw DomainRuleException.Validation("DONATION_RECEIPT_DUPLICATE_ITEM", "Each donation item can appear only once in a receipt.");
+            }
+
+            receipt = DonationReceipt.ForMaterial(DonationId, receivedAt, receivedByUserId, cleanedNote, now);
+            foreach (var line in lines)
+            {
+                var item = _items.FirstOrDefault(candidate => candidate.DonationItemId == line.DonationItemId)
+                    ?? throw DomainRuleException.Validation("DONATION_ITEM_UNKNOWN", $"Item {line.DonationItemId} does not belong to this donation.");
+                receipt.AddLine(item, line.ReceivedQuantity, line.UnusableQuantity, line.Note);
+                if (item.PledgedQuantity is { } pledged && item.ReceivedQuantity > pledged)
+                {
+                    warnings.Add($"Item {item.DonationItemId}: received {item.ReceivedQuantity} in total, more than the {pledged} pledged.");
+                }
+            }
+
+            Status = _items.All(item => item.OutstandingQuantity == 0) ? DonationStatus.Received : DonationStatus.PartiallyReceived;
+        }
+
+        _receipts.Add(receipt);
+        UpdatedAt = now.ToUniversalTime();
+        return new RecordedReceipt(receipt, isFirst, warnings);
     }
 
     public void EnsureVersion(long? expected)

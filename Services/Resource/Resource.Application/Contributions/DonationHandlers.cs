@@ -164,6 +164,67 @@ public sealed class DonationOfficerScope(WorkAreaAccess access, IWorkAreaScopeSt
     }
 }
 
+/// <summary>
+/// Posts one receipt (BR-38): stages a <c>DONATION_RECEIPT</c> ledger row per line with usable quantity on the receiving
+/// work area (reference <c>DONATION_RECEIPT_ITEM</c> → posted once), in the caller's unit of work; after the save,
+/// publishes <c>material.shortage.changed</c> where it moved and <c>contribution.receipt.confirmed</c>.
+/// </summary>
+public sealed class DonationReceiptPoster(
+    IInventoryStore inventory,
+    ShortageTracker shortages,
+    IIntegrationEventPublisher publisher,
+    ICurrentUser currentUser)
+{
+    public async Task<IReadOnlyList<ShortageTracker.Snapshot>> StageAsync(
+        WorkAreaScope? scope,
+        Donation donation,
+        DonationReceipt receipt,
+        CancellationToken cancellationToken)
+    {
+        var before = new List<ShortageTracker.Snapshot>();
+        if (scope is null)
+        {
+            return before;
+        }
+
+        var materialOfItem = donation.Items.ToDictionary(item => item.DonationItemId, item => item.MaterialId);
+        foreach (var line in receipt.Items.Where(line => line.UsableQuantity > 0))
+        {
+            var materialId = materialOfItem[line.DonationItemId];
+            before.Add(await shortages.CaptureAsync(scope, materialId, cancellationToken));
+            inventory.Append(MaterialTransaction.Post(
+                scope.WorkAreaId, materialId, TransactionType.DonationReceipt, line.UsableQuantity, receipt.ReceivedAt,
+                currentUser.UserId, null, TransactionReferenceType.DonationReceiptItem, line.DonationReceiptItemId));
+        }
+
+        return before;
+    }
+
+    public async Task PublishAsync(
+        IReadOnlyList<ShortageTracker.Snapshot> before,
+        Donation donation,
+        DonationReceipt receipt,
+        Donor donor,
+        Guid parishId,
+        bool isDirect,
+        bool isFirstReceipt,
+        CancellationToken cancellationToken)
+    {
+        foreach (var snapshot in before)
+        {
+            await shortages.PublishIfChangedAsync(snapshot, cancellationToken);
+        }
+
+        await publisher.PublishAsync(
+            ContributionReceiptConfirmed.EventType,
+            ContributionReceiptConfirmed.Version,
+            DonationEvents.ReceiptConfirmed(donation, receipt, donor, parishId, isDirect, isFirstReceipt),
+            "donation",
+            donation.DonationId,
+            cancellationToken);
+    }
+}
+
 /// <summary>Builds <see cref="DonationDto"/>s: donors and catalog fields in two batched reads.</summary>
 public sealed class DonationProjector(IDonorStore donors, IMaterialCatalogStore catalog)
 {
@@ -194,11 +255,9 @@ public sealed class RecordDirectDonationCommandHandler(
     DonationOfficerScope officers,
     IDonorStore donors,
     IDonationStore store,
-    IInventoryStore inventory,
     IMaterialCatalogStore catalog,
-    ShortageTracker shortages,
+    DonationReceiptPoster poster,
     DonationProjector projector,
-    IIntegrationEventPublisher publisher,
     ICurrentUser currentUser)
 {
     public async Task<DonationDto> HandleAsync(RecordDirectDonationCommand command, CancellationToken cancellationToken = default)
@@ -217,35 +276,12 @@ public sealed class RecordDirectDonationCommandHandler(
         await MaterialRules.EnsureActiveAsync(catalog, donation.Items.Select(item => item.MaterialId), cancellationToken);
 
         var receipt = donation.Receipts.Single();
-        var before = new List<ShortageTracker.Snapshot>();
-        if (scope is not null)
-        {
-            var materialOfItem = donation.Items.ToDictionary(item => item.DonationItemId, item => item.MaterialId);
-            foreach (var line in receipt.Items.Where(line => line.UsableQuantity > 0))
-            {
-                var materialId = materialOfItem[line.DonationItemId];
-                before.Add(await shortages.CaptureAsync(scope, materialId, cancellationToken));
-                inventory.Append(MaterialTransaction.Post(
-                    scope.WorkAreaId, materialId, TransactionType.DonationReceipt, line.UsableQuantity, receipt.ReceivedAt,
-                    currentUser.UserId, null, TransactionReferenceType.DonationReceiptItem, line.DonationReceiptItemId));
-            }
-        }
+        var posting = await poster.StageAsync(scope, donation, receipt, cancellationToken);
 
         store.Add(donation);
         await store.SaveChangesAsync(cancellationToken);
 
-        foreach (var snapshot in before)
-        {
-            await shortages.PublishIfChangedAsync(snapshot, cancellationToken);
-        }
-
-        await publisher.PublishAsync(
-            ContributionReceiptConfirmed.EventType,
-            ContributionReceiptConfirmed.Version,
-            DonationEvents.ReceiptConfirmed(donation, receipt, donor, parishId, isDirect: true, isFirstReceipt: true),
-            "donation",
-            donation.DonationId,
-            cancellationToken);
+        await poster.PublishAsync(posting, donation, receipt, donor, parishId, isDirect: true, isFirstReceipt: true, cancellationToken);
         return await projector.ToDtoAsync(donation, cancellationToken);
     }
 }
@@ -342,6 +378,72 @@ public sealed class ListMyContributionsQueryHandler(
             new DonationSearch(seasonId is { } season ? [season] : null, null, donor.DonorId, null, null, page, size),
             cancellationToken);
         return new PagedResult<DonationDto>(await projector.ToDtosAsync(result.Items, withReceipts: false, cancellationToken), result.TotalItems);
+    }
+}
+
+/// <summary>Result of <c>recordDonationReceipt</c>: the receipt, the donation status after it and non-blocking warnings.</summary>
+public sealed record RecordedReceiptDto(
+    Guid Id,
+    Guid DonationId,
+    DateTimeOffset ReceivedAt,
+    Guid ReceivedBy,
+    MoneyDto? ReceivedAmount,
+    string? Note,
+    IReadOnlyList<DonationReceiptItemDto> Items,
+    DonationStatus DonationStatus,
+    IReadOnlyList<string> Warnings);
+
+public sealed record RecordDonationReceiptCommand(
+    Guid DonationId,
+    DateTimeOffset? ReceivedAt,
+    decimal? Amount,
+    IReadOnlyList<ReceiptLineInput> Items,
+    string? Note);
+
+/// <summary>
+/// F-RES-13c <c>recordDonationReceipt</c> (MO of the receiving work area / season): one actual receipt of a pledge —
+/// cumulated totals, PARTIALLY_RECEIVED → RECEIVED, usable quantity posted once per receipt line, over-receipt only
+/// warned (BA 8.7). The donation row is updated too, so two concurrent receipts cannot both win (xmin → 412).
+/// </summary>
+public sealed class RecordDonationReceiptCommandHandler(
+    DonationOfficerScope officers,
+    IDonationStore store,
+    IDonorStore donors,
+    DonationReceiptPoster poster,
+    ICurrentUser currentUser)
+{
+    public async Task<RecordedReceiptDto> HandleAsync(RecordDonationReceiptCommand command, CancellationToken cancellationToken = default)
+    {
+        var donation = await store.GetAsync(command.DonationId, cancellationToken)
+            ?? throw DomainRuleException.NotFound("DONATION_NOT_FOUND", "The donation does not exist.");
+        WorkAreaScope? scope;
+        Guid parishId;
+        try
+        {
+            (scope, _, parishId) = await officers.ResolveAsync(donation.Type, donation.WorkAreaId, donation.SeasonId, cancellationToken);
+        }
+        catch (DomainRuleException exception) when (exception.Kind == DomainErrorKind.NotFound)
+        {
+            throw DomainRuleException.NotFound("DONATION_NOT_FOUND", "The donation does not exist.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var recorded = donation.RecordReceipt(command.ReceivedAt ?? now, command.Amount, command.Items, command.Note, currentUser.UserId, now);
+        var posting = await poster.StageAsync(scope, donation, recorded.Receipt, cancellationToken);
+        await store.SaveChangesAsync(cancellationToken);
+
+        var donor = await donors.GetAsync(donation.DonorId, cancellationToken)
+            ?? throw new InvalidOperationException("Donation points to a missing donor.");
+        await poster.PublishAsync(posting, donation, recorded.Receipt, donor, parishId, isDirect: false, recorded.IsFirstReceipt, cancellationToken);
+
+        var materialOfItem = donation.Items.ToDictionary(item => item.DonationItemId, item => item.MaterialId);
+        var receipt = recorded.Receipt;
+        return new RecordedReceiptDto(
+            receipt.DonationReceiptId, donation.DonationId, receipt.ReceivedAt, receipt.ReceivedByUserId,
+            receipt.ReceivedAmount is { } amount ? MoneyDto.InVnd(amount) : null, receipt.Note,
+            receipt.Items.Select(line => new DonationReceiptItemDto(line.DonationReceiptItemId, line.DonationItemId,
+                materialOfItem[line.DonationItemId], line.ReceivedQuantity, line.UnusableQuantity, line.UsableQuantity)).ToList(),
+            donation.Status, recorded.Warnings);
     }
 }
 

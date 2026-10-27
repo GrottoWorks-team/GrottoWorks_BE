@@ -1,7 +1,7 @@
 # Resource Service
 
 Vật tư, tồn kho, mua sắm, quyên góp, đồ mượn (owner: Vũ — spec §5.2, tag `Materials`, `Purchases`, `Contributions`).
-Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5; F-RES-13b — S6.
+Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5; F-RES-13b, 13c — S6.
 
 ## Kiến trúc
 
@@ -65,6 +65,7 @@ Mẫu request: `Resource.Api.http`.
 | `POST /api/v1/donations/material-pledges` | `pledgeMaterialDonation` | VOLUNTEER — vật tư work area đang có requirement | F-RES-13b |
 | `POST /api/v1/donations/monetary-pledges` | `pledgeMonetarySupport` | VOLUNTEER — tiền cho season (work area tùy chọn) | F-RES-13b |
 | `POST /api/v1/donations/{id}/cancel` | `cancelDonationPledge` | VOLUNTEER chủ pledge, MO của work area/season; `reason` bắt buộc | F-RES-13b |
+| `POST /api/v1/donations/{id}/receipts` | `recordDonationReceipt` | MO của work area/season — một lần nhận thực tế của pledge | F-RES-13c |
 | `PUT /internal/work-area-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/season-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 
@@ -125,6 +126,10 @@ Mẫu request: `Resource.Api.http`.
   MONEY: `amount > 0`, season bắt buộc, work area tùy chọn.
 - `listContributionNeeds`: `remainingNeed = max(0, shortage − pledgedOutstanding)` để volunteer không pledge trùng.
   Nhu cầu tiền cần ngân sách season (ParishCoordination) → chưa liệt kê.
+- Lần nhận (F-RES-13c, BR-38): MONEY → `receivedAmount`; MATERIAL → `items[{donationItemId, receivedQuantity,
+  unusableQuantity}]`. Cộng dồn received/unusable/amount; PLEDGED → PARTIALLY_RECEIVED → RECEIVED khi đủ; nhận vượt
+  cam kết vẫn ghi và trả `warnings`. Phần usable của mỗi dòng post kho đúng một lần như donation trực tiếp. Donation
+  RECEIVED/CANCELLED không nhận thêm (409). Response: receipt + `donationStatus` + `warnings`.
 - Hủy: chỉ PLEDGED / PARTIALLY_RECEIVED, lý do 1–500 ký tự; receipt đã nhận giữ nguyên. Event `contribution.pledged`
   (kèm `materialOfficerUserId` để báo MO).
 

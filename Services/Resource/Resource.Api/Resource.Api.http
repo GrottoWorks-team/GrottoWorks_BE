@@ -206,4 +206,11 @@ Authorization: Bearer {{volunteerAccessToken}}
 
 { "version": {{pledge.response.body.$.data.version}}, "reason": "Không mua được" }
 
+### F-RES-13c — officer records one actual receipt of the pledge (usable part goes to stock)
+POST {{host}}/api/v1/donations/{{pledge.response.body.$.data.id}}/receipts
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "items": [{ "donationItemId": "{{pledge.response.body.$.data.items[0].id}}", "receivedQuantity": 3, "unusableQuantity": 1 }], "note": "Lần 1" }
+
 ###

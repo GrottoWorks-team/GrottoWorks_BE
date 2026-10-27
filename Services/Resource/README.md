@@ -47,10 +47,10 @@ Mẫu request: `Resource.Api.http`.
 | `GET /api/v1/work-areas/{id}/shortages` | `getWorkAreaShortages` | PARISH, LEADER, MO | F-RES-05 |
 | `GET /api/v1/seasons/{id}/material-needs` | `listMaterialNeeds` | USER cùng parish (chỉ shortage > 0) | F-RES-05 |
 | `GET /api/v1/purchase-requests` | `listPurchaseRequests` | PARISH, LEADER, MO (`seasonId,workAreaId,status`, sort `createdAt`, mặc định mới nhất trước) | F-RES-06 |
-| `POST /api/v1/purchase-requests` | `createPurchaseRequest` | MO của work area → DRAFT | F-RES-06 |
+| `POST /api/v1/purchase-requests` | `createPurchaseRequest` | MO của work area → PLANNING | F-RES-06 |
 | `GET /api/v1/purchase-requests/{id}` | `getPurchaseRequest` | PARISH, LEADER, MO cùng parish (VOLUNTEER: xem "Việc còn mở") | F-RES-06 |
-| `PATCH /api/v1/purchase-requests/{id}` | `updatePurchaseRequest` | MO của work area; chỉ DRAFT; `items` thay toàn bộ dòng; `version`/`If-Match` | F-RES-06 |
-| `POST /api/v1/purchase-requests/{id}/submit` | `submitPurchaseRequest` | MO của work area: DRAFT → PENDING_APPROVAL | F-RES-06 |
+| `PATCH /api/v1/purchase-requests/{id}` | `updatePurchaseRequest` | MO của work area; chỉ PLANNING; `items` thay toàn bộ dòng; `version`/`If-Match` | F-RES-06 |
+| `POST /api/v1/purchase-requests/{id}/submit` | `submitPurchaseRequest` | MO của work area: PLANNING → PENDING_APPROVAL | F-RES-06 |
 | `POST /api/v1/purchase-requests/{id}/approve` | `approvePurchaseRequest` | LEADER **của work area** (D-01, BR-29) | F-RES-07 |
 | `POST /api/v1/purchase-requests/{id}/reject` | `rejectPurchaseRequest` | LEADER của work area; `reason` bắt buộc (BR-31) | F-RES-07 |
 | `GET /api/v1/purchase-requests/{id}/history` | `getPurchaseRequestHistory` | PARISH, LEADER, MO — `StateChange[]` cũ → mới | F-RES-06 |
@@ -68,7 +68,8 @@ Mẫu request: `Resource.Api.http`.
 
 ## Purchase request (F-RES-06/07, BA 8.6 + 9.5, D-01)
 
-- `DRAFT` → `PENDING_APPROVAL` (submit) → `APPROVED` / `REJECTED` (Leader của work area). Chỉ sửa khi DRAFT; DRAFT được
+- `PLANNING` → `PENDING_APPROVAL` (submit) → `APPROVED` / `REJECTED` (Leader của work area). Không có DRAFT (R-12,
+  Contract v1.3.2). Chỉ sửa khi PLANNING; PLANNING được
   phép chưa có dòng/lý do, submit thì bắt buộc ≥ 1 dòng + lý do (BR-27). Phê duyệt áp dụng cho cả request.
 - Dòng: material ACTIVE, mỗi material 1 lần/request, `requestedQuantity > 0` (2 số lẻ), `estimatedCost` = chi phí cả dòng
   (VND, ≥ 0, null = chưa ước tính). `estimatedTotal` = tổng các dòng, trả về dạng `Money { amount, currency: "VND" }`.
@@ -96,7 +97,7 @@ Mẫu request: `Resource.Api.http`.
   `task_projection` (F-RES-01 phần còn lại) — chờ Lâm publish event và outbox của F-PLT-05.
 - Event đang chỉ log (`LoggingIntegrationEventPublisher`) — chưa qua outbox.
 - Purchase request: VOLUNTEER đọc được request của task PURCHASE mình đã nhận — cần buyer từ `task.purchase-task.assigned`
-  (F-RES-01), tạm thời trả 404. Chưa có endpoint hủy (Contract chưa có; BA cho DRAFT/PENDING/APPROVED → CANCELLED).
+  (F-RES-01), tạm thời trả 404. Chưa có endpoint hủy (Contract chưa có; BA cho PLANNING/PENDING/APPROVED → CANCELLED).
   PARTIALLY_RECEIVED sẽ trừ phần đã giao khỏi "đã xin" khi làm F-RES-10.
 - Gateway: `/purchase-requests/{id}/purchase-tasks` thuộc Task (F-TSK-17) — khi Lâm thêm cần route riêng `Order: -1`.
 - Allocation (F-RES-15) sẽ cộng vào `allocated` và vào lịch sử `getAllocationHistory`.

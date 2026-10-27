@@ -259,7 +259,7 @@ public sealed class GetPurchaseRequestHistoryQueryHandler(PurchaseRequestLoader 
     }
 }
 
-/// <summary>F-RES-06 <c>createPurchaseRequest</c> (MO of the work area): a DRAFT with zero or more lines.</summary>
+/// <summary>F-RES-06 <c>createPurchaseRequest</c> (MO of the work area): a PLANNING request with zero or more lines.</summary>
 public sealed class CreatePurchaseRequestCommandHandler(
     WorkAreaAccess access,
     IPurchaseRequestStore store,
@@ -282,7 +282,7 @@ public sealed class CreatePurchaseRequestCommandHandler(
     }
 }
 
-/// <summary>F-RES-06 <c>updatePurchaseRequest</c> (MO of the work area): reason and/or full line replacement, DRAFT only.</summary>
+/// <summary>F-RES-06 <c>updatePurchaseRequest</c> (MO of the work area): reason and/or full line replacement, PLANNING only.</summary>
 public sealed class UpdatePurchaseRequestCommandHandler(
     WorkAreaAccess access,
     IPurchaseRequestStore store,
@@ -296,7 +296,7 @@ public sealed class UpdatePurchaseRequestCommandHandler(
         var scope = await access.ForMaterialOfficerWriteAsync(request.WorkAreaId, cancellationToken);
         request.EnsureVersion(command.Version);
 
-        request.UpdateDraft(command.Reason, command.Items, DateTimeOffset.UtcNow);
+        request.UpdatePlanning(command.Reason, command.Items, DateTimeOffset.UtcNow);
         if (command.Items is not null)
         {
             await PurchaseItemCatalog.EnsureActiveAsync(catalog, command.Items, cancellationToken);
@@ -309,7 +309,7 @@ public sealed class UpdatePurchaseRequestCommandHandler(
 }
 
 /// <summary>
-/// F-RES-06 <c>submitPurchaseRequest</c> (MO of the work area): DRAFT → PENDING_APPROVAL (BR-27), shortage re-checked
+/// F-RES-06 <c>submitPurchaseRequest</c> (MO of the work area): PLANNING → PENDING_APPROVAL (BR-27), shortage re-checked
 /// against current stock, then <c>purchase.request.submitted</c> to the work-area leader.
 /// </summary>
 public sealed class SubmitPurchaseRequestCommandHandler(

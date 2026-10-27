@@ -5,7 +5,8 @@ namespace Resource.Domain.Purchases;
 /// <summary><c>purchase_request.request_status</c> (ERD v3.6, BA 9.5).</summary>
 public enum PurchaseRequestStatus
 {
-    Draft,
+    /// <summary>Preparation state (R-12: no DRAFT in the baseline); empty lines and reason are allowed.</summary>
+    Planning,
     PendingApproval,
     Approved,
     Rejected,
@@ -30,7 +31,7 @@ public sealed record PurchaseRequestItemInput(
 
 /// <summary>
 /// <c>purchase_request</c> (ERD v3.6, F-RES-06/07): created by the material officer of a work area, approved or
-/// rejected as a whole by the leader of the same work area (D-01, BR-28/29). Lines are editable only in DRAFT.
+/// rejected as a whole by the leader of the same work area (D-01, BR-28/29). Lines are editable only in PLANNING.
 /// Estimated total is the sum of the line estimates — never stored separately.
 /// </summary>
 public sealed class PurchaseRequest
@@ -94,11 +95,11 @@ public sealed class PurchaseRequest
             WorkAreaId = workAreaId,
             RequestedByUserId = requestedByUserId,
             RequestReason = CleanReason(reason),
-            Status = PurchaseRequestStatus.Draft,
+            Status = PurchaseRequestStatus.Planning,
             CreatedAt = now.ToUniversalTime()
         };
         request.SetItems(items);
-        request.Record(null, PurchaseRequestStatus.Draft, requestedByUserId, null, now);
+        request.Record(null, PurchaseRequestStatus.Planning, requestedByUserId, null, now);
         return request;
     }
 
@@ -114,9 +115,9 @@ public sealed class PurchaseRequest
     }
 
     /// <summary>PATCH semantics: <c>null</c> = unchanged, an empty reason clears it; items replace all lines.</summary>
-    public void UpdateDraft(string? reason, IReadOnlyCollection<PurchaseRequestItemInput>? items, DateTimeOffset now)
+    public void UpdatePlanning(string? reason, IReadOnlyCollection<PurchaseRequestItemInput>? items, DateTimeOffset now)
     {
-        EnsureStatus(PurchaseRequestStatus.Draft, "Only a DRAFT purchase request can be edited.");
+        EnsureStatus(PurchaseRequestStatus.Planning, "Only a PLANNING purchase request can be edited.");
 
         if (reason is not null)
         {
@@ -134,7 +135,7 @@ public sealed class PurchaseRequest
     /// <summary>BR-27: at least one line and a reason before it goes to the leader.</summary>
     public void Submit(Guid userId, DateTimeOffset now)
     {
-        EnsureStatus(PurchaseRequestStatus.Draft, "Only a DRAFT purchase request can be submitted.");
+        EnsureStatus(PurchaseRequestStatus.Planning, "Only a PLANNING purchase request can be submitted.");
 
         if (_items.Count == 0)
         {

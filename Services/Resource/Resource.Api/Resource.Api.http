@@ -87,7 +87,7 @@ Authorization: Bearer {{accessToken}}
 
 ###
 
-### F-RES-06 — draft purchase request (MO of the work area). A line above the uncovered shortage needs shortageOverrideReason.
+### F-RES-06 — purchase request in PLANNING (MO of the work area). A line above the uncovered shortage needs shortageOverrideReason.
 # @name purchaseRequest
 POST {{host}}/api/v1/purchase-requests
 Content-Type: application/json
@@ -99,7 +99,7 @@ Authorization: Bearer {{accessToken}}
   "items": [{ "materialId": "{{material.response.body.$.data.id}}", "requestedQuantity": 8, "estimatedCost": 400000 }]
 }
 
-### F-RES-06 — edit the draft (items, when given, replace every line)
+### F-RES-06 — edit while PLANNING (items, when given, replace every line)
 PATCH {{host}}/api/v1/purchase-requests/{{purchaseRequest.response.body.$.data.id}}
 Content-Type: application/json
 Authorization: Bearer {{accessToken}}

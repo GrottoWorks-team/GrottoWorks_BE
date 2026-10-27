@@ -21,7 +21,7 @@ public sealed class PurchaseRequestItemRequest
     public string? ShortageOverrideReason { get; init; }
 }
 
-/// <summary><c>CreatePurchaseRequest</c> (F-RES-06): a DRAFT; reason and at least one item are required on submit.</summary>
+/// <summary><c>CreatePurchaseRequest</c> (F-RES-06): a PLANNING request; reason and at least one item are required on submit.</summary>
 public sealed class CreatePurchaseRequestRequest
 {
     [Required(ErrorMessage = "Work area is required.")]
@@ -33,7 +33,7 @@ public sealed class CreatePurchaseRequestRequest
     public List<PurchaseRequestItemRequest>? Items { get; init; }
 }
 
-/// <summary><c>UpdatePurchaseRequest</c> — PATCH of a DRAFT; <c>items</c>, when given, replaces every line.</summary>
+/// <summary><c>UpdatePurchaseRequest</c> — PATCH of a PLANNING request; <c>items</c>, when given, replaces every line.</summary>
 public sealed class UpdatePurchaseRequestRequest
 {
     public long? Version { get; init; }

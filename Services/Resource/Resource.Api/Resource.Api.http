@@ -274,4 +274,33 @@ Authorization: Bearer <MO token of the receiving work area>
 
 { "receivedUsableQuantity": 2, "receivedUnusableQuantity": 0 }
 
+### F-RES-18 — volunteer offers equipment for loan on behalf of the lender
+# @name loanOffer
+POST {{host}}/api/v1/loan-offers
+Content-Type: application/json
+Authorization: Bearer {{volunteerAccessToken}}
+
+{ "seasonId": "{{seasonId}}", "ownerName": "Ông Giuse Tâm", "ownerPhone": "0909 111 222", "itemName": "Máy phát điện 5kVA", "quantity": 1, "initialCondition": "Tốt", "expectedReturnDate": "2027-01-10" }
+
+### F-RES-18 — officer accepts, then issues and returns it
+POST {{host}}/api/v1/loan-offers/{{loanOffer.response.body.$.data.id}}/accept
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "workAreaId": "{{workAreaId}}" }
+
+###
+POST {{host}}/api/v1/borrowed-items/{{loanOffer.response.body.$.data.id}}/issue
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{}
+
+###
+POST {{host}}/api/v1/borrowed-items/{{loanOffer.response.body.$.data.id}}/return
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "condition": "GOOD" }
+
 ###

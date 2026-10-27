@@ -1,7 +1,7 @@
 # Resource Service
 
 Vật tư, tồn kho, mua sắm, quyên góp, đồ mượn (owner: Vũ — spec §5.2, tag `Materials`, `Purchases`, `Contributions`).
-Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5; F-RES-13b, 13c, 15, 16 — S6; F-RES-17, 20 — S7.
+Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-12, 13 — S5; F-RES-13b, 13c, 15, 16 — S6; F-RES-17, 18, 20 — S7.
 
 ## Kiến trúc
 
@@ -74,6 +74,12 @@ Mẫu request: `Resource.Api.http`.
 | `POST /api/v1/task-material-reports/{id}/verify` | `verifyTaskMaterialReport` | MO của work area — trả phần remaining về kho | F-RES-17 |
 | `POST /api/v1/task-material-reports/{id}/request-revision` | `requestMaterialReportRevision` | MO của work area — lý do bắt buộc | F-RES-17 |
 | `POST /api/v1/support-response-materials/{itemId}/confirm-receipt` | `confirmSupportMaterialReceipt` | MO của work area nhận — `TRANSFER_IN` phần usable | F-RES-20 |
+| `POST /api/v1/loan-offers` | `offerItemForLoan` | VOLUNTEER — nhập giùm người cho mượn (D-05) | F-RES-18 |
+| `GET /api/v1/loan-offers` | `listLoanOffers` | MO — `status` (mặc định OFFERED) | F-RES-18 |
+| `POST /api/v1/loan-offers/{id}/accept` · `/reject` | `acceptLoanOffer` · `rejectLoanOffer` | MO của work area / season; reject cần lý do | F-RES-18 |
+| `GET /api/v1/borrowed-items` | `listBorrowedItems` | PARISH, LEADER, MO — `seasonId,workAreaId,status,overdue` | F-RES-18 |
+| `GET /api/v1/borrowed-items/overdue` | `listOverdueBorrowedItems` | MO — `date`, `withinDays` (mặc định 2) | F-RES-18 |
+| `POST /api/v1/borrowed-items/{id}/issue` · `PUT …/assignment` · `POST …/return` · `POST …/incidents` | `issueBorrowedItem` · `assignBorrowedItem` · `returnBorrowedItem` · `recordBorrowedItemIncident` | MO | F-RES-18 |
 | `PUT /internal/work-area-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/season-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/task-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm `task_projection` (work area, type, status, assignee ACCEPTED) | F-RES-01 |
@@ -176,6 +182,18 @@ Mẫu request: `Resource.Api.http`.
   và số đã gửi để MO bên nhận xác nhận đúng; `support_response_material` vẫn thuộc TaskExecution.
 - Một MO bên nhận xác nhận (R-23): `usable + unusable ≤ đã gửi`, chỉ usable → `TRANSFER_IN` (BR-64). Cả hai dòng ledger
   `reference = (SUPPORT_RESPONSE_MATERIAL, itemId)` → mỗi loại post một lần. Event `support.transfer.confirmed`.
+
+## Đồ mượn (F-RES-18, D-05, BR-41..43)
+
+- Volunteer nhập loan offer (tên + liên hệ người cho mượn, ngày trả dự kiến bắt buộc — BR-41) và là đầu mối liên hệ;
+  event `loan.offer.submitted` báo MO. OFFERED → ACCEPTED/REJECTED (lý do) → ISSUED → IN_USE (work area/task cùng season)
+  → RETURNED với tình trạng GOOD/DAMAGED/LOST (BR-42). OVERDUE suy ra từ `expected_return_date` (giờ Việt Nam).
+- Đồ mượn **không** thuộc catalog và **không** vào ledger. `borrow_transaction`: dòng ISSUE (đóng lại khi trả, ghi tình
+  trạng + số lượng trả) và dòng INCIDENT (DAMAGED/LOST khi đang mượn, không có ngày trả).
+- Job nhắc (`BorrowedItemReminderService`, mỗi `BorrowedItems:ReminderIntervalMinutes` = 60): hạn hôm nay/mai →
+  `borrowed-item.return-due`, quá hạn → `borrowed-item.overdue`, mỗi item tối đa 1 lần/ngày (`last_reminded_on`).
+  Tắt bằng `BorrowedItems:RemindersEnabled=false`.
+- **Bổ sung so với ERD**: cột `borrowed_item.rejection_reason`, `borrowed_item.last_reminded_on`.
 
 ## Phạm vi (scope)
 

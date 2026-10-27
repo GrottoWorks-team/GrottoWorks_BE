@@ -62,7 +62,7 @@ public sealed class PledgeTests
     }
 
     private CancelPledgeCommandHandler Cancel(FakeCurrentUser user) =>
-        new(new DonationOfficerScope(new WorkAreaAccess(_scopes, user), _scopes, user), _store, _donors, Projector(), user);
+        new(new MaterialOfficerScope(new WorkAreaAccess(_scopes, user), _scopes, user), _store, _donors, Projector(), user);
 
     private ListContributionNeedsQueryHandler Needs(FakeCurrentUser? user = null)
     {

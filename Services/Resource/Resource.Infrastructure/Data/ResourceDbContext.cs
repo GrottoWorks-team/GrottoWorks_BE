@@ -36,6 +36,8 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
 
     public DbSet<Donation> Donations => Set<Donation>();
 
+    public DbSet<BorrowedItem> BorrowedItems => Set<BorrowedItem>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ResourceDbContext).Assembly);

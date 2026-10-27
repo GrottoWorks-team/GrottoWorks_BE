@@ -109,6 +109,162 @@ namespace Resource.Infrastructure.Data.Migrations
                     b.ToTable("material_category", (string)null);
                 });
 
+            modelBuilder.Entity("Resource.Domain.Contributions.BorrowTransaction", b =>
+                {
+                    b.Property<Guid>("BorrowTransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("borrow_transaction_id");
+
+                    b.Property<DateOnly>("BorrowDate")
+                        .HasColumnType("date")
+                        .HasColumnName("borrow_date");
+
+                    b.Property<Guid>("BorrowedItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("borrowed_item_id");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("transaction_note");
+
+                    b.Property<Guid?>("RecordedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recorded_by_user_id");
+
+                    b.Property<string>("ReturnCondition")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("return_condition");
+
+                    b.Property<DateOnly?>("ReturnDate")
+                        .HasColumnType("date")
+                        .HasColumnName("return_date");
+
+                    b.Property<decimal?>("ReturnedQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("returned_quantity");
+
+                    b.HasKey("BorrowTransactionId");
+
+                    b.HasIndex("BorrowedItemId");
+
+                    b.ToTable("borrow_transaction", null, t =>
+                        {
+                            t.HasCheckConstraint("borrow_transaction_return_condition", "\"return_date\" IS NULL OR \"return_condition\" IS NOT NULL");
+                        });
+                });
+
+            modelBuilder.Entity("Resource.Domain.Contributions.BorrowedItem", b =>
+                {
+                    b.Property<Guid>("BorrowedItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("borrowed_item_id");
+
+                    b.Property<DateTimeOffset?>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<Guid?>("AcceptedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("accepted_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("borrowed_item_description");
+
+                    b.Property<DateOnly>("ExpectedReturnDate")
+                        .HasColumnType("date")
+                        .HasColumnName("expected_return_date");
+
+                    b.Property<string>("InitialCondition")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("initial_condition");
+
+                    b.Property<string>("ItemName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("borrowed_item_name");
+
+                    b.Property<DateOnly?>("LastRemindedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("last_reminded_on");
+
+                    b.Property<Guid>("OfferedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("offered_by_user_id");
+
+                    b.Property<string>("OwnerAddress")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("owner_address");
+
+                    b.Property<string>("OwnerName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("owner_name");
+
+                    b.Property<string>("OwnerNote")
+                        .HasColumnType("text")
+                        .HasColumnName("owner_note");
+
+                    b.Property<string>("OwnerPhone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("owner_phone");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("borrowed_item_quantity");
+
+                    b.Property<string>("RejectionReason")
+                        .HasColumnType("text")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("borrowed_item_status");
+
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<Guid?>("WorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_area_id");
+
+                    b.HasKey("BorrowedItemId");
+
+                    b.HasIndex(new[] { "SeasonId", "Status", "ExpectedReturnDate" }, "ix_borrowed_item_season_status_due");
+
+                    b.ToTable("borrowed_item", null, t =>
+                        {
+                            t.HasCheckConstraint("borrowed_item_positive_quantity", "\"borrowed_item_quantity\" > 0");
+
+                            t.HasCheckConstraint("borrowed_item_rejection_reason", "\"borrowed_item_status\" <> 'REJECTED' OR \"rejection_reason\" IS NOT NULL");
+                        });
+                });
+
             modelBuilder.Entity("Resource.Domain.Contributions.Donation", b =>
                 {
                     b.Property<Guid>("DonationId")
@@ -1087,6 +1243,15 @@ namespace Resource.Infrastructure.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Resource.Domain.Contributions.BorrowTransaction", b =>
+                {
+                    b.HasOne("Resource.Domain.Contributions.BorrowedItem", null)
+                        .WithMany("Transactions")
+                        .HasForeignKey("BorrowedItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Resource.Domain.Contributions.Donation", b =>
                 {
                     b.HasOne("Resource.Domain.Contributions.Donor", null)
@@ -1214,6 +1379,11 @@ namespace Resource.Infrastructure.Data.Migrations
                         .HasForeignKey("PurchaseRequestId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Resource.Domain.Contributions.BorrowedItem", b =>
+                {
+                    b.Navigation("Transactions");
                 });
 
             modelBuilder.Entity("Resource.Domain.Contributions.Donation", b =>

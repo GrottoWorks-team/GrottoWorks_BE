@@ -118,53 +118,6 @@ public sealed record RecordDirectDonationCommand(
     string? Note);
 
 /// <summary>
-/// Which donations a material officer may record or change: MATERIAL (and MONEY with a work area) → the MO of that work
-/// area; MONEY for the whole season → the MO of any work area of the season. Archived seasons are read-only (BR-07).
-/// </summary>
-public sealed class DonationOfficerScope(WorkAreaAccess access, IWorkAreaScopeStore scopes, ICurrentUser currentUser)
-{
-    public async Task<(WorkAreaScope? Scope, Guid SeasonId, Guid ParishId)> ResolveAsync(
-        DonationType type,
-        Guid? workAreaId,
-        Guid? seasonId,
-        CancellationToken cancellationToken)
-    {
-        if (workAreaId is { } areaId)
-        {
-            var scope = await access.ForMaterialOfficerWriteAsync(areaId, cancellationToken);
-            if (seasonId is { } season && season != scope.SeasonId)
-            {
-                throw DomainRuleException.Validation("DONATION_SEASON_MISMATCH", "The work area belongs to another season.");
-            }
-
-            return (scope, scope.SeasonId, scope.ParishId);
-        }
-
-        if (type == DonationType.Material)
-        {
-            throw DomainRuleException.Validation("DONATION_WORK_AREA_REQUIRED", "A MATERIAL donation needs the receiving work area (BR-37).");
-        }
-
-        var requiredSeason = seasonId
-            ?? throw DomainRuleException.Validation("DONATION_SEASON_REQUIRED", "Choose the season (or a work area) the money is for.");
-        var parishId = access.RequireParish();
-        var areas = await scopes.ListByParishAsync(parishId, requiredSeason, cancellationToken);
-        if (areas.Count == 0)
-        {
-            throw DomainRuleException.NotFound("SEASON_NOT_FOUND", "The season does not exist or is outside your parish.");
-        }
-
-        if (!areas.Any(area => area.MaterialOfficerUserId == currentUser.UserId))
-        {
-            throw DomainRuleException.Forbidden("WORK_AREA_SCOPE_DENIED", "Only a material officer of this season can record its donations.");
-        }
-
-        WorkAreaAccess.EnsureWritable(areas[0]);
-        return (null, requiredSeason, parishId);
-    }
-}
-
-/// <summary>
 /// Posts one receipt (BR-38): stages a <c>DONATION_RECEIPT</c> ledger row per line with usable quantity on the receiving
 /// work area (reference <c>DONATION_RECEIPT_ITEM</c> → posted once), in the caller's unit of work; after the save,
 /// publishes <c>material.shortage.changed</c> where it moved and <c>contribution.receipt.confirmed</c>.
@@ -252,7 +205,7 @@ public sealed class DonationProjector(IDonorStore donors, IMaterialCatalogStore 
 /// area. MONEY: MO of that work area when given, otherwise MO of any work area of the season.
 /// </summary>
 public sealed class RecordDirectDonationCommandHandler(
-    DonationOfficerScope officers,
+    MaterialOfficerScope officers,
     IDonorStore donors,
     IDonationStore store,
     IMaterialCatalogStore catalog,
@@ -406,7 +359,7 @@ public sealed record RecordDonationReceiptCommand(
 /// warned (BA 8.7). The donation row is updated too, so two concurrent receipts cannot both win (xmin → 412).
 /// </summary>
 public sealed class RecordDonationReceiptCommandHandler(
-    DonationOfficerScope officers,
+    MaterialOfficerScope officers,
     IDonationStore store,
     IDonorStore donors,
     DonationReceiptPoster poster,

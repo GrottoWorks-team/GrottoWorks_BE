@@ -14,6 +14,7 @@ public static class ResourceEndpoints
         app.MapDonorEndpoints();
         app.MapDonationEndpoints();
         app.MapMaterialReportEndpoints();
+        app.MapBorrowedItemEndpoints();
         return app;
     }
 }

@@ -191,7 +191,7 @@ public sealed class PledgeMoneyCommandHandler(
 /// cancels what is still outstanding, with a reason; received receipts stay.
 /// </summary>
 public sealed class CancelPledgeCommandHandler(
-    DonationOfficerScope officers,
+    MaterialOfficerScope officers,
     IDonationStore store,
     IDonorStore donors,
     DonationProjector projector,

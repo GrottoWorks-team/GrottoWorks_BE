@@ -47,7 +47,7 @@ public sealed class DonationReceiptTests
     private RecordDonationReceiptCommandHandler Receive(FakeCurrentUser? user = null)
     {
         var current = user ?? Officer();
-        return new(new DonationOfficerScope(new WorkAreaAccess(_scopes, current), _scopes, current), _store, _donors,
+        return new(new MaterialOfficerScope(new WorkAreaAccess(_scopes, current), _scopes, current), _store, _donors,
             new DonationReceiptPoster(_inventory, new ShortageTracker(new InventoryReader(_inventory, _catalog), _events), _events, current), current);
     }
 

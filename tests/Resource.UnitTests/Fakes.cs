@@ -501,3 +501,33 @@ public sealed class FakeSupportTransferStore : Resource.Application.Inventory.IS
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
+
+public sealed class FakeBorrowedItemStore : Resource.Application.Contributions.IBorrowedItemStore
+{
+    public List<Resource.Domain.Contributions.BorrowedItem> Items { get; } = [];
+
+    public Task<Resource.Domain.Contributions.BorrowedItem?> GetAsync(Guid itemId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(i => i.BorrowedItemId == itemId));
+
+    public Task<PagedResult<Resource.Domain.Contributions.BorrowedItem>> SearchAsync(
+        Resource.Application.Contributions.BorrowedItemSearch search, CancellationToken cancellationToken = default)
+    {
+        var filtered = Items
+            .Where(i => search.SeasonIds.Contains(i.SeasonId) && search.Statuses.Contains(i.Status))
+            .Where(i => search.WorkAreaId is null || i.WorkAreaId == search.WorkAreaId)
+            .Where(i => search.DueOnOrBefore is null || i.ExpectedReturnDate <= search.DueOnOrBefore)
+            .OrderBy(i => i.ExpectedReturnDate)
+            .ToList();
+        return Task.FromResult(new PagedResult<Resource.Domain.Contributions.BorrowedItem>(
+            filtered.Skip((search.Page - 1) * search.Size).Take(search.Size).ToList(), filtered.Count));
+    }
+
+    public Task<IReadOnlyList<Resource.Domain.Contributions.BorrowedItem>> ListToRemindAsync(DateOnly dueOnOrBefore, DateOnly today, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Contributions.BorrowedItem>>(Items
+            .Where(i => i.IsOut && i.ExpectedReturnDate <= dueOnOrBefore && (i.LastRemindedOn is null || i.LastRemindedOn < today))
+            .ToList());
+
+    public void Add(Resource.Domain.Contributions.BorrowedItem item) => Items.Add(item);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+}

@@ -5,6 +5,7 @@ using Resource.Application.Requirements;
 using Resource.Application.Inventory;
 using Resource.Application.Shortages;
 using Resource.Application.Purchases;
+using Resource.Application.Contributions;
 
 namespace Resource.Application;
 
@@ -26,6 +27,7 @@ public static class DependencyInjection
         // F-RES-01 work-area scope projection
         services.AddScoped<ApplyWorkAreaSnapshotHandler>();
         services.AddScoped<ApplySeasonStatusHandler>();
+        services.AddScoped<ApplyTaskSnapshotHandler>();
         services.AddScoped<WorkAreaAccess>();
 
         // F-RES-03 material requirements
@@ -38,6 +40,25 @@ public static class DependencyInjection
         services.AddScoped<RecordOpeningStockCommandHandler>();
         services.AddScoped<ListInventoryQueryHandler>();
         services.AddScoped<GetMaterialHistoryQueryHandler>();
+
+        // F-RES-15 allocations
+        services.AddScoped<AllocationProjector>();
+        services.AddScoped<AllocateMaterialCommandHandler>();
+        services.AddScoped<ListMaterialAllocationsQueryHandler>();
+
+        // F-RES-16 inventory adjustments
+        services.AddScoped<CreateInventoryAdjustmentCommandHandler>();
+
+        // F-RES-17 task material reports
+        services.AddScoped<MaterialReportContext>();
+        services.AddScoped<SubmitMaterialReportCommandHandler>();
+        services.AddScoped<ListTaskMaterialReportsQueryHandler>();
+        services.AddScoped<VerifyMaterialReportCommandHandler>();
+        services.AddScoped<RequestReportRevisionCommandHandler>();
+
+        // F-RES-20 support transfers
+        services.AddScoped<StartSupportTransferCommandHandler>();
+        services.AddScoped<ConfirmTransferReceiptCommandHandler>();
 
         // F-RES-05 shortages
         services.AddScoped<ShortageTracker>();
@@ -54,6 +75,51 @@ public static class DependencyInjection
         services.AddScoped<UpdatePurchaseRequestCommandHandler>();
         services.AddScoped<SubmitPurchaseRequestCommandHandler>();
         services.AddScoped<DecidePurchaseRequestCommandHandler>();
+
+        // F-RES-09/10/11 purchases, delivery, cost overrun
+        services.AddScoped<PurchaseBuyerSync>();
+        services.AddScoped<PurchaseContext>();
+        services.AddScoped<RecordPurchaseCommandHandler>();
+        services.AddScoped<AttachPurchaseReceiptsCommandHandler>();
+        services.AddScoped<PurchaseReviewCommandHandler>();
+        services.AddScoped<ConfirmPurchaseDeliveryCommandHandler>();
+
+        // F-RES-12 donors
+        services.AddScoped<DonorAccess>();
+        services.AddScoped<ListDonorsQueryHandler>();
+        services.AddScoped<CreateDonorCommandHandler>();
+        services.AddScoped<UpdateDonorCommandHandler>();
+
+        // F-RES-13 direct donations
+        services.AddScoped<DonationProjector>();
+        services.AddScoped<MaterialOfficerScope>();
+        services.AddScoped<DonationReceiptPoster>();
+        services.AddScoped<RecordDirectDonationCommandHandler>();
+        services.AddScoped<ListDonationsQueryHandler>();
+        services.AddScoped<GetDonationQueryHandler>();
+        services.AddScoped<ListMyContributionsQueryHandler>();
+
+        // F-RES-13b pledges
+        services.AddScoped<VolunteerDonorResolver>();
+        services.AddScoped<ListContributionNeedsQueryHandler>();
+        services.AddScoped<PledgeMaterialCommandHandler>();
+        services.AddScoped<PledgeMoneyCommandHandler>();
+        services.AddScoped<CancelPledgeCommandHandler>();
+
+        // F-RES-14 donation corrections
+        services.AddScoped<AdjustDonationCommandHandler>();
+
+        // F-RES-18 loan offers and borrowed items
+        services.AddScoped<BorrowedItemAccess>();
+        services.AddScoped<OfferItemForLoanCommandHandler>();
+        services.AddScoped<ListLoanOffersQueryHandler>();
+        services.AddScoped<ListBorrowedItemsQueryHandler>();
+        services.AddScoped<ListOverdueBorrowedItemsQueryHandler>();
+        services.AddScoped<BorrowedItemCommandHandler>();
+        services.AddScoped<BorrowedItemReminderJob>();
+
+        // F-RES-13c receipts of pledges
+        services.AddScoped<RecordDonationReceiptCommandHandler>();
 
         return services;
     }

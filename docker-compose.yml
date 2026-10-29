@@ -23,6 +23,18 @@ services:
       context: .
       dockerfile: Services/ParishCoordination/ParishCoordination.Api/Dockerfile
 
+  readiness.api:
+    image: ${DOCKER_REGISTRY-}readinessapi
+    build:
+      context: .
+      dockerfile: Services/Readiness/Readiness.Api/Dockerfile
+
+  reporting.api:
+    image: ${DOCKER_REGISTRY-}reportingapi
+    build:
+      context: .
+      dockerfile: Services/Reporting/Reporting.Api/Dockerfile
+
   resource.api:
     image: ${DOCKER_REGISTRY-}resourceapi
     build:

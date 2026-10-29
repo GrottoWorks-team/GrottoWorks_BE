@@ -3,6 +3,7 @@ using Resource.Domain.Catalog;
 using Resource.Domain.Scope;
 using Resource.Domain.Inventory;
 using Resource.Domain.Purchases;
+using Resource.Domain.Contributions;
 
 namespace Resource.Infrastructure.Data;
 
@@ -15,13 +16,29 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
 
     public DbSet<WorkAreaScope> WorkAreaScopes => Set<WorkAreaScope>();
 
+    public DbSet<TaskProjection> TaskProjections => Set<TaskProjection>();
+
     public DbSet<MaterialRequirement> MaterialRequirements => Set<MaterialRequirement>();
 
     public DbSet<MaterialTransaction> MaterialTransactions => Set<MaterialTransaction>();
 
+    public DbSet<MaterialAllocation> MaterialAllocations => Set<MaterialAllocation>();
+
+    public DbSet<TaskMaterialReport> TaskMaterialReports => Set<TaskMaterialReport>();
+
+    public DbSet<SupportTransfer> SupportTransfers => Set<SupportTransfer>();
+
     public DbSet<PurchaseRequest> PurchaseRequests => Set<PurchaseRequest>();
 
     public DbSet<PurchaseRequestStateChange> PurchaseRequestStateChanges => Set<PurchaseRequestStateChange>();
+
+    public DbSet<Purchase> Purchases => Set<Purchase>();
+
+    public DbSet<Donor> Donors => Set<Donor>();
+
+    public DbSet<Donation> Donations => Set<Donation>();
+
+    public DbSet<BorrowedItem> BorrowedItems => Set<BorrowedItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

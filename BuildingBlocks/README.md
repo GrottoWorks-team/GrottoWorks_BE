@@ -105,3 +105,52 @@ Cho tới khi ParishCoordination publish `planning.work-area.*` / `planning.seas
 
 **Đề nghị payload event của Lâm** chứa đúng các trường trên (+ envelope Mục 8), để consumer của Resource /
 Readiness / Task chỉ map 1–1. Header `X-Internal-Api-Key` như §5.
+
+Readiness (`readiness.api`) và Reporting (`reporting.api`) có **cùng** ba endpoint `PUT /internal/work-area-scopes|season-scopes|task-scopes`
+(cùng body) cho projection của mình — Parish / Task (hoặc script seed) gọi cả ba service cho tới khi có event.
+Readiness cần `status` của work area (`confirmAreaReadiness` chỉ khi `READINESS_REVIEW`, BR-73) và task `CORRECTIVE`;
+Reporting cần thêm `dueAt` của task.
+
+### 5.3 Resource — feed tạm `task_projection` (F-RES-01)
+
+Cho tới khi TaskExecution publish `task.status.changed` / `task.assignment.responded` / `task.purchase-task.assigned`:
+
+- `PUT http://resource.api:8080/internal/task-scopes/{taskId}` — body
+  `{ workAreaId, name, type, status, purchaseRequestId?, assigneeUserIds[], version }` (`type`: `WORK|PURCHASE|CORRECTIVE`;
+  `status`: `OPEN|NOT_STARTED|IN_PROGRESS|SUBMITTED|REVISION_REQUIRED|COMPLETED|CANCELLED`; `assigneeUserIds` = volunteer có
+  assignment `ACCEPTED`; PURCHASE bắt buộc `purchaseRequestId`; work area phải được project trước).
+
+### 5.4 Resource — chuyển kho hỗ trợ vật tư (F-RES-20 ↔ F-TSK-15b, R-08)
+
+- `POST http://resource.api:8080/internal/support-transfers` — body
+  `{ supportResponseMaterialId, sourceWorkAreaId, targetWorkAreaId, materialId, quantity, approvedByUserId }`.
+  - `201` → đã ghi `TRANSFER_OUT` cho work area nguồn; `200` → gọi lại y hệt (idempotent theo `supportResponseMaterialId`,
+    không ghi thêm); `409 MATERIAL_INSUFFICIENT_AVAILABLE` → thiếu tồn chưa phân bổ (trả thẳng cho Leader);
+    `409 SUPPORT_TRANSFER_CONFLICT` → cùng id nhưng dữ liệu khác; `422` → work area khác season / trùng nhau / chưa project.
+  - Body trả về `SupportTransfer { supportResponseMaterialId, status: IN_TRANSIT|RECEIVED, quantity, ... }`.
+- MO bên nhận gọi `POST /api/v1/support-response-materials/{itemId}/confirm-receipt` (Resource host, gateway route riêng)
+  `{ receivedUsableQuantity, receivedUnusableQuantity?, note?, version? }` → `TRANSFER_IN` phần usable, event
+  `support.transfer.confirmed { supportResponseMaterialId, sentQuantity, receivedUsableQuantity, receivedUnusableQuantity, ... }`
+  để Task cập nhật FULFILLED/PARTIALLY_FULFILLED (consumer idempotent theo `supportResponseMaterialId`).
+
+### 5.5 Reporting — nhận event (F-RPT-02) và payload đề nghị cho event của Task
+
+Cho tới khi có outbox (F-PLT-05) và consumer MassTransit, producer (hoặc script seed) gửi từng event:
+
+- `POST http://reporting.api:8080/internal/events` — body `{ eventId, eventType, version, occurredAt?, payload }` (envelope §2 +
+  `eventId` = message id của broker, là khóa inbox). Trả `200 { outcome: APPLIED|DUPLICATE|IGNORED, contributionsRecorded,
+  pointsAwarded }`; gửi lại cùng `eventId` → `DUPLICATE`, không tính lại (BR-55); `409 EVENT_CONCURRENT_UPDATE` → event khác
+  đang cập nhật cùng contribution, gửi lại; `422 EVENT_PAYLOAD_INVALID` / `EVENT_SEASON_MISMATCH`. Event không dùng → `IGNORED`.
+- Event của Resource / Readiness dùng đúng record trong `Resource.Contracts.Events` / `Readiness.Contracts.Events`
+  (contribution + điểm: `purchase.delivery.confirmed`, `contribution.receipt.confirmed`, `contribution.donation.adjusted`;
+  read model dashboard / báo cáo: thêm `material.shortage.changed`, `contribution.pledged`, `purchase.request.submitted/decided`,
+  `readiness.item.failed`, `readiness.area.ready/reopened`).
+- Task cho dashboard: `PUT http://reporting.api:8080/internal/task-scopes/{taskId}` như §5.3, thêm `dueAt?` (hạn task).
+- **Đề nghị payload event của Lâm** (Reporting đang đọc theo các trường này, `Reporting.Application/Ingestion/ConsumedEvents.cs`):
+  - `task.completion.reviewed { taskId, workAreaId, seasonId, parishId, taskName?, taskType, decision: APPROVED|REVISION_REQUIRED,
+    volunteerUserIds[], reviewedByUserId, reviewedAt }` — `volunteerUserIds` = assignment ACCEPTED/COMPLETED được ghi nhận;
+    task PURCHASE không tính ở đây (tính từ `purchase.delivery.confirmed`).
+  - `attendance.hours.approved { attendanceId, taskId, workAreaId, seasonId, parishId, volunteerUserId, approvedHours,
+    approvedByUserId, approvedAt }` — duyệt lại (correction) cùng `attendanceId` không tạo contribution mới.
+  - `support.member.completed { supportResponseMemberId, supportRequestId, volunteerUserId, targetWorkAreaId, seasonId, parishId,
+    completedAt }`.

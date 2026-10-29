@@ -98,12 +98,12 @@ public sealed class ListMaterialNeedsQueryHandler(WorkAreaAccess access, IWorkAr
 /// </summary>
 public sealed class ShortageTracker(InventoryReader reader, IIntegrationEventPublisher publisher)
 {
-    public sealed record Snapshot(WorkAreaScope Scope, Guid MaterialId, decimal Shortage);
+    public sealed record Snapshot(WorkAreaScope Scope, Guid MaterialId, decimal Shortage, InventoryBalanceDto? Row);
 
     public async Task<Snapshot> CaptureAsync(WorkAreaScope scope, Guid materialId, CancellationToken cancellationToken = default)
     {
         var row = await ReadAsync(scope, materialId, cancellationToken);
-        return new Snapshot(scope, materialId, row?.Shortage ?? 0);
+        return new Snapshot(scope, materialId, row?.Shortage ?? 0, row);
     }
 
     public async Task PublishIfChangedAsync(Snapshot before, CancellationToken cancellationToken = default)
@@ -127,7 +127,10 @@ public sealed class ShortageTracker(InventoryReader reader, IIntegrationEventPub
                 shortage,
                 row?.Required ?? 0,
                 row?.ConfirmedAvailable ?? 0,
-                DateTimeOffset.UtcNow),
+                DateTimeOffset.UtcNow,
+                (row ?? before.Row)?.MaterialCode ?? string.Empty,
+                (row ?? before.Row)?.MaterialName ?? string.Empty,
+                (row ?? before.Row)?.Unit ?? string.Empty),
             "work_area_material",
             before.Scope.WorkAreaId,
             cancellationToken);

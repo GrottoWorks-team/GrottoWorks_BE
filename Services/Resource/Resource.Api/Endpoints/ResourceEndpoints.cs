@@ -11,6 +11,11 @@ public static class ResourceEndpoints
         app.MapInventoryEndpoints();
         app.MapShortageEndpoints();
         app.MapPurchaseRequestEndpoints();
+        app.MapPurchaseEndpoints();
+        app.MapDonorEndpoints();
+        app.MapDonationEndpoints();
+        app.MapMaterialReportEndpoints();
+        app.MapBorrowedItemEndpoints();
         return app;
     }
 }

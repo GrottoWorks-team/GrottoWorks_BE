@@ -9,6 +9,7 @@
 # leaderAccessToken: a LEADER of the same parish; its sub goes into leaderUserId of the work-area scope.
 @leaderAccessToken = <LEADER access token>
 @leaderUserId = <sub of the LEADER token>
+@volunteerAccessToken = <VOLUNTEER access token of the same parish>
 
 ### F-RES-01 — (interim) project a work area until planning.work-area.* events exist
 PUT {{host}}/internal/work-area-scopes/{{workAreaId}}
@@ -87,7 +88,7 @@ Authorization: Bearer {{accessToken}}
 
 ###
 
-### F-RES-06 — draft purchase request (MO of the work area). A line above the uncovered shortage needs shortageOverrideReason.
+### F-RES-06 — purchase request in PLANNING (MO of the work area). A line above the uncovered shortage needs shortageOverrideReason.
 # @name purchaseRequest
 POST {{host}}/api/v1/purchase-requests
 Content-Type: application/json
@@ -99,7 +100,7 @@ Authorization: Bearer {{accessToken}}
   "items": [{ "materialId": "{{material.response.body.$.data.id}}", "requestedQuantity": 8, "estimatedCost": 400000 }]
 }
 
-### F-RES-06 — edit the draft (items, when given, replace every line)
+### F-RES-06 — edit while PLANNING (items, when given, replace every line)
 PATCH {{host}}/api/v1/purchase-requests/{{purchaseRequest.response.body.$.data.id}}
 Content-Type: application/json
 Authorization: Bearer {{accessToken}}
@@ -129,5 +130,177 @@ Authorization: Bearer {{accessToken}}
 ### F-RES-06 — status and approval history
 GET {{host}}/api/v1/purchase-requests/{{purchaseRequest.response.body.$.data.id}}/history
 Authorization: Bearer {{accessToken}}
+
+### F-RES-12 — create a donor (MO: own parish; optional userId links a volunteer account of the same parish)
+# @name donor
+POST {{host}}/api/v1/donors
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "donorName": "Bà Maria Lan", "phone": "0901 234 567", "address": "12 Lê Lợi" }
+
+### F-RES-12 — search donors (no automatic merge: pick the right one)
+GET {{host}}/api/v1/donors?q=Lan&sort=name
+Authorization: Bearer {{accessToken}}
+
+### F-RES-12 — update contact details (If-Match = version)
+PATCH {{host}}/api/v1/donors/{{donor.response.body.$.data.id}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+If-Match: "{{donor.response.body.$.data.version}}"
+
+{ "email": "lan@example.com" }
+
+### F-RES-13 — record a MATERIAL donation already received (usable = received − unusable goes to stock)
+# @name donation
+POST {{host}}/api/v1/donations
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "donorId": "{{donor.response.body.$.data.id}}",
+  "type": "MATERIAL",
+  "workAreaId": "{{workAreaId}}",
+  "items": [{ "materialId": "{{material.response.body.$.data.id}}", "receivedQuantity": 20, "unusableQuantity": 2 }],
+  "note": "Giao tận nơi"
+}
+
+### F-RES-13 — record a MONEY donation for the season (VND)
+POST {{host}}/api/v1/donations
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "donorId": "{{donor.response.body.$.data.id}}", "type": "MONEY", "seasonId": "{{seasonId}}", "amount": 2000000 }
+
+### F-RES-13 — donation with items and receipts
+GET {{host}}/api/v1/donations/{{donation.response.body.$.data.id}}
+Authorization: Bearer {{accessToken}}
+
+### F-RES-13 — donations of the season
+GET {{host}}/api/v1/donations?seasonId={{seasonId}}&type=MATERIAL
+Authorization: Bearer {{accessToken}}
+
+### F-RES-13b — what is still needed (shortage minus outstanding pledges)
+GET {{host}}/api/v1/seasons/{{seasonId}}/contribution-needs
+Authorization: Bearer {{volunteerAccessToken}}
+
+### F-RES-13b — volunteer pledges materials for a required need
+# @name pledge
+POST {{host}}/api/v1/donations/material-pledges
+Content-Type: application/json
+Authorization: Bearer {{volunteerAccessToken}}
+
+{ "workAreaId": "{{workAreaId}}", "items": [{ "materialId": "{{material.response.body.$.data.id}}", "pledgedQuantity": 5 }], "note": "Mang tới thứ Bảy" }
+
+### F-RES-13b — volunteer pledges money for the season (VND)
+POST {{host}}/api/v1/donations/monetary-pledges
+Content-Type: application/json
+Authorization: Bearer {{volunteerAccessToken}}
+
+{ "seasonId": "{{seasonId}}", "amount": 500000 }
+
+### F-RES-13b — cancel the outstanding part of a pledge
+POST {{host}}/api/v1/donations/{{pledge.response.body.$.data.id}}/cancel
+Content-Type: application/json
+Authorization: Bearer {{volunteerAccessToken}}
+
+{ "version": {{pledge.response.body.$.data.version}}, "reason": "Không mua được" }
+
+### F-RES-13c — officer records one actual receipt of the pledge (usable part goes to stock)
+POST {{host}}/api/v1/donations/{{pledge.response.body.$.data.id}}/receipts
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "items": [{ "donationItemId": "{{pledge.response.body.$.data.items[0].id}}", "receivedQuantity": 3, "unusableQuantity": 1 }], "note": "Lần 1" }
+
+### F-RES-01 — (interim) project a task until task.* events exist
+PUT {{host}}/internal/task-scopes/00000000-0000-0000-0000-0000000000c1
+Content-Type: application/json
+X-Internal-Api-Key: {{internalApiKey}}
+
+{ "workAreaId": "{{workAreaId}}", "name": "Treo đèn hang đá", "type": "WORK", "status": "IN_PROGRESS", "assigneeUserIds": [], "version": 1 }
+
+### F-RES-15 — allocate unallocated stock to a task of the work area
+POST {{host}}/api/v1/material-allocations
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "workAreaId": "{{workAreaId}}", "taskId": "00000000-0000-0000-0000-0000000000c1", "items": [{ "materialId": "{{material.response.body.$.data.id}}", "quantity": 3 }] }
+
+### F-RES-15 — allocations of the work area
+GET {{host}}/api/v1/material-allocations?workAreaId={{workAreaId}}
+Authorization: Bearer {{accessToken}}
+
+### F-RES-16 — write off damaged / lost / disposed stock (never back to usable)
+POST {{host}}/api/v1/inventory-adjustments
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "workAreaId": "{{workAreaId}}", "materialId": "{{material.response.body.$.data.id}}", "type": "DAMAGED", "quantity": 1, "reason": "Mưa làm chập" }
+
+### F-RES-17 — assigned volunteer reports what is left after the task (one line per allocation item)
+# @name materialReport
+POST {{host}}/api/v1/tasks/00000000-0000-0000-0000-0000000000c1/material-reports
+Content-Type: application/json
+Authorization: Bearer {{volunteerAccessToken}}
+
+{ "items": [{ "materialAllocationItemId": "<allocation item id>", "remainingQuantity": 1, "damagedQuantity": 0, "lostQuantity": 0 }], "note": "Xong việc" }
+
+### F-RES-17 — officer verifies; verified remaining goes back to stock (TASK_RETURN)
+POST {{host}}/api/v1/task-material-reports/{{materialReport.response.body.$.data.id}}/verify
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "items": [{ "reportItemId": "{{materialReport.response.body.$.data.items[0].id}}", "remainingQuantity": 1, "damagedQuantity": 0, "lostQuantity": 0 }] }
+
+### F-RES-20 — (TaskExecution) approve a support material → TRANSFER_OUT on the source work area
+POST {{host}}/internal/support-transfers
+Content-Type: application/json
+X-Internal-Api-Key: {{internalApiKey}}
+
+{
+  "supportResponseMaterialId": "00000000-0000-0000-0000-0000000000d1",
+  "sourceWorkAreaId": "{{workAreaId}}",
+  "targetWorkAreaId": "00000000-0000-0000-0000-0000000000a2",
+  "materialId": "{{material.response.body.$.data.id}}",
+  "quantity": 2,
+  "approvedByUserId": "{{leaderUserId}}"
+}
+
+### F-RES-20 — receiving officer confirms what arrived (usable → TRANSFER_IN)
+POST {{host}}/api/v1/support-response-materials/00000000-0000-0000-0000-0000000000d1/confirm-receipt
+Content-Type: application/json
+Authorization: Bearer <MO token of the receiving work area>
+
+{ "receivedUsableQuantity": 2, "receivedUnusableQuantity": 0 }
+
+### F-RES-18 — volunteer offers equipment for loan on behalf of the lender
+# @name loanOffer
+POST {{host}}/api/v1/loan-offers
+Content-Type: application/json
+Authorization: Bearer {{volunteerAccessToken}}
+
+{ "seasonId": "{{seasonId}}", "ownerName": "Ông Giuse Tâm", "ownerPhone": "0909 111 222", "itemName": "Máy phát điện 5kVA", "quantity": 1, "initialCondition": "Tốt", "expectedReturnDate": "2027-01-10" }
+
+### F-RES-18 — officer accepts, then issues and returns it
+POST {{host}}/api/v1/loan-offers/{{loanOffer.response.body.$.data.id}}/accept
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "workAreaId": "{{workAreaId}}" }
+
+###
+POST {{host}}/api/v1/borrowed-items/{{loanOffer.response.body.$.data.id}}/issue
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{}
+
+###
+POST {{host}}/api/v1/borrowed-items/{{loanOffer.response.body.$.data.id}}/return
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "condition": "GOOD" }
 
 ###

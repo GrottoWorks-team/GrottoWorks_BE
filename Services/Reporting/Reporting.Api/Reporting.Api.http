@@ -1,0 +1,134 @@
+@host = http://localhost:5186
+# adminAccessToken: login through Identity (POST /api/v1/auth/login) as ADMIN.
+@adminAccessToken = <ADMIN access token>
+@parishAccessToken = <PARISH access token>
+@contributionTypeId = 0f3c2a10-0000-4000-8000-000000000001
+@ruleId = <id from createRecognitionRule>
+@internalApiKey = dev-internal-api-key-change-me-0123456789
+@volunteerAccessToken = <VOLUNTEER access token>
+@volunteerUserId = <sub of the VOLUNTEER token>
+@seasonId = 00000000-0000-0000-0000-0000000000b1
+@parishId = 00000000-0000-0000-0000-000000000001
+@workAreaId = 00000000-0000-0000-0000-0000000000a1
+@leaderAccessToken = <LEADER access token>
+@moAccessToken = <MO access token>
+
+### F-RPT-01 — listContributionTypes
+GET {{host}}/api/v1/contribution-types?status=ACTIVE
+Authorization: Bearer {{parishAccessToken}}
+
+### F-RPT-01 — createContributionType
+POST {{host}}/api/v1/contribution-types
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{ "code": "EMERGENCY_HELP", "name": "Hỗ trợ khẩn cấp", "description": "Hỗ trợ ngoài kế hoạch" }
+
+### F-RPT-01 — updateContributionType (deactivate)
+PATCH {{host}}/api/v1/contribution-types/{{contributionTypeId}}
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{ "status": "INACTIVE" }
+
+### F-RPT-01 — createRecognitionRule (version 1)
+POST {{host}}/api/v1/recognition-rules
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "contributionTypeId": "{{contributionTypeId}}",
+  "name": "Hoàn thành task",
+  "points": 10,
+  "effectiveFrom": "2026-12-01"
+}
+
+### F-RPT-01 — createRecognitionRule (next version, BR-68)
+POST {{host}}/api/v1/recognition-rules
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{ "points": 12, "effectiveFrom": "2026-12-15", "previousRuleId": "{{ruleId}}" }
+
+### F-RPT-01 — listRecognitionRules
+GET {{host}}/api/v1/recognition-rules?status=ACTIVE
+Authorization: Bearer {{parishAccessToken}}
+
+### F-RPT-01 — deactivateRecognitionRule
+POST {{host}}/api/v1/recognition-rules/{{ruleId}}/deactivate
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{ "reason": "Đổi chính sách tính điểm" }
+
+### F-RPT-02 — (interim) deliver task.completion.reviewed
+POST {{host}}/internal/events
+Content-Type: application/json
+X-Internal-Api-Key: {{internalApiKey}}
+
+{
+  "eventId": "11111111-1111-1111-1111-111111111111",
+  "eventType": "task.completion.reviewed",
+  "version": 1,
+  "payload": {
+    "taskId": "22222222-2222-2222-2222-222222222222",
+    "workAreaId": "{{workAreaId}}",
+    "seasonId": "{{seasonId}}",
+    "parishId": "{{parishId}}",
+    "taskName": "Treo đèn",
+    "taskType": "WORK",
+    "decision": "APPROVED",
+    "volunteerUserIds": ["{{volunteerUserId}}"],
+    "reviewedByUserId": "33333333-3333-3333-3333-333333333333",
+    "reviewedAt": "2026-12-10T03:00:00Z"
+  }
+}
+
+### F-RPT-03 — getMyRecognition
+GET {{host}}/api/v1/users/me/recognition?seasonId={{seasonId}}
+Authorization: Bearer {{volunteerAccessToken}}
+
+### F-RPT-03 — getSeasonRecognition
+GET {{host}}/api/v1/seasons/{{seasonId}}/recognition
+Authorization: Bearer {{parishAccessToken}}
+
+### F-RPT-04 — viewSeasonDashboard
+GET {{host}}/api/v1/dashboards/season?seasonId={{seasonId}}
+Authorization: Bearer {{parishAccessToken}}
+
+### F-RPT-04 — viewWorkAreaDashboard
+GET {{host}}/api/v1/dashboards/work-area?workAreaId={{workAreaId}}
+Authorization: Bearer {{leaderAccessToken}}
+
+### F-RPT-04 — viewMaterialDashboard
+GET {{host}}/api/v1/dashboards/materials?workAreaId={{workAreaId}}
+Authorization: Bearer {{moAccessToken}}
+
+### F-RPT-05 — getMaterialReport
+GET {{host}}/api/v1/reports/materials?seasonId={{seasonId}}
+Authorization: Bearer {{parishAccessToken}}
+
+### F-RPT-05 — getAttendanceReport (date range)
+GET {{host}}/api/v1/reports/attendance?seasonId={{seasonId}}&from=2026-12-01&to=2026-12-31
+Authorization: Bearer {{parishAccessToken}}
+
+### F-RPT-05 — getReadinessReport (one work area)
+GET {{host}}/api/v1/reports/readiness?seasonId={{seasonId}}&workAreaId={{workAreaId}}
+Authorization: Bearer {{leaderAccessToken}}
+
+### F-RPT-06 — createReportExport (202 + job)
+POST {{host}}/api/v1/report-exports
+Authorization: Bearer {{parishAccessToken}}
+Content-Type: application/json
+Idempotency-Key: 6f1c2b8e-0d1a-4c55-9a7e-2f0b5f1e8c11
+
+{ "reportType": "MATERIALS", "format": "XLSX", "seasonId": "{{seasonId}}" }
+
+### F-RPT-06 — getReportExport
+@jobId = <id from createReportExport>
+GET {{host}}/api/v1/report-exports/{{jobId}}
+Authorization: Bearer {{parishAccessToken}}
+
+### F-RPT-06 — download the file once SUCCEEDED
+GET {{host}}/api/v1/report-exports/{{jobId}}/file
+Authorization: Bearer {{parishAccessToken}}

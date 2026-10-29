@@ -4,6 +4,7 @@ using Resource.Application.Catalog;
 using Resource.Domain;
 using Resource.Domain.Catalog;
 using Resource.Domain.Purchases;
+using Resource.Domain.Contributions;
 using Resource.Infrastructure.Data;
 using Resource.Infrastructure.Data.Configurations;
 
@@ -103,7 +104,9 @@ public sealed class MaterialCatalogStore(ResourceDbContext dbContext) : IMateria
     public async Task<bool> IsMaterialReferencedAsync(Guid materialId, CancellationToken cancellationToken = default) =>
         await dbContext.MaterialRequirements.AnyAsync(requirement => requirement.MaterialId == materialId, cancellationToken) ||
         await dbContext.MaterialTransactions.AnyAsync(transaction => transaction.MaterialId == materialId, cancellationToken) ||
-        await dbContext.Set<PurchaseRequestItem>().AnyAsync(item => item.MaterialId == materialId, cancellationToken);
+        await dbContext.Set<PurchaseRequestItem>().AnyAsync(item => item.MaterialId == materialId, cancellationToken) ||
+        await dbContext.Set<DonationItem>().AnyAsync(item => item.MaterialId == materialId, cancellationToken) ||
+        await dbContext.Set<Resource.Domain.Inventory.MaterialAllocationItem>().AnyAsync(item => item.MaterialId == materialId, cancellationToken);
 
     public void AddMaterial(Material material) => dbContext.Materials.Add(material);
 

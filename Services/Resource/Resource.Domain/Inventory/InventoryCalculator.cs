@@ -15,7 +15,7 @@ public static class InventoryCalculator
 {
     /// <param name="required">Sum of ACTIVE requirements (0 when the material is not required).</param>
     /// <param name="ledgerTotal">SUM(transaction_quantity) of the ledger — confirmed available quantity.</param>
-    /// <param name="activeAllocated">Active allocated quantity (allocations arrive with F-RES-15; 0 until then).</param>
+    /// <param name="activeAllocated">Allocated quantity (F-RES-15); usable task returns come back through the ledger.</param>
     public static InventoryFigures Calculate(decimal required, decimal ledgerTotal, decimal activeAllocated = 0)
     {
         if (required < 0 || activeAllocated < 0)

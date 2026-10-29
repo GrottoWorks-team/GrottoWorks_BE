@@ -47,7 +47,8 @@ public sealed record PurchaseRequestDto(
     DateTimeOffset? RejectedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,
-    long Version)
+    long Version,
+    IReadOnlyList<PurchaseDto>? Purchases = null)
 {
     public static PurchaseRequestDto From(PurchaseRequest request, WorkAreaScope scope, IReadOnlyDictionary<Guid, Material> materials) =>
         new(request.PurchaseRequestId, request.WorkAreaId, scope.Name, scope.SeasonId, request.RequestedByUserId, request.RequestReason,
@@ -94,8 +95,8 @@ public sealed record PurchaseRequestCommand(Guid PurchaseRequestId, long? Versio
 public static class PurchaseRequestRules
 {
     /// <summary>
-    /// Requests whose quantity is asked for but not delivered yet. PARTIALLY_RECEIVED joins once F-RES-10 tracks the
-    /// delivered part per line (its delivered part is already in the ledger).
+    /// Requests whose whole quantity is asked for but not delivered yet. PARTIALLY_RECEIVED requests also reserve the
+    /// part not delivered yet (computed by the store from confirmed purchases).
     /// </summary>
     public static readonly IReadOnlySet<PurchaseRequestStatus> OpenStatuses = new HashSet<PurchaseRequestStatus>
     {
@@ -174,31 +175,6 @@ public sealed class PurchaseShortageGuard(InventoryReader reader, IPurchaseReque
     }
 }
 
-/// <summary>Validates the catalog side of request lines: every material exists and is ACTIVE.</summary>
-internal static class PurchaseItemCatalog
-{
-    public static async Task EnsureActiveAsync(
-        IMaterialCatalogStore catalog,
-        IReadOnlyCollection<PurchaseRequestItemInput> items,
-        CancellationToken cancellationToken)
-    {
-        var ids = items.Select(item => item.MaterialId).Distinct().ToList();
-        var materials = (await catalog.GetMaterialsAsync(ids, cancellationToken)).ToDictionary(material => material.MaterialId);
-        foreach (var id in ids)
-        {
-            if (!materials.TryGetValue(id, out var material))
-            {
-                throw DomainRuleException.Validation("MATERIAL_UNKNOWN", $"Material {id} does not exist.");
-            }
-
-            if (material.Status != CatalogStatus.Active)
-            {
-                throw DomainRuleException.Validation("MATERIAL_INACTIVE", $"Material {material.Code} is inactive.");
-            }
-        }
-    }
-}
-
 /// <summary>F-RES-06 <c>listPurchaseRequests</c> (PARISH, LEADER, MO): requests of the caller's parish, newest first.</summary>
 public sealed class ListPurchaseRequestsQueryHandler(
     WorkAreaAccess access,
@@ -229,21 +205,28 @@ public sealed class ListPurchaseRequestsQueryHandler(
 }
 
 /// <summary>
-/// F-RES-06 <c>getPurchaseRequest</c> (PARISH, LEADER, MO, VOLUNTEER of the parish). A volunteer may only see the
-/// request of a PURCHASE task they accepted — the buyer projection arrives with <c>task.purchase-task.assigned</c>
-/// (F-RES-01), so until then volunteers get 404.
+/// F-RES-06 <c>getPurchaseRequest</c> (PARISH, LEADER, MO of the parish; VOLUNTEER only as the buyer — assignee of a
+/// PURCHASE task of this request in <c>task_projection</c>), with its purchases so the officer can confirm delivery.
 /// </summary>
-public sealed class GetPurchaseRequestQueryHandler(PurchaseRequestLoader loader, ICurrentUser currentUser)
+public sealed class GetPurchaseRequestQueryHandler(
+    PurchaseRequestLoader loader,
+    ITaskProjectionStore tasks,
+    IPurchaseStore purchases,
+    ICurrentUser currentUser)
 {
     public async Task<PurchaseRequestDto> HandleAsync(Guid requestId, CancellationToken cancellationToken = default)
     {
         var (request, scope) = await loader.ForReadAsync(requestId, cancellationToken);
-        if (currentUser.Role == GrottoWorksRoles.Volunteer)
+        if (currentUser.Role == GrottoWorksRoles.Volunteer &&
+            !(await tasks.ListByPurchaseRequestAsync(requestId, cancellationToken)).Any(task => task.AssigneeUserIds.Contains(currentUser.UserId)))
         {
             throw PurchaseRequestLoader.NotFound();
         }
 
-        return await loader.ToDtoAsync(request, scope, cancellationToken);
+        var dto = await loader.ToDtoAsync(request, scope, cancellationToken);
+        var bought = await purchases.ListByRequestAsync(requestId, cancellationToken);
+        var materials = await loader.MaterialsAsync([request], cancellationToken);
+        return dto with { Purchases = bought.Select(purchase => PurchaseDto.From(purchase, materials, null)).ToList() };
     }
 }
 
@@ -259,7 +242,7 @@ public sealed class GetPurchaseRequestHistoryQueryHandler(PurchaseRequestLoader 
     }
 }
 
-/// <summary>F-RES-06 <c>createPurchaseRequest</c> (MO of the work area): a DRAFT with zero or more lines.</summary>
+/// <summary>F-RES-06 <c>createPurchaseRequest</c> (MO of the work area): a PLANNING request with zero or more lines.</summary>
 public sealed class CreatePurchaseRequestCommandHandler(
     WorkAreaAccess access,
     IPurchaseRequestStore store,
@@ -273,7 +256,7 @@ public sealed class CreatePurchaseRequestCommandHandler(
         var scope = await access.ForMaterialOfficerWriteAsync(command.WorkAreaId, cancellationToken);
 
         var request = PurchaseRequest.Create(command.WorkAreaId, currentUser.UserId, command.Reason, command.Items, DateTimeOffset.UtcNow);
-        await PurchaseItemCatalog.EnsureActiveAsync(catalog, command.Items, cancellationToken);
+        await MaterialRules.EnsureActiveAsync(catalog, command.Items.Select(item => item.MaterialId), cancellationToken);
         await guard.EnsureCoveredAsync(scope, request, cancellationToken);
 
         store.Add(request);
@@ -282,7 +265,7 @@ public sealed class CreatePurchaseRequestCommandHandler(
     }
 }
 
-/// <summary>F-RES-06 <c>updatePurchaseRequest</c> (MO of the work area): reason and/or full line replacement, DRAFT only.</summary>
+/// <summary>F-RES-06 <c>updatePurchaseRequest</c> (MO of the work area): reason and/or full line replacement, PLANNING only.</summary>
 public sealed class UpdatePurchaseRequestCommandHandler(
     WorkAreaAccess access,
     IPurchaseRequestStore store,
@@ -296,10 +279,10 @@ public sealed class UpdatePurchaseRequestCommandHandler(
         var scope = await access.ForMaterialOfficerWriteAsync(request.WorkAreaId, cancellationToken);
         request.EnsureVersion(command.Version);
 
-        request.UpdateDraft(command.Reason, command.Items, DateTimeOffset.UtcNow);
+        request.UpdatePlanning(command.Reason, command.Items, DateTimeOffset.UtcNow);
         if (command.Items is not null)
         {
-            await PurchaseItemCatalog.EnsureActiveAsync(catalog, command.Items, cancellationToken);
+            await MaterialRules.EnsureActiveAsync(catalog, command.Items.Select(item => item.MaterialId), cancellationToken);
             await guard.EnsureCoveredAsync(scope, request, cancellationToken);
         }
 
@@ -309,7 +292,7 @@ public sealed class UpdatePurchaseRequestCommandHandler(
 }
 
 /// <summary>
-/// F-RES-06 <c>submitPurchaseRequest</c> (MO of the work area): DRAFT → PENDING_APPROVAL (BR-27), shortage re-checked
+/// F-RES-06 <c>submitPurchaseRequest</c> (MO of the work area): PLANNING → PENDING_APPROVAL (BR-27), shortage re-checked
 /// against current stock, then <c>purchase.request.submitted</c> to the work-area leader.
 /// </summary>
 public sealed class SubmitPurchaseRequestCommandHandler(

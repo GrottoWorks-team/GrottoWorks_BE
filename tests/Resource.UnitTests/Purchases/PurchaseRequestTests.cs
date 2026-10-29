@@ -11,7 +11,7 @@ using Resource.Domain.Scope;
 
 namespace Resource.UnitTests.Purchases;
 
-/// <summary>F-RES-06/07: purchase requests — draft, shortage guard, submit, leader approve/reject, history.</summary>
+/// <summary>F-RES-06/07: purchase requests — planning, shortage guard, submit, leader approve/reject, history.</summary>
 public sealed class PurchaseRequestTests
 {
     private static readonly Guid Parish = Guid.NewGuid();
@@ -80,35 +80,35 @@ public sealed class PurchaseRequestTests
     private static PurchaseRequestItemInput Line(Material material, decimal quantity, decimal? cost = null, string? overrideReason = null) =>
         new(material.MaterialId, quantity, cost, null, overrideReason);
 
-    private Task<PurchaseRequestDto> Draft(params PurchaseRequestItemInput[] items) =>
+    private Task<PurchaseRequestDto> Planning(params PurchaseRequestItemInput[] items) =>
         Create().HandleAsync(new CreatePurchaseRequestCommand(_area.WorkAreaId, "Thiếu dây cho hang đá", items));
 
     private async Task<PurchaseRequestDto> Pending(params PurchaseRequestItemInput[] items)
     {
-        var draft = await Draft(items);
-        return await Submit().HandleAsync(new PurchaseRequestCommand(draft.Id, draft.Version));
+        var planning = await Planning(items);
+        return await Submit().HandleAsync(new PurchaseRequestCommand(planning.Id, planning.Version));
     }
 
     private static async Task<DomainRuleException> Fails(Func<Task> act) =>
         (await act.Should().ThrowAsync<DomainRuleException>()).Which;
 
     [Fact]
-    public async Task Officer_creates_a_draft_with_estimated_total()
+    public async Task Officer_creates_a_planning_request_with_estimated_total()
     {
-        var dto = await Draft(Line(_cable, 30, 450_000m), Line(_paint, 2, 120_000m, "Sơn lại tượng"));
+        var dto = await Planning(Line(_cable, 30, 450_000m), Line(_paint, 2, 120_000m, "Sơn lại tượng"));
 
-        dto.Status.Should().Be(PurchaseRequestStatus.Draft);
+        dto.Status.Should().Be(PurchaseRequestStatus.Planning);
         dto.RequestedBy.Should().Be(_officer);
         dto.SeasonId.Should().Be(_area.SeasonId);
         dto.EstimatedTotal.Should().Be(new MoneyDto(570_000m, "VND"));
         dto.Items.Select(item => item.MaterialCode).Should().Equal("CABLE", "PAINT");
         dto.Items[0].Unit.Should().Be("m");
-        _store.History.Should().ContainSingle(change => change.FromStatus == null && change.ToStatus == PurchaseRequestStatus.Draft);
+        _store.History.Should().ContainSingle(change => change.FromStatus == null && change.ToStatus == PurchaseRequestStatus.Planning);
         _events.Events.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task A_draft_may_start_without_lines_or_reason()
+    public async Task A_planning_request_may_start_without_lines_or_reason()
     {
         var dto = await Create().HandleAsync(new CreatePurchaseRequestCommand(_area.WorkAreaId, null, []));
 
@@ -123,18 +123,18 @@ public sealed class PurchaseRequestTests
     [InlineData(1, 0.001, "PURCHASE_ITEM_COST_INVALID")]
     public async Task Lines_are_validated(decimal quantity, double? cost, string code)
     {
-        (await Fails(() => Draft(Line(_cable, quantity, (decimal?)cost)))).Code.Should().Be(code);
+        (await Fails(() => Planning(Line(_cable, quantity, (decimal?)cost)))).Code.Should().Be(code);
     }
 
     [Fact]
     public async Task A_material_appears_once_and_must_be_active()
     {
-        (await Fails(() => Draft(Line(_cable, 1), Line(_cable, 2)))).Code.Should().Be("PURCHASE_REQUEST_DUPLICATE_MATERIAL");
+        (await Fails(() => Planning(Line(_cable, 1), Line(_cable, 2)))).Code.Should().Be("PURCHASE_REQUEST_DUPLICATE_MATERIAL");
 
-        (await Fails(() => Draft(new PurchaseRequestItemInput(Guid.NewGuid(), 1, null, null, "x")))).Code.Should().Be("MATERIAL_UNKNOWN");
+        (await Fails(() => Planning(new PurchaseRequestItemInput(Guid.NewGuid(), 1, null, null, "x")))).Code.Should().Be("MATERIAL_UNKNOWN");
 
         _cable.Update(null, null, null, CatalogStatus.Inactive, isReferenced: true);
-        (await Fails(() => Draft(Line(_cable, 1)))).Code.Should().Be("MATERIAL_INACTIVE");
+        (await Fails(() => Planning(Line(_cable, 1)))).Code.Should().Be("MATERIAL_INACTIVE");
     }
 
     [Fact]
@@ -154,13 +154,13 @@ public sealed class PurchaseRequestTests
     [Fact]
     public async Task Lines_cannot_exceed_the_shortage_without_an_override_reason()
     {
-        (await Draft(Line(_cable, 30))).Items.Should().ContainSingle();
+        (await Planning(Line(_cable, 30))).Items.Should().ContainSingle();
 
-        (await Fails(() => Draft(Line(_cable, 30.5m)))).Code.Should().Be("PURCHASE_EXCEEDS_SHORTAGE");
+        (await Fails(() => Planning(Line(_cable, 30.5m)))).Code.Should().Be("PURCHASE_EXCEEDS_SHORTAGE");
 
         // Paint has no shortage at all (BA 8.6: shortage = 0 → override + reason).
-        (await Fails(() => Draft(Line(_paint, 1)))).Code.Should().Be("PURCHASE_EXCEEDS_SHORTAGE");
-        (await Draft(Line(_paint, 1, overrideReason: "Dự phòng hư hỏng")))
+        (await Fails(() => Planning(Line(_paint, 1)))).Code.Should().Be("PURCHASE_EXCEEDS_SHORTAGE");
+        (await Planning(Line(_paint, 1, overrideReason: "Dự phòng hư hỏng")))
             .Items.Single().ShortageOverrideReason.Should().Be("Dự phòng hư hỏng");
     }
 
@@ -170,18 +170,18 @@ public sealed class PurchaseRequestTests
         await Pending(Line(_cable, 20));
 
         // 30 short, 20 already asked for and waiting for approval → only 10 left.
-        (await Fails(() => Draft(Line(_cable, 15)))).Code.Should().Be("PURCHASE_EXCEEDS_SHORTAGE");
-        (await Draft(Line(_cable, 10))).Items.Should().ContainSingle();
+        (await Fails(() => Planning(Line(_cable, 15)))).Code.Should().Be("PURCHASE_EXCEEDS_SHORTAGE");
+        (await Planning(Line(_cable, 10))).Items.Should().ContainSingle();
     }
 
     [Fact]
-    public async Task Drafts_and_rejected_requests_do_not_reserve_the_shortage()
+    public async Task Planning_and_rejected_requests_do_not_reserve_the_shortage()
     {
-        await Draft(Line(_cable, 30));
+        await Planning(Line(_cable, 30));
         var rejected = await Pending(Line(_cable, 30));
         await Decide().RejectAsync(new PurchaseRequestCommand(rejected.Id, rejected.Version, "Đã có người tặng"));
 
-        (await Draft(Line(_cable, 30))).Items.Should().ContainSingle();
+        (await Planning(Line(_cable, 30))).Items.Should().ContainSingle();
     }
 
     [Fact]
@@ -209,16 +209,16 @@ public sealed class PurchaseRequestTests
     [Fact]
     public async Task Submit_rechecks_the_shortage_against_current_stock()
     {
-        var draft = await Draft(Line(_cable, 30));
+        var planning = await Planning(Line(_cable, 30));
         _inventory.Append(MaterialTransaction.Post(
             _area.WorkAreaId, _cable.MaterialId, TransactionType.DonationReceipt, 10, DateTimeOffset.UtcNow, _officer, null,
             TransactionReferenceType.DonationReceiptItem, Guid.NewGuid()));
 
-        (await Fails(() => Submit().HandleAsync(new PurchaseRequestCommand(draft.Id, null)))).Code.Should().Be("PURCHASE_EXCEEDS_SHORTAGE");
+        (await Fails(() => Submit().HandleAsync(new PurchaseRequestCommand(planning.Id, null)))).Code.Should().Be("PURCHASE_EXCEEDS_SHORTAGE");
     }
 
     [Fact]
-    public async Task Only_drafts_are_edited_or_submitted()
+    public async Task Only_planning_requests_are_edited_or_submitted()
     {
         var pending = await Pending(Line(_cable, 5));
 
@@ -230,10 +230,10 @@ public sealed class PurchaseRequestTests
     [Fact]
     public async Task Update_replaces_lines_and_clears_an_empty_reason()
     {
-        var draft = await Draft(Line(_cable, 5));
+        var planning = await Planning(Line(_cable, 5));
 
         var updated = await Update().HandleAsync(
-            new UpdatePurchaseRequestCommand(draft.Id, draft.Version, "", [Line(_cable, 8, 100m), Line(_paint, 1, 50m, "Dự phòng")]));
+            new UpdatePurchaseRequestCommand(planning.Id, planning.Version, "", [Line(_cable, 8, 100m), Line(_paint, 1, 50m, "Dự phòng")]));
 
         updated.Reason.Should().BeNull();
         updated.Items.Should().HaveCount(2);
@@ -244,9 +244,9 @@ public sealed class PurchaseRequestTests
     [Fact]
     public async Task Stale_version_is_rejected()
     {
-        var draft = await Draft(Line(_cable, 5));
+        var planning = await Planning(Line(_cable, 5));
 
-        var failure = await Fails(() => Update().HandleAsync(new UpdatePurchaseRequestCommand(draft.Id, draft.Version + 1, "x", null)));
+        var failure = await Fails(() => Update().HandleAsync(new UpdatePurchaseRequestCommand(planning.Id, planning.Version + 1, "x", null)));
 
         failure.Code.Should().Be("PURCHASE_REQUEST_VERSION_MISMATCH");
         failure.Kind.Should().Be(DomainErrorKind.PreconditionFailed);
@@ -272,14 +272,14 @@ public sealed class PurchaseRequestTests
     }
 
     [Fact]
-    public async Task Another_leader_cannot_decide_and_a_draft_cannot_be_approved()
+    public async Task Another_leader_cannot_decide_and_a_planning_request_cannot_be_approved()
     {
         var pending = await Pending(Line(_cable, 5));
         (await Fails(() => Decide(Leader(Guid.NewGuid())).ApproveAsync(new PurchaseRequestCommand(pending.Id, null))))
             .Code.Should().Be("WORK_AREA_SCOPE_DENIED");
 
-        var draft = await Draft(Line(_cable, 5));
-        (await Fails(() => Decide().ApproveAsync(new PurchaseRequestCommand(draft.Id, null)))).Code.Should().Be("PURCHASE_REQUEST_INVALID_STATE");
+        var planning = await Planning(Line(_cable, 5));
+        (await Fails(() => Decide().ApproveAsync(new PurchaseRequestCommand(planning.Id, null)))).Code.Should().Be("PURCHASE_REQUEST_INVALID_STATE");
 
         await Decide().ApproveAsync(new PurchaseRequestCommand(pending.Id, null));
         (await Fails(() => Decide().RejectAsync(new PurchaseRequestCommand(pending.Id, null, "Muộn"))))
@@ -312,7 +312,7 @@ public sealed class PurchaseRequestTests
         var history = await new GetPurchaseRequestHistoryQueryHandler(Loader(Leader()), _store).HandleAsync(pending.Id);
 
         history.Select(change => change.ToStatus).Should().Equal(
-            PurchaseRequestStatus.Draft, PurchaseRequestStatus.PendingApproval, PurchaseRequestStatus.Approved);
+            PurchaseRequestStatus.Planning, PurchaseRequestStatus.PendingApproval, PurchaseRequestStatus.Approved);
         history[0].FromStatus.Should().BeNull();
         history[1].ChangedBy.Should().Be(_officer);
         history[2].ChangedBy.Should().Be(_leader);
@@ -320,26 +320,26 @@ public sealed class PurchaseRequestTests
     }
 
     [Fact]
-    public async Task Reads_are_limited_to_the_parish_and_hidden_from_volunteers_for_now()
+    public async Task Reads_are_limited_to_the_parish_and_hidden_from_volunteers_who_are_not_buyers()
     {
-        var draft = await Draft(Line(_cable, 5));
+        var planning = await Planning(Line(_cable, 5));
 
         var parishUser = User(Guid.NewGuid(), GrottoWorksRoles.Parish);
-        (await new GetPurchaseRequestQueryHandler(Loader(parishUser), parishUser).HandleAsync(draft.Id)).Id.Should().Be(draft.Id);
+        (await new GetPurchaseRequestQueryHandler(Loader(parishUser), new FakeTaskProjectionStore(), new FakePurchaseStore(), parishUser).HandleAsync(planning.Id)).Id.Should().Be(planning.Id);
 
         var outsider = User(Guid.NewGuid(), GrottoWorksRoles.Parish, Guid.NewGuid());
-        (await Fails(() => new GetPurchaseRequestQueryHandler(Loader(outsider), outsider).HandleAsync(draft.Id)))
+        (await Fails(() => new GetPurchaseRequestQueryHandler(Loader(outsider), new FakeTaskProjectionStore(), new FakePurchaseStore(), outsider).HandleAsync(planning.Id)))
             .Code.Should().Be("PURCHASE_REQUEST_NOT_FOUND");
 
         var volunteer = User(Guid.NewGuid(), GrottoWorksRoles.Volunteer);
-        (await Fails(() => new GetPurchaseRequestQueryHandler(Loader(volunteer), volunteer).HandleAsync(draft.Id)))
+        (await Fails(() => new GetPurchaseRequestQueryHandler(Loader(volunteer), new FakeTaskProjectionStore(), new FakePurchaseStore(), volunteer).HandleAsync(planning.Id)))
             .Code.Should().Be("PURCHASE_REQUEST_NOT_FOUND");
     }
 
     [Fact]
     public async Task List_filters_by_status_within_the_parish()
     {
-        await Draft(Line(_cable, 5));
+        await Planning(Line(_cable, 5));
         var pending = await Pending(Line(_cable, 5));
         var otherParish = _scopes.Seed(Guid.NewGuid(), _officer);
         _store.Add(PurchaseRequest.Create(otherParish.WorkAreaId, _officer, "x", [], DateTimeOffset.UtcNow));

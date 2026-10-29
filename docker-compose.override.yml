@@ -1,6 +1,6 @@
 # Local development overrides: ports, credentials and per-service environment (F-PLT-02).
 # Secrets come from .env (copy .env.example first) — never commit .env.
-# Host ports: 6100 identity, 6101 parish, 6102 gateway, 6103 resource, 6104 task.
+# Host ports: 6100 identity, 6101 parish, 6102 gateway, 6103 resource, 6104 task, 6105 readiness, 6106 reporting.
 services:
   postgres:
     container_name: grottoworks-postgres
@@ -105,6 +105,7 @@ services:
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__ResourceDatabase=Host=postgres;Port=5432;Database=resource_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
       - Jwt__SigningKey=${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY (>= 32 chars) in .env}
+      - IdentityClient__BaseAddress=http://identity.api:8080/
       - InternalApi__ApiKey=${INTERNAL_API_KEY:-dev-internal-api-key-change-me-0123456789}
       - Database__MigrateOnStartup=true
       - MessageBroker__Host=amqp://rabbitmq:5672
@@ -115,6 +116,35 @@ services:
         condition: service_healthy
     ports:
       - "6103:8080"
+
+  readiness.api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__ReadinessDatabase=Host=postgres;Port=5432;Database=readiness_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
+      - Jwt__SigningKey=${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY (>= 32 chars) in .env}
+      - InternalApi__ApiKey=${INTERNAL_API_KEY:-dev-internal-api-key-change-me-0123456789}
+      - Database__MigrateOnStartup=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "6105:8080"
+
+  reporting.api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__ReportingDatabase=Host=postgres;Port=5432;Database=reporting_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
+      - Jwt__SigningKey=${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY (>= 32 chars) in .env}
+      - IdentityClient__BaseAddress=http://identity.api:8080/
+      - InternalApi__ApiKey=${INTERNAL_API_KEY:-dev-internal-api-key-change-me-0123456789}
+      - Database__MigrateOnStartup=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "6106:8080"
 
   taskexecution.api:
     environment:
@@ -140,11 +170,15 @@ services:
       - ReverseProxy__Clusters__identity__Destinations__destination1__Address=http://identity.api:8080/
       - ReverseProxy__Clusters__parish__Destinations__destination1__Address=http://parishcoordination.api:8080/
       - ReverseProxy__Clusters__resource__Destinations__destination1__Address=http://resource.api:8080/
+      - ReverseProxy__Clusters__readiness__Destinations__destination1__Address=http://readiness.api:8080/
+      - ReverseProxy__Clusters__reporting__Destinations__destination1__Address=http://reporting.api:8080/
       - ReverseProxy__Clusters__task__Destinations__destination1__Address=http://taskexecution.api:8080/
     depends_on:
       - identity.api
       - parishcoordination.api
       - resource.api
+      - readiness.api
+      - reporting.api
       - taskexecution.api
     ports:
       - "6102:8080"

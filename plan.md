@@ -183,42 +183,42 @@ Khởi tạo (S2): `Services/Resource/*`, `resource_db`, outbox/inbox.
 | 5 | F-RES-05 | `getWorkAreaShortages`, `listMaterialNeeds`; BR-25; event `material.shortage.changed` | RES-03/04 | S3 · ✅ 18/10 |
 | 6 | F-RES-06 | `purchase_request` + items; CRUD/submit/history; BR-27; shortage = 0 → cần override + lý do | RES-05 | S4 · ✅ 18/10 |
 | 7 | F-RES-07 | `approvePurchaseRequest`, `rejectPurchaseRequest` — **role LEADER** đúng work area (D-01); reject cần lý do (BR-31); event `purchase.request.submitted/decided` | RES-06 | S4 (**giữa S4 chốt với Lâm**) · ✅ 18/10, payload event chờ Lâm review |
-| 8 | F-RES-12 | `listDonors`, `createDonor`, `updateDonor`; không auto-merge; link `user_id` tùy chọn | — | S5 |
-| 9 | F-RES-09 | `purchase`, `purchase_item`; `recordPurchase`, `attachPurchaseReceipt`; chỉ buyer (assignee ACCEPTED của task PURCHASE); status PURCHASED, stock **chưa** tăng (BR-26); Idempotency-Key | TSK-17, NTF-01, PLT-07 | S5 |
-| 10 | F-RES-10 | `confirmPurchaseDelivery` (usable qty → ledger + tính lại shortage trong 1 transaction; giao thiếu → còn phần dở), `requestPurchaseInfo`; event `purchase.delivery.confirmed` | RES-09 | S5 |
-| 11 | F-RES-13 | `donation`, `donation_item`, `donation_receipt(_item)`; `recordDirectDonation` (RECEIVED + 1 receipt, 1 transaction); `listDonations`, `getDonation`, `listMyContributions`; event `contribution.receipt.confirmed` | RES-12 | S5 |
-| 12 | F-RES-11 | `approveCostOverrun` (LEADER); BR-32 chặn confirm khi vượt dự toán | RES-10 | S6 |
-| 13 | F-RES-13b | Pledge: `listContributionNeeds`, `pledgeMaterialDonation`, `pledgeMonetarySupport`, `cancelDonationPledge`; pledge không tăng stock (BR-39); event `contribution.pledged` | RES-13 | S6 |
-| 14 | F-RES-13c | `recordDonationReceipt`; BR-38 cộng dồn, PARTIALLY_RECEIVED → RECEIVED, nhận vượt → cảnh báo; event `contribution.receipt.confirmed` | RES-13b | S6 |
-| 15 | F-RES-15 | `material_allocation(_item)`; `allocateMaterial`, `listMaterialAllocations`; BR-33; test 2 MO song song → 1 thành công, 1 `MATERIAL_INSUFFICIENT_AVAILABLE` | RES-04, task_projection | S6 |
-| 16 | F-RES-16 | `createInventoryAdjustment`; damaged/lost/disposed không quay lại usable (BR-43) | RES-04 | S6 |
-| 17 | F-RES-17 | `task_material_report(_item)`; submit (Volunteer), list, verify, revision (MO); BR-44..51; event `material-report.submitted/verified` | RES-15, `task.completion.reviewed` | S7 |
-| 18 | F-RES-18 | `borrowed_item`, `borrow_transaction`; loan offer (D-05) → accept/reject → issue/assign/return/incident; job nhắc hạn → `borrowed-item.return-due/overdue` | — | S7 |
-| 19 | F-RES-20 | `POST /internal/support-transfers` (Task gọi đồng bộ): khóa tồn kho nguồn, kiểm tra unallocated, ghi TRANSFER_OUT, idempotent theo itemId; `confirmSupportMaterialReceipt` — `POST /support-response-materials/{itemId}/confirm-receipt` (MO nhận, Resource host) → TRANSFER_IN; event `support.transfer.confirmed` | TSK-15b (Lâm) | S7 |
-| 20 | F-RES-14 | `adjustDonation` — `PATCH /donations/{donationId}` reconcile delta stock + contribution; event `contribution.donation.adjusted` | RES-13c | S8 (P2) |
+| 8 | F-RES-12 | `listDonors`, `createDonor`, `updateDonor`; không auto-merge; link `user_id` tùy chọn | — | S5 · ✅ 27/10 |
+| 9 | F-RES-09 | `purchase`, `purchase_item`; `recordPurchase`, `attachPurchaseReceipt`; chỉ buyer (assignee ACCEPTED của task PURCHASE); status PURCHASED, stock **chưa** tăng (BR-26); Idempotency-Key | TSK-17, NTF-01, PLT-07 | S5 · ✅ 27/10 (buyer từ `task_projection`; chưa Idempotency-Key / file NTF-01) |
+| 10 | F-RES-10 | `confirmPurchaseDelivery` (usable qty → ledger + tính lại shortage trong 1 transaction; giao thiếu → còn phần dở), `requestPurchaseInfo`; event `purchase.delivery.confirmed` | RES-09 | S5 · ✅ 27/10 (buyer từ `task_projection`; chưa Idempotency-Key / file NTF-01) |
+| 11 | F-RES-13 | `donation`, `donation_item`, `donation_receipt(_item)`; `recordDirectDonation` (RECEIVED + 1 receipt, 1 transaction); `listDonations`, `getDonation`, `listMyContributions`; event `contribution.receipt.confirmed` | RES-12 | S5 · ✅ 27/10 (chưa Idempotency-Key, chờ PLT-07) |
+| 12 | F-RES-11 | `approveCostOverrun` (LEADER); BR-32 chặn confirm khi vượt dự toán | RES-10 | S6 · ✅ 27/10 (buyer từ `task_projection`; chưa Idempotency-Key / file NTF-01) |
+| 13 | F-RES-13b | Pledge: `listContributionNeeds`, `pledgeMaterialDonation`, `pledgeMonetarySupport`, `cancelDonationPledge`; pledge không tăng stock (BR-39); event `contribution.pledged` | RES-13 | S6 · ✅ 27/10 |
+| 14 | F-RES-13c | `recordDonationReceipt`; BR-38 cộng dồn, PARTIALLY_RECEIVED → RECEIVED, nhận vượt → cảnh báo; event `contribution.receipt.confirmed` | RES-13b | S6 · ✅ 27/10 |
+| 15 | F-RES-15 | `material_allocation(_item)`; `allocateMaterial`, `listMaterialAllocations`; BR-33; test 2 MO song song → 1 thành công, 1 `MATERIAL_INSUFFICIENT_AVAILABLE` | RES-04, task_projection | S6 · ✅ 27/10 |
+| 16 | F-RES-16 | `createInventoryAdjustment`; damaged/lost/disposed không quay lại usable (BR-43) | RES-04 | S6 · ✅ 27/10 |
+| 17 | F-RES-17 | `task_material_report(_item)`; submit (Volunteer), list, verify, revision (MO); BR-44..51; event `material-report.submitted/verified` | RES-15, `task.completion.reviewed` | S7 · ✅ 27/10 (task COMPLETED lấy từ `task_projection`, feed tạm) |
+| 18 | F-RES-18 | `borrowed_item`, `borrow_transaction`; loan offer (D-05) → accept/reject → issue/assign/return/incident; job nhắc hạn → `borrowed-item.return-due/overdue` | — | S7 · ✅ 27/10 |
+| 19 | F-RES-20 | `POST /internal/support-transfers` (Task gọi đồng bộ): khóa tồn kho nguồn, kiểm tra unallocated, ghi TRANSFER_OUT, idempotent theo itemId; `confirmSupportMaterialReceipt` — `POST /support-response-materials/{itemId}/confirm-receipt` (MO nhận, Resource host) → TRANSFER_IN; event `support.transfer.confirmed` | TSK-15b (Lâm) | S7 · ✅ 27/10 (contract cho Lâm: BuildingBlocks README §5.4) |
+| 20 | F-RES-14 | `adjustDonation` — `PATCH /donations/{donationId}` reconcile delta stock + contribution; event `contribution.donation.adjusted` | RES-13c | S8 (P2) · ✅ 27/10 |
 
 ### 4.3 Readiness — S6 → S8
 
 | Thứ tự | Function | Việc chính | Phụ thuộc | Sprint |
 |---|---|---|---|---|
-| 0 | Setup | `Services/Readiness/*`, `readiness_db`, projection `work_area_scope` | PAR event | S6 |
-| 1 | F-RDY-02 | `readiness_checklist`, `readiness_item` (`is_required`); `createReadinessCheck`, `replaceReadinessItems`, `getReadinessCheck`; chỉ sửa item khi DRAFT (D-04) | — | S6 |
-| 2 | F-RDY-03 | `recordReadinessResult`, `attachReadinessEvidence`; failed → `readiness.item.failed` | NTF-01 | S7 |
-| 3 | F-RDY-04 | `linkCorrectiveTask` → gọi `POST /internal/tasks` (typed HttpClient + Idempotency-Key) hoặc link task có sẵn; mandatory failed bắt buộc có corrective task | `/internal/tasks` (Lâm, hết S6) | S7 |
-| 4 | F-RDY-05 | `recheckReadinessItem`, `confirmAreaReadiness` (BR-52 → 409), `reopenReadinessCheck` (BR-53 lý do); event `readiness.area.ready/reopened` | RDY-03/04 | S7 |
-| 5 | F-RDY-06 | `getSeasonReadiness` | RDY-05 | S8 |
+| 0 | Setup | `Services/Readiness/*`, `readiness_db`, projection `work_area_scope` + `task_projection` | PAR event | S6 · ✅ 27/10 (feed tạm `/internal/*-scopes`) |
+| 1 | F-RDY-02 | `readiness_checklist`, `readiness_item` (`is_required`); `createReadinessCheck`, `replaceReadinessItems`, `getReadinessCheck`; chỉ sửa item khi PLANNING (D-04, R-12) | — | S6 · ✅ 27/10 |
+| 2 | F-RDY-03 | `recordReadinessResult`, `attachReadinessEvidence`; failed → `readiness.item.failed` | NTF-01 | S7 · ✅ 27/10 (file id chưa kiểm tra, chờ NTF-01) |
+| 3 | F-RDY-04 | `linkCorrectiveTask` → gọi `POST /internal/tasks` (typed HttpClient + Idempotency-Key) hoặc link task có sẵn; mandatory failed bắt buộc có corrective task | `/internal/tasks` (Lâm, hết S6) | S7 · ✅ 27/10 link task có sẵn; tạo mới chờ `/internal/tasks` |
+| 4 | F-RDY-05 | `recheckReadinessItem`, `confirmAreaReadiness` (BR-52 → 409), `reopenReadinessCheck` (BR-53 lý do); event `readiness.area.ready/reopened` | RDY-03/04 | S7 · ✅ 27/10 |
+| 5 | F-RDY-06 | `getSeasonReadiness` | RDY-05 | S8 · ✅ 27/10 |
 
 ### 4.4 Reporting — S6 → S9
 
 | Thứ tự | Function | Việc chính | Phụ thuộc | Sprint |
 |---|---|---|---|---|
-| 0 | Setup | `Services/Reporting/*`, `reporting_db`, inbox | — | S6 |
-| 1 | F-RPT-01 | `contribution_type`, `recognition_rule` (version, `effective_from/to`); đổi điểm = version mới (BR-68) | — | S6 |
-| 2 | F-RPT-02 | Consumer `task.completion.reviewed`, `attendance.hours.approved`, `purchase.delivery.confirmed`, `contribution.receipt.confirmed`, `contribution.donation.adjusted`, `support.member.completed` → `contribution` + `recognition_point` (lưu rule version); unique theo eventId/reference (BR-54..56); event `recognition.entry.created` | Event từ Task/Resource | S7 |
-| 3 | F-RPT-03 | `getMyRecognition`, `getSeasonRecognition` | RPT-02 | S7 |
-| 4 | F-RPT-04 | Read-model dashboard (season, work area, material) cập nhật từ event; cache Redis; mục tiêu < 3s | Toàn bộ event | S8 |
-| 5 | F-RPT-05 | 6 báo cáo (task, material, purchase, contribution, attendance, readiness); BR-57 ghi parish/season/thời gian/bộ lọc | RPT-04 | S8 |
-| 6 | F-RPT-06 | `createReportExport` (202 + job), `getReportExport`; xlsx (ClosedXML) / pdf (QuestPDF) lưu MinIO | NTF-01 | S9 (P2) |
+| 0 | Setup | `Services/Reporting/*`, `reporting_db`, inbox | — | S6 · ✅ 27/10 (scaffold; inbox cùng RPT-02) |
+| 1 | F-RPT-01 | `contribution_type`, `recognition_rule` (version, `effective_from/to`); đổi điểm = version mới (BR-68) | — | S6 · ✅ 27/10 |
+| 2 | F-RPT-02 | Consumer `task.completion.reviewed`, `attendance.hours.approved`, `purchase.delivery.confirmed`, `contribution.receipt.confirmed`, `contribution.donation.adjusted`, `support.member.completed` → `contribution` + `recognition_point` (lưu rule version); unique theo eventId/reference (BR-54..56); event `recognition.entry.created` | Event từ Task/Resource | S7 · ✅ 27/10 (feed `/internal/events` + inbox; payload Task đề nghị ở BuildingBlocks README §5.5) |
+| 3 | F-RPT-03 | `getMyRecognition`, `getSeasonRecognition` | RPT-02 | S7 · ✅ 27/10 |
+| 4 | F-RPT-04 | Read-model dashboard (season, work area, material) cập nhật từ event; cache Redis; mục tiêu < 3s | Toàn bộ event | S8 · ✅ 27/10 (read model `rm_*`, chưa cache Redis) |
+| 5 | F-RPT-05 | 6 báo cáo (task, material, purchase, contribution, attendance, readiness); BR-57 ghi parish/season/thời gian/bộ lọc | RPT-04 | S8 · ✅ 27/10 |
+| 6 | F-RPT-06 | `createReportExport` (202 + job), `getReportExport`; xlsx (ClosedXML) / pdf (QuestPDF) lưu MinIO | NTF-01 | S9 (P2) · ✅ 27/10 (worker + xlsx/pdf/csv; file tạm trong DB tới khi có NTF-01) |
 
 ---
 
@@ -308,9 +308,9 @@ Kịch bản nghiệm thu theo owner (Mục 8 spec): Lâm #1–4, #11, #16; Vũ 
 | TaskExecution | Lâm | TSK-01..04, 06..11, 17 | TSK-05, 12..15, 15b | TSK-16 | 0 / 18 |
 | NotificationAudit | Lâm | NTF-01 | NTF-02..04 | NTF-05, 06 | 0 / 6 |
 | Identity | Vũ | IDN-01..03, 05..09 | IDN-04, 10 | — | ✅ 10 / 10 (S0+S1: IDN-01, 02, 03, 05, 06 · S2 sớm 18/10: IDN-04, 07, 08, 09, 10 — chờ review/merge) |
-| Resource | Vũ | RES-01..07, 09, 10, 12, 13, 15, 17 | RES-11, 13b, 13c, 16, 18, 20 | RES-14 | 🟨 6 / 20 + RES-01 một phần (18/10: scaffold, RES-02, 03, 04, 05, 06, 07; RES-01 projection + feed tạm, chờ event Parish/Task) |
-| Readiness | Vũ | — | RDY-02..06 | — | 0 / 5 |
-| Reporting | Vũ | — | RPT-01..05 | RPT-06 | 0 / 6 |
+| Resource | Vũ | RES-01..07, 09, 10, 12, 13, 15, 17 | RES-11, 13b, 13c, 16, 18, 20 | RES-14 | ✅ 19 / 20 + RES-01 một phần (18/10: scaffold, RES-02..07 · 27/10: RES-09..18, 13b, 13c, 20, task_projection; RES-01 projection + feed tạm, chờ event Parish/Task) |
+| Readiness | Vũ | — | RDY-02..06 | — | ✅ 5 / 5 (27/10; RDY-04 tạo corrective task chờ `/internal/tasks` của Lâm) |
+| Reporting | Vũ | — | RPT-01..05 | RPT-06 | ✅ 6 / 6 (27/10: RPT-01..06; consumer event chờ outbox, nhận qua `/internal/events`) |
 
 ---
 

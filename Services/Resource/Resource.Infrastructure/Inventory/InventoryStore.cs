@@ -52,6 +52,27 @@ public sealed class InventoryStore(ResourceDbContext dbContext) : IInventoryStor
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<QuantityByMaterial>> GetAllocatedTotalsAsync(
+        IReadOnlyCollection<Guid> workAreaIds,
+        Guid? materialId,
+        CancellationToken cancellationToken = default)
+    {
+        var query =
+            from allocation in dbContext.MaterialAllocations.AsNoTracking()
+            from item in allocation.Items
+            where workAreaIds.Contains(allocation.WorkAreaId)
+            select new { allocation.WorkAreaId, item.MaterialId, item.AllocatedQuantity };
+        if (materialId is { } material)
+        {
+            query = query.Where(row => row.MaterialId == material);
+        }
+
+        return await query
+            .GroupBy(row => new { row.WorkAreaId, row.MaterialId })
+            .Select(group => new QuantityByMaterial(group.Key.WorkAreaId, group.Key.MaterialId, group.Sum(row => row.AllocatedQuantity)))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<MaterialTransaction>> ListTransactionsAsync(TransactionQuery query, CancellationToken cancellationToken = default)
     {
         var transactions = dbContext.MaterialTransactions.AsNoTracking()

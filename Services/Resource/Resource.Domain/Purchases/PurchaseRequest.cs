@@ -5,7 +5,8 @@ namespace Resource.Domain.Purchases;
 /// <summary><c>purchase_request.request_status</c> (ERD v3.6, BA 9.5).</summary>
 public enum PurchaseRequestStatus
 {
-    Draft,
+    /// <summary>Preparation state (R-12: no DRAFT in the baseline); empty lines and reason are allowed.</summary>
+    Planning,
     PendingApproval,
     Approved,
     Rejected,
@@ -30,7 +31,7 @@ public sealed record PurchaseRequestItemInput(
 
 /// <summary>
 /// <c>purchase_request</c> (ERD v3.6, F-RES-06/07): created by the material officer of a work area, approved or
-/// rejected as a whole by the leader of the same work area (D-01, BR-28/29). Lines are editable only in DRAFT.
+/// rejected as a whole by the leader of the same work area (D-01, BR-28/29). Lines are editable only in PLANNING.
 /// Estimated total is the sum of the line estimates — never stored separately.
 /// </summary>
 public sealed class PurchaseRequest
@@ -94,11 +95,11 @@ public sealed class PurchaseRequest
             WorkAreaId = workAreaId,
             RequestedByUserId = requestedByUserId,
             RequestReason = CleanReason(reason),
-            Status = PurchaseRequestStatus.Draft,
+            Status = PurchaseRequestStatus.Planning,
             CreatedAt = now.ToUniversalTime()
         };
         request.SetItems(items);
-        request.Record(null, PurchaseRequestStatus.Draft, requestedByUserId, null, now);
+        request.Record(null, PurchaseRequestStatus.Planning, requestedByUserId, null, now);
         return request;
     }
 
@@ -114,9 +115,9 @@ public sealed class PurchaseRequest
     }
 
     /// <summary>PATCH semantics: <c>null</c> = unchanged, an empty reason clears it; items replace all lines.</summary>
-    public void UpdateDraft(string? reason, IReadOnlyCollection<PurchaseRequestItemInput>? items, DateTimeOffset now)
+    public void UpdatePlanning(string? reason, IReadOnlyCollection<PurchaseRequestItemInput>? items, DateTimeOffset now)
     {
-        EnsureStatus(PurchaseRequestStatus.Draft, "Only a DRAFT purchase request can be edited.");
+        EnsureStatus(PurchaseRequestStatus.Planning, "Only a PLANNING purchase request can be edited.");
 
         if (reason is not null)
         {
@@ -134,7 +135,7 @@ public sealed class PurchaseRequest
     /// <summary>BR-27: at least one line and a reason before it goes to the leader.</summary>
     public void Submit(Guid userId, DateTimeOffset now)
     {
-        EnsureStatus(PurchaseRequestStatus.Draft, "Only a DRAFT purchase request can be submitted.");
+        EnsureStatus(PurchaseRequestStatus.Planning, "Only a PLANNING purchase request can be submitted.");
 
         if (_items.Count == 0)
         {
@@ -171,6 +172,50 @@ public sealed class PurchaseRequest
         RejectedAt = now.ToUniversalTime();
         DecisionNote = cleaned;
         Transition(PurchaseRequestStatus.Rejected, leaderUserId, cleaned, now);
+    }
+
+    /// <summary>Has any line an estimate? Without one there is no approved budget to exceed (BR-32).</summary>
+    public bool HasEstimate => _items.Any(item => item.EstimatedCost is not null);
+
+    /// <summary>
+    /// <c>task.purchase-task.assigned</c>: a volunteer accepted the PURCHASE task (BR-30). Idempotent; only an approved
+    /// request moves.
+    /// </summary>
+    public bool MarkBuyerAssigned(Guid systemUserId, DateTimeOffset now)
+    {
+        if (Status != PurchaseRequestStatus.Approved)
+        {
+            return false;
+        }
+
+        Transition(PurchaseRequestStatus.BuyerAssigned, systemUserId, null, now);
+        return true;
+    }
+
+    /// <summary>F-RES-09: the buyer recorded a purchase — stock unchanged until delivery is confirmed (BR-26).</summary>
+    public void MarkPurchased(Guid buyerUserId, DateTimeOffset now)
+    {
+        if (Status is not (PurchaseRequestStatus.Approved or PurchaseRequestStatus.BuyerAssigned or PurchaseRequestStatus.Purchased
+            or PurchaseRequestStatus.PartiallyReceived))
+        {
+            throw new DomainRuleException("PURCHASE_REQUEST_INVALID_STATE", "Purchases can only be recorded for an approved request that is not completed.");
+        }
+
+        if (Status != PurchaseRequestStatus.Purchased)
+        {
+            Transition(PurchaseRequestStatus.Purchased, buyerUserId, null, now);
+        }
+    }
+
+    /// <summary>F-RES-10: after a delivery, COMPLETED when every line received its requested usable quantity, else the request stays partly open.</summary>
+    public void MarkDelivered(IReadOnlyDictionary<Guid, decimal> deliveredUsableByLine, Guid officerUserId, DateTimeOffset now)
+    {
+        var completed = _items.All(item => deliveredUsableByLine.GetValueOrDefault(item.PurchaseRequestItemId) >= item.RequestedQuantity);
+        var target = completed ? PurchaseRequestStatus.Completed : PurchaseRequestStatus.PartiallyReceived;
+        if (Status != target)
+        {
+            Transition(target, officerUserId, null, now);
+        }
     }
 
     private void SetItems(IReadOnlyCollection<PurchaseRequestItemInput> items)

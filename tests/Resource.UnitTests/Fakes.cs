@@ -182,6 +182,8 @@ public sealed class FakeInventoryStore(FakeRequirementStore requirements) : Reso
 {
     public List<Resource.Domain.Inventory.MaterialTransaction> Ledger { get; } = [];
 
+    public List<Resource.Domain.Inventory.MaterialAllocation> Allocations { get; } = [];
+
     public int SaveChangesCount { get; private set; }
 
     public void Append(Resource.Domain.Inventory.MaterialTransaction transaction) => Ledger.Add(transaction);
@@ -204,6 +206,16 @@ public sealed class FakeInventoryStore(FakeRequirementStore requirements) : Reso
             .Where(r => workAreaIds.Contains(r.WorkAreaId) && r.Status == Resource.Domain.Inventory.RequirementStatus.Active &&
                         (materialId is null || r.MaterialId == materialId))
             .Select(r => new Resource.Application.Inventory.QuantityByMaterial(r.WorkAreaId, r.MaterialId, r.RequiredQuantity))
+            .ToList());
+
+    public Task<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>> GetAllocatedTotalsAsync(
+        IReadOnlyCollection<Guid> workAreaIds, Guid? materialId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>>(Allocations
+            .Where(a => workAreaIds.Contains(a.WorkAreaId))
+            .SelectMany(a => a.Items.Select(i => (a.WorkAreaId, i.MaterialId, i.AllocatedQuantity)))
+            .Where(row => materialId is null || row.MaterialId == materialId)
+            .GroupBy(row => (row.WorkAreaId, row.MaterialId))
+            .Select(g => new Resource.Application.Inventory.QuantityByMaterial(g.Key.WorkAreaId, g.Key.MaterialId, g.Sum(row => row.AllocatedQuantity)))
             .ToList());
 
     public Task<IReadOnlyList<Resource.Domain.Inventory.MaterialTransaction>> ListTransactionsAsync(
@@ -272,4 +284,268 @@ public sealed class FakePurchaseRequestStore : Resource.Application.Purchases.IP
 
         return Task.CompletedTask;
     }
+}
+
+public sealed class FakeDonorStore : Resource.Application.Contributions.IDonorStore
+{
+    public List<Resource.Domain.Contributions.Donor> Donors { get; } = [];
+
+    public int SaveChangesCount { get; private set; }
+
+    public Task<Resource.Domain.Contributions.Donor?> GetAsync(Guid donorId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Donors.FirstOrDefault(d => d.DonorId == donorId));
+
+    public Task<Resource.Domain.Contributions.Donor?> FindByUserAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Donors.FirstOrDefault(d => d.UserId == userId));
+
+    public Task<IReadOnlyList<Resource.Domain.Contributions.Donor>> GetManyAsync(IReadOnlyCollection<Guid> donorIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Contributions.Donor>>(Donors.Where(d => donorIds.Contains(d.DonorId)).ToList());
+
+    public Task<PagedResult<Resource.Domain.Contributions.Donor>> SearchAsync(
+        Resource.Application.Contributions.DonorSearch search, CancellationToken cancellationToken = default)
+    {
+        var filtered = Donors
+            .Where(d => search.ParishId is null || d.ParishId == search.ParishId)
+            .Where(d => search.Linked is null || (d.UserId != null) == search.Linked)
+            .Where(d => search.Search is null ||
+                        d.DonorName.Contains(search.Search, StringComparison.OrdinalIgnoreCase) ||
+                        (d.Phone?.Contains(search.Search) ?? false) ||
+                        (d.Email?.Contains(search.Search, StringComparison.OrdinalIgnoreCase) ?? false))
+            .ToList();
+        IEnumerable<Resource.Domain.Contributions.Donor> ordered = search.SortField == Resource.Application.Contributions.DonorSortField.CreatedAt
+            ? filtered.OrderBy(d => d.CreatedAt)
+            : filtered.OrderBy(d => d.DonorName, StringComparer.Ordinal);
+        if (search.SortDescending)
+        {
+            ordered = ordered.Reverse();
+        }
+
+        return Task.FromResult(new PagedResult<Resource.Domain.Contributions.Donor>(
+            ordered.Skip((search.Page - 1) * search.Size).Take(search.Size).ToList(), filtered.Count));
+    }
+
+    public void Add(Resource.Domain.Contributions.Donor donor) => Donors.Add(donor);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class FakeIdentityUserLookup : Resource.Application.Users.IIdentityUserLookup
+{
+    public Dictionary<Guid, Resource.Application.Users.IdentityUser> Users { get; } = [];
+
+    public bool Unavailable { get; set; }
+
+    public Task<Resource.Application.Users.IdentityUser?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        Unavailable
+            ? throw new Resource.Application.Users.IdentityUserLookupUnavailableException("down")
+            : Task.FromResult(Users.GetValueOrDefault(userId));
+
+    public Resource.Application.Users.IdentityUser Seed(Guid parishId, string role = "VOLUNTEER", string name = "Nguyễn Văn A")
+    {
+        var user = new Resource.Application.Users.IdentityUser(Guid.NewGuid(), name, "ACTIVE", role, parishId);
+        Users[user.UserId] = user;
+        return user;
+    }
+}
+
+public sealed class FakeDonationStore : Resource.Application.Contributions.IDonationStore
+{
+    public List<Resource.Domain.Contributions.Donation> Donations { get; } = [];
+
+    public int SaveChangesCount { get; private set; }
+
+    public Task<Resource.Domain.Contributions.Donation?> GetAsync(Guid donationId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Donations.FirstOrDefault(d => d.DonationId == donationId));
+
+    public Task<PagedResult<Resource.Domain.Contributions.Donation>> SearchAsync(
+        Resource.Application.Contributions.DonationSearch search, CancellationToken cancellationToken = default)
+    {
+        var filtered = Donations
+            .Where(d => search.SeasonIds is null || search.SeasonIds.Contains(d.SeasonId))
+            .Where(d => search.WorkAreaId is null || d.WorkAreaId == search.WorkAreaId)
+            .Where(d => search.DonorId is null || d.DonorId == search.DonorId)
+            .Where(d => search.Type is null || d.Type == search.Type)
+            .Where(d => search.Status is null || d.Status == search.Status)
+            .OrderByDescending(d => d.DonationDate)
+            .ToList();
+        return Task.FromResult(new PagedResult<Resource.Domain.Contributions.Donation>(
+            filtered.Skip((search.Page - 1) * search.Size).Take(search.Size).ToList(), filtered.Count));
+    }
+
+    public Task<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>> GetOutstandingPledgesAsync(
+        IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>>(Donations
+            .Where(d => d.WorkAreaId is { } area && workAreaIds.Contains(area) &&
+                        d.Status is Resource.Domain.Contributions.DonationStatus.Pledged or Resource.Domain.Contributions.DonationStatus.PartiallyReceived)
+            .SelectMany(d => d.Items.Where(i => i.OutstandingQuantity > 0).Select(i => (d.WorkAreaId!.Value, i.MaterialId, i.OutstandingQuantity)))
+            .GroupBy(row => (row.Item1, row.MaterialId))
+            .Select(g => new Resource.Application.Inventory.QuantityByMaterial(g.Key.Item1, g.Key.MaterialId, g.Sum(row => row.OutstandingQuantity)))
+            .ToList());
+
+    public void Add(Resource.Domain.Contributions.Donation donation) => Donations.Add(donation);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class FakeTaskProjectionStore : Resource.Application.Scope.ITaskProjectionStore
+{
+    public List<Resource.Domain.Scope.TaskProjection> Tasks { get; } = [];
+
+    public Task<Resource.Domain.Scope.TaskProjection?> GetAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Tasks.FirstOrDefault(t => t.TaskId == taskId));
+
+    public Task<IReadOnlyList<Resource.Domain.Scope.TaskProjection>> ListByPurchaseRequestAsync(Guid purchaseRequestId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Scope.TaskProjection>>(Tasks.Where(t => t.PurchaseRequestId == purchaseRequestId).ToList());
+
+    public void Add(Resource.Domain.Scope.TaskProjection task) => Tasks.Add(task);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public Resource.Domain.Scope.TaskProjection Seed(
+        Guid workAreaId,
+        Resource.Domain.Scope.ProjectedTaskStatus status = Resource.Domain.Scope.ProjectedTaskStatus.InProgress,
+        params Guid[] assignees)
+    {
+        var task = Resource.Domain.Scope.TaskProjection.FromSnapshot(
+            new Resource.Domain.Scope.TaskSnapshot(Guid.NewGuid(), workAreaId, "Treo đèn", Resource.Domain.Scope.ProjectedTaskType.Work,
+                status, null, assignees, 1),
+            DateTimeOffset.UtcNow);
+        Tasks.Add(task);
+        return task;
+    }
+}
+
+/// <summary>Allocations live in the inventory fake so balances see them (same unit of work).</summary>
+public sealed class FakeAllocationStore(FakeInventoryStore inventory) : Resource.Application.Inventory.IAllocationStore
+{
+    public Task<PagedResult<Resource.Domain.Inventory.MaterialAllocation>> SearchAsync(
+        Resource.Application.Inventory.AllocationSearch search, CancellationToken cancellationToken = default)
+    {
+        var filtered = inventory.Allocations
+            .Where(a => search.WorkAreaIds.Contains(a.WorkAreaId))
+            .Where(a => search.TaskId is null || a.TaskId == search.TaskId)
+            .Where(a => search.MaterialId is null || a.Items.Any(i => i.MaterialId == search.MaterialId))
+            .OrderByDescending(a => a.AllocationDate)
+            .ToList();
+        return Task.FromResult(new PagedResult<Resource.Domain.Inventory.MaterialAllocation>(
+            filtered.Skip((search.Page - 1) * search.Size).Take(search.Size).ToList(), filtered.Count));
+    }
+
+    public Task<IReadOnlyList<Resource.Domain.Inventory.MaterialAllocationItem>> ListItemsOfTaskAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Inventory.MaterialAllocationItem>>(
+            inventory.Allocations.Where(a => a.TaskId == taskId).SelectMany(a => a.Items).ToList());
+
+    public void Add(Resource.Domain.Inventory.MaterialAllocation allocation) => inventory.Allocations.Add(allocation);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+}
+
+public sealed class FakeStockLock : Resource.Application.Abstractions.IWorkAreaStockLock
+{
+    public int Acquired { get; private set; }
+
+    public int Committed { get; private set; }
+
+    public Task<Resource.Application.Abstractions.IStockLease> AcquireAsync(Guid workAreaId, CancellationToken cancellationToken = default)
+    {
+        Acquired++;
+        return Task.FromResult<Resource.Application.Abstractions.IStockLease>(new Lease(this));
+    }
+
+    private sealed class Lease(FakeStockLock owner) : Resource.Application.Abstractions.IStockLease
+    {
+        public Task CommitAsync(CancellationToken cancellationToken = default)
+        {
+            owner.Committed++;
+            return Task.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+}
+
+public sealed class FakeTaskMaterialReportStore : Resource.Application.Inventory.ITaskMaterialReportStore
+{
+    public List<Resource.Domain.Inventory.TaskMaterialReport> Reports { get; } = [];
+
+    public int SaveChangesCount { get; private set; }
+
+    public Task<Resource.Domain.Inventory.TaskMaterialReport?> GetAsync(Guid reportId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Reports.FirstOrDefault(r => r.TaskMaterialReportId == reportId));
+
+    public Task<Resource.Domain.Inventory.TaskMaterialReport?> GetByTaskAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Reports.FirstOrDefault(r => r.TaskId == taskId));
+
+    public void Add(Resource.Domain.Inventory.TaskMaterialReport report) => Reports.Add(report);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class FakeSupportTransferStore : Resource.Application.Inventory.ISupportTransferStore
+{
+    public List<Resource.Domain.Inventory.SupportTransfer> Transfers { get; } = [];
+
+    public Task<Resource.Domain.Inventory.SupportTransfer?> GetAsync(Guid supportResponseMaterialId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Transfers.FirstOrDefault(t => t.SupportResponseMaterialId == supportResponseMaterialId));
+
+    public void Add(Resource.Domain.Inventory.SupportTransfer transfer) => Transfers.Add(transfer);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+}
+
+public sealed class FakeBorrowedItemStore : Resource.Application.Contributions.IBorrowedItemStore
+{
+    public List<Resource.Domain.Contributions.BorrowedItem> Items { get; } = [];
+
+    public Task<Resource.Domain.Contributions.BorrowedItem?> GetAsync(Guid itemId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(i => i.BorrowedItemId == itemId));
+
+    public Task<PagedResult<Resource.Domain.Contributions.BorrowedItem>> SearchAsync(
+        Resource.Application.Contributions.BorrowedItemSearch search, CancellationToken cancellationToken = default)
+    {
+        var filtered = Items
+            .Where(i => search.SeasonIds.Contains(i.SeasonId) && search.Statuses.Contains(i.Status))
+            .Where(i => search.WorkAreaId is null || i.WorkAreaId == search.WorkAreaId)
+            .Where(i => search.DueOnOrBefore is null || i.ExpectedReturnDate <= search.DueOnOrBefore)
+            .OrderBy(i => i.ExpectedReturnDate)
+            .ToList();
+        return Task.FromResult(new PagedResult<Resource.Domain.Contributions.BorrowedItem>(
+            filtered.Skip((search.Page - 1) * search.Size).Take(search.Size).ToList(), filtered.Count));
+    }
+
+    public Task<IReadOnlyList<Resource.Domain.Contributions.BorrowedItem>> ListToRemindAsync(DateOnly dueOnOrBefore, DateOnly today, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Contributions.BorrowedItem>>(Items
+            .Where(i => i.IsOut && i.ExpectedReturnDate <= dueOnOrBefore && (i.LastRemindedOn is null || i.LastRemindedOn < today))
+            .ToList());
+
+    public void Add(Resource.Domain.Contributions.BorrowedItem item) => Items.Add(item);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+}
+
+public sealed class FakePurchaseStore : Resource.Application.Purchases.IPurchaseStore
+{
+    public List<Resource.Domain.Purchases.Purchase> Purchases { get; } = [];
+
+    public Task<Resource.Domain.Purchases.Purchase?> GetAsync(Guid purchaseId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Purchases.FirstOrDefault(p => p.PurchaseId == purchaseId));
+
+    public Task<IReadOnlyList<Resource.Domain.Purchases.Purchase>> ListByRequestAsync(Guid purchaseRequestId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Purchases.Purchase>>(Purchases.Where(p => p.PurchaseRequestId == purchaseRequestId).ToList());
+
+    public void Add(Resource.Domain.Purchases.Purchase purchase) => Purchases.Add(purchase);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

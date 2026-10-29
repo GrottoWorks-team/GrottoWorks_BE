@@ -7,7 +7,7 @@ using Resource.Domain;
 
 namespace Resource.Api.Endpoints;
 
-/// <summary>F-RES-04: stock ledger — opening stock, balances, material history (tag Materials).</summary>
+/// <summary>F-RES-04/15/16: stock ledger — opening stock, balances, allocations, adjustments, material history (tag Materials).</summary>
 public static class InventoryEndpoints
 {
     private static readonly string[] Readers = [GrottoWorksRoles.Parish, GrottoWorksRoles.Leader, GrottoWorksRoles.MaterialOfficer];
@@ -32,6 +32,47 @@ public static class InventoryEndpoints
             .Produces<PagedResponse<InventoryBalanceDto>>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        app.MapPost("/api/v1/material-allocations", AllocateAsync)
+            .WithName("allocateMaterial")
+            .WithTags("Materials")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer))
+            .Accepts<CreateAllocationRequest>("application/json")
+            .Produces<ApiResponse<MaterialAllocationDto>>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        app.MapGet("/api/v1/material-allocations", ListAllocationsAsync)
+            .WithName("listMaterialAllocations")
+            .WithTags("Materials")
+            .RequireAuthorization(policy => policy.RequireRole(Readers))
+            .Produces<PagedResponse<MaterialAllocationDto>>()
+            .ProducesProblem(StatusCodes.Status400BadRequest);
+
+        app.MapPost("/api/v1/inventory-adjustments", AdjustAsync)
+            .WithName("createInventoryAdjustment")
+            .WithTags("Materials")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer))
+            .Accepts<InventoryAdjustmentRequest>("application/json")
+            .Produces<ApiResponse<InventoryTransactionDto>>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        app.MapPost("/api/v1/support-response-materials/{itemId:guid}/confirm-receipt", ConfirmTransferReceiptAsync)
+            .WithName("confirmSupportMaterialReceipt")
+            .WithTags("Support")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer))
+            .Accepts<ConfirmTransferReceiptRequest>("application/json")
+            .Produces<ApiResponse<SupportTransferDto>>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
 
         app.MapGet("/api/v1/materials/{materialId:guid}/allocation-history", GetHistoryAsync)
             .WithName("getAllocationHistory")
@@ -76,6 +117,64 @@ public static class InventoryEndpoints
 
         var result = await handler.HandleAsync(
             new InventoryFilter(page, size, reader.Guid("seasonId"), reader.Guid("workAreaId"), reader.Guid("materialId"), onlyShortage),
+            cancellationToken);
+        return Results.Ok(ApiResults.Page(result.Items, result.TotalItems, page, size, httpContext));
+    }
+
+    private static async Task<IResult> AllocateAsync(
+        CreateAllocationRequest request,
+        HttpContext httpContext,
+        AllocateMaterialCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var allocation = await handler.HandleAsync(
+            new AllocateMaterialCommand(
+                request.WorkAreaId!.Value,
+                request.TaskId,
+                request.Items!.Select(item => new Domain.Inventory.AllocationLineInput(item.MaterialId!.Value, item.Quantity!.Value)).ToList(),
+                request.AllocationDate,
+                Text.Clean(request.Note)),
+            cancellationToken);
+        return Results.Json(ApiResults.Ok(allocation, httpContext), statusCode: StatusCodes.Status201Created);
+    }
+
+    private static async Task<IResult> AdjustAsync(
+        InventoryAdjustmentRequest request,
+        HttpContext httpContext,
+        CreateInventoryAdjustmentCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var transaction = await handler.HandleAsync(
+            new CreateInventoryAdjustmentCommand(request.WorkAreaId!.Value, request.MaterialId!.Value, request.Type!.Value,
+                request.Quantity!.Value, request.TransactionDate, request.Reason),
+            cancellationToken);
+        return Results.Json(ApiResults.Ok(transaction, httpContext), statusCode: StatusCodes.Status201Created);
+    }
+
+    private static async Task<IResult> ConfirmTransferReceiptAsync(
+        Guid itemId,
+        ConfirmTransferReceiptRequest request,
+        HttpContext httpContext,
+        ConfirmTransferReceiptCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var transfer = await handler.HandleAsync(
+            new ConfirmTransferReceiptCommand(itemId, VersionHeader.Resolve(request.Version, httpContext, "SUPPORT_TRANSFER_VERSION_MISMATCH"),
+                request.ReceivedUsableQuantity!.Value, request.ReceivedUnusableQuantity ?? 0, request.Note),
+            cancellationToken);
+        return Results.Ok(ApiResults.Ok(transfer, httpContext));
+    }
+
+    /// <summary><c>AllocationFilter</c>: seasonId, workAreaId, taskId, materialId; newest first; paged.</summary>
+    private static async Task<IResult> ListAllocationsAsync(
+        HttpContext httpContext,
+        ListMaterialAllocationsQueryHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var reader = new QueryReader(httpContext.Request.Query, "page", "size", "seasonId", "workAreaId", "taskId", "materialId");
+        var (page, size) = reader.Paging();
+        var result = await handler.HandleAsync(
+            new AllocationFilter(page, size, reader.Guid("seasonId"), reader.Guid("workAreaId"), reader.Guid("taskId"), reader.Guid("materialId")),
             cancellationToken);
         return Results.Ok(ApiResults.Page(result.Items, result.TotalItems, page, size, httpContext));
     }

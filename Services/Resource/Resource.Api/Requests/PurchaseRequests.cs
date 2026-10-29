@@ -21,7 +21,7 @@ public sealed class PurchaseRequestItemRequest
     public string? ShortageOverrideReason { get; init; }
 }
 
-/// <summary><c>CreatePurchaseRequest</c> (F-RES-06): a DRAFT; reason and at least one item are required on submit.</summary>
+/// <summary><c>CreatePurchaseRequest</c> (F-RES-06): a PLANNING request; reason and at least one item are required on submit.</summary>
 public sealed class CreatePurchaseRequestRequest
 {
     [Required(ErrorMessage = "Work area is required.")]
@@ -33,7 +33,7 @@ public sealed class CreatePurchaseRequestRequest
     public List<PurchaseRequestItemRequest>? Items { get; init; }
 }
 
-/// <summary><c>UpdatePurchaseRequest</c> — PATCH of a DRAFT; <c>items</c>, when given, replaces every line.</summary>
+/// <summary><c>UpdatePurchaseRequest</c> — PATCH of a PLANNING request; <c>items</c>, when given, replaces every line.</summary>
 public sealed class UpdatePurchaseRequestRequest
 {
     public long? Version { get; init; }
@@ -67,4 +67,60 @@ public sealed class ReasonCommandRequest
     [Required(ErrorMessage = "Reason is required.")]
     [StringLength(500, MinimumLength = 1, ErrorMessage = "Reason must be 1–500 characters.")]
     public string? Reason { get; init; }
+}
+
+public sealed class PurchaseLineRequest
+{
+    [Required(ErrorMessage = "Purchase request line is required.")]
+    public Guid? PurchaseRequestItemId { get; init; }
+
+    [Required(ErrorMessage = "Purchased quantity is required.")]
+    public decimal? PurchasedQuantity { get; init; }
+
+    [Required(ErrorMessage = "Unit price is required.")]
+    public decimal? UnitPrice { get; init; }
+
+    /// <summary>Defaults to quantity × unit price.</summary>
+    public decimal? TotalPrice { get; init; }
+}
+
+/// <summary><c>FileReference</c> (only the id is needed to attach an uploaded file).</summary>
+public sealed class FileReferenceRequest
+{
+    [Required(ErrorMessage = "File id is required.")]
+    public Guid? Id { get; init; }
+}
+
+/// <summary><c>CreatePurchaseBody</c> (F-RES-09): what the buyer actually bought; no stock change yet (BR-26).</summary>
+public sealed class CreatePurchaseBody
+{
+    [StringLength(150, ErrorMessage = "Supplier must not exceed 150 characters.")]
+    public string? SupplierName { get; init; }
+
+    public DateOnly? PurchaseDate { get; init; }
+
+    [Required(ErrorMessage = "Items are required.")]
+    public List<PurchaseLineRequest>? Items { get; init; }
+
+    public List<FileReferenceRequest>? Receipts { get; init; }
+}
+
+public sealed class DeliveryLineRequest
+{
+    [Required(ErrorMessage = "Purchase line is required.")]
+    public Guid? PurchaseItemId { get; init; }
+
+    [Required(ErrorMessage = "Received usable quantity is required.")]
+    public decimal? ReceivedUsableQuantity { get; init; }
+
+    public decimal? ReceivedUnusableQuantity { get; init; }
+}
+
+/// <summary><c>ConfirmDeliveryRequest</c> (F-RES-10): usable / unusable counted per purchased line.</summary>
+public sealed class ConfirmDeliveryRequest
+{
+    public long? Version { get; init; }
+
+    [Required(ErrorMessage = "Items are required.")]
+    public List<DeliveryLineRequest>? Items { get; init; }
 }

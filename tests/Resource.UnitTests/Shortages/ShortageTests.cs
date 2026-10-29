@@ -111,6 +111,7 @@ public sealed class ShortageTests
         payloads.Select(p => (p.PreviousShortage, p.Shortage)).Should().Equal((0m, 100m), (100m, 60m), (60m, 0m));
         payloads[1].ConfirmedAvailable.Should().Be(40);
         payloads.Should().OnlyContain(p => p.WorkAreaId == _grotto.WorkAreaId && p.SeasonId == _season && p.ParishId == Parish);
+        payloads.Should().OnlyContain(p => p.MaterialCode == _cable.Code && p.MaterialName == _cable.Name && p.Unit == _cable.Unit);
     }
 
     [Fact]

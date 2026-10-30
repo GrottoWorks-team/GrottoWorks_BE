@@ -22,3 +22,11 @@ Rule IDs are stable so the administration UI can update a rule without discoveri
 | `000000000012` | `readiness.inspection.completed` |
 
 Push and email preferences are persisted but providers are not connected yet. File access across business records is also deferred to each owning service integration.
+
+## Integration status
+
+- The service has a transactional inbox and a RabbitMQ consumer for `TaskIntegrationEvent`.
+- Direct assignment, attendance review, and long-open attendance events have complete recipient context and can create in-app notifications.
+- Events without enough recipient context are retained as `REQUIRES_CONTEXT` and never reported as delivered notifications.
+- TaskExecution currently stores integration events in its own outbox but has no broker dispatcher yet. Publishers from TaskExecution and other source services must be connected in later integration commits.
+- Audit ingestion stores only an allowlist of non-secret payload fields. Tokens, passwords, private URLs, and arbitrary payload content are not copied.

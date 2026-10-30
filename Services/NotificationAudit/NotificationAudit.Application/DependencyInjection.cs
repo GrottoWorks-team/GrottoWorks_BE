@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NotificationAudit.Application.Files;
 using NotificationAudit.Application.Notifications;
 using NotificationAudit.Application.Audit;
+using NotificationAudit.Application.Events;
 
 namespace NotificationAudit.Application;
 
@@ -24,6 +25,7 @@ public static class DependencyInjection
         services.AddScoped<ListActivityLogsHandler>();
         services.AddScoped<GetActivityLogHandler>();
         services.AddScoped<GetResourceHistoryHandler>();
+        services.AddScoped<TaskEventIngestionHandler>();
         return services;
     }
 }

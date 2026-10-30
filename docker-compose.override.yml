@@ -180,12 +180,18 @@ services:
       - ObjectStorage__SecretKey=${MINIO_ROOT_PASSWORD:-grottoworks_minio_1234}
       - ObjectStorage__Bucket=grottoworks-files
       - FileUpload__AllowOtherPdf=${ALLOW_OTHER_PDF_UPLOADS:-false}
+      - NotificationEvents__Enabled=true
+      - MessageBroker__Host=amqp://rabbitmq:5672
+      - MessageBroker__UserName=${RABBITMQ_DEFAULT_USER:-grottoworks}
+      - MessageBroker__Password=${RABBITMQ_DEFAULT_PASS:-grottoworks}
       - Database__MigrateOnStartup=true
     depends_on:
       postgres:
         condition: service_healthy
       minio:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
     ports:
       - "6107:8080"
 

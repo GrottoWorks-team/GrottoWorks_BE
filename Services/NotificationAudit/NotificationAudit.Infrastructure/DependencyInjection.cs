@@ -8,6 +8,9 @@ using NotificationAudit.Application.Notifications;
 using NotificationAudit.Infrastructure.Notifications;
 using NotificationAudit.Application.Audit;
 using NotificationAudit.Infrastructure.Audit;
+using BuildingBlocks.Messaging.MassTransit;
+using NotificationAudit.Application.Events;
+using NotificationAudit.Infrastructure.Events;
 
 namespace NotificationAudit.Infrastructure;
 
@@ -32,6 +35,11 @@ public static class DependencyInjection
         services.AddScoped<INotificationRuleRepository, NotificationRuleRepository>();
         services.AddScoped<INotificationRuleSeeder, NotificationRuleSeeder>();
         services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
+        services.AddScoped<INotificationEventStore, NotificationEventStore>();
+        if (configuration.GetValue("NotificationEvents:Enabled", false))
+        {
+            services.AddMessageBroker(configuration, typeof(TaskIntegrationEventConsumer).Assembly);
+        }
         return services;
     }
 }

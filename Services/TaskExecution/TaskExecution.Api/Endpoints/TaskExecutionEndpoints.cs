@@ -8,5 +8,6 @@ public static class TaskExecutionEndpoints
         app.MapTaskEndpoints();
         app.MapAssignmentEndpoints();
         app.MapApplicationEndpoints();
+        app.MapMyTasksEndpoints();
     }
 }

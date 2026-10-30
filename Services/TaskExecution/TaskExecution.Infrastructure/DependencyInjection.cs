@@ -25,6 +25,7 @@ public static class DependencyInjection
         services.AddScoped<IScopeProjectionStore, ScopeProjectionStore>();
         services.AddScoped<IScopeSnapshotTransaction, ScopeSnapshotTransaction>();
         services.AddScoped<ITaskRepository, TaskRepository>();
+        services.AddScoped<IMyTasksStore, MyTasksStore>();
         services.AddScoped<TaskExecution.Application.Assignments.IAssignmentStore, TaskExecution.Infrastructure.Assignments.AssignmentStore>();
         services.AddHttpClient<TaskExecution.Application.Users.IIdentityUserLookup, TaskExecution.Infrastructure.Identity.IdentityUserLookup>(client =>
         {

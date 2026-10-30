@@ -6,6 +6,8 @@ using NotificationAudit.Application.Files;
 using NotificationAudit.Infrastructure.Files;
 using NotificationAudit.Application.Notifications;
 using NotificationAudit.Infrastructure.Notifications;
+using NotificationAudit.Application.Audit;
+using NotificationAudit.Infrastructure.Audit;
 
 namespace NotificationAudit.Infrastructure;
 
@@ -29,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationPreferenceRepository, NotificationPreferenceRepository>();
         services.AddScoped<INotificationRuleRepository, NotificationRuleRepository>();
         services.AddScoped<INotificationRuleSeeder, NotificationRuleSeeder>();
+        services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
         return services;
     }
 }

@@ -6,6 +6,8 @@ using NotificationAudit.Api.Common;
 using NotificationAudit.Application.Notifications;
 using NotificationAudit.Contracts.Notifications;
 using BuildingBlocks.Security;
+using NotificationAudit.Application.Audit;
+using NotificationAudit.Contracts.Audit;
 
 namespace NotificationAudit.Api.Endpoints;
 
@@ -85,7 +87,59 @@ public static class NotificationAuditEndpoints
             .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Admin))
             .Produces<ApiResponse<NotificationRuleDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401)
             .Produces<ProblemDetails>(403).Produces<ProblemDetails>(404).Produces<ProblemDetails>(412).Produces<ProblemDetails>(422);
+
+        app.MapGet("/api/v1/activity-logs", ListActivityLogsAsync)
+            .WithName("listActivityLogs").WithTags("Audit")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Admin))
+            .Produces<PagedResponse<ActivityLogDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401).Produces<ProblemDetails>(403);
+        app.MapGet("/api/v1/activity-logs/{logId:guid}", GetActivityLogAsync)
+            .WithName("getActivityLog").WithTags("Audit")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Admin))
+            .Produces<ApiResponse<ActivityLogDto>>().Produces<ProblemDetails>(401).Produces<ProblemDetails>(403).Produces<ProblemDetails>(404);
+        app.MapGet("/api/v1/resource-history/{resourceType}/{resourceId:guid}", GetResourceHistoryAsync)
+            .WithName("getResourceHistory").WithTags("Audit")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Admin))
+            .Produces<ApiResponse<IReadOnlyList<StateChangeDto>>>().Produces<ProblemDetails>(401).Produces<ProblemDetails>(403);
     }
+
+    private static async Task<IResult> ListActivityLogsAsync(
+        Guid? actorUserId,
+        Guid? parishId,
+        Guid? seasonId,
+        string? action,
+        string? entityType,
+        Guid? entityId,
+        DateTimeOffset? from,
+        DateTimeOffset? to,
+        int? page,
+        int? size,
+        HttpContext httpContext,
+        ListActivityLogsHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var pageNumber = Math.Max(page ?? 1, 1);
+        var pageSize = Math.Clamp(size ?? 20, 1, 100);
+        var filter = new ActivityLogFilter(
+            actorUserId, parishId, seasonId, action?.Trim(), entityType?.Trim(), entityId,
+            from, to, pageNumber, pageSize);
+        var result = await handler.HandleAsync(filter, cancellationToken);
+        return Results.Ok(ApiResults.Page(result.Items, result.Total, pageNumber, pageSize, httpContext));
+    }
+
+    private static async Task<IResult> GetActivityLogAsync(
+        Guid logId,
+        HttpContext httpContext,
+        GetActivityLogHandler handler,
+        CancellationToken cancellationToken) =>
+        Results.Ok(ApiResults.Ok(await handler.HandleAsync(logId, cancellationToken), httpContext));
+
+    private static async Task<IResult> GetResourceHistoryAsync(
+        string resourceType,
+        Guid resourceId,
+        HttpContext httpContext,
+        GetResourceHistoryHandler handler,
+        CancellationToken cancellationToken) =>
+        Results.Ok(ApiResults.Ok(await handler.HandleAsync(resourceType, resourceId, cancellationToken), httpContext));
 
     private static async Task<IResult> CreateUploadRequestAsync(
         CreateUploadRequest request,

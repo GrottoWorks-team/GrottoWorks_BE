@@ -43,6 +43,72 @@ public sealed partial class SupportRequest
         return request;
     }
 
+    public void Update(SupportType? type,bool changeDescription,string? description,bool changeDeadline,DateOnly? deadline,
+        bool changePositions,IReadOnlyList<SupportPositionInput>? positionInputs,bool changeMaterials,
+        IReadOnlyList<SupportMaterialInput>? materialInputs,int? expectedVersion,DateTimeOffset now)
+    {
+        if (Status!=SupportRequestStatus.Planning)
+            throw new DomainRuleException("SUPPORT_REQUEST_INVALID_STATE","Only a PLANNING support request can be updated.");
+        if (expectedVersion.HasValue && expectedVersion!=Version)
+            throw new DomainRuleException("SUPPORT_REQUEST_VERSION_MISMATCH","The support request changed.",DomainErrorKind.PreconditionFailed);
+        if (!type.HasValue && !changeDescription && !changeDeadline && !changePositions && !changeMaterials)
+            throw DomainRuleException.Validation("VALIDATION_FAILED","At least one field must be updated.");
+        if (type.HasValue && !Enum.IsDefined(type.Value))
+            throw DomainRuleException.Validation("SUPPORT_TYPE_INVALID","Invalid support type.");
+        if (changePositions)
+        {
+            var input=positionInputs ?? [];
+            EnsureOwnedPositionIds(input);
+            var normalized=BuildPositions(Id,input);
+            var merged=new List<SupportPosition>(normalized.Count);
+            foreach(var row in normalized)
+            {
+                var current=positions.SingleOrDefault(p=>p.Id==row.Id);
+                if (current is null) merged.Add(row);
+                else {current.Apply(row);merged.Add(current);}
+            }
+            positions.Clear();positions.AddRange(merged);
+        }
+        if (changeMaterials)
+        {
+            var input=materialInputs ?? [];
+            EnsureOwnedMaterialIds(input);
+            var normalized=BuildMaterials(Id,input);
+            var merged=new List<SupportMaterial>(normalized.Count);
+            foreach(var row in normalized)
+            {
+                var current=materials.SingleOrDefault(m=>m.Id==row.Id);
+                if (current is null) merged.Add(row);
+                else {current.Apply(row);merged.Add(current);}
+            }
+            materials.Clear();materials.AddRange(merged);
+        }
+        if (type.HasValue) SupportType=type.Value;
+        if (changeDescription) Description=NormalizeNote(description);
+        if (changeDeadline) Deadline=deadline;
+        UpdatedAt=now.ToUniversalTime();Version++;
+    }
+
+    private void EnsureOwnedPositionIds(IReadOnlyList<SupportPositionInput> inputs)
+    {
+        var current=positions.Select(p=>p.Id).ToHashSet();
+        if (inputs.Any(p=>p.Id.HasValue && !current.Contains(p.Id.Value)))
+            throw DomainRuleException.Validation("SUPPORT_POSITION_MEMBERSHIP_INVALID","A position does not belong to this request.");
+        var ids=inputs.Where(p=>p.Id.HasValue).Select(p=>p.Id!.Value).ToList();
+        if (ids.Count!=ids.Distinct().Count())
+            throw DomainRuleException.Validation("SUPPORT_POSITION_DUPLICATE","A position ID can only appear once.");
+    }
+
+    private void EnsureOwnedMaterialIds(IReadOnlyList<SupportMaterialInput> inputs)
+    {
+        var current=materials.Select(m=>m.Id).ToHashSet();
+        if (inputs.Any(m=>m.Id.HasValue && !current.Contains(m.Id.Value)))
+            throw DomainRuleException.Validation("SUPPORT_MATERIAL_MEMBERSHIP_INVALID","A material line does not belong to this request.");
+        var ids=inputs.Where(m=>m.Id.HasValue).Select(m=>m.Id!.Value).ToList();
+        if (ids.Count!=ids.Distinct().Count())
+            throw DomainRuleException.Validation("SUPPORT_MATERIAL_DUPLICATE","A material line ID can only appear once.");
+    }
+
     private static List<SupportPosition> BuildPositions(Guid requestId,IReadOnlyList<SupportPositionInput> inputs)
     {
         var rows=new List<SupportPosition>();var names=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -103,6 +169,18 @@ public sealed class SupportPosition
         }
         return row;
     }
+    internal void Apply(SupportPosition source)
+    {
+        Name=source.Name;RequiredVolunteerCount=source.RequiredVolunteerCount;Note=source.Note;
+        var merged=new List<SupportPositionSkill>(source.skills.Count);
+        foreach(var next in source.skills)
+        {
+            var current=skills.SingleOrDefault(s=>s.SkillId==next.SkillId);
+            if (current is null) merged.Add(next);
+            else {current.Apply(next.RequiredSkillLevel);merged.Add(current);}
+        }
+        skills.Clear();skills.AddRange(merged);
+    }
 }
 
 public sealed class SupportPositionSkill
@@ -112,6 +190,7 @@ public sealed class SupportPositionSkill
     public Guid SkillId {get;private set;}
     public string? RequiredSkillLevel {get;private set;}
     internal static SupportPositionSkill Create(Guid position,Guid skill,string? level)=>new() {PositionId=position,SkillId=skill,RequiredSkillLevel=level};
+    internal void Apply(string? level)=>RequiredSkillLevel=level;
 }
 
 public sealed class SupportMaterial
@@ -124,4 +203,6 @@ public sealed class SupportMaterial
     public string? Note {get;private set;}
     internal static SupportMaterial Create(Guid id,Guid request,Guid material,decimal quantity,string? note)=>new()
     {Id=id,RequestId=request,MaterialId=material,RequiredQuantity=quantity,Note=note};
+    internal void Apply(SupportMaterial source)
+    { MaterialId=source.MaterialId;RequiredQuantity=source.RequiredQuantity;Note=source.Note; }
 }

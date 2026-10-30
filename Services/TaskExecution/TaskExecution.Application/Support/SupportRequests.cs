@@ -8,6 +8,9 @@ namespace TaskExecution.Application.Support;
 
 public sealed record CreateSupportCommand(Guid SeasonId,Guid WorkAreaId,SupportType SupportType,string? Description,DateOnly? Deadline,
     IReadOnlyList<SupportPositionInput> Positions,IReadOnlyList<SupportMaterialInput> Materials);
+public sealed record UpdateSupportCommand(Guid Id,SupportType? SupportType,bool ChangeDescription,string? Description,
+    bool ChangeDeadline,DateOnly? Deadline,bool ChangePositions,IReadOnlyList<SupportPositionInput>? Positions,
+    bool ChangeMaterials,IReadOnlyList<SupportMaterialInput>? Materials,int? ExpectedVersion);
 public sealed record SupportSkillDto(Guid SkillId,string? RequiredSkillLevel);
 public sealed record SupportPositionDto(Guid Id,string Name,int RequiredVolunteerCount,string? Note,IReadOnlyList<SupportSkillDto> Skills);
 public sealed record SupportMaterialDto(Guid Id,Guid MaterialId,decimal RequiredQuantity,string? Note);
@@ -33,6 +36,18 @@ public interface ISupportRequestRepository
 
 public sealed partial class SupportRequestService(ISupportRequestRepository repository,TaskScopeAccess scopes,ActiveUserAccess users,ICurrentUser user)
 {
+    public async Task<SupportRequestDto> UpdateAsync(UpdateSupportCommand command,CancellationToken ct=default)
+    {
+        var request=await repository.GetAsync(command.Id,true,ct)
+            ?? throw DomainRuleException.NotFound("SUPPORT_REQUEST_NOT_FOUND","The support request does not exist.");
+        var (area,_)=await scopes.GetWorkAreaForLeaderWriteAsync(request.WorkAreaId,ct);
+        await users.EnsureCallerAsync(area.ParishId,ct);
+        request.Update(command.SupportType,command.ChangeDescription,command.Description,command.ChangeDeadline,command.Deadline,
+            command.ChangePositions,command.Positions,command.ChangeMaterials,command.Materials,command.ExpectedVersion,DateTimeOffset.UtcNow);
+        await repository.SaveAsync(ct);
+        return SupportRequestDto.From(request);
+    }
+
     public async Task<(IReadOnlyList<SupportRequestDto> Items,long Total)> ListAsync(Guid? seasonId,Guid? workAreaId,
         SupportType? type,SupportRequestStatus? status,int page,int size,bool descending,CancellationToken ct=default)
     {

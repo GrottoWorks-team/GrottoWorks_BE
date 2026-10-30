@@ -100,4 +100,30 @@ public sealed class SupportRequestTests
         var page=await fixture.Service.ListAsync(fixture.Season.SeasonId,null,SupportType.Staffing,SupportRequestStatus.Planning,1,20,true);
         page.Total.Should().Be(1);page.Items.Single().WorkAreaId.Should().Be(fixture.Area.WorkAreaId);
     }
+
+    [Fact]
+    public async Task Partial_update_clears_description_and_replaces_only_supplied_lines()
+    {
+        var fixture=new Fixture();
+        var created=await fixture.Service.CreateAsync(new(fixture.Season.SeasonId,fixture.Area.WorkAreaId,SupportType.Mixed,"old",null,
+            [new(null,"Team",2,null,[])],[new(null,Guid.NewGuid(),1,null)]));
+        var position=created.Positions.Single();
+        var result=await fixture.Service.UpdateAsync(new(created.Id,SupportType.Staffing,true," ",true,new(2026,12,24),
+            true,[new(position.Id,"Updated",3,null,[])],false,null,1));
+        result.SupportType.Should().Be(SupportType.Staffing);result.Description.Should().BeNull();result.Deadline.Should().Be(new DateOnly(2026,12,24));
+        result.Positions.Single().Id.Should().Be(position.Id);result.Positions.Single().Name.Should().Be("Updated");
+        result.Materials.Should().HaveCount(1);result.Version.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Foreign_child_id_and_stale_version_are_rejected_before_save()
+    {
+        var fixture=new Fixture();
+        var created=await fixture.Service.CreateAsync(new(fixture.Season.SeasonId,fixture.Area.WorkAreaId,SupportType.Staffing,null,null,[],[]));
+        var act=()=>fixture.Service.UpdateAsync(new(created.Id,null,false,null,false,null,true,
+            [new(Guid.NewGuid(),"Foreign",1,null,[])],false,null,1));
+        await act.Should().ThrowAsync<DomainRuleException>().Where(e=>e.Code=="SUPPORT_POSITION_MEMBERSHIP_INVALID");
+        act=()=>fixture.Service.UpdateAsync(new(created.Id,SupportType.Mixed,false,null,false,null,false,null,false,null,99));
+        await act.Should().ThrowAsync<DomainRuleException>().Where(e=>e.Code=="SUPPORT_REQUEST_VERSION_MISMATCH");
+    }
 }

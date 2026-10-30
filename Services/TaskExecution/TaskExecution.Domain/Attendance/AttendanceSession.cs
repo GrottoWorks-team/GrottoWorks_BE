@@ -15,9 +15,14 @@ public sealed class AttendanceSession
     public AttendanceStatus Status { get; private set; }
     public int Version { get; private set; } = 1;
 
-    public static AttendanceSession Open(AttendanceRequest request) => new()
+    public static AttendanceSession Open(AttendanceRequest request)
     {
-        Id = Guid.NewGuid(), AssignmentId = request.AssignmentId, CheckInRequestId = request.Id,
-        CheckInAt = request.RequestedAt, Status = AttendanceStatus.Open
-    };
+        if (request.Status!=AttendanceRequestStatus.Approved || !request.AttendanceId.HasValue)
+            throw new DomainRuleException("ATTENDANCE_REQUEST_NOT_APPROVED","An approved check-in request is required.");
+        return new AttendanceSession
+        {
+            Id=request.AttendanceId.Value,AssignmentId=request.AssignmentId,CheckInRequestId=request.Id,
+            CheckInAt=request.RequestedAt,Status=AttendanceStatus.Open
+        };
+    }
 }

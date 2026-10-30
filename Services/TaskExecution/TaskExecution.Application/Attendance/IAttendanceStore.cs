@@ -18,6 +18,7 @@ public interface IAttendanceStore
 {
     Task<T> ForVolunteerAsync<T>(Guid volunteerId, Func<Task<T>> action, CancellationToken cancellationToken);
     Task<AttendanceRequest?> RequestAsync(Guid id, CancellationToken cancellationToken);
+    Task<(IReadOnlyList<AttendanceRequest> Items,long Total)> RequestsPageAsync(Guid areaId,AttendanceRequestStatus status,int page,int size,bool descending,CancellationToken cancellationToken);
     Task<AttendanceSession?> SessionAsync(Guid id, CancellationToken cancellationToken);
     Task<bool> HasPendingOrOpenAsync(Guid volunteerId, CancellationToken cancellationToken);
     Task<bool> OverlapsAsync(Guid volunteerId, DateTimeOffset start, DateTimeOffset? end, Guid? excludeSession, CancellationToken cancellationToken);

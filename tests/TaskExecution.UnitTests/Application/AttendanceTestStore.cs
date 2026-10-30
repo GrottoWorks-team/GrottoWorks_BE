@@ -13,6 +13,12 @@ internal sealed partial class AttendanceTestStore(AssignmentTestFixture fixture)
     public async Task<T> ForVolunteerAsync<T>(Guid id,Func<Task<T>> action,CancellationToken ct)
     { await gate.WaitAsync(ct); try { return await action(); } finally { gate.Release(); } }
     public Task<AttendanceRequest?> RequestAsync(Guid id,CancellationToken ct)=>Task.FromResult(Requests.SingleOrDefault(r=>r.Id==id));
+    public Task<(IReadOnlyList<AttendanceRequest> Items,long Total)> RequestsPageAsync(Guid area,AttendanceRequestStatus status,int page,int size,bool descending,CancellationToken ct)
+    {
+        var query=Requests.Where(r=>r.Status==status).OrderBy(r=>r.RequestedAt).ThenBy(r=>r.Id).ToList();
+        if (descending) query.Reverse();
+        return Task.FromResult<(IReadOnlyList<AttendanceRequest>,long)>((query.Skip((page-1)*size).Take(size).ToList(),query.Count));
+    }
     public Task<AttendanceSession?> SessionAsync(Guid id,CancellationToken ct)=>Task.FromResult(Sessions.SingleOrDefault(r=>r.Id==id));
     public Task<bool> HasPendingOrOpenAsync(Guid id,CancellationToken ct)=>Task.FromResult(
         Requests.Any(r=>r.VolunteerId==id && r.Status==AttendanceRequestStatus.Pending) ||

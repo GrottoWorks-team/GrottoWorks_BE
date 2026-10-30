@@ -46,4 +46,17 @@ public sealed class AttendanceRequest
         Status = AttendanceRequestStatus.Cancelled;
         Version++;
     }
+
+    public void Review(bool approve,Guid reviewerId,string? note,Guid? attendanceId,int? version,DateTimeOffset now)
+    {
+        EnsurePending(version);
+        var normalized=note?.Trim();
+        if ((!approve && string.IsNullOrWhiteSpace(normalized)) || normalized?.Length>2000)
+            throw DomainRuleException.Validation("ATTENDANCE_REVIEW_NOTE_REQUIRED","Rejection requires a review note (maximum 2000 characters).");
+        if (approve && (!attendanceId.HasValue || attendanceId==Guid.Empty))
+            throw DomainRuleException.Validation("ATTENDANCE_IDENTITY_INVALID","Approval requires an attendance session ID.");
+        Status=approve ? AttendanceRequestStatus.Approved : AttendanceRequestStatus.Rejected;
+        AttendanceId=approve ? attendanceId : null;
+        ReviewedBy=reviewerId; ReviewNote=normalized; ReviewedAt=now.ToUniversalTime(); Version++;
+    }
 }

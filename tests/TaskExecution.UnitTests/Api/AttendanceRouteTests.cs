@@ -19,6 +19,7 @@ public sealed class AttendanceRouteTests
         builder.Services.AddScoped<AttendanceService>();
         await using var app=builder.Build();
         app.MapAttendanceEndpoints();
+        app.MapAttendanceReviewEndpoints();
         var endpoints=((IEndpointRouteBuilder)app).DataSources.SelectMany(s=>s.Endpoints).OfType<RouteEndpoint>().ToList();
         foreach(var name in new[] {"requestCheckIn","cancelCheckInRequest"})
         {
@@ -27,6 +28,12 @@ public sealed class AttendanceRouteTests
                 .OfType<RolesAuthorizationRequirement>().Should().Contain(r=>r.AllowedRoles.Contains("VOLUNTEER"));
             route.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Select(p=>p.StatusCode)
                 .Should().Contain(new[] {400,401,403,404,409,412,422,503});
+        }
+        foreach(var name in new[] {"listAttendanceRequests","approveAttendanceRequest","rejectAttendanceRequest"})
+        {
+            var route=endpoints.Single(e=>e.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName==name);
+            route.Metadata.GetOrderedMetadata<AuthorizationPolicy>().SelectMany(p=>p.Requirements)
+                .OfType<RolesAuthorizationRequirement>().Should().Contain(r=>r.AllowedRoles.Contains("LEADER"));
         }
     }
 }

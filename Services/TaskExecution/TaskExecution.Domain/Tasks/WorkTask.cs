@@ -167,6 +167,15 @@ public sealed partial class WorkTask
         }
     }
 
+    public void BeginWork(DateTimeOffset now)
+    {
+        if (Status is not (TaskStatus.NotStarted or TaskStatus.InProgress))
+            throw new DomainRuleException("TASK_INVALID_STATE","Only a ready task can start work.");
+        Status=TaskStatus.InProgress;
+        UpdatedAt=now.ToUniversalTime();
+        Version++;
+    }
+
     public bool ReplaceCompletionCriteria(
         string? completionCriteria,
         int? expectedVersion,

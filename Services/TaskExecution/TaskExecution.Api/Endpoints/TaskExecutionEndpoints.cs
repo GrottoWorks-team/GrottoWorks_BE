@@ -10,5 +10,6 @@ public static class TaskExecutionEndpoints
         app.MapApplicationEndpoints();
         app.MapMyTasksEndpoints();
         app.MapTaskLifecycleEndpoints();
+        app.MapAttendanceEndpoints();
     }
 }

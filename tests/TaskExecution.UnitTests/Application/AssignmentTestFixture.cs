@@ -40,6 +40,10 @@ internal sealed class AssignmentTestFixture
 
     public AssignVolunteerCommand Command() => new(Task.Id,VolunteerId,null,false,false,null);
 
+    public TaskExecution.Application.Attendance.AttendanceService Attendance(TaskExecution.Application.Attendance.IAttendanceStore store) =>
+        new(store,Store,new TestTasks(Task),new TaskScopeAccess(new TestScopes(Season,Area),User),
+            new ActiveUserAccess(Identity,User),User,new TaskEventRecorder(Events,User,new TestCorrelation()));
+
     internal sealed class TestUser : ICurrentUser
     {
         public bool IsAuthenticated => true;

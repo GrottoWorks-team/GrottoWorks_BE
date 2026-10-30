@@ -26,6 +26,9 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
             builder.Property<DateTimeOffset?>("CancelledAt").HasColumnName("cancelled_at").HasColumnType("timestamp with time zone");
         });
         BuildAssignmentModel(modelBuilder);
+        new TaskExecution.Infrastructure.Attendance.AttendanceRequestConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Attendance.AttendanceRequest>());
+        new TaskExecution.Infrastructure.Attendance.AttendanceSessionConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Attendance.AttendanceSession>());
+        new TaskExecution.Infrastructure.Attendance.AttendanceReplayConfiguration().Configure(modelBuilder.Entity<TaskExecution.Application.Attendance.AttendanceReplay>());
         new TaskExecution.Infrastructure.Events.TaskEventOutboxConfiguration()
             .Configure(modelBuilder.Entity<TaskExecution.Infrastructure.Events.TaskEventOutboxMessage>());
     }

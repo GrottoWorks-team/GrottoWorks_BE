@@ -71,4 +71,14 @@ public sealed class FileObject
         Status = FileObjectStatus.Uploaded;
         CompletedAt = completedAt;
     }
+
+    public void MarkDeleted()
+    {
+        if (Status == FileObjectStatus.Attached)
+        {
+            throw new InvalidOperationException("An attached file cannot be deleted.");
+        }
+
+        Status = FileObjectStatus.Deleted;
+    }
 }

@@ -92,6 +92,45 @@ public sealed class MinioFileObjectStorage : IFileObjectStorage
         }
     }
 
+    public async Task<PresignedObjectRequest> CreateDownloadRequestAsync(
+        string objectKey,
+        TimeSpan lifetime,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var seconds = Math.Clamp((int)lifetime.TotalSeconds, 60, 604800);
+            var url = await publicClient.PresignedGetObjectAsync(
+                new PresignedGetObjectArgs()
+                    .WithBucket(options.Bucket)
+                    .WithObject(objectKey)
+                    .WithExpiry(seconds));
+            return new PresignedObjectRequest(
+                url,
+                new Dictionary<string, string>(),
+                timeProvider.GetUtcNow().AddSeconds(seconds));
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw new FileStorageUnavailableException("Could not create a download URL.", exception);
+        }
+    }
+
+    public async Task DeleteAsync(string objectKey, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await internalClient.RemoveObjectAsync(
+                new RemoveObjectArgs().WithBucket(options.Bucket).WithObject(objectKey),
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw new FileStorageUnavailableException("Could not delete the object.", exception);
+        }
+    }
+
     public static string DetectContentType(ReadOnlySpan<byte> content)
     {
         if (content.StartsWith(new byte[] { 0xFF, 0xD8, 0xFF })) return "image/jpeg";

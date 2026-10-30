@@ -18,6 +18,9 @@ internal sealed class FileObjectRepository(NotificationAuditDbContext dbContext)
             .FromSqlInterpolated($"SELECT * FROM file_object WHERE file_id = {fileId} FOR UPDATE")
             .SingleOrDefaultAsync(cancellationToken);
 
+    public Task<FileObject?> GetAsync(Guid fileId, CancellationToken cancellationToken) =>
+        dbContext.FileObjects.AsNoTracking().SingleOrDefaultAsync(file => file.Id == fileId, cancellationToken);
+
     public Task SaveChangesAsync(CancellationToken cancellationToken) =>
         dbContext.SaveChangesAsync(cancellationToken);
 }

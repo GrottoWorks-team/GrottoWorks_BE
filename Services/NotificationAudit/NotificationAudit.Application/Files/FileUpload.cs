@@ -10,6 +10,7 @@ public interface IFileObjectRepository
     void Add(FileObject file);
     Task<IFileObjectTransaction> BeginTransactionAsync(CancellationToken cancellationToken);
     Task<FileObject?> GetForUpdateAsync(Guid fileId, CancellationToken cancellationToken);
+    Task<FileObject?> GetAsync(Guid fileId, CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
 
@@ -28,6 +29,11 @@ public interface IFileObjectStorage
 
     Task<StoredObjectInspection> InspectAsync(string objectKey, CancellationToken cancellationToken);
     Task CommitUploadAsync(string pendingObjectKey, string completedObjectKey, CancellationToken cancellationToken);
+    Task<PresignedObjectRequest> CreateDownloadRequestAsync(
+        string objectKey,
+        TimeSpan lifetime,
+        CancellationToken cancellationToken);
+    Task DeleteAsync(string objectKey, CancellationToken cancellationToken);
 }
 
 public sealed record PresignedObjectRequest(
@@ -48,7 +54,110 @@ public sealed class FileUploadOptions
 {
     public const string SectionName = "FileUpload";
     public int UploadUrlMinutes { get; init; } = 10;
+    public int DownloadUrlMinutes { get; init; } = 5;
     public bool AllowOtherPdf { get; init; }
+}
+
+public sealed class GetFileDownloadHandler(
+    ICurrentUser currentUser,
+    IFileObjectRepository repository,
+    IFileObjectStorage storage,
+    Microsoft.Extensions.Options.IOptions<FileUploadOptions> options)
+{
+    public async Task<FileDownloadDto> HandleAsync(Guid fileId, CancellationToken cancellationToken)
+    {
+        var file = await repository.GetAsync(fileId, cancellationToken);
+        if (file is null || file.UploadedByUserId != currentUser.UserId)
+        {
+            throw new DomainException("FILE_NOT_FOUND", "The file does not exist.", 404);
+        }
+
+        if (file.Status is not (FileObjectStatus.Uploaded or FileObjectStatus.Attached))
+        {
+            throw new DomainException("FILE_NOT_READY", "The file has not been completed.", 409);
+        }
+
+        try
+        {
+            var lifetime = TimeSpan.FromMinutes(Math.Clamp(options.Value.DownloadUrlMinutes, 1, 60));
+            var request = await storage.CreateDownloadRequestAsync(file.ObjectKey, lifetime, cancellationToken);
+            return new FileDownloadDto(request.Url, request.ExpiresAt);
+        }
+        catch (FileStorageUnavailableException)
+        {
+            throw new DomainException("FILE_STORAGE_UNAVAILABLE", "File storage is temporarily unavailable.", 503);
+        }
+    }
+}
+
+public sealed class DeleteUnattachedFileHandler(
+    ICurrentUser currentUser,
+    IFileObjectRepository repository,
+    IFileObjectStorage storage)
+{
+    public async Task HandleAsync(Guid fileId, CancellationToken cancellationToken)
+    {
+        await using var transaction = await repository.BeginTransactionAsync(cancellationToken);
+        var file = await repository.GetForUpdateAsync(fileId, cancellationToken);
+        if (file is null || file.UploadedByUserId != currentUser.UserId)
+        {
+            throw new DomainException("FILE_NOT_FOUND", "The file does not exist.", 404);
+        }
+
+        if (file.Status == FileObjectStatus.Deleted)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return;
+        }
+
+        if (file.Status == FileObjectStatus.Attached)
+        {
+            throw new DomainException("FILE_ATTACHED", "An attached file cannot be deleted.", 409);
+        }
+
+        try
+        {
+            await storage.DeleteAsync(file.ObjectKey, cancellationToken);
+        }
+        catch (FileStorageUnavailableException)
+        {
+            throw new DomainException("FILE_STORAGE_UNAVAILABLE", "File storage is temporarily unavailable.", 503);
+        }
+
+        file.MarkDeleted();
+        await repository.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+}
+
+public sealed class GetInternalFileHandler(IFileObjectRepository repository)
+{
+    public async Task<InternalFileDto> HandleAsync(Guid fileId, CancellationToken cancellationToken)
+    {
+        var file = await repository.GetAsync(fileId, cancellationToken);
+        if (file is null)
+        {
+            throw new DomainException("FILE_NOT_FOUND", "The file does not exist.", 404);
+        }
+
+        return new InternalFileDto(
+            file.Id,
+            file.UploadedByUserId,
+            ToContractValue(file.Purpose),
+            ToContractValue(file.Status),
+            file.OriginalFileName,
+            file.ContentType,
+            file.SizeBytes,
+            file.Checksum,
+            file.ReferenceType,
+            file.ReferenceId,
+            file.CreatedAt,
+            file.CompletedAt);
+    }
+
+    private static string ToContractValue<TEnum>(TEnum value) where TEnum : struct, Enum =>
+        string.Concat(value.ToString().Select((character, index) =>
+            index > 0 && char.IsUpper(character) ? "_" + character : character.ToString())).ToUpperInvariant();
 }
 
 public sealed class CompleteUploadHandler(

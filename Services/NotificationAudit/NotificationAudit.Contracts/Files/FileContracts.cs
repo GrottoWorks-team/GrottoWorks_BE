@@ -32,3 +32,19 @@ public sealed record FileReferenceDto(
     string FileName,
     string ContentType,
     long SizeBytes);
+
+public sealed record FileDownloadDto(string DownloadUrl, DateTimeOffset ExpiresAt);
+
+public sealed record InternalFileDto(
+    Guid Id,
+    Guid UploadedByUserId,
+    string Purpose,
+    string Status,
+    string FileName,
+    string ContentType,
+    long SizeBytes,
+    string? Checksum,
+    string? ReferenceType,
+    Guid? ReferenceId,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? CompletedAt);

@@ -1,5 +1,7 @@
 namespace NotificationAudit.Contracts.Notifications;
 
+using System.ComponentModel.DataAnnotations;
+
 public sealed record NotificationDto(
     Guid Id,
     string EventType,
@@ -10,3 +12,13 @@ public sealed record NotificationDto(
     bool IsRead,
     DateTimeOffset CreatedAt,
     DateTimeOffset? ReadAt);
+
+public sealed record NotificationPreferenceDto(
+    bool InAppEnabled,
+    bool PushEnabled,
+    bool EmailEnabled);
+
+public sealed record UpdateNotificationPreferenceRequest(
+    [property: Required] bool? InAppEnabled,
+    [property: Required] bool? PushEnabled,
+    [property: Required] bool? EmailEnabled);

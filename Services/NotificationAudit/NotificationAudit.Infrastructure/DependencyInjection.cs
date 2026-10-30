@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<IFileObjectStorage, MinioFileObjectStorage>();
         services.AddHostedService<MinioBucketInitializer>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<INotificationPreferenceRepository, NotificationPreferenceRepository>();
         return services;
     }
 }

@@ -71,6 +71,13 @@ public static class NotificationAuditEndpoints
         app.MapPost("/api/v1/notifications/read-all", MarkAllNotificationsReadAsync)
             .WithName("markAllNotificationsRead").WithTags("Notifications").RequireAuthorization()
             .Produces(204).Produces<ProblemDetails>(401);
+
+        app.MapGet("/api/v1/users/me/notification-preferences", GetNotificationPreferencesAsync)
+            .WithName("getNotificationPreferences").WithTags("Notifications").RequireAuthorization()
+            .Produces<ApiResponse<NotificationPreferenceDto>>().Produces<ProblemDetails>(401);
+        app.MapPut("/api/v1/users/me/notification-preferences", UpdateNotificationPreferencesAsync)
+            .WithName("updateNotificationPreferences").WithTags("Notifications").RequireAuthorization()
+            .Produces<ApiResponse<NotificationPreferenceDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401).Produces<ProblemDetails>(422);
     }
 
     private static async Task<IResult> CreateUploadRequestAsync(
@@ -154,4 +161,17 @@ public static class NotificationAuditEndpoints
         await handler.HandleAsync(cancellationToken);
         return Results.NoContent();
     }
+
+    private static async Task<IResult> GetNotificationPreferencesAsync(
+        HttpContext httpContext,
+        GetNotificationPreferenceHandler handler,
+        CancellationToken cancellationToken) =>
+        Results.Ok(ApiResults.Ok(await handler.HandleAsync(cancellationToken), httpContext));
+
+    private static async Task<IResult> UpdateNotificationPreferencesAsync(
+        UpdateNotificationPreferenceRequest request,
+        HttpContext httpContext,
+        UpdateNotificationPreferenceHandler handler,
+        CancellationToken cancellationToken) =>
+        Results.Ok(ApiResults.Ok(await handler.HandleAsync(request, cancellationToken), httpContext));
 }

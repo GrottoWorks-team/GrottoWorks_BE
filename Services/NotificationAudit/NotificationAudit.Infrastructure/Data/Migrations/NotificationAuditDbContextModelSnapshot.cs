@@ -19,5 +19,6 @@ public partial class NotificationAuditDbContextModelSnapshot : ModelSnapshot
         NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
         new FileObjectConfiguration().Configure(modelBuilder.Entity<NotificationAudit.Domain.Files.FileObject>());
         new NotificationConfiguration().Configure(modelBuilder.Entity<NotificationAudit.Domain.Notifications.Notification>());
+        new NotificationPreferenceConfiguration().Configure(modelBuilder.Entity<NotificationAudit.Domain.Notifications.NotificationPreference>());
     }
 }

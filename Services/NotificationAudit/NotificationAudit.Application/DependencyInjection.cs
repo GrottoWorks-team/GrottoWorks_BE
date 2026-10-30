@@ -17,6 +17,8 @@ public static class DependencyInjection
         services.AddScoped<ListNotificationsHandler>();
         services.AddScoped<MarkNotificationReadHandler>();
         services.AddScoped<MarkAllNotificationsReadHandler>();
+        services.AddScoped<GetNotificationPreferenceHandler>();
+        services.AddScoped<UpdateNotificationPreferenceHandler>();
         return services;
     }
 }

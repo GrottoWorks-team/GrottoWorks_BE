@@ -8,6 +8,13 @@
     <Project Path="BuildingBlocks/BuildingBlocks.Web/BuildingBlocks.Web.csproj" />
   </Folder>
   <Folder Name="/Services/" />
+  <Folder Name="/Services/NotificationAudit/">
+    <Project Path="Services/NotificationAudit/NotificationAudit.Api/NotificationAudit.Api.csproj" />
+    <Project Path="Services/NotificationAudit/NotificationAudit.Application/NotificationAudit.Application.csproj" />
+    <Project Path="Services/NotificationAudit/NotificationAudit.Contracts/NotificationAudit.Contracts.csproj" />
+    <Project Path="Services/NotificationAudit/NotificationAudit.Domain/NotificationAudit.Domain.csproj" />
+    <Project Path="Services/NotificationAudit/NotificationAudit.Infrastructure/NotificationAudit.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/Services/ParishCoordination/">
     <Project Path="Services/ParishCoordination/ParishCoordination.Api/ParishCoordination.Api.csproj" />
     <Project Path="Services/ParishCoordination/ParishCoordination.Application/ParishCoordination.Application.csproj" />
@@ -50,6 +57,7 @@
     <Project Path="Services/TaskExecution/TaskExecution.Infrastructure/TaskExecution.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/NotificationAudit.UnitTests/NotificationAudit.UnitTests.csproj" />
     <Project Path="tests/Identity.UnitTests/Identity.UnitTests.csproj" />
     <Project Path="tests/ParishCoordination.UnitTests/ParishCoordination.UnitTests.csproj" />
     <Project Path="tests/Readiness.UnitTests/Readiness.UnitTests.csproj" />

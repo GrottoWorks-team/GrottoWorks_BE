@@ -17,6 +17,7 @@ public static class DependencyInjection
         services.AddScoped<GetTasksQueryHandler>();
         services.AddScoped<MyTasksQueryHandler>();
         services.AddScoped<TaskExecution.Application.Attendance.AttendanceService>();
+        services.AddScoped<TaskExecution.Application.Attendance.AttendanceQueries>();
         services.AddScoped<GetTaskQueryHandler>();
         services.AddScoped<CreateTaskCommandHandler>();
         services.AddScoped<UpdateTaskCommandHandler>();

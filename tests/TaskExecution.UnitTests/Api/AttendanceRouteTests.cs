@@ -17,10 +17,12 @@ public sealed class AttendanceRouteTests
     {
         var builder=WebApplication.CreateBuilder(new WebApplicationOptions {EnvironmentName="Testing"});
         builder.Services.AddScoped<AttendanceService>();
+        builder.Services.AddScoped<AttendanceQueries>();
         await using var app=builder.Build();
         app.MapAttendanceEndpoints();
         app.MapAttendanceReviewEndpoints();
         app.MapCheckOutEndpoints();
+        app.MapAttendanceQueryEndpoints();
         var endpoints=((IEndpointRouteBuilder)app).DataSources.SelectMany(s=>s.Endpoints).OfType<RouteEndpoint>().ToList();
         foreach(var name in new[] {"requestCheckIn","cancelCheckInRequest","recordCheckOut"})
         {
@@ -30,6 +32,9 @@ public sealed class AttendanceRouteTests
             route.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Select(p=>p.StatusCode)
                 .Should().Contain(new[] {400,401,403,404,409,412,422,503});
         }
+        var hours=endpoints.Single(e=>e.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName=="getWorkingHours");
+        hours.Metadata.GetOrderedMetadata<AuthorizationPolicy>().SelectMany(p=>p.Requirements)
+            .OfType<RolesAuthorizationRequirement>().Single().AllowedRoles.Should().BeEquivalentTo("PARISH","LEADER");
         foreach(var name in new[] {"listAttendanceRequests","approveAttendanceRequest","rejectAttendanceRequest"})
         {
             var route=endpoints.Single(e=>e.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName==name);

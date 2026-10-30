@@ -27,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<ITaskRepository, TaskRepository>();
         services.AddScoped<IMyTasksStore, MyTasksStore>();
         services.AddScoped<TaskExecution.Application.Attendance.IAttendanceStore, TaskExecution.Infrastructure.Attendance.AttendanceStore>();
+        services.AddScoped<TaskExecution.Application.Attendance.IAttendanceReadStore, TaskExecution.Infrastructure.Attendance.AttendanceReadStore>();
         services.AddScoped<TaskExecution.Application.Assignments.IAssignmentStore, TaskExecution.Infrastructure.Assignments.AssignmentStore>();
         services.AddHttpClient<TaskExecution.Application.Users.IIdentityUserLookup, TaskExecution.Infrastructure.Identity.IdentityUserLookup>(client =>
         {

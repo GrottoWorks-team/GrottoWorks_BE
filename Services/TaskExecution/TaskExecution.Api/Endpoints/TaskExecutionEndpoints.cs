@@ -13,5 +13,6 @@ public static class TaskExecutionEndpoints
         app.MapAttendanceEndpoints();
         app.MapAttendanceReviewEndpoints();
         app.MapCheckOutEndpoints();
+        app.MapAttendanceQueryEndpoints();
     }
 }

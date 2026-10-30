@@ -2,11 +2,16 @@ using TaskExecution.Domain.Scopes;
 
 namespace TaskExecution.Application.Scopes;
 
-public sealed class ApplySeasonScopeSnapshotHandler(IScopeProjectionStore store)
+public sealed class ApplySeasonScopeSnapshotHandler(IScopeProjectionStore store, IScopeSnapshotTransaction transaction)
 {
-    public async Task<(SeasonScopeDto Scope, bool Applied)> HandleAsync(
+    public Task<(SeasonScopeDto Scope, bool Applied)> HandleAsync(
         SeasonScopeSnapshot snapshot,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        transaction.ExecuteAsync("season", snapshot.SeasonId,
+            () => ApplyAsync(snapshot, cancellationToken), cancellationToken);
+
+    private async Task<(SeasonScopeDto Scope, bool Applied)> ApplyAsync(
+        SeasonScopeSnapshot snapshot, CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
         var existing = await store.GetSeasonAsync(snapshot.SeasonId, cancellationToken);
@@ -43,11 +48,16 @@ public sealed class ApplySeasonScopeSnapshotHandler(IScopeProjectionStore store)
     }
 }
 
-public sealed class ApplyWorkAreaScopeSnapshotHandler(IScopeProjectionStore store)
+public sealed class ApplyWorkAreaScopeSnapshotHandler(IScopeProjectionStore store, IScopeSnapshotTransaction transaction)
 {
-    public async Task<(WorkAreaScopeDto Scope, bool Applied)> HandleAsync(
+    public Task<(WorkAreaScopeDto Scope, bool Applied)> HandleAsync(
         WorkAreaScopeSnapshot snapshot,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        transaction.ExecuteAsync("work-area", snapshot.WorkAreaId,
+            () => ApplyAsync(snapshot, cancellationToken), cancellationToken);
+
+    private async Task<(WorkAreaScopeDto Scope, bool Applied)> ApplyAsync(
+        WorkAreaScopeSnapshot snapshot, CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
         var existing = await store.GetWorkAreaAsync(snapshot.WorkAreaId, cancellationToken);

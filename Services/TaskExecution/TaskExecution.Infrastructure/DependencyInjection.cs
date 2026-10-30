@@ -23,6 +23,7 @@ public static class DependencyInjection
 
         services.AddDbContext<TaskExecutionDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IScopeProjectionStore, ScopeProjectionStore>();
+        services.AddScoped<IScopeSnapshotTransaction, ScopeSnapshotTransaction>();
         services.AddScoped<ITaskRepository, TaskRepository>();
         return services;
     }

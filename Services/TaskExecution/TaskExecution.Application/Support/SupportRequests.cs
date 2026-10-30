@@ -25,12 +25,25 @@ public sealed record SupportRequestDto(Guid Id,Guid SeasonId,Guid WorkAreaId,Gui
 public interface ISupportRequestRepository
 {
     Task<SupportRequest?> GetAsync(Guid id,bool tracked,CancellationToken cancellationToken);
+    Task<(IReadOnlyList<SupportRequest> Items,long Total)> GetPageAsync(Guid? parishId,Guid? seasonId,Guid? workAreaId,
+        SupportType? type,SupportRequestStatus? status,int page,int size,bool descending,CancellationToken cancellationToken);
     void Add(SupportRequest request);
     Task SaveAsync(CancellationToken cancellationToken);
 }
 
 public sealed partial class SupportRequestService(ISupportRequestRepository repository,TaskScopeAccess scopes,ActiveUserAccess users,ICurrentUser user)
 {
+    public async Task<(IReadOnlyList<SupportRequestDto> Items,long Total)> ListAsync(Guid? seasonId,Guid? workAreaId,
+        SupportType? type,SupportRequestStatus? status,int page,int size,bool descending,CancellationToken ct=default)
+    {
+        Guid? parishId=user.Role==GrottoWorksRoles.Admin ? null : user.ParishId;
+        if (user.Role!=GrottoWorksRoles.Admin && !parishId.HasValue)
+            throw DomainRuleException.Forbidden("PARISH_ACCESS_DENIED","A parish is required to list support requests.");
+        if (workAreaId.HasValue) await scopes.GetWorkAreaForReadAsync(workAreaId.Value,ct);
+        var result=await repository.GetPageAsync(parishId,seasonId,workAreaId,type,status,page,size,descending,ct);
+        return (result.Items.Select(SupportRequestDto.From).ToList(),result.Total);
+    }
+
     public async Task<SupportRequestDto> CreateAsync(CreateSupportCommand command,CancellationToken ct=default)
     {
         var (area,_)=await scopes.GetWorkAreaForLeaderWriteAsync(command.WorkAreaId,ct);

@@ -27,5 +27,8 @@ public sealed class SupportRequestRouteTests
             .Should().Contain(new[] {201,400,401,403,404,409,412,422,503});
         routes.Single(e=>e.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName=="getSupportRequest")
             .RoutePattern.RawText.Should().Be("/api/v1/support-requests/{requestId:guid}");
+        var list=routes.Single(e=>e.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName=="listSupportRequests");
+        list.RoutePattern.RawText.Should().Be("/api/v1/support-requests");
+        list.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Select(p=>p.StatusCode).Should().Contain(new[] {200,400,401,403});
     }
 }

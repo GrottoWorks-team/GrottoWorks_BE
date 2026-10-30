@@ -82,6 +82,22 @@ public sealed class SupportRequestTests
     {
         public List<SupportRequest> Rows{get;}=[];public int Saves{get;private set;}
         public Task<SupportRequest?> GetAsync(Guid id,bool tracked,CancellationToken ct)=>Task.FromResult(Rows.SingleOrDefault(r=>r.Id==id));
+        public Task<(IReadOnlyList<SupportRequest> Items,long Total)> GetPageAsync(Guid? parish,Guid? season,Guid? area,
+            SupportType? type,SupportRequestStatus? status,int page,int size,bool desc,CancellationToken ct)
+        {
+            var query=Rows.Where(r=>(!season.HasValue||r.SeasonId==season) && (!area.HasValue||r.WorkAreaId==area) &&
+                (!type.HasValue||r.SupportType==type) && (!status.HasValue||r.Status==status)).OrderBy(r=>r.CreatedAt).ToList();
+            if(desc)query.Reverse();return Task.FromResult<(IReadOnlyList<SupportRequest>,long)>((query.Skip((page-1)*size).Take(size).ToList(),query.Count));
+        }
         public void Add(SupportRequest row)=>Rows.Add(row);public Task SaveAsync(CancellationToken ct){Saves++;return Task.CompletedTask;}
+    }
+
+    [Fact]
+    public async Task List_filters_by_tenant_and_returns_stable_page()
+    {
+        var fixture=new Fixture();
+        await fixture.Service.CreateAsync(new(fixture.Season.SeasonId,fixture.Area.WorkAreaId,SupportType.Staffing,null,null,[],[]));
+        var page=await fixture.Service.ListAsync(fixture.Season.SeasonId,null,SupportType.Staffing,SupportRequestStatus.Planning,1,20,true);
+        page.Total.Should().Be(1);page.Items.Single().WorkAreaId.Should().Be(fixture.Area.WorkAreaId);
     }
 }

@@ -4,6 +4,8 @@ using BuildingBlocks.Web;
 using Microsoft.AspNetCore.Mvc;
 using TaskExecution.Application.Support;
 using TaskExecution.Domain.Support;
+using BuildingBlocks.Pagination;
+using TaskExecution.Api.Common;
 
 namespace TaskExecution.Api.Endpoints;
 
@@ -23,6 +25,9 @@ public static partial class SupportRequestEndpoints
     public static void MapSupportRequestEndpoints(this IEndpointRouteBuilder app)
     {
         var group=app.MapGroup("/api/v1").WithTags("Support").RequireAuthorization();
+        group.MapGet("/support-requests",ListAsync).WithName("listSupportRequests")
+            .Produces<PagedResponse<SupportRequestDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401)
+            .Produces<ProblemDetails>(403);
         group.MapPost("/support-requests",CreateAsync).WithName("createSupportRequest")
             .RequireAuthorization(p=>p.RequireRole(GrottoWorksRoles.Leader))
             .Produces<ApiResponse<SupportRequestDto>>(201).Produces<ProblemDetails>(400).Produces<ProblemDetails>(401)
@@ -38,6 +43,15 @@ public static partial class SupportRequestEndpoints
             request.Description,request.Deadline,request.Positions,request.Materials),ct);
         context.Response.Headers.ETag=$"\"{result.Version}\"";
         return Results.Created($"/api/v1/support-requests/{result.Id}",ApiResults.Ok(result,context));
+    }
+    private static async Task<IResult> ListAsync(Guid? seasonId,Guid? workAreaId,string? supportType,string? status,
+        SupportRequestService service,HttpContext context,CancellationToken ct)
+    {
+        var page=PaginationRequest.FromQuery(context.Request.Query,"createdAt");
+        var result=await service.ListAsync(seasonId,workAreaId,QueryEnum.Parse<SupportType>(supportType,"supportType"),
+            QueryEnum.Parse<SupportRequestStatus>(status,"status"),page.Page,page.Size,
+            page.Sort is null || page.Sort.EndsWith(",desc"),ct);
+        return Results.Ok(ApiResults.Page(result.Items,result.Total,page.Page,page.Size,context));
     }
     private static async Task<IResult> GetAsync(Guid requestId,SupportRequestService service,HttpContext context,CancellationToken ct)
     {

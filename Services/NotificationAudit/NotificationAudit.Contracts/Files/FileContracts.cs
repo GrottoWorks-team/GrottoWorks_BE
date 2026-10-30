@@ -23,3 +23,12 @@ public sealed record UploadRequestDto(
     string Method,
     IReadOnlyDictionary<string, string> Headers,
     DateTimeOffset ExpiresAt);
+
+public sealed record CompleteUploadRequest(
+    [property: RegularExpression("^[A-Fa-f0-9]{64}$")] string? Checksum);
+
+public sealed record FileReferenceDto(
+    Guid Id,
+    string FileName,
+    string ContentType,
+    long SizeBytes);

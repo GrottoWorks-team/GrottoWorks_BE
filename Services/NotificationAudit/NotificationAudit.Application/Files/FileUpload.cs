@@ -8,7 +8,14 @@ namespace NotificationAudit.Application.Files;
 public interface IFileObjectRepository
 {
     void Add(FileObject file);
+    Task<IFileObjectTransaction> BeginTransactionAsync(CancellationToken cancellationToken);
+    Task<FileObject?> GetForUpdateAsync(Guid fileId, CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);
+}
+
+public interface IFileObjectTransaction : IAsyncDisposable
+{
+    Task CommitAsync(CancellationToken cancellationToken);
 }
 
 public interface IFileObjectStorage
@@ -18,6 +25,9 @@ public interface IFileObjectStorage
         string contentType,
         TimeSpan lifetime,
         CancellationToken cancellationToken);
+
+    Task<StoredObjectInspection> InspectAsync(string objectKey, CancellationToken cancellationToken);
+    Task CommitUploadAsync(string pendingObjectKey, string completedObjectKey, CancellationToken cancellationToken);
 }
 
 public sealed record PresignedObjectRequest(
@@ -25,11 +35,115 @@ public sealed record PresignedObjectRequest(
     IReadOnlyDictionary<string, string> Headers,
     DateTimeOffset ExpiresAt);
 
+public sealed record StoredObjectInspection(
+    long SizeBytes,
+    string? ContentType,
+    string Sha256,
+    string DetectedContentType);
+
+public sealed class FileStorageUnavailableException(string message, Exception? innerException = null)
+    : Exception(message, innerException);
+
 public sealed class FileUploadOptions
 {
     public const string SectionName = "FileUpload";
     public int UploadUrlMinutes { get; init; } = 10;
     public bool AllowOtherPdf { get; init; }
+}
+
+public sealed class CompleteUploadHandler(
+    ICurrentUser currentUser,
+    IFileObjectRepository repository,
+    IFileObjectStorage storage,
+    TimeProvider timeProvider)
+{
+    public async Task<FileReferenceDto> HandleAsync(
+        Guid fileId,
+        CompleteUploadRequest request,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await repository.BeginTransactionAsync(cancellationToken);
+        var file = await repository.GetForUpdateAsync(fileId, cancellationToken);
+        if (file is null || file.UploadedByUserId != currentUser.UserId)
+        {
+            throw new DomainException("FILE_NOT_FOUND", "The file does not exist.", 404);
+        }
+
+        if (file.Status == FileObjectStatus.Uploaded || file.Status == FileObjectStatus.Attached)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return Map(file);
+        }
+
+        if (file.Status != FileObjectStatus.PendingUpload)
+        {
+            throw new DomainException("FILE_INVALID_STATE", "The file cannot be completed in its current state.", 409);
+        }
+
+        StoredObjectInspection inspection;
+        try
+        {
+            inspection = await storage.InspectAsync(file.ObjectKey, cancellationToken);
+        }
+        catch (FileStorageUnavailableException)
+        {
+            throw new DomainException("FILE_STORAGE_UNAVAILABLE", "File storage is temporarily unavailable.", 503);
+        }
+
+        ValidateStoredObject(file, request.Checksum, inspection);
+        var completedObjectKey = $"completed/{file.UploadedByUserId:N}/{file.Id:N}";
+
+        try
+        {
+            await storage.CommitUploadAsync(file.ObjectKey, completedObjectKey, cancellationToken);
+        }
+        catch (FileStorageUnavailableException)
+        {
+            throw new DomainException("FILE_STORAGE_UNAVAILABLE", "File storage is temporarily unavailable.", 503);
+        }
+
+        file.Complete(completedObjectKey, inspection.Sha256, timeProvider.GetUtcNow());
+        await repository.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Map(file);
+    }
+
+    public static void ValidateStoredObject(
+        FileObject file,
+        string? requestedChecksum,
+        StoredObjectInspection inspection)
+    {
+        if (inspection.SizeBytes != file.SizeBytes)
+        {
+            throw new DomainException("FILE_SIZE_MISMATCH", "Uploaded file size does not match the upload request.", 422);
+        }
+
+        if (!string.Equals(inspection.DetectedContentType, file.ContentType, StringComparison.OrdinalIgnoreCase) ||
+            (!string.IsNullOrWhiteSpace(inspection.ContentType) &&
+             !string.Equals(inspection.ContentType, file.ContentType, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new DomainException("FILE_CONTENT_TYPE_MISMATCH", "Uploaded content does not match the declared type.", 422);
+        }
+
+        var expectedChecksum = string.IsNullOrWhiteSpace(file.Checksum)
+            ? requestedChecksum?.Trim().ToLowerInvariant()
+            : file.Checksum;
+        if (!string.IsNullOrWhiteSpace(requestedChecksum) &&
+            !string.IsNullOrWhiteSpace(file.Checksum) &&
+            !string.Equals(requestedChecksum.Trim(), file.Checksum, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new DomainException("FILE_CHECKSUM_MISMATCH", "Checksum does not match the upload request.", 422);
+        }
+
+        if (!string.IsNullOrWhiteSpace(expectedChecksum) &&
+            !string.Equals(expectedChecksum, inspection.Sha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new DomainException("FILE_CHECKSUM_MISMATCH", "Uploaded file checksum is invalid.", 422);
+        }
+    }
+
+    private static FileReferenceDto Map(FileObject file) =>
+        new(file.Id, file.OriginalFileName, file.ContentType, file.SizeBytes);
 }
 
 public sealed class CreateUploadRequestHandler(

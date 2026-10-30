@@ -58,4 +58,17 @@ public sealed class FileObject
             CreatedAt = now
         };
     }
+
+    public void Complete(string completedObjectKey, string checksum, DateTimeOffset completedAt)
+    {
+        if (Status != FileObjectStatus.PendingUpload)
+        {
+            throw new InvalidOperationException("Only a pending upload can be completed.");
+        }
+
+        ObjectKey = completedObjectKey;
+        Checksum = checksum;
+        Status = FileObjectStatus.Uploaded;
+        CompletedAt = completedAt;
+    }
 }

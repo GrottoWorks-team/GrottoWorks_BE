@@ -18,6 +18,18 @@ public static class NotificationAuditEndpoints
             .Produces<ProblemDetails>(StatusCodes.Status401Unauthorized)
             .Produces<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)
             .Produces<ProblemDetails>(StatusCodes.Status503ServiceUnavailable);
+
+        app.MapPost("/api/v1/files/{fileId:guid}/complete", CompleteUploadAsync)
+            .WithName("completeUpload")
+            .WithTags("Files")
+            .RequireAuthorization()
+            .Produces<ApiResponse<FileReferenceDto>>()
+            .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
+            .Produces<ProblemDetails>(StatusCodes.Status401Unauthorized)
+            .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
+            .Produces<ProblemDetails>(StatusCodes.Status409Conflict)
+            .Produces<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)
+            .Produces<ProblemDetails>(StatusCodes.Status503ServiceUnavailable);
     }
 
     private static async Task<IResult> CreateUploadRequestAsync(
@@ -28,5 +40,16 @@ public static class NotificationAuditEndpoints
     {
         var result = await handler.HandleAsync(request, cancellationToken);
         return Results.Created($"/api/v1/files/{result.FileId}", ApiResults.Ok(result, httpContext));
+    }
+
+    private static async Task<IResult> CompleteUploadAsync(
+        Guid fileId,
+        CompleteUploadRequest request,
+        HttpContext httpContext,
+        CompleteUploadHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(fileId, request, cancellationToken);
+        return Results.Ok(ApiResults.Ok(result, httpContext));
     }
 }

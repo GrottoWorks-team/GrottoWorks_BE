@@ -1,6 +1,6 @@
 namespace TaskExecution.Domain.Tasks;
 
-public sealed class WorkTask
+public sealed partial class WorkTask
 {
     private readonly List<TaskSkill> _skills = [];
 

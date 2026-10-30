@@ -106,4 +106,12 @@ public sealed class TaskAssignment
         RejectedAt = now.ToUniversalTime();
         Version++;
     }
+
+    public void CancelForTask(string reason)
+    {
+        if (Status is not (AssignmentStatus.Pending or AssignmentStatus.Accepted or AssignmentStatus.InProgress)) return;
+        Status = AssignmentStatus.Cancelled;
+        ResponseReason = reason;
+        Version++;
+    }
 }

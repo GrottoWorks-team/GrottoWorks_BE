@@ -19,6 +19,12 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
     {
         BuildScopeModelCore(modelBuilder);
         BuildTaskModel(modelBuilder);
+        modelBuilder.Entity("TaskExecution.Domain.Tasks.WorkTask", builder =>
+        {
+            builder.Property<string>("CancellationReason").HasMaxLength(500).HasColumnName("cancellation_reason").HasColumnType("character varying(500)");
+            builder.Property<Guid?>("CancelledBy").HasColumnName("cancelled_by_user_id").HasColumnType("uuid");
+            builder.Property<DateTimeOffset?>("CancelledAt").HasColumnName("cancelled_at").HasColumnType("timestamp with time zone");
+        });
         BuildAssignmentModel(modelBuilder);
         new TaskExecution.Infrastructure.Events.TaskEventOutboxConfiguration()
             .Configure(modelBuilder.Entity<TaskExecution.Infrastructure.Events.TaskEventOutboxMessage>());

@@ -20,6 +20,7 @@ public sealed class AssignmentRouteTests
         builder.Services.AddScoped<AssignmentService>();
         await using var app = builder.Build();
         app.MapAssignmentEndpoints();
+        app.MapApplicationEndpoints();
         var endpoints = ((IEndpointRouteBuilder)app).DataSources.SelectMany(source=>source.Endpoints).OfType<RouteEndpoint>().ToList();
         var create = endpoints.Single(endpoint=>endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName=="assignVolunteer");
         create.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId:guid}/assignments");
@@ -28,6 +29,14 @@ public sealed class AssignmentRouteTests
         create.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Select(data=>data.StatusCode)
             .Should().Contain(new[] {201,400,401,403,404,409,412,422,503});
         endpoints.Should().Contain(endpoint=>endpoint.Metadata.GetMetadata<EndpointNameMetadata>()!.EndpointName=="listTaskAssignments");
+        foreach (var name in new[] { "applyForTask", "listTaskApplications" })
+        {
+            var route = endpoints.Single(e => e.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == name);
+            route.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId:guid}/applications");
+            var expectedRole = name == "applyForTask" ? "VOLUNTEER" : "LEADER";
+            route.Metadata.GetOrderedMetadata<AuthorizationPolicy>().SelectMany(p => p.Requirements)
+                .OfType<RolesAuthorizationRequirement>().Should().Contain(r => r.AllowedRoles.Contains(expectedRole));
+        }
         foreach(var name in new[] {"acceptTaskAssignment","declineTaskAssignment"})
         {
             var response=endpoints.Single(endpoint=>endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName==name);

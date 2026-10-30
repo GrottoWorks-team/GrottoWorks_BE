@@ -53,6 +53,20 @@ public sealed class TaskAssignment
             throw new DomainRuleException("TASK_ASSIGNMENT_VERSION_MISMATCH", "The assignment changed.", DomainErrorKind.PreconditionFailed);
     }
 
+    public static TaskAssignment Apply(Guid taskId, Guid volunteerId, string? note, DateTimeOffset now)
+    {
+        if (taskId == Guid.Empty || volunteerId == Guid.Empty)
+            throw DomainRuleException.Validation("ASSIGNMENT_IDENTITY_INVALID", "Task and volunteer are required.");
+        if (note?.Length > 2000)
+            throw DomainRuleException.Validation("ASSIGNMENT_NOTE_INVALID", "Note must not exceed 2000 characters.");
+        return new TaskAssignment
+        {
+            Id = Guid.NewGuid(), TaskId = taskId, VolunteerId = volunteerId,
+            Type = AssignmentType.Application, Status = AssignmentStatus.Pending,
+            RequestedAt = now.ToUniversalTime(), Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim()
+        };
+    }
+
     public void Accept(int? expectedVersion, DateTimeOffset now)
     {
         EnsureVersion(expectedVersion);

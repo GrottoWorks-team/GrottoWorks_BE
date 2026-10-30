@@ -64,6 +64,12 @@ internal sealed class AssignmentTestFixture
             System.Threading.Tasks.Task.FromResult<IReadOnlyList<TaskAssignment>>(Items.Where(row=>row.TaskId==id).ToList());
         public Task<TaskAssignment?> GetAsync(Guid id,CancellationToken ct) =>
             System.Threading.Tasks.Task.FromResult(Items.SingleOrDefault(row=>row.Id==id));
+        public Task<(IReadOnlyList<TaskAssignment> Items,long Total)> ApplicationsPageAsync(Guid id,int page,int size,bool descending,CancellationToken ct)
+        {
+            var rows = Items.Where(row => row.TaskId == id && row.Type == AssignmentType.Application).OrderBy(row=>row.RequestedAt).ThenBy(row=>row.Id).ToList();
+            if (descending) rows.Reverse();
+            return System.Threading.Tasks.Task.FromResult<(IReadOnlyList<TaskAssignment>,long)>((rows.Skip((page-1)*size).Take(size).ToList(),rows.Count));
+        }
         public Task<bool> HasScheduleConflictAsync(Guid volunteer,Guid task,DateTimeOffset? start,DateTimeOffset end,CancellationToken ct) =>
             System.Threading.Tasks.Task.FromResult(ScheduleConflict);
         public void Add(TaskAssignment row) => Items.Add(row);

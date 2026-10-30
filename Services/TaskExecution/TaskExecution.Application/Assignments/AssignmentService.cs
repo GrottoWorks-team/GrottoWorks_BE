@@ -23,7 +23,7 @@ public sealed record AssignmentDto(Guid Id, Guid TaskId, Guid VolunteerId, Assig
         row.RequestedAt, row.AssignedAt, row.ApprovedAt, row.RejectedAt, warnings ?? [], row.ResponseReason);
 }
 
-public sealed class AssignmentService(IAssignmentStore assignments, ITaskRepository tasks,
+public sealed partial class AssignmentService(IAssignmentStore assignments, ITaskRepository tasks,
     TaskScopeAccess scopeAccess, ActiveUserAccess users, ICurrentUser user, TaskEventRecorder events)
 {
     public async Task<AssignmentDto> RespondAsync(Guid assignmentId, bool accept, string? reason, int? expectedVersion,

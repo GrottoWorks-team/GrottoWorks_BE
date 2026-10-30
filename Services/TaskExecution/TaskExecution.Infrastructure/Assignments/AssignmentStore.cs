@@ -42,6 +42,16 @@ public sealed class AssignmentStore(TaskExecutionDbContext db) : IAssignmentStor
     public Task<TaskAssignment?> GetAsync(Guid assignmentId, CancellationToken cancellationToken) =>
         db.Assignments.SingleOrDefaultAsync(row => row.Id == assignmentId, cancellationToken);
 
+    public async Task<(IReadOnlyList<TaskAssignment> Items, long Total)> ApplicationsPageAsync(Guid taskId, int page, int size,
+        bool descending, CancellationToken cancellationToken)
+    {
+        var query = db.Assignments.AsNoTracking().Where(row => row.TaskId == taskId && row.Type == AssignmentType.Application);
+        var total = await query.LongCountAsync(cancellationToken);
+        var sorted = descending ? query.OrderByDescending(row => row.RequestedAt).ThenBy(row => row.Id)
+            : query.OrderBy(row => row.RequestedAt).ThenBy(row => row.Id);
+        return (await sorted.Skip((page - 1) * size).Take(size).ToListAsync(cancellationToken), total);
+    }
+
     public async Task<bool> HasScheduleConflictAsync(Guid volunteerId, Guid taskId, DateTimeOffset? startAt,
         DateTimeOffset deadline, CancellationToken cancellationToken)
     {

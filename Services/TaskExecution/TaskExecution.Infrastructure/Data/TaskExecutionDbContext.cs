@@ -11,6 +11,7 @@ public sealed class TaskExecutionDbContext(DbContextOptions<TaskExecutionDbConte
     public DbSet<WorkAreaScope> WorkAreaScopes => Set<WorkAreaScope>();
     public DbSet<WorkTask> Tasks => Set<WorkTask>();
     public DbSet<TaskSkill> TaskSkills => Set<TaskSkill>();
+    public DbSet<TaskExecution.Domain.Assignments.TaskAssignment> Assignments => Set<TaskExecution.Domain.Assignments.TaskAssignment>();
     public DbSet<TaskExecution.Infrastructure.Events.TaskEventOutboxMessage> EventOutbox => Set<TaskExecution.Infrastructure.Events.TaskEventOutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

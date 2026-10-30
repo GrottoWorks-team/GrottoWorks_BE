@@ -6,5 +6,6 @@ public static class TaskExecutionEndpoints
     {
         app.MapInternalScopeEndpoints();
         app.MapTaskEndpoints();
+        app.MapAssignmentEndpoints();
     }
 }

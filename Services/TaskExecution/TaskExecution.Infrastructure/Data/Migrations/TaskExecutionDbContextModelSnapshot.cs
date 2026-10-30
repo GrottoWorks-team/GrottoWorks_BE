@@ -19,8 +19,36 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
     {
         BuildScopeModelCore(modelBuilder);
         BuildTaskModel(modelBuilder);
+        BuildAssignmentModel(modelBuilder);
         new TaskExecution.Infrastructure.Events.TaskEventOutboxConfiguration()
             .Configure(modelBuilder.Entity<TaskExecution.Infrastructure.Events.TaskEventOutboxMessage>());
+    }
+
+    private static void BuildAssignmentModel(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity("TaskExecution.Domain.Assignments.TaskAssignment", builder =>
+        {
+            builder.Property<Guid>("Id").HasColumnName("task_assignment_id").HasColumnType("uuid");
+            builder.Property<Guid>("TaskId").HasColumnName("task_id").HasColumnType("uuid");
+            builder.Property<Guid>("VolunteerId").HasColumnName("volunteer_user_id").HasColumnType("uuid");
+            builder.Property<string>("Type").IsRequired().HasMaxLength(40).HasColumnName("assignment_type").HasColumnType("character varying(40)");
+            builder.Property<string>("Status").IsRequired().HasMaxLength(30).HasColumnName("assignment_status").HasColumnType("character varying(30)");
+            builder.Property<string>("Note").HasMaxLength(2000).HasColumnName("assignment_note").HasColumnType("character varying(2000)");
+            builder.Property<string>("OverrideReason").HasMaxLength(500).HasColumnName("override_reason").HasColumnType("character varying(500)");
+            builder.Property<bool>("OverrideCapacity").HasColumnName("override_capacity").HasColumnType("boolean");
+            builder.Property<bool>("OverrideSkillMismatch").HasColumnName("override_skill_mismatch").HasColumnType("boolean");
+            builder.Property<Guid?>("AssignedBy").HasColumnName("assigned_by_user_id").HasColumnType("uuid");
+            builder.Property<DateTimeOffset?>("RequestedAt").HasColumnName("requested_at").HasColumnType("timestamp with time zone");
+            builder.Property<DateTimeOffset?>("AssignedAt").HasColumnName("assigned_at").HasColumnType("timestamp with time zone");
+            builder.Property<DateTimeOffset?>("ApprovedAt").HasColumnName("approved_at").HasColumnType("timestamp with time zone");
+            builder.Property<DateTimeOffset?>("RejectedAt").HasColumnName("rejected_at").HasColumnType("timestamp with time zone");
+            builder.Property<int>("Version").IsConcurrencyToken().ValueGeneratedOnAdd().HasDefaultValue(1).HasColumnName("version").HasColumnType("integer");
+            builder.HasKey("Id");
+            builder.HasIndex("TaskId","VolunteerId").IsUnique().HasFilter("assignment_status IN ('PENDING','ACCEPTED','IN_PROGRESS','COMPLETED')").HasDatabaseName("ux_task_assignment_active_volunteer");
+            builder.HasIndex("VolunteerId").HasDatabaseName("ix_task_assignment_volunteer");
+            builder.ToTable("task_assignment");
+            builder.HasOne("TaskExecution.Domain.Tasks.WorkTask", null).WithMany().HasForeignKey("TaskId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+        });
     }
 
     private static void BuildScopeModelCore(ModelBuilder modelBuilder)

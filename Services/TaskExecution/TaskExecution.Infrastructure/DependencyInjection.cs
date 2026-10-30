@@ -25,6 +25,12 @@ public static class DependencyInjection
         services.AddScoped<IScopeProjectionStore, ScopeProjectionStore>();
         services.AddScoped<IScopeSnapshotTransaction, ScopeSnapshotTransaction>();
         services.AddScoped<ITaskRepository, TaskRepository>();
+        services.AddScoped<TaskExecution.Application.Assignments.IAssignmentStore, TaskExecution.Infrastructure.Assignments.AssignmentStore>();
+        services.AddHttpClient<TaskExecution.Application.Users.IIdentityUserLookup, TaskExecution.Infrastructure.Identity.IdentityUserLookup>(client =>
+        {
+            client.BaseAddress = new Uri(configuration["IdentityClient:BaseAddress"] ?? "http://localhost:6100/");
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<TaskExecution.Application.Events.ITaskEventOutbox, TaskExecution.Infrastructure.Events.TaskEventOutbox>();
         return services;
     }

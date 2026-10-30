@@ -239,6 +239,12 @@ public sealed class WorkTask
         Version++;
     }
 
+    public void RegisterAssignmentChange(DateTimeOffset now)
+    {
+        Version++;
+        UpdatedAt = now.ToUniversalTime();
+    }
+
     private static IReadOnlyList<TaskSkillRequirement> NormalizeSkillRequirements(
         IReadOnlyCollection<TaskSkillRequirement> requirements)
     {

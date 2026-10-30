@@ -24,6 +24,7 @@ public sealed class DomainRuleTranslationMiddleware(RequestDelegate next)
         DomainErrorKind.Forbidden => StatusCodes.Status403Forbidden,
         DomainErrorKind.BadRequest => StatusCodes.Status400BadRequest,
         DomainErrorKind.PreconditionFailed => StatusCodes.Status412PreconditionFailed,
+        DomainErrorKind.ServiceUnavailable => StatusCodes.Status503ServiceUnavailable,
         _ => StatusCodes.Status409Conflict
     };
 }

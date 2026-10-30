@@ -152,6 +152,7 @@ services:
 
   taskexecution.api:
     environment:
+      - IdentityClient__BaseAddress=http://identity.api:8080/
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__TaskExecutionDatabase=Host=postgres;Port=5432;Database=task_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true

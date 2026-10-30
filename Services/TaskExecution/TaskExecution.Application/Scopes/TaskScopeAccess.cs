@@ -49,4 +49,12 @@ public sealed class TaskScopeAccess(IScopeProjectionStore scopes, ICurrentUser c
 
         return (workArea, season);
     }
+
+    public async Task<WorkAreaScope> GetWorkAreaForLeaderReadAsync(Guid workAreaId, CancellationToken cancellationToken = default)
+    {
+        var area = await GetWorkAreaForReadAsync(workAreaId, cancellationToken);
+        if (currentUser.Role != GrottoWorksRoles.Leader || area.LeaderUserId != currentUser.UserId)
+            throw DomainRuleException.Forbidden("WORK_AREA_ACCESS_DENIED", "Only the assigned leader can read this information.");
+        return area;
+    }
 }

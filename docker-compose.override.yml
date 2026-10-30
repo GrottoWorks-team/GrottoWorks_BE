@@ -83,6 +83,10 @@ services:
 
   parishcoordination.api:
     environment:
+      - TaskScopeSync__Enabled=true
+      - TaskScopeSync__BaseAddress=http://taskexecution.api:8080/
+      - TaskScopeSync__PollIntervalSeconds=2
+      - TaskScopeSync__RequestTimeoutSeconds=10
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__ParishCoordinationDatabase=Host=postgres;Port=5432;Database=parish_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true

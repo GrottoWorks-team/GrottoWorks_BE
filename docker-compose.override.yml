@@ -55,6 +55,7 @@ services:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-grottoworks}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-grottoworks_minio_1234}
       - MINIO_CONSOLE_PORT_NUMBER=9001
+      - MINIO_API_CORS_ALLOW_ORIGIN=${FRONTEND_ORIGIN:-http://localhost:5173}
     restart: always
     ports:
       - "9000:9000"
@@ -173,10 +174,18 @@ services:
       - ConnectionStrings__NotificationAuditDatabase=Host=postgres;Port=5432;Database=notify_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
       - Jwt__SigningKey=${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY (>= 32 chars) in .env}
       - InternalApi__ApiKey=${INTERNAL_API_KEY:-dev-internal-api-key-change-me-0123456789}
+      - ObjectStorage__InternalEndpoint=http://minio:9000
+      - ObjectStorage__PublicEndpoint=${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
+      - ObjectStorage__AccessKey=${MINIO_ROOT_USER:-grottoworks}
+      - ObjectStorage__SecretKey=${MINIO_ROOT_PASSWORD:-grottoworks_minio_1234}
+      - ObjectStorage__Bucket=grottoworks-files
+      - FileUpload__AllowOtherPdf=${ALLOW_OTHER_PDF_UPLOADS:-false}
       - Database__MigrateOnStartup=true
     depends_on:
       postgres:
         condition: service_healthy
+      minio:
+        condition: service_started
     ports:
       - "6107:8080"
 

@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\BuildingBlocks.Security\BuildingBlocks.Security.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\BuildingBlocks.Web\BuildingBlocks.Web.csproj" />
     <ProjectReference Include="..\NotificationAudit.Contracts\NotificationAudit.Contracts.csproj" />
     <ProjectReference Include="..\NotificationAudit.Domain\NotificationAudit.Domain.csproj" />
   </ItemGroup>

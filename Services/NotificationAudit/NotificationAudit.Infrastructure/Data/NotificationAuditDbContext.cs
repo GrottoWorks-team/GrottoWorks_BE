@@ -1,10 +1,13 @@
 using Microsoft.EntityFrameworkCore;
+using NotificationAudit.Domain.Files;
 
 namespace NotificationAudit.Infrastructure.Data;
 
 public sealed class NotificationAuditDbContext(DbContextOptions<NotificationAuditDbContext> options)
     : DbContext(options)
 {
+    public DbSet<FileObject> FileObjects => Set<FileObject>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(NotificationAuditDbContext).Assembly);
 }

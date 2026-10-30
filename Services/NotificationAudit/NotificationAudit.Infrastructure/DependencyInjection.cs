@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NotificationAudit.Infrastructure.Data;
+using NotificationAudit.Application.Files;
+using NotificationAudit.Infrastructure.Files;
 
 namespace NotificationAudit.Infrastructure;
 
@@ -16,6 +18,11 @@ public static class DependencyInjection
         }
 
         services.AddDbContext<NotificationAuditDbContext>(options => options.UseNpgsql(connectionString));
+        services.Configure<ObjectStorageOptions>(configuration.GetSection(ObjectStorageOptions.SectionName));
+        services.Configure<FileUploadOptions>(configuration.GetSection(FileUploadOptions.SectionName));
+        services.AddScoped<IFileObjectRepository, FileObjectRepository>();
+        services.AddScoped<IFileObjectStorage, MinioFileObjectStorage>();
+        services.AddHostedService<MinioBucketInitializer>();
         return services;
     }
 }

@@ -24,6 +24,7 @@ public sealed class AttendanceRouteTests
         app.MapCheckOutEndpoints();
         app.MapAttendanceQueryEndpoints();
         app.MapAttendanceCorrectionEndpoints();
+        app.MapAttendanceCorrectionReviewEndpoints();
         var endpoints=((IEndpointRouteBuilder)app).DataSources.SelectMany(s=>s.Endpoints).OfType<RouteEndpoint>().ToList();
         foreach(var name in new[] {"requestCheckIn","cancelCheckInRequest","recordCheckOut"})
         {
@@ -38,7 +39,7 @@ public sealed class AttendanceRouteTests
         endpoints.Should().Contain(e=>e.Metadata.GetMetadata<EndpointNameMetadata>()!.EndpointName=="listAttendanceCorrections");
         hours.Metadata.GetOrderedMetadata<AuthorizationPolicy>().SelectMany(p=>p.Requirements)
             .OfType<RolesAuthorizationRequirement>().Single().AllowedRoles.Should().BeEquivalentTo("PARISH","LEADER");
-        foreach(var name in new[] {"listAttendanceRequests","approveAttendanceRequest","rejectAttendanceRequest"})
+        foreach(var name in new[] {"listAttendanceRequests","approveAttendanceRequest","rejectAttendanceRequest","approveAttendanceCorrection","rejectAttendanceCorrection"})
         {
             var route=endpoints.Single(e=>e.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName==name);
             route.Metadata.GetOrderedMetadata<AuthorizationPolicy>().SelectMany(p=>p.Requirements)

@@ -42,6 +42,14 @@ public sealed class AttendanceSession
             throw new DomainRuleException("ATTENDANCE_VERSION_MISMATCH","The session changed.",DomainErrorKind.PreconditionFailed);
     }
 
+    public void Correct(DateTimeOffset start,DateTimeOffset end,int expectedVersion)
+    {
+        EnsureVersion(expectedVersion);
+        SetApprovedTimes(start,end);
+        Status=AttendanceStatus.Corrected;
+        Version++;
+    }
+
     private void SetApprovedTimes(DateTimeOffset start,DateTimeOffset end)
     {
         if (end<=start || (end-start).TotalMinutes>599999)

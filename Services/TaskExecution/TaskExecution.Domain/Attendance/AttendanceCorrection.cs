@@ -36,4 +36,22 @@ public sealed class AttendanceCorrection
             Status=AttendanceCorrectionStatus.Pending,CreatedAt=now.ToUniversalTime()
         };
     }
+
+    public void EnsureReviewAllowed(bool approve,string? note,int? version)
+    {
+        if (version.HasValue && version!=Version)
+            throw new DomainRuleException("ATTENDANCE_VERSION_MISMATCH","The correction changed.",DomainErrorKind.PreconditionFailed);
+        if (Status!=AttendanceCorrectionStatus.Pending)
+            throw new DomainRuleException("ATTENDANCE_CORRECTION_INVALID_STATE","Only a pending correction can be reviewed.");
+        if ((!approve && string.IsNullOrWhiteSpace(note)) || note?.Trim().Length>2000)
+            throw DomainRuleException.Validation("ATTENDANCE_REVIEW_NOTE_REQUIRED","Rejection requires a note (maximum 2000 characters).");
+    }
+
+    public void Review(bool approve,Guid reviewer,string? note,int? version,DateTimeOffset now)
+    {
+        EnsureReviewAllowed(approve,note,version);
+        Status=approve ? AttendanceCorrectionStatus.Approved : AttendanceCorrectionStatus.Rejected;
+        ReviewedBy=reviewer;ReviewNote=string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        ReviewedAt=now.ToUniversalTime();Version++;
+    }
 }

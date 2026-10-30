@@ -18,6 +18,44 @@ public sealed record TaskApplicationDto(Guid Id, Guid TaskId, Guid VolunteerId, 
 
 public sealed partial class AssignmentService
 {
+    public async Task<AssignmentDto> ApproveApplicationAsync(Guid id, int? version, CancellationToken cancellationToken = default) =>
+        AssignmentDto.From(await ReviewApplicationAsync(id, true, null, version, cancellationToken));
+
+    public async Task<TaskApplicationDto> RejectApplicationAsync(Guid id, string reason, int? version, CancellationToken cancellationToken = default) =>
+        TaskApplicationDto.From(await ReviewApplicationAsync(id, false, reason, version, cancellationToken));
+
+    private async Task<TaskAssignment> ReviewApplicationAsync(Guid id, bool approve, string? reason, int? version, CancellationToken cancellationToken)
+    {
+        var row = await assignments.GetAsync(id, cancellationToken);
+        if (row is null || row.Type != AssignmentType.Application)
+            throw DomainRuleException.NotFound("TASK_APPLICATION_NOT_FOUND", "The application does not exist.");
+        return await assignments.InTaskTransactionAsync(row.TaskId, async () =>
+        {
+            var task = await tasks.GetByIdForUpdateAsync(row.TaskId, cancellationToken)
+                ?? throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
+            var (area, _) = await scopeAccess.GetWorkAreaForLeaderWriteAsync(task.WorkAreaId, cancellationToken);
+            await users.EnsureCallerAsync(area.ParishId, cancellationToken);
+            task.EnsurePlanningCanBeUpdated(null);
+            row.EnsureVersion(version);
+            if (approve)
+            {
+                var volunteer = await users.EnsureActiveAsync(row.VolunteerId, area.ParishId, GrottoWorksRoles.Volunteer, cancellationToken);
+                var existing = await assignments.ListAsync(task.Id, cancellationToken);
+                EnsureCapacity(existing, task.RequiredVolunteerCount, false);
+                EnsureSkills(task, volunteer, false);
+            }
+            row.ReviewApplication(approve, user.UserId, reason, version, DateTimeOffset.UtcNow);
+            task.RegisterAssignmentChange(DateTimeOffset.UtcNow);
+            events.Record(TaskEventTypes.AssignmentResponded, task, area, new
+            {
+                assignmentId = row.Id, taskId = task.Id, workAreaId = area.WorkAreaId,
+                volunteerUserId = row.VolunteerId, decision = approve ? "ACCEPTED" : "REJECTED", reason = row.ResponseReason
+            });
+            await assignments.SaveAsync(cancellationToken);
+            return row;
+        }, cancellationToken);
+    }
+
     public async Task<TaskApplicationDto> ApplyAsync(Guid taskId, string? note, CancellationToken cancellationToken = default)
     {
         return await assignments.InTaskTransactionAsync(taskId, async () =>

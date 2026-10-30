@@ -45,5 +45,13 @@ public sealed class AssignmentRouteTests
             response.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Select(data=>data.StatusCode)
                 .Should().Contain(new[] {200,400,401,403,404,409,412,422,503});
         }
+        foreach (var name in new[] {"approveTaskApplication", "rejectTaskApplication"})
+        {
+            var route = endpoints.Single(e=>e.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName==name);
+            route.Metadata.GetOrderedMetadata<AuthorizationPolicy>().SelectMany(p=>p.Requirements)
+                .OfType<RolesAuthorizationRequirement>().Should().Contain(r=>r.AllowedRoles.Contains("LEADER"));
+            route.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Select(p=>p.StatusCode)
+                .Should().Contain(new[] {200,400,401,403,404,409,412,422,503});
+        }
     }
 }

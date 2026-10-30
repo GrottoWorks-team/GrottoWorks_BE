@@ -77,6 +77,22 @@ public sealed class TaskAssignment
         Version++;
     }
 
+    public void ReviewApplication(bool approve, Guid reviewerId, string? reason, int? expectedVersion, DateTimeOffset now)
+    {
+        EnsureVersion(expectedVersion);
+        if (Type != AssignmentType.Application || Status != AssignmentStatus.Pending)
+            throw new DomainRuleException("TASK_APPLICATION_INVALID_STATE", "Only a pending application can be reviewed.");
+        var normalized = reason?.Trim();
+        if (!approve && (string.IsNullOrWhiteSpace(normalized) || normalized.Length > 500))
+            throw DomainRuleException.Validation("ASSIGNMENT_REASON_REQUIRED", "Rejection requires a reason of 1–500 characters.");
+        AssignedBy = reviewerId;
+        ResponseReason = approve ? null : normalized;
+        Status = approve ? AssignmentStatus.Accepted : AssignmentStatus.Declined;
+        if (approve) ApprovedAt = AssignedAt = now.ToUniversalTime();
+        else RejectedAt = now.ToUniversalTime();
+        Version++;
+    }
+
     public void Decline(string reason, int? expectedVersion, DateTimeOffset now)
     {
         EnsureVersion(expectedVersion);

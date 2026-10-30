@@ -20,8 +20,9 @@ public sealed class AttendanceRouteTests
         await using var app=builder.Build();
         app.MapAttendanceEndpoints();
         app.MapAttendanceReviewEndpoints();
+        app.MapCheckOutEndpoints();
         var endpoints=((IEndpointRouteBuilder)app).DataSources.SelectMany(s=>s.Endpoints).OfType<RouteEndpoint>().ToList();
-        foreach(var name in new[] {"requestCheckIn","cancelCheckInRequest"})
+        foreach(var name in new[] {"requestCheckIn","cancelCheckInRequest","recordCheckOut"})
         {
             var route=endpoints.Single(e=>e.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName==name);
             route.Metadata.GetOrderedMetadata<AuthorizationPolicy>().SelectMany(p=>p.Requirements)

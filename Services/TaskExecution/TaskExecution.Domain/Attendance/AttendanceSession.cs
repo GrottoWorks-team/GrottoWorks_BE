@@ -25,4 +25,29 @@ public sealed class AttendanceSession
             CheckInAt=request.RequestedAt,Status=AttendanceStatus.Open
         };
     }
+
+    public void Close(DateTimeOffset serverTime,int? expectedVersion)
+    {
+        EnsureVersion(expectedVersion);
+        if (Status!=AttendanceStatus.Open)
+            throw new DomainRuleException("ATTENDANCE_NOT_OPEN","Only an open session can check out.");
+        SetApprovedTimes(CheckInAt,serverTime);
+        Status=AttendanceStatus.Closed;
+        Version++;
+    }
+
+    public void EnsureVersion(int? version)
+    {
+        if (version.HasValue && version!=Version)
+            throw new DomainRuleException("ATTENDANCE_VERSION_MISMATCH","The session changed.",DomainErrorKind.PreconditionFailed);
+    }
+
+    private void SetApprovedTimes(DateTimeOffset start,DateTimeOffset end)
+    {
+        if (end<=start || (end-start).TotalMinutes>599999)
+            throw DomainRuleException.Validation("ATTENDANCE_TIME_INVALID","Check-out must follow check-in and duration must fit the working-hours limit.");
+        CheckInAt=start.ToUniversalTime();CheckOutAt=end.ToUniversalTime();
+        ApprovedMinutes=(int)Math.Floor((end-start).TotalMinutes);
+        WorkingHours=decimal.Round(ApprovedMinutes/60m,2,MidpointRounding.AwayFromZero);
+    }
 }

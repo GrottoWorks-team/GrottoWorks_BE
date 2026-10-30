@@ -20,6 +20,7 @@ internal sealed partial class AttendanceTestStore(AssignmentTestFixture fixture)
         return Task.FromResult<(IReadOnlyList<AttendanceRequest>,long)>((query.Skip((page-1)*size).Take(size).ToList(),query.Count));
     }
     public Task<AttendanceSession?> SessionAsync(Guid id,CancellationToken ct)=>Task.FromResult(Sessions.SingleOrDefault(r=>r.Id==id));
+    public Task<AttendanceSession?> OpenSessionAsync(Guid id,CancellationToken ct)=>Task.FromResult(Sessions.SingleOrDefault(r=>r.AssignmentId==id && !r.CheckOutAt.HasValue));
     public Task<bool> HasPendingOrOpenAsync(Guid id,CancellationToken ct)=>Task.FromResult(
         Requests.Any(r=>r.VolunteerId==id && r.Status==AttendanceRequestStatus.Pending) ||
         Sessions.Any(s=>!s.CheckOutAt.HasValue && fixture.Store.Items.Any(a=>a.Id==s.AssignmentId && a.VolunteerId==id)));

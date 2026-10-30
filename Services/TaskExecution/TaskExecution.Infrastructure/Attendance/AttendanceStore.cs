@@ -27,6 +27,7 @@ public sealed partial class AttendanceStore(TaskExecutionDbContext db) : IAttend
 
     public Task<AttendanceRequest?> RequestAsync(Guid id,CancellationToken ct) => db.AttendanceRequests.SingleOrDefaultAsync(r=>r.Id==id,ct);
     public Task<AttendanceSession?> SessionAsync(Guid id,CancellationToken ct) => db.AttendanceSessions.SingleOrDefaultAsync(r=>r.Id==id,ct);
+    public Task<AttendanceSession?> OpenSessionAsync(Guid id,CancellationToken ct) => db.AttendanceSessions.SingleOrDefaultAsync(r=>r.AssignmentId==id && r.CheckOutAt==null,ct);
     public async Task<bool> HasPendingOrOpenAsync(Guid volunteerId,CancellationToken ct) =>
         await db.AttendanceRequests.AnyAsync(r=>r.VolunteerId==volunteerId && r.Status==AttendanceRequestStatus.Pending,ct) ||
         await (from s in db.AttendanceSessions join a in db.Assignments on s.AssignmentId equals a.Id

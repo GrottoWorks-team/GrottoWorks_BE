@@ -44,6 +44,10 @@ internal sealed class AssignmentTestFixture
         new(store,Store,new TestTasks(Task),new TaskScopeAccess(new TestScopes(Season,Area),User),
             new ActiveUserAccess(Identity,User),User,new TaskEventRecorder(Events,User,new TestCorrelation()));
 
+    public TaskExecution.Application.Attendance.AttendanceAlertProcessor Alerts(TaskExecution.Application.Attendance.ILongOpenAttendanceStore alerts,
+        TaskExecution.Application.Attendance.IAttendanceStore store) => new(alerts,store,Store,new TestTasks(Task),new TestScopes(Season,Area),
+            new TaskEventRecorder(Events,User,new TestCorrelation()),new());
+
     internal sealed class TestUser : ICurrentUser
     {
         public bool IsAuthenticated => true;

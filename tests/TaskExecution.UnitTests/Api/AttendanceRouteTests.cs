@@ -18,6 +18,7 @@ public sealed class AttendanceRouteTests
         var builder=WebApplication.CreateBuilder(new WebApplicationOptions {EnvironmentName="Testing"});
         builder.Services.AddScoped<AttendanceService>();
         builder.Services.AddScoped<AttendanceQueries>();
+        builder.Services.AddScoped<LongOpenAttendanceQuery>();
         await using var app=builder.Build();
         app.MapAttendanceEndpoints();
         app.MapAttendanceReviewEndpoints();
@@ -25,6 +26,7 @@ public sealed class AttendanceRouteTests
         app.MapAttendanceQueryEndpoints();
         app.MapAttendanceCorrectionEndpoints();
         app.MapAttendanceCorrectionReviewEndpoints();
+        app.MapLongOpenAttendanceEndpoints();
         var endpoints=((IEndpointRouteBuilder)app).DataSources.SelectMany(s=>s.Endpoints).OfType<RouteEndpoint>().ToList();
         foreach(var name in new[] {"requestCheckIn","cancelCheckInRequest","recordCheckOut"})
         {

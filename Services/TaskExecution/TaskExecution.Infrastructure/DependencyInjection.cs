@@ -28,6 +28,11 @@ public static class DependencyInjection
         services.AddScoped<IMyTasksStore, MyTasksStore>();
         services.AddScoped<TaskExecution.Application.Attendance.IAttendanceStore, TaskExecution.Infrastructure.Attendance.AttendanceStore>();
         services.AddScoped<TaskExecution.Application.Attendance.IAttendanceReadStore, TaskExecution.Infrastructure.Attendance.AttendanceReadStore>();
+        services.AddScoped<TaskExecution.Application.Attendance.ILongOpenAttendanceStore, TaskExecution.Infrastructure.Attendance.LongOpenAttendanceStore>();
+        var longOpenHours=configuration.GetValue("Attendance:LongOpenHours",12);
+        if (longOpenHours is <1 or >9999) throw new InvalidOperationException("Attendance:LongOpenHours must be between 1 and 9999.");
+        services.AddSingleton(new TaskExecution.Application.Attendance.LongOpenAttendanceOptions(longOpenHours*60));
+        services.AddHostedService<TaskExecution.Infrastructure.Attendance.AttendanceAlertWorker>();
         services.AddScoped<TaskExecution.Application.Assignments.IAssignmentStore, TaskExecution.Infrastructure.Assignments.AssignmentStore>();
         services.AddHttpClient<TaskExecution.Application.Users.IIdentityUserLookup, TaskExecution.Infrastructure.Identity.IdentityUserLookup>(client =>
         {

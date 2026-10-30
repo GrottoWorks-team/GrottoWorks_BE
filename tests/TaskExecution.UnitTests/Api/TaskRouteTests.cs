@@ -42,7 +42,7 @@ public sealed class TaskRouteTests
         var skills = endpoints.Single(endpoint =>
             endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == "replaceTaskSkills");
         var ready = endpoints.Single(endpoint =>
-            endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == "readyTask");
+            endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == "markTaskReady");
 
         list.RoutePattern.RawText.Should().Be("/api/v1/work-areas/{workAreaId}/tasks");
         detail.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId}");
@@ -72,7 +72,7 @@ public sealed class TaskRouteTests
             .Should().Contain(data => data.Roles == GrottoWorksRoles.Leader);
         skills.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
             .Select(metadata => metadata.StatusCode).Should().Contain([200, 400, 401, 403, 404, 409, 412, 422]);
-        ready.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId}/ready");
+        ready.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId:guid}/ready");
         ready.Metadata.GetOrderedMetadata<IAuthorizeData>()
             .Should().Contain(data => data.Roles == GrottoWorksRoles.Leader);
         ready.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()

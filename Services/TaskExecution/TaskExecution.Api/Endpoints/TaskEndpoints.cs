@@ -83,7 +83,7 @@ public static class TaskEndpoints
             .Produces<ProblemDetails>(StatusCodes.Status422UnprocessableEntity);
 
         group.MapPost("/tasks/{taskId:guid}/ready", ReadyTaskAsync)
-            .WithName("readyTask")
+            .WithName("markTaskReady")
             .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
             .Produces<ApiResponse<TaskDto>>()
             .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
@@ -91,7 +91,8 @@ public static class TaskEndpoints
             .Produces<ProblemDetails>(StatusCodes.Status403Forbidden)
             .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
             .Produces<ProblemDetails>(StatusCodes.Status409Conflict)
-            .Produces<ProblemDetails>(StatusCodes.Status412PreconditionFailed);
+            .Produces<ProblemDetails>(StatusCodes.Status412PreconditionFailed)
+            .Produces<ProblemDetails>(StatusCodes.Status422UnprocessableEntity);
     }
 
     private static async Task<IResult> ListTasksAsync(
@@ -244,16 +245,13 @@ public static class TaskEndpoints
 
     private static async Task<IResult> ReadyTaskAsync(
         Guid taskId,
+        [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] VersionedCommandRequest? request,
         [FromHeader(Name = "If-Match")] string? ifMatch,
         HttpContext httpContext,
         ReadyTaskCommandHandler handler,
         CancellationToken cancellationToken)
     {
-        if (!TaskVersionPrecondition.TryParse(ifMatch, out var expectedVersion))
-        {
-            return InvalidIfMatch(httpContext);
-        }
-
+        var expectedVersion = TaskVersionPrecondition.Resolve(request?.Version, ifMatch);
         var task = await handler.HandleAsync(
             new ReadyTaskCommand(taskId, expectedVersion),
             cancellationToken);

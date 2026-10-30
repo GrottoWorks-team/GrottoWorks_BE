@@ -25,6 +25,7 @@ public static class DependencyInjection
         services.AddScoped<IScopeProjectionStore, ScopeProjectionStore>();
         services.AddScoped<IScopeSnapshotTransaction, ScopeSnapshotTransaction>();
         services.AddScoped<ITaskRepository, TaskRepository>();
+        services.AddScoped<TaskExecution.Application.Events.ITaskEventOutbox, TaskExecution.Infrastructure.Events.TaskEventOutbox>();
         return services;
     }
 }

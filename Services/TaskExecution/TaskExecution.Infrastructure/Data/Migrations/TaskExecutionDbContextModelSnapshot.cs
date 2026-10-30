@@ -19,6 +19,8 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
     {
         BuildScopeModelCore(modelBuilder);
         BuildTaskModel(modelBuilder);
+        new TaskExecution.Infrastructure.Events.TaskEventOutboxConfiguration()
+            .Configure(modelBuilder.Entity<TaskExecution.Infrastructure.Events.TaskEventOutboxMessage>());
     }
 
     private static void BuildScopeModelCore(ModelBuilder modelBuilder)

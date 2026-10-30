@@ -130,7 +130,7 @@ public sealed class UpdateTaskCommandHandlerTests
         var currentUser = new FakeCurrentUser(userId, parishId);
         var repository = new FakeTaskRepository(task);
         var access = new TaskScopeAccess(new FakeScopeStore(season, workArea), currentUser);
-        return new Fixture(new UpdateTaskCommandHandler(repository, access), repository, task);
+        return new Fixture(new UpdateTaskCommandHandler(repository, access, new AssignmentTestFixture.TestAssignments()), repository, task);
     }
 
     private static UpdateTaskCommand EmptyCommand(Guid taskId) =>

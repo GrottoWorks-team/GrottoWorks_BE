@@ -16,7 +16,8 @@ public sealed record UpdateTaskCommand(
     DateTimeOffset? Deadline,
     int? ExpectedVersion);
 
-public sealed class UpdateTaskCommandHandler(ITaskRepository tasks, TaskScopeAccess scopeAccess)
+public sealed class UpdateTaskCommandHandler(ITaskRepository tasks, TaskScopeAccess scopeAccess,
+    TaskExecution.Application.Assignments.IAssignmentStore assignments)
 {
     public async Task<TaskDto> HandleAsync(
         UpdateTaskCommand command,
@@ -33,6 +34,13 @@ public sealed class UpdateTaskCommandHandler(ITaskRepository tasks, TaskScopeAcc
             cancellationToken);
 
         task.EnsurePlanningCanBeUpdated(command.ExpectedVersion);
+
+        if (command.RequiredVolunteers.HasValue)
+        {
+            var reserved = (await assignments.ListAsync(task.Id, cancellationToken)).Count(row => row.ReservesCapacity);
+            if (command.RequiredVolunteers.Value < reserved)
+                throw new DomainRuleException("TASK_CAPACITY_EXCEEDED", "Capacity cannot be reduced below reserved volunteer slots.");
+        }
 
         var nextStart = command.StartAt ?? task.StartAt;
         var nextDeadline = command.Deadline ?? task.Deadline;

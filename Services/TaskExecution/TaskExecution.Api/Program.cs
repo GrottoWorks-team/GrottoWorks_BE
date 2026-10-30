@@ -29,6 +29,8 @@ builder.Services.AddProblemDetails(options =>
     };
 });
 builder.Services.AddApplication();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<TaskExecution.Application.Events.ITaskCorrelationContext, TaskCorrelationContext>();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IReadinessProbe, DatabaseReadinessProbe>();
 builder.Services.ConfigureHttpJsonOptions(options =>

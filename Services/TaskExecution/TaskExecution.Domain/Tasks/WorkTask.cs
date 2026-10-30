@@ -1,6 +1,6 @@
 namespace TaskExecution.Domain.Tasks;
 
-public sealed class WorkTask
+public sealed partial class WorkTask
 {
     private readonly List<TaskSkill> _skills = [];
 
@@ -167,6 +167,15 @@ public sealed class WorkTask
         }
     }
 
+    public void BeginWork(DateTimeOffset now)
+    {
+        if (Status is not (TaskStatus.NotStarted or TaskStatus.InProgress))
+            throw new DomainRuleException("TASK_INVALID_STATE","Only a ready task can start work.");
+        Status=TaskStatus.InProgress;
+        UpdatedAt=now.ToUniversalTime();
+        Version++;
+    }
+
     public bool ReplaceCompletionCriteria(
         string? completionCriteria,
         int? expectedVersion,
@@ -237,6 +246,12 @@ public sealed class WorkTask
         Status = TaskStatus.NotStarted;
         UpdatedAt = updatedAt.ToUniversalTime();
         Version++;
+    }
+
+    public void RegisterAssignmentChange(DateTimeOffset now)
+    {
+        Version++;
+        UpdatedAt = now.ToUniversalTime();
     }
 
     private static IReadOnlyList<TaskSkillRequirement> NormalizeSkillRequirements(

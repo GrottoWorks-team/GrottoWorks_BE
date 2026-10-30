@@ -1,0 +1,45 @@
+using TaskExecution.Application.Attendance;
+using TaskExecution.Domain.Attendance;
+
+namespace TaskExecution.UnitTests.Application;
+
+internal sealed partial class AttendanceTestStore(AssignmentTestFixture fixture) : IAttendanceStore
+{
+    public List<AttendanceRequest> Requests { get; }=[];
+    public List<AttendanceSession> Sessions { get; }=[];
+    public List<AttendanceReplay> Replays { get; }=[];
+    public List<AttendanceCorrection> Corrections {get;}=[];
+    public int Saves { get; private set; }
+    private readonly SemaphoreSlim gate=new(1,1);
+    public async Task<T> ForVolunteerAsync<T>(Guid id,Func<Task<T>> action,CancellationToken ct)
+    { await gate.WaitAsync(ct); try { return await action(); } finally { gate.Release(); } }
+    public Task<AttendanceRequest?> RequestAsync(Guid id,CancellationToken ct)=>Task.FromResult(Requests.SingleOrDefault(r=>r.Id==id));
+    public Task<(IReadOnlyList<AttendanceRequest> Items,long Total)> RequestsPageAsync(Guid area,AttendanceRequestStatus status,int page,int size,bool descending,CancellationToken ct)
+    {
+        var query=Requests.Where(r=>r.Status==status).OrderBy(r=>r.RequestedAt).ThenBy(r=>r.Id).ToList();
+        if (descending) query.Reverse();
+        return Task.FromResult<(IReadOnlyList<AttendanceRequest>,long)>((query.Skip((page-1)*size).Take(size).ToList(),query.Count));
+    }
+    public Task<AttendanceSession?> SessionAsync(Guid id,CancellationToken ct)=>Task.FromResult(Sessions.SingleOrDefault(r=>r.Id==id));
+    public Task<AttendanceSession?> OpenSessionAsync(Guid id,CancellationToken ct)=>Task.FromResult(Sessions.SingleOrDefault(r=>r.AssignmentId==id && !r.CheckOutAt.HasValue));
+    public Task<bool> HasPendingOrOpenAsync(Guid id,CancellationToken ct)=>Task.FromResult(
+        Requests.Any(r=>r.VolunteerId==id && r.Status==AttendanceRequestStatus.Pending) ||
+        Sessions.Any(s=>!s.CheckOutAt.HasValue && fixture.Store.Items.Any(a=>a.Id==s.AssignmentId && a.VolunteerId==id)));
+    public Task<bool> OverlapsAsync(Guid id,DateTimeOffset start,DateTimeOffset? end,Guid? exclude,CancellationToken ct)=>Task.FromResult(
+        Sessions.Any(s=>s.Id!=exclude && (!end.HasValue || s.CheckInAt<end) && (!s.CheckOutAt.HasValue || s.CheckOutAt>start) &&
+            fixture.Store.Items.Any(a=>a.Id==s.AssignmentId && a.VolunteerId==id)));
+    public Task<AttendanceReplay?> ReplayAsync(Guid id,Guid key,CancellationToken ct)=>Task.FromResult(Replays.SingleOrDefault(r=>r.ActorId==id && r.Key==key));
+    public void Add(AttendanceRequest r)=>Requests.Add(r);
+    public void Add(AttendanceSession s)=>Sessions.Add(s);
+    public void Add(AttendanceReplay r)=>Replays.Add(r);
+    public void Add(AttendanceCorrection r)=>Corrections.Add(r);
+    public Task<AttendanceCorrection?> CorrectionAsync(Guid id,CancellationToken ct)=>Task.FromResult(Corrections.SingleOrDefault(r=>r.Id==id));
+    public Task<bool> HasPendingCorrectionAsync(Guid id,CancellationToken ct)=>Task.FromResult(Corrections.Any(r=>r.AttendanceId==id && r.Status==AttendanceCorrectionStatus.Pending));
+    public Task<(IReadOnlyList<AttendanceCorrection> Items,long Total)> CorrectionsPageAsync(Guid area,AttendanceCorrectionStatus status,int page,int size,bool descending,CancellationToken ct)
+    {
+        var rows=Corrections.Where(r=>r.Status==status).OrderBy(r=>r.CreatedAt).ThenBy(r=>r.Id).ToList();
+        if(descending)rows.Reverse();
+        return Task.FromResult<(IReadOnlyList<AttendanceCorrection>,long)>((rows.Skip((page-1)*size).Take(size).ToList(),rows.Count));
+    }
+    public Task SaveAsync(CancellationToken ct) { Saves++;return Task.CompletedTask; }
+}

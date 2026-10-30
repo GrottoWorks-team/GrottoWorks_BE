@@ -10,6 +10,9 @@ using ParishCoordination.Infrastructure.Data;
 using ParishCoordination.Infrastructure.Identity;
 using ParishCoordination.Infrastructure.Repositories;
 using ParishCoordination.Application.Users;
+using ParishCoordination.Infrastructure.TaskScopeSync;
+using Microsoft.Extensions.Http.Resilience;
+using ParishCoordination.Infrastructure.TaskExecution;
 
 namespace ParishCoordination.Infrastructure;
 
@@ -37,6 +40,26 @@ public static class DependencyInjection
         services.AddScoped<IWorkAreaCategoryRepository, WorkAreaCategoryRepository>();
         services.AddScoped<IParishCoordinationDataSeeder, ParishCoordinationDataSeeder>();
 
+        var syncOptions = TaskScopeSyncOptions.FromConfiguration(configuration);
+        services.AddSingleton(syncOptions);
+        if (syncOptions.Enabled)
+        {
+            services.AddScoped<TaskScopeBackfill>();
+            services.AddHttpClient<ITaskScopeDelivery, HttpTaskScopeDelivery>(client =>
+            {
+                client.BaseAddress = syncOptions.BaseAddress;
+                client.Timeout = Timeout.InfiniteTimeSpan;
+            }).AddStandardResilienceHandler(options =>
+            {
+                options.TotalRequestTimeout.Timeout = syncOptions.RequestTimeout;
+                options.AttemptTimeout.Timeout = syncOptions.RequestTimeout;
+                options.CircuitBreaker.SamplingDuration = syncOptions.RequestTimeout * 3;
+                // PUT retries belong to the durable outbox, not this HTTP pipeline.
+                options.Retry.DisableForUnsafeHttpMethods();
+            });
+            services.AddHostedService<TaskScopeSyncWorker>();
+        }
+
         var identityClientOptions = IdentityClientOptions.FromConfiguration(configuration);
         services.AddSingleton(identityClientOptions);
         services.AddHttpClient<IIdentityUserLookup, IdentityUserLookupClient>(client =>
@@ -47,6 +70,21 @@ public static class DependencyInjection
             .AddStandardResilienceHandler(options =>
             {
                 options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10);
+            });
+
+        var taskExecutionClientOptions = TaskExecutionClientOptions.FromConfiguration(configuration);
+        services.AddSingleton(taskExecutionClientOptions);
+        services.AddHttpClient<IWorkAreaTaskCountClient, WorkAreaTaskCountClient>(client =>
+            {
+                client.BaseAddress = taskExecutionClientOptions.BaseAddress;
+                client.Timeout = Timeout.InfiniteTimeSpan;
+            })
+            .AddStandardResilienceHandler(options =>
+            {
+                var timeout = TimeSpan.FromSeconds(10);
+                options.TotalRequestTimeout.Timeout = timeout;
+                options.AttemptTimeout.Timeout = timeout;
+                options.CircuitBreaker.SamplingDuration = timeout * 3;
             });
 
         return services;

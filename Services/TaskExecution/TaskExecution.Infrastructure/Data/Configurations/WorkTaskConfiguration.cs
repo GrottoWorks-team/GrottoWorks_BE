@@ -37,6 +37,9 @@ public sealed class WorkTaskConfiguration : IEntityTypeConfiguration<WorkTask>
         builder.Property(task => task.Status).HasColumnName("task_status")
             .HasConversion(EnumText.Converter<TaskExecution.Domain.Tasks.TaskStatus>()).HasMaxLength(30).IsRequired();
         builder.Property(task => task.Version).HasColumnName("version").HasDefaultValue(1).IsConcurrencyToken();
+        builder.Property(task => task.CancellationReason).HasColumnName("cancellation_reason").HasMaxLength(500);
+        builder.Property(task => task.CancelledBy).HasColumnName("cancelled_by_user_id");
+        builder.Property(task => task.CancelledAt).HasColumnName("cancelled_at");
         builder.Property(task => task.CreatedAt).HasColumnName("created_at")
             .HasColumnType("timestamp with time zone").IsRequired();
         builder.Property(task => task.UpdatedAt).HasColumnName("updated_at")

@@ -13,6 +13,8 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
     [DbContext(typeof(ParishCoordinationDbContext))]
     partial class ParishCoordinationDbContextModelSnapshot : ModelSnapshot
     {
+        internal void BuildSnapshot(ModelBuilder modelBuilder) => BuildModel(modelBuilder);
+
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
@@ -21,6 +23,9 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            new ParishCoordination.Infrastructure.TaskScopeSync.TaskScopeOutboxConfiguration()
+                .Configure(modelBuilder.Entity<ParishCoordination.Infrastructure.TaskScopeSync.TaskScopeOutbox>());
 
             modelBuilder.Entity("ParishCoordination.Domain.Entities.Community", b =>
                 {

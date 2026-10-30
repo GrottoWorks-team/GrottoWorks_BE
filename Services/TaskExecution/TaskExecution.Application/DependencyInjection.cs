@@ -11,7 +11,18 @@ public static class DependencyInjection
         services.AddScoped<ApplySeasonScopeSnapshotHandler>();
         services.AddScoped<ApplyWorkAreaScopeSnapshotHandler>();
         services.AddScoped<TaskScopeAccess>();
+        services.AddScoped<TaskExecution.Application.Users.ActiveUserAccess>();
+        services.AddScoped<TaskExecution.Application.Assignments.AssignmentService>();
+        services.AddScoped<TaskExecution.Application.Events.TaskEventRecorder>();
         services.AddScoped<GetTasksQueryHandler>();
+        services.AddScoped<GetWorkAreaTaskCountsQueryHandler>();
+        services.AddSingleton(TimeProvider.System);
+        services.AddScoped<MyTasksQueryHandler>();
+        services.AddScoped<TaskExecution.Application.Attendance.AttendanceService>();
+        services.AddScoped<TaskExecution.Application.Attendance.AttendanceQueries>();
+        services.AddScoped<TaskExecution.Application.Attendance.LongOpenAttendanceQuery>();
+        services.AddScoped<TaskExecution.Application.Attendance.AttendanceAlertProcessor>();
+        services.AddScoped<TaskExecution.Application.Support.SupportRequestService>();
         services.AddScoped<GetTaskQueryHandler>();
         services.AddScoped<CreateTaskCommandHandler>();
         services.AddScoped<UpdateTaskCommandHandler>();

@@ -7,7 +7,8 @@ public enum DomainErrorKind
     NotFound,
     Forbidden,
     BadRequest,
-    PreconditionFailed
+    PreconditionFailed,
+    ServiceUnavailable
 }
 
 public sealed class DomainRuleException(

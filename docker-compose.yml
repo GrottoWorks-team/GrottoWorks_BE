@@ -47,6 +47,12 @@ services:
       context: .
       dockerfile: Services/TaskExecution/TaskExecution.Api/Dockerfile
 
+  notificationaudit.api:
+    image: ${DOCKER_REGISTRY-}notificationauditapi
+    build:
+      context: .
+      dockerfile: Services/NotificationAudit/NotificationAudit.Api/Dockerfile
+
   yarpapigateway:
     image: ${DOCKER_REGISTRY-}yarpapigateway
     build:

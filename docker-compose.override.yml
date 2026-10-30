@@ -55,6 +55,7 @@ services:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-grottoworks}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-grottoworks_minio_1234}
       - MINIO_CONSOLE_PORT_NUMBER=9001
+      - MINIO_API_CORS_ALLOW_ORIGIN=${FRONTEND_ORIGIN:-http://localhost:5173}
     restart: always
     ports:
       - "9000:9000"
@@ -83,11 +84,16 @@ services:
 
   parishcoordination.api:
     environment:
+      - TaskScopeSync__Enabled=true
+      - TaskScopeSync__BaseAddress=http://taskexecution.api:8080/
+      - TaskScopeSync__PollIntervalSeconds=2
+      - TaskScopeSync__RequestTimeoutSeconds=10
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__ParishCoordinationDatabase=Host=postgres;Port=5432;Database=parish_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
       - Jwt__SigningKey=${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY (>= 32 chars) in .env}
       - IdentityClient__BaseAddress=http://identity.api:8080/
+      - TaskExecutionClient__BaseAddress=http://taskexecution.api:8080/
       - InternalApi__ApiKey=${INTERNAL_API_KEY:-dev-internal-api-key-change-me-0123456789}
       - Database__MigrateOnStartup=true
       - MessageBroker__Host=amqp://rabbitmq:5672
@@ -148,6 +154,7 @@ services:
 
   taskexecution.api:
     environment:
+      - IdentityClient__BaseAddress=http://identity.api:8080/
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__TaskExecutionDatabase=Host=postgres;Port=5432;Database=task_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
@@ -159,6 +166,34 @@ services:
         condition: service_healthy
     ports:
       - "6104:8080"
+
+  notificationaudit.api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__NotificationAuditDatabase=Host=postgres;Port=5432;Database=notify_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
+      - Jwt__SigningKey=${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY (>= 32 chars) in .env}
+      - InternalApi__ApiKey=${INTERNAL_API_KEY:-dev-internal-api-key-change-me-0123456789}
+      - ObjectStorage__InternalEndpoint=http://minio:9000
+      - ObjectStorage__PublicEndpoint=${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
+      - ObjectStorage__AccessKey=${MINIO_ROOT_USER:-grottoworks}
+      - ObjectStorage__SecretKey=${MINIO_ROOT_PASSWORD:-grottoworks_minio_1234}
+      - ObjectStorage__Bucket=grottoworks-files
+      - FileUpload__AllowOtherPdf=${ALLOW_OTHER_PDF_UPLOADS:-false}
+      - NotificationEvents__Enabled=true
+      - MessageBroker__Host=amqp://rabbitmq:5672
+      - MessageBroker__UserName=${RABBITMQ_DEFAULT_USER:-grottoworks}
+      - MessageBroker__Password=${RABBITMQ_DEFAULT_PASS:-grottoworks}
+      - Database__MigrateOnStartup=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "6107:8080"
 
   yarpapigateway:
     environment:
@@ -173,6 +208,7 @@ services:
       - ReverseProxy__Clusters__readiness__Destinations__destination1__Address=http://readiness.api:8080/
       - ReverseProxy__Clusters__reporting__Destinations__destination1__Address=http://reporting.api:8080/
       - ReverseProxy__Clusters__task__Destinations__destination1__Address=http://taskexecution.api:8080/
+      - ReverseProxy__Clusters__notificationaudit__Destinations__destination1__Address=http://notificationaudit.api:8080/
     depends_on:
       - identity.api
       - parishcoordination.api
@@ -180,5 +216,6 @@ services:
       - readiness.api
       - reporting.api
       - taskexecution.api
+      - notificationaudit.api
     ports:
       - "6102:8080"

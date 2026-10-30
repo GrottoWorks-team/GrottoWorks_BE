@@ -12,6 +12,7 @@ using ParishCoordination.Infrastructure.Repositories;
 using ParishCoordination.Application.Users;
 using ParishCoordination.Infrastructure.TaskScopeSync;
 using Microsoft.Extensions.Http.Resilience;
+using ParishCoordination.Infrastructure.TaskExecution;
 
 namespace ParishCoordination.Infrastructure;
 
@@ -69,6 +70,21 @@ public static class DependencyInjection
             .AddStandardResilienceHandler(options =>
             {
                 options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10);
+            });
+
+        var taskExecutionClientOptions = TaskExecutionClientOptions.FromConfiguration(configuration);
+        services.AddSingleton(taskExecutionClientOptions);
+        services.AddHttpClient<IWorkAreaTaskCountClient, WorkAreaTaskCountClient>(client =>
+            {
+                client.BaseAddress = taskExecutionClientOptions.BaseAddress;
+                client.Timeout = Timeout.InfiniteTimeSpan;
+            })
+            .AddStandardResilienceHandler(options =>
+            {
+                var timeout = TimeSpan.FromSeconds(10);
+                options.TotalRequestTimeout.Timeout = timeout;
+                options.AttemptTimeout.Timeout = timeout;
+                options.CircuitBreaker.SamplingDuration = timeout * 3;
             });
 
         return services;

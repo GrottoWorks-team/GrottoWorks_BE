@@ -13,6 +13,7 @@ using ParishCoordination.Application.WorkAreas.Commands.CreateWorkArea;
 using ParishCoordination.Application.WorkAreas.Commands.UpdateWorkArea;
 using ParishCoordination.Application.WorkAreas;
 using ParishCoordination.Application.WorkAreas.Queries.GetWorkArea;
+using ParishCoordination.Application.WorkAreas.Queries.GetWorkAreaProgress;
 using ParishCoordination.Application.WorkAreas.Queries.ListWorkAreas;
 
 namespace ParishCoordination.Api.Endpoints;
@@ -40,6 +41,19 @@ public static class WorkAreaEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        app.MapGet("/api/v1/work-areas/{workAreaId}/progress", GetWorkAreaProgressAsync)
+            .WithName("getWorkAreaProgress")
+            .WithTags("Parish")
+            .RequireAuthorization(policy => policy.RequireRole(
+                GrottoWorksRoles.Parish,
+                GrottoWorksRoles.Leader))
+            .Produces<ApiResponse<WorkAreaProgressDto>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         app.MapPost("/api/v1/seasons/{seasonId}/work-areas", CreateWorkAreaAsync)
             .WithName("createWorkArea")
@@ -185,6 +199,49 @@ public static class WorkAreaEndpoints
         SetETag(httpContext, workArea.Version);
 
         return Results.Ok(ApiResults.Ok(workArea, httpContext));
+    }
+
+    private static async Task<IResult> GetWorkAreaProgressAsync(
+        Guid workAreaId,
+        HttpContext httpContext,
+        GetWorkAreaProgressQueryHandler queryHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await queryHandler.HandleAsync(
+            new GetWorkAreaProgressQuery(workAreaId),
+            cancellationToken);
+
+        if (result.Outcome == GetWorkAreaProgressOutcome.WorkAreaNotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Work area not found",
+                $"Work area with ID '{workAreaId}' was not found.",
+                "WORK_AREA_NOT_FOUND");
+        }
+
+        if (result.Outcome == GetWorkAreaProgressOutcome.SeasonNotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Season not found",
+                "The season that owns this work area was not found.",
+                "SEASON_NOT_FOUND");
+        }
+
+        if (result.Outcome == GetWorkAreaProgressOutcome.TaskExecutionUnavailable)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status503ServiceUnavailable,
+                "TaskExecution service unavailable",
+                "Work area progress cannot be calculated because TaskExecution is unavailable.",
+                "TASK_EXECUTION_SERVICE_UNAVAILABLE");
+        }
+
+        return Results.Ok(ApiResults.Ok(result.Progress!, httpContext));
     }
 
     private static async Task<IResult> CreateWorkAreaAsync(

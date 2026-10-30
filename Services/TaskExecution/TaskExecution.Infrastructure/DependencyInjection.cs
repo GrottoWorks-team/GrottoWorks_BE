@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<IScopeSnapshotTransaction, ScopeSnapshotTransaction>();
         services.AddScoped<ITaskRepository, TaskRepository>();
         services.AddScoped<IMyTasksStore, MyTasksStore>();
+        services.AddScoped<TaskExecution.Application.Support.ISupportRequestRepository, TaskExecution.Infrastructure.Support.SupportRequestRepository>();
         services.AddScoped<TaskExecution.Application.Attendance.IAttendanceStore, TaskExecution.Infrastructure.Attendance.AttendanceStore>();
         services.AddScoped<TaskExecution.Application.Attendance.IAttendanceReadStore, TaskExecution.Infrastructure.Attendance.AttendanceReadStore>();
         services.AddScoped<TaskExecution.Application.Attendance.ILongOpenAttendanceStore, TaskExecution.Infrastructure.Attendance.LongOpenAttendanceStore>();

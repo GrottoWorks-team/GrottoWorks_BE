@@ -30,6 +30,10 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
         new TaskExecution.Infrastructure.Attendance.AttendanceSessionConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Attendance.AttendanceSession>());
         new TaskExecution.Infrastructure.Attendance.AttendanceCorrectionConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Attendance.AttendanceCorrection>());
         new TaskExecution.Infrastructure.Attendance.AttendanceSessionAlertConfiguration().Configure(modelBuilder.Entity<TaskExecution.Application.Attendance.AttendanceSessionAlert>());
+        new TaskExecution.Infrastructure.Support.SupportRequestConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Support.SupportRequest>());
+        new TaskExecution.Infrastructure.Support.SupportPositionConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Support.SupportPosition>());
+        new TaskExecution.Infrastructure.Support.SupportSkillConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Support.SupportPositionSkill>());
+        new TaskExecution.Infrastructure.Support.SupportMaterialConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Support.SupportMaterial>());
         new TaskExecution.Infrastructure.Attendance.AttendanceReplayConfiguration().Configure(modelBuilder.Entity<TaskExecution.Application.Attendance.AttendanceReplay>());
         new TaskExecution.Infrastructure.Events.TaskEventOutboxConfiguration()
             .Configure(modelBuilder.Entity<TaskExecution.Infrastructure.Events.TaskEventOutboxMessage>());

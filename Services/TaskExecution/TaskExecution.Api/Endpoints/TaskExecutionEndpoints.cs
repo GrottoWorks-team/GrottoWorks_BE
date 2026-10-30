@@ -17,5 +17,6 @@ public static class TaskExecutionEndpoints
         app.MapAttendanceCorrectionEndpoints();
         app.MapAttendanceCorrectionReviewEndpoints();
         app.MapLongOpenAttendanceEndpoints();
+        app.MapSupportRequestEndpoints();
     }
 }

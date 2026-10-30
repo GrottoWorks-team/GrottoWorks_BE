@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using NotificationAudit.Infrastructure.Files;
+using NotificationAudit.Infrastructure.Notifications;
 
 #nullable disable
 
@@ -17,5 +18,6 @@ public partial class NotificationAuditDbContextModelSnapshot : ModelSnapshot
             .HasAnnotation("Relational:MaxIdentifierLength", 63);
         NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
         new FileObjectConfiguration().Configure(modelBuilder.Entity<NotificationAudit.Domain.Files.FileObject>());
+        new NotificationConfiguration().Configure(modelBuilder.Entity<NotificationAudit.Domain.Notifications.Notification>());
     }
 }

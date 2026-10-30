@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using NotificationAudit.Application.Files;
 using NotificationAudit.Contracts.Files;
 using NotificationAudit.Api.Common;
+using NotificationAudit.Application.Notifications;
+using NotificationAudit.Contracts.Notifications;
 
 namespace NotificationAudit.Api.Endpoints;
 
@@ -59,6 +61,16 @@ public static class NotificationAuditEndpoints
             .Produces<ApiResponse<InternalFileDto>>()
             .Produces<ProblemDetails>(StatusCodes.Status401Unauthorized)
             .Produces<ProblemDetails>(StatusCodes.Status404NotFound);
+
+        app.MapGet("/api/v1/notifications", ListNotificationsAsync)
+            .WithName("listNotifications").WithTags("Notifications").RequireAuthorization()
+            .Produces<PagedResponse<NotificationDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401);
+        app.MapPost("/api/v1/notifications/{notificationId:guid}/read", MarkNotificationReadAsync)
+            .WithName("markNotificationRead").WithTags("Notifications").RequireAuthorization()
+            .Produces(204).Produces<ProblemDetails>(401).Produces<ProblemDetails>(404);
+        app.MapPost("/api/v1/notifications/read-all", MarkAllNotificationsReadAsync)
+            .WithName("markAllNotificationsRead").WithTags("Notifications").RequireAuthorization()
+            .Produces(204).Produces<ProblemDetails>(401);
     }
 
     private static async Task<IResult> CreateUploadRequestAsync(
@@ -109,5 +121,37 @@ public static class NotificationAuditEndpoints
     {
         var result = await handler.HandleAsync(fileId, cancellationToken);
         return Results.Ok(ApiResults.Ok(result, httpContext));
+    }
+
+    private static async Task<IResult> ListNotificationsAsync(
+        bool? isRead,
+        string? eventType,
+        int? page,
+        int? size,
+        HttpContext httpContext,
+        ListNotificationsHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var pageNumber = Math.Max(page ?? 1, 1);
+        var pageSize = Math.Clamp(size ?? 20, 1, 100);
+        var result = await handler.HandleAsync(isRead, eventType, pageNumber, pageSize, cancellationToken);
+        return Results.Ok(ApiResults.Page(result.Items, result.Total, pageNumber, pageSize, httpContext));
+    }
+
+    private static async Task<IResult> MarkNotificationReadAsync(
+        Guid notificationId,
+        MarkNotificationReadHandler handler,
+        CancellationToken cancellationToken)
+    {
+        await handler.HandleAsync(notificationId, cancellationToken);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> MarkAllNotificationsReadAsync(
+        MarkAllNotificationsReadHandler handler,
+        CancellationToken cancellationToken)
+    {
+        await handler.HandleAsync(cancellationToken);
+        return Results.NoContent();
     }
 }

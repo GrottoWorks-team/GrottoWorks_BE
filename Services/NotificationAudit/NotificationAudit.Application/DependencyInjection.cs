@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using NotificationAudit.Application.Files;
+using NotificationAudit.Application.Notifications;
 
 namespace NotificationAudit.Application;
 
@@ -13,6 +14,9 @@ public static class DependencyInjection
         services.AddScoped<GetFileDownloadHandler>();
         services.AddScoped<DeleteUnattachedFileHandler>();
         services.AddScoped<GetInternalFileHandler>();
+        services.AddScoped<ListNotificationsHandler>();
+        services.AddScoped<MarkNotificationReadHandler>();
+        services.AddScoped<MarkAllNotificationsReadHandler>();
         return services;
     }
 }

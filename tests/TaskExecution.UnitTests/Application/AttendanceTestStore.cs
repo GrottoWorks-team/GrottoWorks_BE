@@ -8,6 +8,7 @@ internal sealed partial class AttendanceTestStore(AssignmentTestFixture fixture)
     public List<AttendanceRequest> Requests { get; }=[];
     public List<AttendanceSession> Sessions { get; }=[];
     public List<AttendanceReplay> Replays { get; }=[];
+    public List<AttendanceCorrection> Corrections {get;}=[];
     public int Saves { get; private set; }
     private readonly SemaphoreSlim gate=new(1,1);
     public async Task<T> ForVolunteerAsync<T>(Guid id,Func<Task<T>> action,CancellationToken ct)
@@ -31,5 +32,14 @@ internal sealed partial class AttendanceTestStore(AssignmentTestFixture fixture)
     public void Add(AttendanceRequest r)=>Requests.Add(r);
     public void Add(AttendanceSession s)=>Sessions.Add(s);
     public void Add(AttendanceReplay r)=>Replays.Add(r);
+    public void Add(AttendanceCorrection r)=>Corrections.Add(r);
+    public Task<AttendanceCorrection?> CorrectionAsync(Guid id,CancellationToken ct)=>Task.FromResult(Corrections.SingleOrDefault(r=>r.Id==id));
+    public Task<bool> HasPendingCorrectionAsync(Guid id,CancellationToken ct)=>Task.FromResult(Corrections.Any(r=>r.AttendanceId==id && r.Status==AttendanceCorrectionStatus.Pending));
+    public Task<(IReadOnlyList<AttendanceCorrection> Items,long Total)> CorrectionsPageAsync(Guid area,AttendanceCorrectionStatus status,int page,int size,bool descending,CancellationToken ct)
+    {
+        var rows=Corrections.Where(r=>r.Status==status).OrderBy(r=>r.CreatedAt).ThenBy(r=>r.Id).ToList();
+        if(descending)rows.Reverse();
+        return Task.FromResult<(IReadOnlyList<AttendanceCorrection>,long)>((rows.Skip((page-1)*size).Take(size).ToList(),rows.Count));
+    }
     public Task SaveAsync(CancellationToken ct) { Saves++;return Task.CompletedTask; }
 }

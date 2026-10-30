@@ -24,6 +24,10 @@ public interface IAttendanceStore
     Task<bool> HasPendingOrOpenAsync(Guid volunteerId, CancellationToken cancellationToken);
     Task<bool> OverlapsAsync(Guid volunteerId, DateTimeOffset start, DateTimeOffset? end, Guid? excludeSession, CancellationToken cancellationToken);
     Task<AttendanceReplay?> ReplayAsync(Guid actorId, Guid key, CancellationToken cancellationToken);
+    Task<AttendanceCorrection?> CorrectionAsync(Guid id,CancellationToken cancellationToken);
+    Task<bool> HasPendingCorrectionAsync(Guid sessionId,CancellationToken cancellationToken);
+    Task<(IReadOnlyList<AttendanceCorrection> Items,long Total)> CorrectionsPageAsync(Guid areaId,AttendanceCorrectionStatus status,int page,int size,bool descending,CancellationToken cancellationToken);
+    void Add(AttendanceCorrection correction);
     void Add(AttendanceRequest request);
     void Add(AttendanceSession session);
     void Add(AttendanceReplay replay);

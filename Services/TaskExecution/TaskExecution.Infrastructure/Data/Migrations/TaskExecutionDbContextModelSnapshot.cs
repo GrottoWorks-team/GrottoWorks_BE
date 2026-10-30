@@ -28,6 +28,7 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
         BuildAssignmentModel(modelBuilder);
         new TaskExecution.Infrastructure.Attendance.AttendanceRequestConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Attendance.AttendanceRequest>());
         new TaskExecution.Infrastructure.Attendance.AttendanceSessionConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Attendance.AttendanceSession>());
+        new TaskExecution.Infrastructure.Attendance.AttendanceCorrectionConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Attendance.AttendanceCorrection>());
         new TaskExecution.Infrastructure.Attendance.AttendanceReplayConfiguration().Configure(modelBuilder.Entity<TaskExecution.Application.Attendance.AttendanceReplay>());
         new TaskExecution.Infrastructure.Events.TaskEventOutboxConfiguration()
             .Configure(modelBuilder.Entity<TaskExecution.Infrastructure.Events.TaskEventOutboxMessage>());

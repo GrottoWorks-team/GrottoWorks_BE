@@ -2,7 +2,7 @@ namespace TaskExecution.Api.Common;
 
 public static class TaskVersionPrecondition
 {
-    public static int? Resolve(int? bodyVersion, string? ifMatch)
+    public static int? Resolve(int? bodyVersion, string? ifMatch, string mismatchCode = "TASK_VERSION_MISMATCH")
     {
         if (!TryParse(ifMatch, out var headerVersion))
         {
@@ -17,7 +17,7 @@ public static class TaskVersionPrecondition
 
         if (bodyVersion.HasValue && headerVersion.HasValue && bodyVersion != headerVersion)
         {
-            throw new TaskExecution.Domain.DomainRuleException("TASK_VERSION_MISMATCH",
+            throw new TaskExecution.Domain.DomainRuleException(mismatchCode,
                 "Body version and If-Match disagree.", TaskExecution.Domain.DomainErrorKind.PreconditionFailed);
         }
 

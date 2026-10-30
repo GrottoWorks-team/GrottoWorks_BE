@@ -16,16 +16,44 @@ public sealed record AssignVolunteerCommand(Guid TaskId, Guid VolunteerId, strin
 public sealed record AssignmentDto(Guid Id, Guid TaskId, Guid VolunteerId, AssignmentType AssignmentType,
     AssignmentStatus Status, string? Note, int Version, DateTimeOffset? RequestedAt,
     DateTimeOffset? AssignedAt, DateTimeOffset? ApprovedAt, DateTimeOffset? RejectedAt,
-    IReadOnlyList<string> Warnings)
+    IReadOnlyList<string> Warnings, string? ResponseReason)
 {
     public static AssignmentDto From(TaskAssignment row, IReadOnlyList<string>? warnings = null) => new(
         row.Id, row.TaskId, row.VolunteerId, row.Type, row.Status, row.Note, row.Version,
-        row.RequestedAt, row.AssignedAt, row.ApprovedAt, row.RejectedAt, warnings ?? []);
+        row.RequestedAt, row.AssignedAt, row.ApprovedAt, row.RejectedAt, warnings ?? [], row.ResponseReason);
 }
 
 public sealed class AssignmentService(IAssignmentStore assignments, ITaskRepository tasks,
     TaskScopeAccess scopeAccess, ActiveUserAccess users, ICurrentUser user, TaskEventRecorder events)
 {
+    public async Task<AssignmentDto> RespondAsync(Guid assignmentId, bool accept, string? reason, int? expectedVersion,
+        CancellationToken cancellationToken = default)
+    {
+        var assignment = await assignments.GetAsync(assignmentId, cancellationToken)
+            ?? throw DomainRuleException.NotFound("TASK_ASSIGNMENT_NOT_FOUND", "The assignment does not exist.");
+        if (user.Role != GrottoWorksRoles.Volunteer || assignment.VolunteerId != user.UserId)
+            throw DomainRuleException.Forbidden("TASK_ASSIGNMENT_ACCESS_DENIED", "Only the assigned volunteer can respond.");
+        return await assignments.InTaskTransactionAsync(assignment.TaskId, async () =>
+        {
+            var task = await tasks.GetByIdForUpdateAsync(assignment.TaskId, cancellationToken)
+                ?? throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
+            var (area, _) = await scopeAccess.GetWorkAreaForVolunteerWriteAsync(task.WorkAreaId, cancellationToken);
+            await users.EnsureCallerAsync(area.ParishId, cancellationToken);
+            if (task.Status is TaskExecution.Domain.Tasks.TaskStatus.Cancelled or TaskExecution.Domain.Tasks.TaskStatus.Completed)
+                throw new DomainRuleException("TASK_INVALID_STATE", "The task no longer accepts assignment responses.");
+            if (accept) assignment.Accept(expectedVersion, DateTimeOffset.UtcNow);
+            else assignment.Decline(reason!, expectedVersion, DateTimeOffset.UtcNow);
+            task.RegisterAssignmentChange(DateTimeOffset.UtcNow);
+            events.Record(TaskEventTypes.AssignmentResponded, task, area, new
+            {
+                assignmentId = assignment.Id, taskId = task.Id, workAreaId = area.WorkAreaId,
+                volunteerUserId = user.UserId, decision = accept ? "ACCEPTED" : "DECLINED", reason = assignment.ResponseReason
+            });
+            await assignments.SaveAsync(cancellationToken);
+            return AssignmentDto.From(assignment);
+        }, cancellationToken);
+    }
+
     public async Task<AssignmentDto> AssignAsync(AssignVolunteerCommand command, CancellationToken cancellationToken = default)
     {
         return await assignments.InTaskTransactionAsync(command.TaskId, async () =>

@@ -16,6 +16,7 @@ public sealed class TaskAssignment
     public DateTimeOffset? ApprovedAt { get; private set; }
     public DateTimeOffset? RejectedAt { get; private set; }
     public string? Note { get; private set; }
+    public string? ResponseReason { get; private set; }
     public bool OverrideCapacity { get; private set; }
     public bool OverrideSkillMismatch { get; private set; }
     public string? OverrideReason { get; private set; }
@@ -44,5 +45,35 @@ public sealed class TaskAssignment
             OverrideCapacity = overrideCapacity, OverrideSkillMismatch = overrideSkills,
             OverrideReason = overrideCapacity || overrideSkills ? reason : null
         };
+    }
+
+    public void EnsureVersion(int? expectedVersion)
+    {
+        if (expectedVersion.HasValue && expectedVersion.Value != Version)
+            throw new DomainRuleException("TASK_ASSIGNMENT_VERSION_MISMATCH", "The assignment changed.", DomainErrorKind.PreconditionFailed);
+    }
+
+    public void Accept(int? expectedVersion, DateTimeOffset now)
+    {
+        EnsureVersion(expectedVersion);
+        if (Type != AssignmentType.Direct || Status != AssignmentStatus.Pending)
+            throw new DomainRuleException("TASK_ASSIGNMENT_INVALID_STATE", "Only a pending direct assignment can be accepted.");
+        Status = AssignmentStatus.Accepted;
+        ApprovedAt = now.ToUniversalTime();
+        Version++;
+    }
+
+    public void Decline(string reason, int? expectedVersion, DateTimeOffset now)
+    {
+        EnsureVersion(expectedVersion);
+        if (Type != AssignmentType.Direct || Status != AssignmentStatus.Pending)
+            throw new DomainRuleException("TASK_ASSIGNMENT_INVALID_STATE", "Only a pending direct assignment can be declined.");
+        var normalized = reason?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized) || normalized.Length > 500)
+            throw DomainRuleException.Validation("ASSIGNMENT_REASON_REQUIRED", "Reason must contain 1–500 characters.");
+        Status = AssignmentStatus.Declined;
+        ResponseReason = normalized;
+        RejectedAt = now.ToUniversalTime();
+        Version++;
     }
 }

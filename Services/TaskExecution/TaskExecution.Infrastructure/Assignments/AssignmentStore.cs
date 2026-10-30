@@ -23,9 +23,11 @@ public sealed class AssignmentStore(TaskExecutionDbContext db) : IAssignmentStor
             await transaction.CommitAsync(cancellationToken);
             return result;
         }
-        catch (DbUpdateConcurrencyException)
+        catch (DbUpdateConcurrencyException exception)
         {
-            throw new DomainRuleException("TASK_VERSION_MISMATCH", "The task or assignment changed concurrently.", DomainErrorKind.PreconditionFailed);
+            var code = exception.Entries.Any(entry=>entry.Entity is TaskAssignment)
+                ? "TASK_ASSIGNMENT_VERSION_MISMATCH" : "TASK_VERSION_MISMATCH";
+            throw new DomainRuleException(code, "The task or assignment changed concurrently.", DomainErrorKind.PreconditionFailed);
         }
         catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
@@ -69,6 +71,7 @@ public sealed class TaskAssignmentConfiguration : IEntityTypeConfiguration<TaskA
         builder.Property(row => row.Type).HasColumnName("assignment_type").HasConversion(EnumText.Converter<AssignmentType>()).HasMaxLength(40);
         builder.Property(row => row.Status).HasColumnName("assignment_status").HasConversion(EnumText.Converter<AssignmentStatus>()).HasMaxLength(30);
         builder.Property(row => row.Note).HasColumnName("assignment_note").HasMaxLength(2000);
+        builder.Property(row => row.ResponseReason).HasColumnName("response_reason").HasMaxLength(500);
         builder.Property(row => row.RequestedAt).HasColumnName("requested_at");
         builder.Property(row => row.AssignedAt).HasColumnName("assigned_at");
         builder.Property(row => row.ApprovedAt).HasColumnName("approved_at");

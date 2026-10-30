@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Routing;
@@ -22,9 +23,18 @@ public sealed class AssignmentRouteTests
         var endpoints = ((IEndpointRouteBuilder)app).DataSources.SelectMany(source=>source.Endpoints).OfType<RouteEndpoint>().ToList();
         var create = endpoints.Single(endpoint=>endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName=="assignVolunteer");
         create.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId:guid}/assignments");
-        create.Metadata.GetOrderedMetadata<IAuthorizeData>().Should().Contain(data=>data.Roles=="LEADER");
+        create.Metadata.GetOrderedMetadata<AuthorizationPolicy>().SelectMany(policy=>policy.Requirements)
+            .OfType<RolesAuthorizationRequirement>().Should().Contain(requirement=>requirement.AllowedRoles.Contains("LEADER"));
         create.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Select(data=>data.StatusCode)
             .Should().Contain(new[] {201,400,401,403,404,409,412,422,503});
         endpoints.Should().Contain(endpoint=>endpoint.Metadata.GetMetadata<EndpointNameMetadata>()!.EndpointName=="listTaskAssignments");
+        foreach(var name in new[] {"acceptTaskAssignment","declineTaskAssignment"})
+        {
+            var response=endpoints.Single(endpoint=>endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName==name);
+            response.Metadata.GetOrderedMetadata<AuthorizationPolicy>().SelectMany(policy=>policy.Requirements)
+                .OfType<RolesAuthorizationRequirement>().Should().Contain(requirement=>requirement.AllowedRoles.Contains("VOLUNTEER"));
+            response.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Select(data=>data.StatusCode)
+                .Should().Contain(new[] {200,400,401,403,404,409,412,422,503});
+        }
     }
 }

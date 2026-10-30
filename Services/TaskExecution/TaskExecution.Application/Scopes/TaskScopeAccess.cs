@@ -57,4 +57,16 @@ public sealed class TaskScopeAccess(IScopeProjectionStore scopes, ICurrentUser c
             throw DomainRuleException.Forbidden("WORK_AREA_ACCESS_DENIED", "Only the assigned leader can read this information.");
         return area;
     }
+
+    public async Task<(WorkAreaScope WorkArea, SeasonScope Season)> GetWorkAreaForVolunteerWriteAsync(
+        Guid workAreaId, CancellationToken cancellationToken = default)
+    {
+        var area = await GetWorkAreaForReadAsync(workAreaId, cancellationToken);
+        if (currentUser.Role != GrottoWorksRoles.Volunteer)
+            throw DomainRuleException.Forbidden("WORK_AREA_ACCESS_DENIED", "Volunteer access is required.");
+        var season = await scopes.GetSeasonAsync(area.SeasonId, cancellationToken)
+            ?? throw DomainRuleException.NotFound("SEASON_NOT_FOUND", "The owning season is missing.");
+        if (season.IsReadOnly) throw new DomainRuleException("SEASON_READ_ONLY", "The archived season is read-only.");
+        return (area, season);
+    }
 }

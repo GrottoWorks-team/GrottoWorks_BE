@@ -34,6 +34,7 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
             builder.Property<string>("Type").IsRequired().HasMaxLength(40).HasColumnName("assignment_type").HasColumnType("character varying(40)");
             builder.Property<string>("Status").IsRequired().HasMaxLength(30).HasColumnName("assignment_status").HasColumnType("character varying(30)");
             builder.Property<string>("Note").HasMaxLength(2000).HasColumnName("assignment_note").HasColumnType("character varying(2000)");
+            builder.Property<string>("ResponseReason").HasMaxLength(500).HasColumnName("response_reason").HasColumnType("character varying(500)");
             builder.Property<string>("OverrideReason").HasMaxLength(500).HasColumnName("override_reason").HasColumnType("character varying(500)");
             builder.Property<bool>("OverrideCapacity").HasColumnName("override_capacity").HasColumnType("boolean");
             builder.Property<bool>("OverrideSkillMismatch").HasColumnName("override_skill_mismatch").HasColumnType("boolean");

@@ -20,5 +20,6 @@ public partial class NotificationAuditDbContextModelSnapshot : ModelSnapshot
         new FileObjectConfiguration().Configure(modelBuilder.Entity<NotificationAudit.Domain.Files.FileObject>());
         new NotificationConfiguration().Configure(modelBuilder.Entity<NotificationAudit.Domain.Notifications.Notification>());
         new NotificationPreferenceConfiguration().Configure(modelBuilder.Entity<NotificationAudit.Domain.Notifications.NotificationPreference>());
+        new NotificationRuleConfiguration().Configure(modelBuilder.Entity<NotificationAudit.Domain.Notifications.NotificationRule>());
     }
 }

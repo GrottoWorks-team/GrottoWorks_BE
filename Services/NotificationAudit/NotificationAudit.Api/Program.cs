@@ -54,6 +54,8 @@ if (app.Configuration.GetValue("Database:MigrateOnStartup", true))
     {
         using var scope = app.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<NotificationAuditDbContext>().Database.MigrateAsync();
+        await scope.ServiceProvider.GetRequiredService<NotificationAudit.Infrastructure.Notifications.INotificationRuleSeeder>()
+            .SeedAsync();
     }
     catch (Exception exception)
     {

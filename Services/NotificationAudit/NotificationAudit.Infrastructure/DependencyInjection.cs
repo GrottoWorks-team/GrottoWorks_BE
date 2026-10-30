@@ -27,6 +27,8 @@ public static class DependencyInjection
         services.AddHostedService<MinioBucketInitializer>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<INotificationPreferenceRepository, NotificationPreferenceRepository>();
+        services.AddScoped<INotificationRuleRepository, NotificationRuleRepository>();
+        services.AddScoped<INotificationRuleSeeder, NotificationRuleSeeder>();
         return services;
     }
 }

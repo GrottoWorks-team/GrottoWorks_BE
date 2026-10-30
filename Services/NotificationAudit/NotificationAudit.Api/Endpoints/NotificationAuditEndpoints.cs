@@ -5,6 +5,7 @@ using NotificationAudit.Contracts.Files;
 using NotificationAudit.Api.Common;
 using NotificationAudit.Application.Notifications;
 using NotificationAudit.Contracts.Notifications;
+using BuildingBlocks.Security;
 
 namespace NotificationAudit.Api.Endpoints;
 
@@ -78,6 +79,12 @@ public static class NotificationAuditEndpoints
         app.MapPut("/api/v1/users/me/notification-preferences", UpdateNotificationPreferencesAsync)
             .WithName("updateNotificationPreferences").WithTags("Notifications").RequireAuthorization()
             .Produces<ApiResponse<NotificationPreferenceDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401).Produces<ProblemDetails>(422);
+
+        app.MapPatch("/api/v1/notification-rules/{ruleId:guid}", UpdateNotificationRuleAsync)
+            .WithName("updateNotificationRule").WithTags("Notifications")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Admin))
+            .Produces<ApiResponse<NotificationRuleDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401)
+            .Produces<ProblemDetails>(403).Produces<ProblemDetails>(404).Produces<ProblemDetails>(412).Produces<ProblemDetails>(422);
     }
 
     private static async Task<IResult> CreateUploadRequestAsync(
@@ -174,4 +181,41 @@ public static class NotificationAuditEndpoints
         UpdateNotificationPreferenceHandler handler,
         CancellationToken cancellationToken) =>
         Results.Ok(ApiResults.Ok(await handler.HandleAsync(request, cancellationToken), httpContext));
+
+    private static async Task<IResult> UpdateNotificationRuleAsync(
+        Guid ruleId,
+        UpdateNotificationRuleRequest request,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
+        HttpContext httpContext,
+        UpdateNotificationRuleHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseVersion(ifMatch, out var expectedVersion))
+        {
+            return Results.Problem(
+                statusCode: 400,
+                title: "Invalid If-Match header",
+                detail: "If-Match must contain a positive integer version.",
+                extensions: new Dictionary<string, object?>
+                {
+                    ["code"] = "INVALID_IF_MATCH",
+                    ["correlationId"] = BuildingBlocks.Web.CorrelationIdMiddlewareExtensions.GetCorrelationId(httpContext),
+                    ["traceId"] = httpContext.TraceIdentifier
+                });
+        }
+
+        var result = await handler.HandleAsync(ruleId, request.InAppEnabled!.Value, expectedVersion, cancellationToken);
+        httpContext.Response.Headers.ETag = $"\"{result.Version}\"";
+        return Results.Ok(ApiResults.Ok(result, httpContext));
+    }
+
+    private static bool TryParseVersion(string? value, out int? version)
+    {
+        version = null;
+        if (string.IsNullOrWhiteSpace(value)) return true;
+        var normalized = value.Trim().Trim('"');
+        if (!int.TryParse(normalized, out var parsed) || parsed <= 0) return false;
+        version = parsed;
+        return true;
+    }
 }

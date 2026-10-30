@@ -5,6 +5,7 @@ public static class TaskExecutionEndpoints
     public static void MapTaskExecutionEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapInternalScopeEndpoints();
+        app.MapInternalTaskCountEndpoints();
         app.MapTaskEndpoints();
         app.MapAssignmentEndpoints();
         app.MapApplicationEndpoints();

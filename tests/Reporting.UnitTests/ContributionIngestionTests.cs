@@ -313,4 +313,32 @@ public sealed class ContributionIngestionTests
             JsonSerializer.SerializeToElement(new { status = "DONE" }, Json), _parishId, _seasonId, Guid.NewGuid(), 1)))
             .Outcome.Should().Be(IngestionOutcome.Ignored, "unknown tasks are not projected");
     }
+
+    [Fact]
+    public async Task Hours_received_before_the_task_get_its_work_area_once_the_task_is_projected()
+    {
+        var taskId = Guid.NewGuid();
+        await Handler.HandleAsync(Hours(Guid.NewGuid(), Dec10, taskId, 90));
+        _readModels.Attendance.Single().WorkAreaId.Should().BeNull();
+
+        var scopes = new FakeScopeStore();
+        var area = scopes.Seed(_parishId, _seasonId);
+        await new Reporting.Application.Scope.ApplyTaskSnapshotHandler(new FakeTaskStore(), scopes, _readModels).HandleAsync(
+            new Reporting.Domain.Scope.TaskSnapshot(taskId, area.WorkAreaId, "Treo đèn", Reporting.Domain.Scope.ProjectedTaskType.Work,
+                Reporting.Domain.Scope.ProjectedTaskStatus.InProgress, null, [], 1));
+
+        _readModels.Attendance.Single().WorkAreaId.Should().Be(area.WorkAreaId);
+    }
+
+    private sealed class FakeTaskStore : Reporting.Application.Scope.ITaskProjectionStore
+    {
+        private readonly List<Reporting.Domain.Scope.TaskProjection> _tasks = [];
+
+        public Task<Reporting.Domain.Scope.TaskProjection?> GetAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_tasks.FirstOrDefault(t => t.TaskId == taskId));
+
+        public void Add(Reporting.Domain.Scope.TaskProjection task) => _tasks.Add(task);
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
 }

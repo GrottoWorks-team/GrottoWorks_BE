@@ -183,6 +183,12 @@ namespace Readiness.Infrastructure.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("purchase_request_id");
 
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.Property<long>("SourceVersion")
                         .HasColumnType("bigint")
                         .HasColumnName("source_version");

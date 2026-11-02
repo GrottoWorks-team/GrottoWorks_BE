@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Resource.Application.Scope;
+using Resource.Domain;
 using Resource.Domain.Scope;
 using Resource.Infrastructure.Data;
 
@@ -15,5 +16,16 @@ public sealed class TaskProjectionStore(ResourceDbContext dbContext) : ITaskProj
 
     public void Add(TaskProjection task) => dbContext.TaskProjections.Add(task);
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default) => dbContext.SaveChangesAsync(cancellationToken);
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (exception is DbUpdateConcurrencyException || exception.IsAnyUniqueViolation())
+        {
+            // Another snapshot or task event changed the same task first: the caller (or the broker) delivers it again.
+            throw new DomainRuleException("TASK_PROJECTION_CONFLICT", "The task projection was updated concurrently; deliver the change again.");
+        }
+    }
 }

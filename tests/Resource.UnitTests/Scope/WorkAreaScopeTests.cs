@@ -140,4 +140,16 @@ public sealed class WorkAreaScopeTests
 
         updated.SeasonStatus.Should().Be(SeasonStatus.Archived);
     }
+
+    [Fact]
+    public async Task Unversioned_season_update_cannot_roll_back_a_versioned_parish_snapshot()
+    {
+        var season = Guid.NewGuid();
+        var handler = new ApplySeasonStatusHandler(_store);
+        await handler.HandleAsync(new SeasonStatusChange(season, SeasonStatus.Archived, 5));
+
+        (await handler.HandleAsync(new SeasonStatusChange(season, SeasonStatus.Active))).Should().Be(0);
+
+        _store.Seasons.Single().Status.Should().Be(SeasonStatus.Archived);
+    }
 }

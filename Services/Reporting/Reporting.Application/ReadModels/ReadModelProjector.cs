@@ -39,6 +39,9 @@ public interface IReadModelStore
     /// <summary>Donations of the season in the parish (with or without a receiving work area).</summary>
     Task<IReadOnlyList<DonationView>> ListDonationsAsync(Guid parishId, Guid seasonId, CancellationToken cancellationToken = default);
 
+    /// <summary>Tracked: attendance of a task stored before its work area was known.</summary>
+    Task<IReadOnlyList<AttendanceView>> ListAttendanceWithoutAreaAsync(Guid taskId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<AttendanceView>> ListAttendanceAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ReadinessAreaView>> ListReadinessAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default);
@@ -57,7 +60,8 @@ public interface IReadModelStore
 /// </summary>
 public sealed class ReadModelProjector(IReadModelStore store)
 {
-    public async Task<bool> ApplyAsync(IncomingEvent incoming, Func<Type, object> read, CancellationToken cancellationToken)
+    /// <param name="hours">attendance.hours.approved resolved once by the caller (envelope + task projection).</param>
+    public async Task<bool> ApplyAsync(IncomingEvent incoming, Func<Type, object> read, ApprovedHours? hours, CancellationToken cancellationToken)
     {
         switch (incoming.EventType)
         {
@@ -152,7 +156,7 @@ public sealed class ReadModelProjector(IReadModelStore store)
 
             case TaskHoursApproved.EventType:
             {
-                var e = await IntegrationEventHandler.HoursAsync(incoming, store, cancellationToken);
+                var e = hours ?? throw new InvalidOperationException("attendance.hours.approved must be resolved by the caller.");
                 var attendance = await store.GetAttendanceAsync(e.AttendanceId, cancellationToken);
                 if (attendance is null)
                 {

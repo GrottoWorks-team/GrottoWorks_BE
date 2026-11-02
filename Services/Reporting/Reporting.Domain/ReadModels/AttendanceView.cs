@@ -38,6 +38,9 @@ public sealed class AttendanceView
             ParishId = parishId
         };
 
+    /// <summary>The task became known after its hours: the attendance now counts for that work area.</summary>
+    public void AssignWorkArea(Guid workAreaId) => WorkAreaId ??= workAreaId;
+
     /// <summary>A corrected approval replaces the hours (latest approval wins).</summary>
     public void Approve(decimal hours, DateTimeOffset at)
     {

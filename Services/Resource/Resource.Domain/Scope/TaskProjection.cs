@@ -48,6 +48,12 @@ public sealed class TaskProjection
 
     public long SourceVersion { get; private set; }
 
+    /// <summary>
+    /// Optimistic concurrency token (<c>xmin</c>): two task events applied at once (e.g. two ACCEPTED assignments) must not
+    /// overwrite each other's assignee list — the loser gets 409 and is redelivered.
+    /// </summary>
+    public uint RowVersion { get; private set; }
+
     public DateTimeOffset UpdatedAt { get; private set; }
 
     public bool IsClosed => Status is ProjectedTaskStatus.Completed or ProjectedTaskStatus.Cancelled;

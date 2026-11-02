@@ -197,7 +197,7 @@ public sealed class ReportQueryHandler(ReportScopeResolver resolver, IReadModelS
     private async Task<Parts> AttendanceAsync(ResolvedScope scope, ReportQuery query, Dictionary<Guid, string> names, CancellationToken cancellationToken)
     {
         var attendance = (await store.ListAttendanceAsync(scope.Ids, cancellationToken))
-            .Where(item => query.InRange(item.ApprovedAt))
+            .Where(item => item.WorkAreaId is not null && query.InRange(item.ApprovedAt))
             .ToList();
         var volunteers = await users.GetDisplayNamesAsync(attendance.Select(item => item.VolunteerUserId).Distinct().ToList(), cancellationToken);
         var rows = attendance

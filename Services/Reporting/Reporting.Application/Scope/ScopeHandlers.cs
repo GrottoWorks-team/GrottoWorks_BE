@@ -42,10 +42,7 @@ public sealed class ApplyWorkAreaSnapshotHandler(IWorkAreaScopeStore store)
             var season = await store.GetSeasonAsync(snapshot.SeasonId, cancellationToken);
             snapshot = snapshot with
             {
-                SeasonStatus = season?.Status
-                    ?? existing?.SeasonStatus
-                    ?? (await store.ListBySeasonAsync(snapshot.SeasonId, cancellationToken)).Select(scope => (SeasonStatus?)scope.SeasonStatus).FirstOrDefault()
-                    ?? SeasonStatus.Planning
+                SeasonStatus = season?.Status ?? existing?.SeasonStatus ?? SeasonStatus.Planning
             };
         }
 

@@ -29,24 +29,27 @@ public sealed class NotificationAuditFileVerifier(
         Guid uploaderUserId,
         CancellationToken cancellationToken = default)
     {
-        foreach (var fileId in fileIds.Distinct())
+        // Checked in parallel (at most 10 evidence / 5 receipt files per request).
+        await Task.WhenAll(fileIds.Distinct().Select(fileId => EnsureAsync(fileId, purpose, uploaderUserId, cancellationToken)));
+    }
+
+    private async Task EnsureAsync(Guid fileId, string purpose, Guid uploaderUserId, CancellationToken cancellationToken)
+    {
+        var file = await GetAsync(fileId, cancellationToken)
+            ?? throw DomainRuleException.Validation("FILE_NOT_FOUND", $"File {fileId} does not exist.");
+        if (file.Status is not ("UPLOADED" or "ATTACHED"))
         {
-            var file = await GetAsync(fileId, cancellationToken)
-                ?? throw DomainRuleException.Validation("FILE_NOT_FOUND", $"File {fileId} does not exist.");
-            if (file.Status is not ("UPLOADED" or "ATTACHED"))
-            {
-                throw DomainRuleException.Validation("FILE_NOT_UPLOADED", $"File {fileId} is not uploaded yet; complete the upload first.");
-            }
+            throw DomainRuleException.Validation("FILE_NOT_UPLOADED", $"File {fileId} is not uploaded yet; complete the upload first.");
+        }
 
-            if (file.Purpose != purpose)
-            {
-                throw DomainRuleException.Validation("FILE_PURPOSE_MISMATCH", $"File {fileId} was uploaded for {file.Purpose}, not {purpose}.");
-            }
+        if (file.Purpose != purpose)
+        {
+            throw DomainRuleException.Validation("FILE_PURPOSE_MISMATCH", $"File {fileId} was uploaded for {file.Purpose}, not {purpose}.");
+        }
 
-            if (file.UploadedByUserId != uploaderUserId)
-            {
-                throw DomainRuleException.Validation("FILE_NOT_OWNED", $"File {fileId} was uploaded by another user.");
-            }
+        if (file.UploadedByUserId != uploaderUserId)
+        {
+            throw DomainRuleException.Validation("FILE_NOT_OWNED", $"File {fileId} was uploaded by another user.");
         }
     }
 

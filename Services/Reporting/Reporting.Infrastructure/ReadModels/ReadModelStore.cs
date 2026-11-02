@@ -50,6 +50,9 @@ public sealed class ReadModelStore(ReportingDbContext dbContext) : IReadModelSto
             .Where(donation => donation.ParishId == parishId && donation.SeasonId == seasonId)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<AttendanceView>> ListAttendanceWithoutAreaAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+        await dbContext.AttendanceViews.Where(attendance => attendance.TaskId == taskId && attendance.WorkAreaId == null).ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<AttendanceView>> ListAttendanceAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
         await dbContext.AttendanceViews.AsNoTracking().Where(attendance => attendance.WorkAreaId != null && workAreaIds.Contains(attendance.WorkAreaId.Value)).ToListAsync(cancellationToken);
 

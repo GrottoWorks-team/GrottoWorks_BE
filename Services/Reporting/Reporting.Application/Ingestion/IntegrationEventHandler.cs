@@ -65,10 +65,11 @@ public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecor
             return new IngestionResult(incoming.EventId, incoming.EventType, IngestionOutcome.Duplicate, 0, 0);
         }
 
+        var hours = incoming.EventType == TaskHoursApproved.EventType ? await HoursAsync(incoming, readModels, cancellationToken) : null;
         var drafts = incoming.EventType switch
         {
             TaskCompletionReviewed.EventType => FromTaskReview(Read<TaskCompletionReviewed>(incoming)),
-            TaskHoursApproved.EventType => FromAttendance(await HoursAsync(incoming, readModels, cancellationToken)),
+            TaskHoursApproved.EventType => FromAttendance(hours!),
             PurchaseDeliveryConfirmed.EventType => FromPurchase(Read<PurchaseDeliveryConfirmed>(incoming)),
             ContributionReceiptConfirmed.EventType => FromReceipt(Read<ContributionReceiptConfirmed>(incoming)),
             ContributionDonationAdjusted.EventType => FromAdjustment(Read<ContributionDonationAdjusted>(incoming)),
@@ -76,7 +77,7 @@ public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecor
             _ => null
         };
 
-        var projected = await projector.ApplyAsync(incoming, type => Read(incoming, type), cancellationToken);
+        var projected = await projector.ApplyAsync(incoming, type => Read(incoming, type), hours, cancellationToken);
         var now = DateTimeOffset.UtcNow;
         if (drafts is null && !projected)
         {
@@ -155,7 +156,7 @@ public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecor
     }
 
     /// <summary>TaskExecution's hours event: parish / season from the envelope, work area from the payload or the task projection.</summary>
-    public static async Task<ApprovedHours> HoursAsync(IncomingEvent incoming, IReadModelStore readModels, CancellationToken cancellationToken)
+    private static async Task<ApprovedHours> HoursAsync(IncomingEvent incoming, IReadModelStore readModels, CancellationToken cancellationToken)
     {
         var payload = Read<TaskHoursApproved>(incoming);
         if (incoming.ParishId is not { } parishId || incoming.SeasonId is not { } seasonId || incoming.AggregateId is not { } taskId ||

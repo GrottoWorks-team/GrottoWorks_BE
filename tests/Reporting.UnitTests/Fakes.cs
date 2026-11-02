@@ -237,6 +237,9 @@ public sealed class FakeReadModelStore : Reporting.Application.ReadModels.IReadM
     public Task<IReadOnlyList<Reporting.Domain.ReadModels.DonationView>> ListDonationsAsync(Guid parishId, Guid seasonId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.DonationView>>(Donations.Where(d => d.ParishId == parishId && d.SeasonId == seasonId).ToList());
 
+    public Task<IReadOnlyList<Reporting.Domain.ReadModels.AttendanceView>> ListAttendanceWithoutAreaAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.AttendanceView>>(Attendance.Where(a => a.TaskId == taskId && a.WorkAreaId == null).ToList());
+
     public Task<IReadOnlyList<Reporting.Domain.ReadModels.AttendanceView>> ListAttendanceAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.AttendanceView>>(Attendance.Where(a => a.WorkAreaId is { } area && workAreaIds.Contains(area)).ToList());
 

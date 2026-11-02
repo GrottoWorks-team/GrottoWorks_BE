@@ -1,5 +1,7 @@
 using BuildingBlocks.Messaging.MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Resource.Application.Files;
+using Resource.Infrastructure.Files;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Resource.Application.Abstractions;
@@ -66,6 +68,24 @@ public static class DependencyInjection
         if (configuration.GetValue("TaskEvents:Enabled", false))
         {
             services.AddMessageBroker(configuration, typeof(TaskIntegrationEventConsumer).Assembly);
+        }
+
+        // F-NTF-01 file checks (evidence, receipts); skipped when NotificationAudit is not configured.
+        if (Uri.TryCreate(configuration[NotificationAuditClientOptions.BaseAddressConfigurationKey], UriKind.Absolute, out var files) &&
+            (files.Scheme == Uri.UriSchemeHttp || files.Scheme == Uri.UriSchemeHttps))
+        {
+            services.AddSingleton(new NotificationAuditClientOptions(files, configuration["InternalApi:ApiKey"] ?? string.Empty));
+            services.AddHttpContextAccessor();
+            services.AddHttpClient<IFileVerifier, NotificationAuditFileVerifier>(client =>
+                {
+                    client.BaseAddress = files;
+                    client.Timeout = Timeout.InfiniteTimeSpan;
+                })
+                .AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
+        }
+        else
+        {
+            services.AddSingleton<IFileVerifier, NoFileVerifier>();
         }
 
         return services;

@@ -556,3 +556,18 @@ public sealed class FakePurchaseStore : Resource.Application.Purchases.IPurchase
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
+
+/// <summary>Accepts every file unless <see cref="Reject"/> is set (then throws it, like the NotificationAudit check).</summary>
+public sealed class FakeFileVerifier : Resource.Application.Files.IFileVerifier
+{
+    public List<(IReadOnlyCollection<Guid> Ids, string Purpose, Guid Uploader)> Calls { get; } = [];
+
+    public Resource.Domain.DomainRuleException? Reject { get; set; }
+
+    public Task EnsureAttachableAsync(IReadOnlyCollection<Guid> fileIds, string purpose, Guid uploaderUserId, CancellationToken cancellationToken = default)
+    {
+        Calls.Add((fileIds, purpose, uploaderUserId));
+        return Reject is null || fileIds.Count == 0 ? Task.CompletedTask : Task.FromException(Reject);
+    }
+}
+

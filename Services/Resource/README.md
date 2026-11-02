@@ -223,6 +223,12 @@ Mẫu request: `Resource.Api.http`.
   publish `planning.work-area.*` / `planning.season.*`; consumer MassTransit sau này gọi đúng các handler
   `ApplyWorkAreaSnapshotHandler` / `ApplySeasonStatusHandler` (payload cần có: xem BuildingBlocks README §5.2).
 
+## File hóa đơn (F-NTF-01)
+
+Hóa đơn của `recordPurchase` / `attachPurchaseReceipt` phải là file đã upload xong, purpose `PURCHASE_RECEIPT`, do chính
+buyer upload — kiểm tra qua NotificationAudit `GET /internal/files/{id}` (`NotificationAuditClient:BaseAddress`); lỗi như
+Readiness (422 `FILE_*`, 503 `FILE_SERVICE_UNAVAILABLE`). Không cấu hình địa chỉ → bỏ qua kiểm tra.
+
 ## Event từ TaskExecution
 
 `TaskIntegrationEvent` qua RabbitMQ (`TaskEvents:Enabled`) hoặc `POST /internal/task-events`: `task.status.changed`,

@@ -130,3 +130,18 @@ public sealed class FakeReadinessCheckStore : IReadinessCheckStore
         return Task.CompletedTask;
     }
 }
+
+/// <summary>Accepts every file unless <see cref="Reject"/> is set (then throws it, like the NotificationAudit check).</summary>
+public sealed class FakeFileVerifier : Readiness.Application.Files.IFileVerifier
+{
+    public List<(IReadOnlyCollection<Guid> Ids, string Purpose, Guid Uploader)> Calls { get; } = [];
+
+    public Readiness.Domain.DomainRuleException? Reject { get; set; }
+
+    public Task EnsureAttachableAsync(IReadOnlyCollection<Guid> fileIds, string purpose, Guid uploaderUserId, CancellationToken cancellationToken = default)
+    {
+        Calls.Add((fileIds, purpose, uploaderUserId));
+        return Reject is null || fileIds.Count == 0 ? Task.CompletedTask : Task.FromException(Reject);
+    }
+}
+

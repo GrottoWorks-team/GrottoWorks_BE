@@ -118,6 +118,7 @@ services:
       - MessageBroker__UserName=${RABBITMQ_DEFAULT_USER:-grottoworks}
       - MessageBroker__Password=${RABBITMQ_DEFAULT_PASS:-grottoworks}
       - TaskEvents__Enabled=${TASK_EVENTS_ENABLED:-true}
+      - NotificationAuditClient__BaseAddress=http://notificationaudit.api:8080/
     depends_on:
       postgres:
         condition: service_healthy
@@ -138,6 +139,7 @@ services:
       - MessageBroker__Host=amqp://rabbitmq:5672
       - MessageBroker__UserName=${RABBITMQ_DEFAULT_USER:-grottoworks}
       - MessageBroker__Password=${RABBITMQ_DEFAULT_PASS:-grottoworks}
+      - NotificationAuditClient__BaseAddress=http://notificationaudit.api:8080/
     depends_on:
       postgres:
         condition: service_healthy

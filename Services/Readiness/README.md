@@ -75,6 +75,11 @@ Ngoài parish → 404; season ARCHIVED → 409 `SEASON_READ_ONLY`.
 Feed scope của Parish (`/internal/season-scopes`, `/internal/work-area-scopes`) nhận đúng body Parish đang gửi (không cần
 `seasonStatus`, có projection `season_scope`).
 
+## Outbox (event ra ngoài)
+
+Event (bảng "Event" ở trên) ghi vào `integration_event_outbox`, `OutboxDispatcher` đẩy lên RabbitMQ dưới dạng
+`ReadinessIntegrationEvent` (BuildingBlocks README §5.7). Broker chết → event nằm chờ, tự gửi lại khi broker sống.
+
 ## Việc còn mở
 
 - Cột kỹ thuật ngoài ERD v3.6.2: `readiness_item.item_position` (thứ tự hiển thị), `readiness_item.evidence_file_ids`

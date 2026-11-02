@@ -1,5 +1,6 @@
 using BuildingBlocks.Messaging.MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Reporting.Infrastructure.Outbox;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Reporting.Application.Abstractions;
@@ -13,7 +14,6 @@ using Reporting.Infrastructure.Data;
 using Reporting.Infrastructure.Exports;
 using Reporting.Infrastructure.Identity;
 using Reporting.Infrastructure.Messaging;
-using Reporting.Infrastructure.Observability;
 using Reporting.Infrastructure.ReadModels;
 using Reporting.Infrastructure.Recognition;
 using Reporting.Infrastructure.Scope;
@@ -31,7 +31,9 @@ public static class DependencyInjection
         }
 
         services.AddDbContext<ReportingDbContext>(options => options.UseNpgsql(connectionString));
-        services.AddScoped<IIntegrationEventPublisher, LoggingIntegrationEventPublisher>();
+        // Integration events go through the transactional outbox (integration_event_outbox).
+        services.AddHttpContextAccessor();
+        services.AddScoped<IIntegrationEventPublisher, OutboxIntegrationEventPublisher>();
         services.AddScoped<IWorkAreaScopeStore, WorkAreaScopeStore>();
         services.AddScoped<ITaskProjectionStore, TaskProjectionStore>();
         services.AddScoped<IRecognitionCatalogStore, RecognitionCatalogStore>();
@@ -74,10 +76,19 @@ public static class DependencyInjection
             services.AddSingleton<IUserDirectory, NoUserDirectory>();
         }
 
-        // TaskExecution outbox events over RabbitMQ (POST /internal/events works without the broker).
-        if (configuration.GetValue("TaskEvents:Enabled", false))
+        // RabbitMQ: consumers of TaskExecution / Resource / Readiness events (IntegrationEvents:ConsumeEnabled, or the older
+        // TaskEvents:Enabled) and the outbox dispatcher (Outbox:DispatchEnabled). Without the broker, events stay in the outbox
+        // and POST /internal/events still accepts them.
+        var consumeTaskEvents = configuration.GetValue("IntegrationEvents:ConsumeEnabled", configuration.GetValue("TaskEvents:Enabled", false));
+        var dispatchOutbox = configuration.GetValue("Outbox:DispatchEnabled", false);
+        if (consumeTaskEvents || dispatchOutbox)
         {
-            services.AddMessageBroker(configuration, typeof(TaskIntegrationEventConsumer).Assembly);
+            services.AddMessageBroker(configuration, consumeTaskEvents ? typeof(TaskIntegrationEventConsumer).Assembly : null);
+        }
+
+        if (dispatchOutbox)
+        {
+            services.AddHostedService<OutboxDispatcher>();
         }
 
         return services;

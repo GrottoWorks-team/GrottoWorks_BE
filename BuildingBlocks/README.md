@@ -177,3 +177,17 @@ Resource, Readiness, Reporting dùng thẳng `TaskExecution.Contracts.Events.Tas
   `attendance.hours.approved` (contribution giờ làm + báo cáo), idempotent theo `eventId`.
 - **Đề nghị Lâm:** thêm event tạo task (hoặc payload đủ `name`, `taskType`, `purchaseRequestId`) để bỏ feed `/internal/task-scopes`.
 
+### 5.7 Outbox của Resource / Readiness / Reporting
+
+- Mọi integration event đi qua bảng `integration_event_outbox` của từng service (ghi cùng DbContext của lệnh; lệnh chạy trong
+  transaction — khóa tồn kho — thì commit chung). `OutboxDispatcher` (`Outbox:DispatchEnabled`) đẩy lên RabbitMQ theo thứ tự tạo,
+  `FOR UPDATE SKIP LOCKED` (nhiều instance không đẩy trùng), lỗi → retry 2 s / 5 s / 15 s / 1 phút / 5 phút; at-least-once,
+  `MessageId` = `eventId`.
+- Message type: `ResourceIntegrationEvent`, `ReadinessIntegrationEvent`, `ReportingIntegrationEvent` (trong `<Service>.Contracts.Events`),
+  cùng dạng envelope với `TaskIntegrationEvent` (`eventId, eventType, version, occurredAt, correlationId, actorId?, parishId?,
+  seasonId?, aggregateType, aggregateId, payload`). Reporting tiêu thụ hai cái đầu (queue `reporting-resource-events`,
+  `reporting-readiness-events`, bật bằng `IntegrationEvents:ConsumeEnabled`). **Đề nghị Lâm:** NotificationAudit tiêu thụ thêm hai
+  message này cho thông báo của Resource/Readiness (purchase request chờ duyệt, pledge, đồ mượn quá hạn, item failed...).
+- **MassTransit hạ về 8.5.12 (Apache 2.0):** bản 9.x đòi license thương mại — không có license thì bus không khởi động và service
+  crash ngay lúc start (NotificationAudit bật `NotificationEvents__Enabled=true` trong compose cũng bị). API dùng ở dự án không đổi.
+

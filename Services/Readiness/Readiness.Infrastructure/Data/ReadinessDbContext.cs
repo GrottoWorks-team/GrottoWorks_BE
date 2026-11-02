@@ -17,6 +17,7 @@ public sealed class ReadinessDbContext(DbContextOptions<ReadinessDbContext> opti
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // integration_event_outbox is configured by Outbox/OutboxMessageConfiguration (same assembly).
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ReadinessDbContext).Assembly);
     }
 

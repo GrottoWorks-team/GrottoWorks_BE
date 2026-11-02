@@ -236,6 +236,11 @@ Readiness (422 `FILE_*`, 503 `FILE_SERVICE_UNAVAILABLE`). Không cấu hình đ�
 Feed scope của Parish (`/internal/season-scopes`, `/internal/work-area-scopes`) nhận đúng body Parish đang gửi (không cần
 `seasonStatus`, có projection `season_scope`).
 
+## Outbox (event ra ngoài)
+
+Event (bảng "Event" ở trên) ghi vào `integration_event_outbox`, `OutboxDispatcher` đẩy lên RabbitMQ dưới dạng
+`ResourceIntegrationEvent` (BuildingBlocks README §5.7). Broker chết → event nằm chờ, tự gửi lại khi broker sống.
+
 ## Việc còn mở
 
 - Consumer `planning.*`, `task.status.changed`, `task.materials.changed`, `task.completion.reviewed`,

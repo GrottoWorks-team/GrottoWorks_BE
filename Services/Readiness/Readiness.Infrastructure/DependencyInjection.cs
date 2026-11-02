@@ -1,5 +1,6 @@
 using BuildingBlocks.Messaging.MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Readiness.Infrastructure.Outbox;
 using Readiness.Application.Files;
 using Readiness.Infrastructure.Files;
 using Microsoft.Extensions.Configuration;
@@ -9,7 +10,6 @@ using Readiness.Application.Checklists;
 using Readiness.Application.Scope;
 using Readiness.Infrastructure.Checklists;
 using Readiness.Infrastructure.Data;
-using Readiness.Infrastructure.Observability;
 using Readiness.Infrastructure.Scope;
 using Readiness.Infrastructure.Messaging;
 
@@ -26,14 +26,24 @@ public static class DependencyInjection
         }
 
         services.AddDbContext<ReadinessDbContext>(options => options.UseNpgsql(connectionString));
-        services.AddScoped<IIntegrationEventPublisher, LoggingIntegrationEventPublisher>();
+        // Integration events go through the transactional outbox (integration_event_outbox).
+        services.AddHttpContextAccessor();
+        services.AddScoped<IIntegrationEventPublisher, OutboxIntegrationEventPublisher>();
         services.AddScoped<IWorkAreaScopeStore, WorkAreaScopeStore>();
         services.AddScoped<ITaskProjectionStore, TaskProjectionStore>();
         services.AddScoped<IReadinessCheckStore, ReadinessCheckStore>();
-        // TaskExecution outbox events over RabbitMQ (POST /internal/task-events works without the broker).
-        if (configuration.GetValue("TaskEvents:Enabled", false))
+        // RabbitMQ: consumers of TaskExecution events (TaskEvents:Enabled) and the outbox dispatcher (Outbox:DispatchEnabled).
+        // Without the broker, events stay in the outbox and the /internal endpoints still accept events.
+        var consumeTaskEvents = configuration.GetValue("TaskEvents:Enabled", false);
+        var dispatchOutbox = configuration.GetValue("Outbox:DispatchEnabled", false);
+        if (consumeTaskEvents || dispatchOutbox)
         {
-            services.AddMessageBroker(configuration, typeof(TaskIntegrationEventConsumer).Assembly);
+            services.AddMessageBroker(configuration, consumeTaskEvents ? typeof(TaskIntegrationEventConsumer).Assembly : null);
+        }
+
+        if (dispatchOutbox)
+        {
+            services.AddHostedService<OutboxDispatcher>();
         }
 
         // F-NTF-01 file checks (evidence, receipts); skipped when NotificationAudit is not configured.

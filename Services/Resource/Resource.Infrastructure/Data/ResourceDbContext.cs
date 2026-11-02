@@ -44,6 +44,7 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // integration_event_outbox is configured by Outbox/OutboxMessageConfiguration (same assembly).
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ResourceDbContext).Assembly);
     }
 }

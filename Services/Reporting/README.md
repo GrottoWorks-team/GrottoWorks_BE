@@ -131,6 +131,11 @@ Mẫu request: `Reporting.Api.http`.
 task chưa project vẫn tính contribution/điểm nhưng không vào báo cáo theo khu vực), `task.status.changed` và
 `task.assignment.responded` cập nhật `task_projection` cho dashboard.
 
+## Outbox (event ra ngoài)
+
+Event (bảng "Event" ở trên) ghi vào `integration_event_outbox`, `OutboxDispatcher` đẩy lên RabbitMQ dưới dạng
+`ReportingIntegrationEvent` (BuildingBlocks README §5.7). Broker chết → event nằm chờ, tự gửi lại khi broker sống.
+
 ## Việc còn mở
 
 - Lý do `deactivateRecognitionRule` chưa có cột lưu (ERD không có) — chờ activity log F-NTF-04.

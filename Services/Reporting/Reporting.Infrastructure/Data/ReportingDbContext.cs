@@ -42,6 +42,7 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // integration_event_outbox is configured by Outbox/OutboxMessageConfiguration (same assembly).
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ReportingDbContext).Assembly);
     }
 }

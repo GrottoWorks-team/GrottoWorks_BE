@@ -61,6 +61,13 @@ Ngoài parish → 404; season ARCHIVED → 409 `SEASON_READ_ONLY`.
   response item trả `checkVersion` để gửi `If-Match` lần sau.
 - Event (đang log, chờ outbox F-PLT-05): `readiness.item.failed`, `readiness.area.ready`, `readiness.area.reopened`.
 
+## Event từ TaskExecution
+
+`TaskIntegrationEvent` qua RabbitMQ (`TaskEvents:Enabled`) hoặc `POST /internal/task-events`: `task.status.changed`,
+`task.assignment.responded` (ACCEPTED) cập nhật `task_projection` của task đã project (BuildingBlocks README §5.6).
+Feed scope của Parish (`/internal/season-scopes`, `/internal/work-area-scopes`) nhận đúng body Parish đang gửi (không cần
+`seasonStatus`, có projection `season_scope`).
+
 ## Việc còn mở
 
 - Cột kỹ thuật ngoài ERD v3.6.2: `readiness_item.item_position` (thứ tự hiển thị), `readiness_item.evidence_file_ids`

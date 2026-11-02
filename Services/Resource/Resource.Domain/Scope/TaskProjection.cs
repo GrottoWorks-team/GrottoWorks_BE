@@ -76,6 +76,38 @@ public sealed class TaskProjection
         return true;
     }
 
+    /// <summary><c>task.status.changed</c>: only the status moves; an older aggregate version changes nothing.</summary>
+    public bool ApplyStatus(ProjectedTaskStatus status, long version, DateTimeOffset now)
+    {
+        if (version < SourceVersion)
+        {
+            return false;
+        }
+
+        Status = status;
+        SourceVersion = version;
+        UpdatedAt = now.ToUniversalTime();
+        return true;
+    }
+
+    /// <summary><c>task.assignment.responded</c> ACCEPTED: the volunteer now holds an accepted assignment.</summary>
+    public bool AddAssignee(Guid userId, long version, DateTimeOffset now)
+    {
+        if (version < SourceVersion)
+        {
+            return false;
+        }
+
+        if (!AssigneeUserIds.Contains(userId))
+        {
+            AssigneeUserIds = [.. AssigneeUserIds, userId];
+        }
+
+        SourceVersion = version;
+        UpdatedAt = now.ToUniversalTime();
+        return true;
+    }
+
     private void Copy(TaskSnapshot snapshot, DateTimeOffset now)
     {
         if (snapshot.WorkAreaId == Guid.Empty)

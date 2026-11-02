@@ -1,3 +1,4 @@
+using BuildingBlocks.Messaging.MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +19,7 @@ using Resource.Infrastructure.Contributions;
 using Resource.Infrastructure.Identity;
 using Resource.Infrastructure.Data;
 using Resource.Infrastructure.Observability;
+using Resource.Infrastructure.Messaging;
 
 namespace Resource.Infrastructure;
 
@@ -59,6 +61,12 @@ public static class DependencyInjection
                 client.Timeout = Timeout.InfiniteTimeSpan;
             })
             .AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
+
+        // TaskExecution outbox events over RabbitMQ (POST /internal/task-events works without the broker).
+        if (configuration.GetValue("TaskEvents:Enabled", false))
+        {
+            services.AddMessageBroker(configuration, typeof(TaskIntegrationEventConsumer).Assembly);
+        }
 
         return services;
     }

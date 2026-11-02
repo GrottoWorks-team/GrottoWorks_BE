@@ -212,7 +212,7 @@ namespace Reporting.Infrastructure.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("volunteer_user_id");
 
-                    b.Property<Guid>("WorkAreaId")
+                    b.Property<Guid?>("WorkAreaId")
                         .HasColumnType("uuid")
                         .HasColumnName("work_area_id");
 

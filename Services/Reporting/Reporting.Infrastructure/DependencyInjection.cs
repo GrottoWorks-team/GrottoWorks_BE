@@ -1,3 +1,4 @@
+using BuildingBlocks.Messaging.MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,6 +12,7 @@ using Reporting.Application.Users;
 using Reporting.Infrastructure.Data;
 using Reporting.Infrastructure.Exports;
 using Reporting.Infrastructure.Identity;
+using Reporting.Infrastructure.Messaging;
 using Reporting.Infrastructure.Observability;
 using Reporting.Infrastructure.ReadModels;
 using Reporting.Infrastructure.Recognition;
@@ -70,6 +72,12 @@ public static class DependencyInjection
         else
         {
             services.AddSingleton<IUserDirectory, NoUserDirectory>();
+        }
+
+        // TaskExecution outbox events over RabbitMQ (POST /internal/events works without the broker).
+        if (configuration.GetValue("TaskEvents:Enabled", false))
+        {
+            services.AddMessageBroker(configuration, typeof(TaskIntegrationEventConsumer).Assembly);
         }
 
         return services;

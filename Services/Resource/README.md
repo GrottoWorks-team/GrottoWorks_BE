@@ -223,6 +223,13 @@ Mẫu request: `Resource.Api.http`.
   publish `planning.work-area.*` / `planning.season.*`; consumer MassTransit sau này gọi đúng các handler
   `ApplyWorkAreaSnapshotHandler` / `ApplySeasonStatusHandler` (payload cần có: xem BuildingBlocks README §5.2).
 
+## Event từ TaskExecution
+
+`TaskIntegrationEvent` qua RabbitMQ (`TaskEvents:Enabled`) hoặc `POST /internal/task-events`: `task.status.changed`,
+`task.assignment.responded` (ACCEPTED) cập nhật `task_projection` của task đã project (BuildingBlocks README §5.6).
+Feed scope của Parish (`/internal/season-scopes`, `/internal/work-area-scopes`) nhận đúng body Parish đang gửi (không cần
+`seasonStatus`, có projection `season_scope`).
+
 ## Việc còn mở
 
 - Consumer `planning.*`, `task.status.changed`, `task.materials.changed`, `task.completion.reviewed`,

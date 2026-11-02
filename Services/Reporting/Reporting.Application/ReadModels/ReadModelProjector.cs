@@ -1,8 +1,10 @@
 using System.Text.Json;
 using Readiness.Contracts.Events;
 using Reporting.Application.Ingestion;
+using Reporting.Domain;
 using Reporting.Domain.ReadModels;
 using Resource.Contracts.Events;
+using TaskExecution.Contracts.Events;
 
 namespace Reporting.Application.ReadModels;
 
@@ -42,6 +44,9 @@ public interface IReadModelStore
     Task<IReadOnlyList<ReadinessAreaView>> ListReadinessAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ReadinessHistoryEntry>> ListReadinessHistoryAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default);
+
+    /// <summary>Tracked task projection (null when not projected).</summary>
+    Task<Domain.Scope.TaskProjection?> GetTaskAsync(Guid taskId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Domain.Scope.TaskProjection>> ListTasksAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default);
 }
@@ -145,9 +150,9 @@ public sealed class ReadModelProjector(IReadModelStore store)
                 return true;
             }
 
-            case AttendanceHoursApproved.EventType:
+            case TaskHoursApproved.EventType:
             {
-                var e = (AttendanceHoursApproved)read(typeof(AttendanceHoursApproved));
+                var e = await IntegrationEventHandler.HoursAsync(incoming, store, cancellationToken);
                 var attendance = await store.GetAttendanceAsync(e.AttendanceId, cancellationToken);
                 if (attendance is null)
                 {
@@ -155,7 +160,32 @@ public sealed class ReadModelProjector(IReadModelStore store)
                     store.Add(attendance);
                 }
 
-                attendance.Approve(e.ApprovedHours, e.ApprovedAt);
+                attendance.Approve(e.Hours, e.ApprovedAt);
+                return true;
+            }
+
+            case TaskEventTypes.StatusChanged:
+            case TaskEventTypes.AssignmentResponded:
+            {
+                // Dashboards: task status and accepted volunteers; only tasks already projected (the events carry no name/type).
+                var task = incoming.AggregateId is { } taskId ? await store.GetTaskAsync(taskId, cancellationToken) : null;
+                if (task is null)
+                {
+                    return false;
+                }
+
+                var version = incoming.AggregateVersion ?? task.SourceVersion;
+                var payload = (TaskEventPayload)read(typeof(TaskEventPayload));
+                if (incoming.EventType == TaskEventTypes.StatusChanged)
+                {
+                    task.ApplyStatus(payload.Status ?? throw DomainRuleException.Validation("EVENT_PAYLOAD_INVALID", "task.status.changed has no status."),
+                        version, DateTimeOffset.UtcNow);
+                }
+                else if (payload.Decision == "ACCEPTED" && payload.VolunteerUserId is { } volunteer)
+                {
+                    task.AddAssignee(volunteer, version, DateTimeOffset.UtcNow);
+                }
+
                 return true;
             }
 
@@ -241,3 +271,6 @@ public sealed class ReadModelProjector(IReadModelStore store)
         return area;
     }
 }
+
+/// <summary>Fields of <c>task.status.changed</c> / <c>task.assignment.responded</c> Reporting reads.</summary>
+public sealed record TaskEventPayload(Domain.Scope.ProjectedTaskStatus? Status, string? Decision, Guid? VolunteerUserId);

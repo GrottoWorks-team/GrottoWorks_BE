@@ -13,6 +13,8 @@ COPY ["Services/Readiness/Readiness.Application/Readiness.Application.csproj", "
 COPY ["Services/Readiness/Readiness.Infrastructure/Readiness.Infrastructure.csproj", "Services/Readiness/Readiness.Infrastructure/"]
 COPY ["Services/Readiness/Readiness.Domain/Readiness.Domain.csproj", "Services/Readiness/Readiness.Domain/"]
 COPY ["Services/Readiness/Readiness.Contracts/Readiness.Contracts.csproj", "Services/Readiness/Readiness.Contracts/"]
+COPY ["Services/TaskExecution/TaskExecution.Contracts/TaskExecution.Contracts.csproj", "Services/TaskExecution/TaskExecution.Contracts/"]
+COPY ["BuildingBlocks/BuildingBlocks.Messaging/BuildingBlocks.Messaging.csproj", "BuildingBlocks/BuildingBlocks.Messaging/"]
 COPY ["BuildingBlocks/BuildingBlocks.Web/BuildingBlocks.Web.csproj", "BuildingBlocks/BuildingBlocks.Web/"]
 COPY ["BuildingBlocks/BuildingBlocks.Security/BuildingBlocks.Security.csproj", "BuildingBlocks/BuildingBlocks.Security/"]
 RUN dotnet restore "./Services/Readiness/Readiness.Api/./Readiness.Api.csproj"

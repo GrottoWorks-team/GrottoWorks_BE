@@ -201,7 +201,7 @@ public sealed class ReportQueryHandler(ReportScopeResolver resolver, IReadModelS
             .ToList();
         var volunteers = await users.GetDisplayNamesAsync(attendance.Select(item => item.VolunteerUserId).Distinct().ToList(), cancellationToken);
         var rows = attendance
-            .GroupBy(item => (item.VolunteerUserId, item.WorkAreaId))
+            .GroupBy(item => (item.VolunteerUserId, WorkAreaId: item.WorkAreaId!.Value))
             .Select(group => Row(
                 ("volunteerUserId", group.Key.VolunteerUserId),
                 ("volunteer", volunteers.GetValueOrDefault(group.Key.VolunteerUserId)),

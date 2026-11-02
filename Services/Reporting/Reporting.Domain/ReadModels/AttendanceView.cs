@@ -13,7 +13,8 @@ public sealed class AttendanceView
 
     public Guid TaskId { get; private set; }
 
-    public Guid WorkAreaId { get; private set; }
+    /// <summary>Null while TaskExecution's event carries no work area and the task is not projected.</summary>
+    public Guid? WorkAreaId { get; private set; }
 
     public Guid SeasonId { get; private set; }
 
@@ -26,7 +27,7 @@ public sealed class AttendanceView
 
     public DateTimeOffset ApprovedAt { get; private set; }
 
-    public static AttendanceView Create(Guid attendanceId, Guid volunteerUserId, Guid taskId, Guid workAreaId, Guid seasonId, Guid parishId) =>
+    public static AttendanceView Create(Guid attendanceId, Guid volunteerUserId, Guid taskId, Guid? workAreaId, Guid seasonId, Guid parishId) =>
         new()
         {
             AttendanceId = attendanceId,

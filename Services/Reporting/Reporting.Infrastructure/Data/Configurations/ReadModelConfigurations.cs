@@ -93,7 +93,7 @@ public sealed class AttendanceViewConfiguration : IEntityTypeConfiguration<Atten
         builder.Property(attendance => attendance.AttendanceId).HasColumnName("attendance_id").ValueGeneratedNever();
         builder.Property(attendance => attendance.VolunteerUserId).HasColumnName("volunteer_user_id").IsRequired();
         builder.Property(attendance => attendance.TaskId).HasColumnName("task_id").IsRequired();
-        builder.Property(attendance => attendance.WorkAreaId).HasColumnName("work_area_id").IsRequired();
+        builder.Property(attendance => attendance.WorkAreaId).HasColumnName("work_area_id");
         builder.Property(attendance => attendance.SeasonId).HasColumnName("season_id").IsRequired();
         builder.Property(attendance => attendance.ParishId).HasColumnName("parish_id").IsRequired();
         builder.Property(attendance => attendance.ApprovedHours).HasColumnName("approved_hours").HasPrecision(8, 2);

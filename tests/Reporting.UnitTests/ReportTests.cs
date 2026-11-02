@@ -36,7 +36,8 @@ public sealed class ReportTests
     }
 
     private IntegrationEventHandler Ingest =>
-        new(_contributions, new ContributionRecorder(_contributions, _catalog, new FakeIntegrationEventPublisher()), new ReadModelProjector(_readModels));
+        new(_contributions, new ContributionRecorder(_contributions, _catalog, new FakeIntegrationEventPublisher()), new ReadModelProjector(_readModels),
+            _readModels);
 
     private Task Send<T>(string type, T payload) =>
         Ingest.HandleAsync(new IncomingEvent(Guid.NewGuid(), type, 1, null, JsonSerializer.SerializeToElement(payload, Json)));
@@ -48,6 +49,12 @@ public sealed class ReportTests
 
     private DashboardQueryHandler Dashboards(FakeCurrentUser user) =>
         new(new ReportScopeResolver(_scopes, new WorkAreaAccess(_scopes, user), user), new WorkAreaAccess(_scopes, user), _scopes, _readModels, user);
+
+    /// <summary>TaskExecution's attendance.hours.approved: minutes in the payload, parish / season / task in the envelope.</summary>
+    private Task Hours(Guid attendance, Guid volunteer, int minutes, DateTimeOffset at) =>
+        Ingest.HandleAsync(new IncomingEvent(Guid.NewGuid(), TaskHoursApproved.EventType, 1, at,
+            JsonSerializer.SerializeToElement(new TaskHoursApproved(attendance, null, volunteer, null, at, minutes, null, null, _grotto.WorkAreaId), Json),
+            _parishId, _seasonId, Guid.NewGuid(), 1));
 
     private async Task SeedEventsAsync()
     {
@@ -75,12 +82,9 @@ public sealed class ReportTests
             _seasonId, null, "MONEY", 1_000_000, "VND", [], true, true, Guid.NewGuid(), Dec10));
         var attendance = Guid.NewGuid();
         var volunteer = Guid.NewGuid();
-        await Send(AttendanceHoursApproved.EventType, new AttendanceHoursApproved(attendance, Guid.NewGuid(), _grotto.WorkAreaId, _seasonId, _parishId,
-            volunteer, 4, _leaderId, Dec10));
-        await Send(AttendanceHoursApproved.EventType, new AttendanceHoursApproved(attendance, Guid.NewGuid(), _grotto.WorkAreaId, _seasonId, _parishId,
-            volunteer, 3.5m, _leaderId, Dec10.AddHours(2)));
-        await Send(AttendanceHoursApproved.EventType, new AttendanceHoursApproved(Guid.NewGuid(), Guid.NewGuid(), _grotto.WorkAreaId, _seasonId, _parishId,
-            volunteer, 2, _leaderId, Dec10.AddDays(5)));
+        await Hours(attendance, volunteer, 240, Dec10);
+        await Hours(attendance, volunteer, 210, Dec10.AddHours(2));
+        await Hours(Guid.NewGuid(), volunteer, 120, Dec10.AddDays(5));
         var checklist = Guid.NewGuid();
         await Send(ReadinessItemFailed.EventType, new ReadinessItemFailed(checklist, Guid.NewGuid(), _grotto.WorkAreaId, _seasonId, _parishId, _leaderId,
             "Điện an toàn", true, "Dây hở", _leaderId, Dec10));

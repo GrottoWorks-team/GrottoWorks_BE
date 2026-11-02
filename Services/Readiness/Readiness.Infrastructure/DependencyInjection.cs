@@ -1,3 +1,4 @@
+using BuildingBlocks.Messaging.MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,6 +9,7 @@ using Readiness.Infrastructure.Checklists;
 using Readiness.Infrastructure.Data;
 using Readiness.Infrastructure.Observability;
 using Readiness.Infrastructure.Scope;
+using Readiness.Infrastructure.Messaging;
 
 namespace Readiness.Infrastructure;
 
@@ -26,6 +28,12 @@ public static class DependencyInjection
         services.AddScoped<IWorkAreaScopeStore, WorkAreaScopeStore>();
         services.AddScoped<ITaskProjectionStore, TaskProjectionStore>();
         services.AddScoped<IReadinessCheckStore, ReadinessCheckStore>();
+        // TaskExecution outbox events over RabbitMQ (POST /internal/task-events works without the broker).
+        if (configuration.GetValue("TaskEvents:Enabled", false))
+        {
+            services.AddMessageBroker(configuration, typeof(TaskIntegrationEventConsumer).Assembly);
+        }
+
         return services;
     }
 }

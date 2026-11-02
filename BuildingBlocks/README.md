@@ -155,7 +155,25 @@ Cho tới khi có outbox (F-PLT-05) và consumer MassTransit, producer (hoặc s
   - `task.completion.reviewed { taskId, workAreaId, seasonId, parishId, taskName?, taskType, decision: APPROVED|REVISION_REQUIRED,
     volunteerUserIds[], reviewedByUserId, reviewedAt }` — `volunteerUserIds` = assignment ACCEPTED/COMPLETED được ghi nhận;
     task PURCHASE không tính ở đây (tính từ `purchase.delivery.confirmed`).
-  - `attendance.hours.approved { attendanceId, taskId, workAreaId, seasonId, parishId, volunteerUserId, approvedHours,
-    approvedByUserId, approvedAt }` — duyệt lại (correction) cùng `attendanceId` không tạo contribution mới.
+  - `attendance.hours.approved`: Reporting đọc **đúng payload Task đang publish** (`attendanceId, assignmentId, volunteerUserId,
+    checkInAt, checkOutAt, approvedMinutes, previousApprovedMinutes, correctionId?`; parish/season/task lấy từ envelope).
+    **Đề nghị Lâm** thêm `workAreaId` vào payload này như các event Task khác — hiện Reporting suy ra từ `task_projection`,
+    task chưa được project thì giờ làm vẫn tính điểm nhưng không vào báo cáo theo khu vực.
   - `support.member.completed { supportResponseMemberId, supportRequestId, volunteerUserId, targetWorkAreaId, seasonId, parishId,
     completedAt }`.
+
+### 5.6 Nhận event TaskExecution (`TaskIntegrationEvent`)
+
+Resource, Readiness, Reporting dùng thẳng `TaskExecution.Contracts.Events.TaskIntegrationEvent` (envelope của outbox Task):
+
+- Qua RabbitMQ: consumer MassTransit (`resource-task-events`, `readiness-task-events`, `reporting-task-events`), bật bằng
+  `TaskEvents:Enabled` + `MessageBroker:*` (docker-compose đã bật). Task hiện **chưa có publisher** cho `task_event_outbox`
+  — khi Lâm thêm transport, các consumer nhận ngay.
+- Qua HTTP (feed tạm / thử nghiệm): `POST /internal/task-events` (Resource, Readiness) và `POST /internal/events`
+  (Reporting) nhận nguyên JSON envelope.
+- `task.status.changed` → `task_projection.status`; `task.assignment.responded` ACCEPTED → thêm người nhận (Resource:
+  PURCHASE request sang BUYER_ASSIGNED; Readiness: corrective task COMPLETED → item RECHECK). Chỉ cập nhật task đã được
+  project (event không có tên / loại task) và bỏ qua `aggregateVersion` cũ hơn bản đã lưu. Reporting thêm
+  `attendance.hours.approved` (contribution giờ làm + báo cáo), idempotent theo `eventId`.
+- **Đề nghị Lâm:** thêm event tạo task (hoặc payload đủ `name`, `taskType`, `purchaseRequestId`) để bỏ feed `/internal/task-scopes`.
+

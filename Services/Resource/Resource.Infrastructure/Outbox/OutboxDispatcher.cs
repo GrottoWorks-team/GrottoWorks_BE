@@ -19,14 +19,24 @@ public sealed class OutboxDispatcher(IServiceScopeFactory scopes, ILogger<Outbox
     public static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
     public static readonly TimeSpan PublishTimeout = TimeSpan.FromSeconds(10);
 
+    /// <summary>Published rows are kept this long (troubleshooting), then deleted by an hourly clean-up.</summary>
+    public static readonly TimeSpan Retention = TimeSpan.FromDays(7);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var lastCleanup = DateTimeOffset.MinValue;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 while (await DispatchBatchAsync(stoppingToken) == BatchSize)
                 {
+                }
+
+                if (DateTimeOffset.UtcNow - lastCleanup > TimeSpan.FromHours(1))
+                {
+                    lastCleanup = DateTimeOffset.UtcNow;
+                    await DeletePublishedAsync(lastCleanup - Retention, stoppingToken);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -47,6 +57,16 @@ public sealed class OutboxDispatcher(IServiceScopeFactory scopes, ILogger<Outbox
                 return;
             }
         }
+    }
+
+    /// <returns>How many published rows older than <paramref name="before"/> were deleted.</returns>
+    public async Task<int> DeletePublishedAsync(DateTimeOffset before, CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ResourceDbContext>();
+        return await dbContext.Set<OutboxMessage>()
+            .Where(row => row.PublishedAt != null && row.PublishedAt < before)
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
     /// <returns>How many rows were published.</returns>

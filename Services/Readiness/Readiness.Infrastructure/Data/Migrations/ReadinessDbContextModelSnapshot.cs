@@ -137,6 +137,31 @@ namespace Readiness.Infrastructure.Data.Migrations
                     b.ToTable("readiness_item", (string)null);
                 });
 
+            modelBuilder.Entity("Readiness.Domain.Scope.SeasonScope", b =>
+                {
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<long>("SourceVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_version");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("season_status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("SeasonId");
+
+                    b.ToTable("season_scope", (string)null);
+                });
+
             modelBuilder.Entity("Readiness.Domain.Scope.TaskProjection", b =>
                 {
                     b.Property<Guid>("TaskId")

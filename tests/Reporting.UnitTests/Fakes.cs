@@ -101,6 +101,13 @@ public sealed class FakeScopeStore : Reporting.Application.Scope.IWorkAreaScopeS
 
     public void Add(Reporting.Domain.Scope.WorkAreaScope scope) => Scopes.Add(scope);
 
+    public List<Reporting.Domain.Scope.SeasonScope> Seasons { get; } = [];
+
+    public Task<Reporting.Domain.Scope.SeasonScope?> GetSeasonAsync(Guid seasonId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Seasons.FirstOrDefault(season => season.SeasonId == seasonId));
+
+    public void AddSeason(Reporting.Domain.Scope.SeasonScope season) => Seasons.Add(season);
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Reporting.Domain.Scope.WorkAreaScope Seed(Guid parishId, Guid seasonId, Guid? leaderId = null, Guid? officerId = null, string name = "Hang đá")

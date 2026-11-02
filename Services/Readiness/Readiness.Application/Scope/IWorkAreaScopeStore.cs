@@ -16,5 +16,9 @@ public interface IWorkAreaScopeStore
 
     void Add(WorkAreaScope scope);
 
+    Task<SeasonScope?> GetSeasonAsync(Guid seasonId, CancellationToken cancellationToken = default);
+
+    void AddSeason(SeasonScope season);
+
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

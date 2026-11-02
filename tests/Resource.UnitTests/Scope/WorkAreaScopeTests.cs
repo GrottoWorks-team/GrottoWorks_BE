@@ -101,4 +101,43 @@ public sealed class WorkAreaScopeTests
         var act = () => new WorkAreaAccess(_store, new FakeCurrentUser(Guid.NewGuid(), GrottoWorksRoles.Admin)).RequireParish();
         act.Should().Throw<DomainRuleException>().Which.Code.Should().Be("PARISH_SCOPE_REQUIRED");
     }
+
+    [Fact]
+    public async Task Parish_snapshot_without_season_status_takes_the_projected_season()
+    {
+        var season = Guid.NewGuid();
+        await new ApplySeasonStatusHandler(_store).HandleAsync(new SeasonStatusChange(season, SeasonStatus.Active, 4));
+
+        var (area, _) = await new ApplyWorkAreaSnapshotHandler(_store).HandleAsync(
+            new WorkAreaSnapshot(Guid.NewGuid(), season, Parish, "Hang đá", WorkAreaStatus.InProgress, null, null, null, null, 1));
+
+        area.SeasonStatus.Should().Be(SeasonStatus.Active);
+    }
+
+    [Fact]
+    public async Task Stale_season_snapshot_is_ignored_and_unknown_season_defaults_to_planning()
+    {
+        var season = Guid.NewGuid();
+        var handler = new ApplySeasonStatusHandler(_store);
+        await handler.HandleAsync(new SeasonStatusChange(season, SeasonStatus.Archived, 5));
+        (await handler.HandleAsync(new SeasonStatusChange(season, SeasonStatus.Active, 3))).Should().Be(0);
+        _store.Seasons.Single().Status.Should().Be(SeasonStatus.Archived);
+
+        var (orphan, _) = await new ApplyWorkAreaSnapshotHandler(_store).HandleAsync(
+            new WorkAreaSnapshot(Guid.NewGuid(), Guid.NewGuid(), Parish, "Đường kiệu", WorkAreaStatus.Planned, null, null, null, null, 1));
+        orphan.SeasonStatus.Should().Be(SeasonStatus.Planning);
+    }
+
+    [Fact]
+    public async Task Update_without_season_status_keeps_the_stored_one()
+    {
+        var id = Guid.NewGuid();
+        var handler = new ApplyWorkAreaSnapshotHandler(_store);
+        var first = Snapshot(id, 1, season: SeasonStatus.Archived);
+        await handler.HandleAsync(first);
+
+        var (updated, _) = await handler.HandleAsync(first with { Version = 2, SeasonStatus = null, Name = "Mới" });
+
+        updated.SeasonStatus.Should().Be(SeasonStatus.Archived);
+    }
 }

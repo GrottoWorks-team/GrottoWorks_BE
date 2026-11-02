@@ -53,6 +53,13 @@ public sealed class FakeScopeStore : IWorkAreaScopeStore
 
     public void Add(WorkAreaScope scope) => Scopes.Add(scope);
 
+    public List<SeasonScope> Seasons { get; } = [];
+
+    public Task<SeasonScope?> GetSeasonAsync(Guid seasonId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Seasons.FirstOrDefault(season => season.SeasonId == seasonId));
+
+    public void AddSeason(SeasonScope season) => Seasons.Add(season);
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     /// <summary>Adds a work area (IN_PROGRESS by default) of an ACTIVE season led by <paramref name="leaderId"/>.</summary>

@@ -101,7 +101,12 @@ Cho tới khi ParishCoordination publish `planning.work-area.*` / `planning.seas
   `{ seasonId, parishId, name, status, seasonStatus, communityId?, leaderUserId?, materialOfficerUserId?, version }`
   (`status`: `PLANNED|IN_PROGRESS|READINESS_REVIEW|NEEDS_CORRECTION|READY|COMPLETED`; `seasonStatus`:
   `PLANNING|ACTIVE|READY|COMPLETED|ARCHIVED`; snapshot có `version` nhỏ hơn bản đã lưu bị bỏ qua).
-- `PUT http://resource.api:8080/internal/season-scopes/{seasonId}` — body `{ status }`.
+- `PUT http://resource.api:8080/internal/season-scopes/{seasonId}` — body `{ status, version? }` (các trường khác bị bỏ qua).
+- Nhận được **đúng body** `HttpTaskScopeDelivery` của Parish đang gửi sang Task (`SeasonSnapshot`, `WorkAreaSnapshot` không
+  có `seasonStatus`): `seasonStatus` không bắt buộc — lấy từ projection `season_scope` (Parish luôn gửi season trước),
+  nếu chưa có thì giữ giá trị cũ / mặc định `PLANNING`; season snapshot cũ hơn (`version`) bị bỏ qua.
+  **Đề nghị Lâm:** cho `TaskScopeSync` gửi thêm tới `resource.api`, `readiness.api`, `reporting.api` (nhiều đích, mỗi đích
+  một hàng outbox) để bỏ feed tay.
 
 **Đề nghị payload event của Lâm** chứa đúng các trường trên (+ envelope Mục 8), để consumer của Resource /
 Readiness / Task chỉ map 1–1. Header `X-Internal-Api-Key` như §5.

@@ -100,7 +100,7 @@ public sealed class WorkAreaScope
         ParishId = snapshot.ParishId;
         Name = (snapshot.Name ?? string.Empty).Trim();
         Status = snapshot.Status;
-        SeasonStatus = snapshot.SeasonStatus;
+        SeasonStatus = snapshot.SeasonStatus ?? SeasonStatus;
         CommunityId = snapshot.CommunityId;
         LeaderUserId = snapshot.LeaderUserId;
         MaterialOfficerUserId = snapshot.MaterialOfficerUserId;
@@ -119,7 +119,7 @@ public sealed record WorkAreaSnapshot(
     Guid ParishId,
     string? Name,
     WorkAreaStatus Status,
-    SeasonStatus SeasonStatus,
+    SeasonStatus? SeasonStatus,
     Guid? CommunityId,
     Guid? LeaderUserId,
     Guid? MaterialOfficerUserId,

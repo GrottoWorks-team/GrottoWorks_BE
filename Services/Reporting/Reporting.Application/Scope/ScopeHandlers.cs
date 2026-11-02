@@ -3,7 +3,8 @@ using Reporting.Domain.Scope;
 
 namespace Reporting.Application.Scope;
 
-public sealed record SeasonStatusChange(Guid SeasonId, SeasonStatus Status);
+/// <param name="Version">Source season version (Parish snapshot); null when the sender has none.</param>
+public sealed record SeasonStatusChange(Guid SeasonId, SeasonStatus Status, long? Version = null);
 
 public sealed record WorkAreaScopeDto(
     Guid WorkAreaId,
@@ -35,6 +36,18 @@ public sealed class ApplyWorkAreaSnapshotHandler(IWorkAreaScopeStore store)
     {
         var now = DateTimeOffset.UtcNow;
         var existing = await store.GetAsync(snapshot.WorkAreaId, cancellationToken);
+        if (snapshot.SeasonStatus is null)
+        {
+            // Parish's work-area snapshot carries no season state: take the projected season, else keep what is stored.
+            var season = await store.GetSeasonAsync(snapshot.SeasonId, cancellationToken);
+            snapshot = snapshot with
+            {
+                SeasonStatus = season?.Status
+                    ?? existing?.SeasonStatus
+                    ?? (await store.ListBySeasonAsync(snapshot.SeasonId, cancellationToken)).Select(scope => (SeasonStatus?)scope.SeasonStatus).FirstOrDefault()
+                    ?? SeasonStatus.Planning
+            };
+        }
 
         if (existing is null)
         {
@@ -59,8 +72,18 @@ public sealed class ApplySeasonStatusHandler(IWorkAreaScopeStore store)
 {
     public async Task<int> HandleAsync(SeasonStatusChange change, CancellationToken cancellationToken = default)
     {
-        var scopes = await store.ListBySeasonAsync(change.SeasonId, cancellationToken);
         var now = DateTimeOffset.UtcNow;
+        var season = await store.GetSeasonAsync(change.SeasonId, cancellationToken);
+        if (season is null)
+        {
+            store.AddSeason(SeasonScope.Create(change.SeasonId, change.Status, change.Version, now));
+        }
+        else if (!season.Apply(change.Status, change.Version, now))
+        {
+            return 0;
+        }
+
+        var scopes = await store.ListBySeasonAsync(change.SeasonId, cancellationToken);
         foreach (var scope in scopes)
         {
             scope.ApplySeasonStatus(change.Status, now);

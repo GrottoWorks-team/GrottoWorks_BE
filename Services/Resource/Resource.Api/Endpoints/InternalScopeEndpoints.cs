@@ -40,7 +40,7 @@ public static class InternalScopeEndpoints
                 request.ParishId!.Value,
                 request.Name,
                 request.Status!.Value,
-                request.SeasonStatus!.Value,
+                request.SeasonStatus,
                 request.CommunityId,
                 request.LeaderUserId,
                 request.MaterialOfficerUserId,
@@ -91,7 +91,7 @@ public static class InternalScopeEndpoints
         ApplySeasonStatusHandler handler,
         CancellationToken cancellationToken)
     {
-        var updated = await handler.HandleAsync(new SeasonStatusChange(seasonId, request.Status!.Value), cancellationToken);
+        var updated = await handler.HandleAsync(new SeasonStatusChange(seasonId, request.Status!.Value, request.Version), cancellationToken);
         return Results.Ok(ApiResults.Ok(new { seasonId, workAreasUpdated = updated }, httpContext));
     }
 }

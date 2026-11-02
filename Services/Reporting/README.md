@@ -123,6 +123,19 @@ Mẫu request: `Reporting.Api.http`.
 - File nằm tạm trong `report_export_job.content` (bảng kỹ thuật) và tải qua `/report-exports/{id}/file` cho tới khi
   NotificationAudit lưu file (MinIO, `file_object` — F-NTF-01).
 
+## Event từ TaskExecution
+
+`TaskIntegrationEvent` qua RabbitMQ (`TaskEvents:Enabled`, queue `reporting-task-events`) hoặc gửi nguyên envelope vào
+`POST /internal/events` (thêm `parishId`, `seasonId`, `aggregateId`, `aggregateVersion`): `attendance.hours.approved`
+(payload thật của Task: `approvedMinutes`; khu vực lấy từ `task_projection` vì payload chưa có `workAreaId`; giờ làm của
+task chưa project vẫn tính contribution/điểm nhưng không vào báo cáo theo khu vực), `task.status.changed` và
+`task.assignment.responded` cập nhật `task_projection` cho dashboard.
+
+## Outbox (event ra ngoài)
+
+Event (bảng "Event" ở trên) ghi vào `integration_event_outbox`, `OutboxDispatcher` đẩy lên RabbitMQ dưới dạng
+`ReportingIntegrationEvent` (BuildingBlocks README §5.7). Broker chết → event nằm chờ, tự gửi lại khi broker sống.
+
 ## Việc còn mở
 
 - Lý do `deactivateRecognitionRule` chưa có cột lưu (ERD không có) — chờ activity log F-NTF-04.

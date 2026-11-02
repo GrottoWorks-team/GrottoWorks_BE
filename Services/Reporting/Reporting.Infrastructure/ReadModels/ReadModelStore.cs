@@ -50,14 +50,20 @@ public sealed class ReadModelStore(ReportingDbContext dbContext) : IReadModelSto
             .Where(donation => donation.ParishId == parishId && donation.SeasonId == seasonId)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<AttendanceView>> ListAttendanceWithoutAreaAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+        await dbContext.AttendanceViews.Where(attendance => attendance.TaskId == taskId && attendance.WorkAreaId == null).ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<AttendanceView>> ListAttendanceAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
-        await dbContext.AttendanceViews.AsNoTracking().Where(attendance => workAreaIds.Contains(attendance.WorkAreaId)).ToListAsync(cancellationToken);
+        await dbContext.AttendanceViews.AsNoTracking().Where(attendance => attendance.WorkAreaId != null && workAreaIds.Contains(attendance.WorkAreaId.Value)).ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<ReadinessAreaView>> ListReadinessAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
         await dbContext.ReadinessAreaViews.AsNoTracking().Where(area => workAreaIds.Contains(area.WorkAreaId)).ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<ReadinessHistoryEntry>> ListReadinessHistoryAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
         await dbContext.ReadinessHistory.AsNoTracking().Where(entry => workAreaIds.Contains(entry.WorkAreaId)).ToListAsync(cancellationToken);
+
+    public async Task<TaskProjection?> GetTaskAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+        await dbContext.TaskProjections.FindAsync([taskId], cancellationToken);
 
     public async Task<IReadOnlyList<TaskProjection>> ListTasksAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
         await dbContext.TaskProjections.AsNoTracking().Where(task => workAreaIds.Contains(task.WorkAreaId)).ToListAsync(cancellationToken);

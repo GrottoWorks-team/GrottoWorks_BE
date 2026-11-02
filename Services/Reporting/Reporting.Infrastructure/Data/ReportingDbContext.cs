@@ -12,6 +12,8 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
 {
     public DbSet<WorkAreaScope> WorkAreaScopes => Set<WorkAreaScope>();
 
+    public DbSet<SeasonScope> SeasonScopes => Set<SeasonScope>();
+
     public DbSet<TaskProjection> TaskProjections => Set<TaskProjection>();
 
     public DbSet<ContributionType> ContributionTypes => Set<ContributionType>();
@@ -40,6 +42,7 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // integration_event_outbox is configured by Outbox/OutboxMessageConfiguration (same assembly).
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ReportingDbContext).Assembly);
     }
 }

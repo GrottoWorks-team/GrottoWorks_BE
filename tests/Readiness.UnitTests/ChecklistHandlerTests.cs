@@ -5,6 +5,7 @@ using Readiness.Contracts.Events;
 using Readiness.Domain;
 using Readiness.Domain.Checklists;
 using Readiness.Domain.Scope;
+using TaskExecution.Contracts.Events;
 
 namespace Readiness.UnitTests;
 
@@ -16,13 +17,14 @@ public sealed class ChecklistHandlerTests
     private readonly FakeTaskProjectionStore _tasks = new();
     private readonly FakeReadinessCheckStore _store = new();
     private readonly FakeIntegrationEventPublisher _publisher = new();
+    private readonly FakeFileVerifier _files = new();
 
     private WorkAreaAccess Access(ICurrentUser user) => new(_scopes, user);
 
     private FakeCurrentUser LeaderUser() => new(_leaderId, GrottoWorksRoles.Leader, _parishId);
 
     private InspectionCommandHandler Inspection(ICurrentUser user) =>
-        new(new ChecklistLoader(_store, Access(user)), _store, _tasks, _publisher, user);
+        new(new ChecklistLoader(_store, Access(user)), _store, _tasks, _publisher, user, _files);
 
     private async Task<(WorkAreaScope Scope, ReadinessCheckDto Check)> CreateAsync(
         SeasonStatus seasonStatus = SeasonStatus.Active,
@@ -168,7 +170,7 @@ public sealed class ChecklistHandlerTests
 
         AttachEvidenceCommandHandler Attach(Guid userId) =>
             new(new ChecklistLoader(_store, Access(new FakeCurrentUser(userId, GrottoWorksRoles.Volunteer, _parishId))), _store, _tasks,
-                new FakeCurrentUser(userId, GrottoWorksRoles.Volunteer, _parishId));
+                new FakeCurrentUser(userId, GrottoWorksRoles.Volunteer, _parishId), _files);
 
         var item = await Attach(volunteerId).HandleAsync(new AttachEvidenceCommand(check.Id, check.Items[0].Id, [Guid.NewGuid()]));
         item.EvidenceFileIds.Should().ContainSingle();
@@ -248,5 +250,39 @@ public sealed class ChecklistHandlerTests
 
         (await confirm.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("WORK_AREA_NOT_IN_READINESS_REVIEW");
         _store.Checklists[0].Status.Should().Be(ChecklistStatus.InReview);
+    }
+
+    [Fact]
+    public async Task Corrective_task_completed_event_moves_the_item_to_recheck()
+    {
+        var (scope, check) = await CreateAsync();
+        var handler = Inspection(LeaderUser());
+        await handler.RecordResultAsync(new ItemResultCommand(check.Id, check.Items[0].Id, null, InspectionResult.Failed, null, []));
+        var corrective = _tasks.Seed(scope.WorkAreaId);
+        await handler.LinkCorrectiveTaskAsync(new LinkCorrectiveTaskCommand(check.Id, check.Items[0].Id, null, corrective.TaskId));
+
+        var completed = new TaskIntegrationEvent(Guid.NewGuid(), TaskEventTypes.StatusChanged, 1, DateTimeOffset.UtcNow, "c", Guid.NewGuid(),
+            scope.ParishId, scope.SeasonId, "task", corrective.TaskId, 2,
+            System.Text.Json.JsonSerializer.SerializeToElement(new { taskId = corrective.TaskId, status = "COMPLETED" }));
+        (await new ApplyTaskEventHandler(_tasks, new CorrectiveTaskSync(_store)).HandleAsync(completed)).Should().BeTrue();
+
+        _store.Checklists[0].Items[0].Status.Should().Be(ItemStatus.Recheck);
+    }
+
+    [Fact]
+    public async Task Evidence_must_be_a_completed_readiness_upload_of_the_caller()
+    {
+        var (_, check) = await CreateAsync();
+        var file = Guid.NewGuid();
+        _files.Reject = DomainRuleException.Validation("FILE_PURPOSE_MISMATCH", "wrong purpose");
+
+        var act = () => Inspection(LeaderUser()).RecordResultAsync(
+            new ItemResultCommand(check.Id, check.Items[0].Id, null, InspectionResult.Failed, null, [file]));
+
+        (await act.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("FILE_PURPOSE_MISMATCH");
+        _store.Checklists[0].Items[0].Status.Should().Be(ItemStatus.Pending, "nothing is recorded when a file is rejected");
+        var call = _files.Calls.Should().ContainSingle().Subject;
+        call.Ids.Should().Equal(file);
+        (call.Purpose, call.Uploader).Should().Be(("READINESS_EVIDENCE", _leaderId));
     }
 }

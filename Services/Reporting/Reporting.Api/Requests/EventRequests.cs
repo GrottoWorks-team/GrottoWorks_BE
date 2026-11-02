@@ -19,4 +19,13 @@ public sealed class IntegrationEventRequest
 
     [Required(ErrorMessage = "payload is required.")]
     public JsonElement? Payload { get; init; }
+
+    /// <summary>TaskExecution envelope context (a <c>TaskIntegrationEvent</c> can be posted as-is).</summary>
+    public Guid? ParishId { get; init; }
+
+    public Guid? SeasonId { get; init; }
+
+    public Guid? AggregateId { get; init; }
+
+    public long? AggregateVersion { get; init; }
 }

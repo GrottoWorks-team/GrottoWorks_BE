@@ -16,6 +16,8 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
 
     public DbSet<WorkAreaScope> WorkAreaScopes => Set<WorkAreaScope>();
 
+    public DbSet<SeasonScope> SeasonScopes => Set<SeasonScope>();
+
     public DbSet<TaskProjection> TaskProjections => Set<TaskProjection>();
 
     public DbSet<MaterialRequirement> MaterialRequirements => Set<MaterialRequirement>();
@@ -42,6 +44,7 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // integration_event_outbox is configured by Outbox/OutboxMessageConfiguration (same assembly).
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ResourceDbContext).Assembly);
     }
 }

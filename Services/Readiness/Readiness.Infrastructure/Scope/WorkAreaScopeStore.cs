@@ -38,5 +38,10 @@ public sealed class WorkAreaScopeStore(ReadinessDbContext dbContext) : IWorkArea
 
     public void Add(WorkAreaScope scope) => dbContext.WorkAreaScopes.Add(scope);
 
+    public Task<SeasonScope?> GetSeasonAsync(Guid seasonId, CancellationToken cancellationToken = default) =>
+        dbContext.SeasonScopes.FirstOrDefaultAsync(season => season.SeasonId == seasonId, cancellationToken);
+
+    public void AddSeason(SeasonScope season) => dbContext.SeasonScopes.Add(season);
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => dbContext.SaveChangesAsync(cancellationToken);
 }

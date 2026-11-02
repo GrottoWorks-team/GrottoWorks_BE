@@ -1,6 +1,7 @@
 using BuildingBlocks.Security;
 using Resource.Application.Abstractions;
 using Resource.Application.Contributions;
+using Resource.Application.Files;
 using Resource.Application.Inventory;
 using Resource.Application.Scope;
 using Resource.Application.Shortages;
@@ -153,7 +154,8 @@ public sealed class RecordPurchaseCommandHandler(
     ITaskProjectionStore tasks,
     IPurchaseStore store,
     PurchaseContext context,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IFileVerifier files)
 {
     public async Task<PurchaseDto> HandleAsync(RecordPurchaseCommand command, CancellationToken cancellationToken = default)
     {
@@ -162,6 +164,7 @@ public sealed class RecordPurchaseCommandHandler(
             .FirstOrDefault(candidate => candidate.Status != ProjectedTaskStatus.Cancelled && candidate.AssigneeUserIds.Contains(currentUser.UserId))
             ?? throw DomainRuleException.Forbidden("PURCHASE_NOT_BUYER", "Only the volunteer who accepted the purchase task can record the purchase (BR-30).");
         WorkAreaAccess.EnsureWritable(scope);
+        await files.EnsureAttachableAsync(command.ReceiptFileIds, FilePurposes.PurchaseReceipt, currentUser.UserId, cancellationToken);
 
         var now = DateTimeOffset.UtcNow;
         var today = ParishClock.Today(now);
@@ -177,7 +180,7 @@ public sealed class RecordPurchaseCommandHandler(
 }
 
 /// <summary>F-RES-09 <c>attachPurchaseReceipt</c> (the buyer): receipt files (≤ 5); NEEDS_INFO goes back to SUBMITTED.</summary>
-public sealed class AttachPurchaseReceiptsCommandHandler(PurchaseContext context, IPurchaseStore store, ICurrentUser currentUser)
+public sealed class AttachPurchaseReceiptsCommandHandler(PurchaseContext context, IPurchaseStore store, ICurrentUser currentUser, IFileVerifier files)
 {
     public async Task<PurchaseDto> HandleAsync(AttachPurchaseReceiptsCommand command, CancellationToken cancellationToken = default)
     {
@@ -187,6 +190,7 @@ public sealed class AttachPurchaseReceiptsCommandHandler(PurchaseContext context
             throw PurchaseContext.NotFound();
         }
 
+        await files.EnsureAttachableAsync(command.FileIds, FilePurposes.PurchaseReceipt, currentUser.UserId, cancellationToken);
         purchase.AttachReceipts(command.FileIds);
         await store.SaveChangesAsync(cancellationToken);
         return await context.ToDtoAsync(purchase, request, cancellationToken);

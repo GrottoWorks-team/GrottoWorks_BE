@@ -223,6 +223,24 @@ Mẫu request: `Resource.Api.http`.
   publish `planning.work-area.*` / `planning.season.*`; consumer MassTransit sau này gọi đúng các handler
   `ApplyWorkAreaSnapshotHandler` / `ApplySeasonStatusHandler` (payload cần có: xem BuildingBlocks README §5.2).
 
+## File hóa đơn (F-NTF-01)
+
+Hóa đơn của `recordPurchase` / `attachPurchaseReceipt` phải là file đã upload xong, purpose `PURCHASE_RECEIPT`, do chính
+buyer upload — kiểm tra qua NotificationAudit `GET /internal/files/{id}` (`NotificationAuditClient:BaseAddress`); lỗi như
+Readiness (422 `FILE_*`, 503 `FILE_SERVICE_UNAVAILABLE`). Không cấu hình địa chỉ → bỏ qua kiểm tra.
+
+## Event từ TaskExecution
+
+`TaskIntegrationEvent` qua RabbitMQ (`TaskEvents:Enabled`) hoặc `POST /internal/task-events`: `task.status.changed`,
+`task.assignment.responded` (ACCEPTED) cập nhật `task_projection` của task đã project (BuildingBlocks README §5.6).
+Feed scope của Parish (`/internal/season-scopes`, `/internal/work-area-scopes`) nhận đúng body Parish đang gửi (không cần
+`seasonStatus`, có projection `season_scope`).
+
+## Outbox (event ra ngoài)
+
+Event (bảng "Event" ở trên) ghi vào `integration_event_outbox`, `OutboxDispatcher` đẩy lên RabbitMQ dưới dạng
+`ResourceIntegrationEvent` (BuildingBlocks README §5.7). Broker chết → event nằm chờ, tự gửi lại khi broker sống.
+
 ## Việc còn mở
 
 - Consumer `planning.*`, `task.status.changed`, `task.materials.changed`, `task.completion.reviewed`,

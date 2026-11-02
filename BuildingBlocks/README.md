@@ -101,7 +101,12 @@ Cho tới khi ParishCoordination publish `planning.work-area.*` / `planning.seas
   `{ seasonId, parishId, name, status, seasonStatus, communityId?, leaderUserId?, materialOfficerUserId?, version }`
   (`status`: `PLANNED|IN_PROGRESS|READINESS_REVIEW|NEEDS_CORRECTION|READY|COMPLETED`; `seasonStatus`:
   `PLANNING|ACTIVE|READY|COMPLETED|ARCHIVED`; snapshot có `version` nhỏ hơn bản đã lưu bị bỏ qua).
-- `PUT http://resource.api:8080/internal/season-scopes/{seasonId}` — body `{ status }`.
+- `PUT http://resource.api:8080/internal/season-scopes/{seasonId}` — body `{ status, version? }` (các trường khác bị bỏ qua).
+- Nhận được **đúng body** `HttpTaskScopeDelivery` của Parish đang gửi sang Task (`SeasonSnapshot`, `WorkAreaSnapshot` không
+  có `seasonStatus`): `seasonStatus` không bắt buộc — lấy từ projection `season_scope` (Parish luôn gửi season trước),
+  nếu chưa có thì giữ giá trị cũ / mặc định `PLANNING`; season snapshot cũ hơn (`version`) bị bỏ qua.
+  **Đề nghị Lâm:** cho `TaskScopeSync` gửi thêm tới `resource.api`, `readiness.api`, `reporting.api` (nhiều đích, mỗi đích
+  một hàng outbox) để bỏ feed tay.
 
 **Đề nghị payload event của Lâm** chứa đúng các trường trên (+ envelope Mục 8), để consumer của Resource /
 Readiness / Task chỉ map 1–1. Header `X-Internal-Api-Key` như §5.
@@ -150,7 +155,39 @@ Cho tới khi có outbox (F-PLT-05) và consumer MassTransit, producer (hoặc s
   - `task.completion.reviewed { taskId, workAreaId, seasonId, parishId, taskName?, taskType, decision: APPROVED|REVISION_REQUIRED,
     volunteerUserIds[], reviewedByUserId, reviewedAt }` — `volunteerUserIds` = assignment ACCEPTED/COMPLETED được ghi nhận;
     task PURCHASE không tính ở đây (tính từ `purchase.delivery.confirmed`).
-  - `attendance.hours.approved { attendanceId, taskId, workAreaId, seasonId, parishId, volunteerUserId, approvedHours,
-    approvedByUserId, approvedAt }` — duyệt lại (correction) cùng `attendanceId` không tạo contribution mới.
+  - `attendance.hours.approved`: Reporting đọc **đúng payload Task đang publish** (`attendanceId, assignmentId, volunteerUserId,
+    checkInAt, checkOutAt, approvedMinutes, previousApprovedMinutes, correctionId?`; parish/season/task lấy từ envelope).
+    **Đề nghị Lâm** thêm `workAreaId` vào payload này như các event Task khác — hiện Reporting suy ra từ `task_projection`,
+    task chưa được project thì giờ làm vẫn tính điểm nhưng không vào báo cáo theo khu vực.
   - `support.member.completed { supportResponseMemberId, supportRequestId, volunteerUserId, targetWorkAreaId, seasonId, parishId,
     completedAt }`.
+
+### 5.6 Nhận event TaskExecution (`TaskIntegrationEvent`)
+
+Resource, Readiness, Reporting dùng thẳng `TaskExecution.Contracts.Events.TaskIntegrationEvent` (envelope của outbox Task):
+
+- Qua RabbitMQ: consumer MassTransit (`resource-task-events`, `readiness-task-events`, `reporting-task-events`), bật bằng
+  `TaskEvents:Enabled` + `MessageBroker:*` (docker-compose đã bật). Task hiện **chưa có publisher** cho `task_event_outbox`
+  — khi Lâm thêm transport, các consumer nhận ngay.
+- Qua HTTP (feed tạm / thử nghiệm): `POST /internal/task-events` (Resource, Readiness) và `POST /internal/events`
+  (Reporting) nhận nguyên JSON envelope.
+- `task.status.changed` → `task_projection.status`; `task.assignment.responded` ACCEPTED → thêm người nhận (Resource:
+  PURCHASE request sang BUYER_ASSIGNED; Readiness: corrective task COMPLETED → item RECHECK). Chỉ cập nhật task đã được
+  project (event không có tên / loại task) và bỏ qua `aggregateVersion` cũ hơn bản đã lưu. Reporting thêm
+  `attendance.hours.approved` (contribution giờ làm + báo cáo), idempotent theo `eventId`.
+- **Đề nghị Lâm:** thêm event tạo task (hoặc payload đủ `name`, `taskType`, `purchaseRequestId`) để bỏ feed `/internal/task-scopes`.
+
+### 5.7 Outbox của Resource / Readiness / Reporting
+
+- Mọi integration event đi qua bảng `integration_event_outbox` của từng service (ghi cùng DbContext của lệnh; lệnh chạy trong
+  transaction — khóa tồn kho — thì commit chung). `OutboxDispatcher` (`Outbox:DispatchEnabled`) đẩy lên RabbitMQ theo thứ tự tạo,
+  `FOR UPDATE SKIP LOCKED` (nhiều instance không đẩy trùng), lỗi → retry 2 s / 5 s / 15 s / 1 phút / 5 phút; at-least-once,
+  `MessageId` = `eventId`.
+- Message type: `ResourceIntegrationEvent`, `ReadinessIntegrationEvent`, `ReportingIntegrationEvent` (trong `<Service>.Contracts.Events`),
+  cùng dạng envelope với `TaskIntegrationEvent` (`eventId, eventType, version, occurredAt, correlationId, actorId?, parishId?,
+  seasonId?, aggregateType, aggregateId, payload`). Reporting tiêu thụ hai cái đầu (queue `reporting-resource-events`,
+  `reporting-readiness-events`, bật bằng `IntegrationEvents:ConsumeEnabled`). **Đề nghị Lâm:** NotificationAudit tiêu thụ thêm hai
+  message này cho thông báo của Resource/Readiness (purchase request chờ duyệt, pledge, đồ mượn quá hạn, item failed...).
+- **MassTransit hạ về 8.5.12 (Apache 2.0):** bản 9.x đòi license thương mại — không có license thì bus không khởi động và service
+  crash ngay lúc start (NotificationAudit bật `NotificationEvents__Enabled=true` trong compose cũng bị). API dùng ở dự án không đổi.
+

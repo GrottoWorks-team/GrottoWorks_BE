@@ -19,7 +19,8 @@ public sealed class WorkAreaSnapshotRequest
 
     [Required] public WorkAreaStatus? Status { get; init; }
 
-    [Required] public SeasonStatus? SeasonStatus { get; init; }
+    /// <summary>Optional: Parish's snapshot has none; the projected season state is used instead.</summary>
+    public SeasonStatus? SeasonStatus { get; init; }
 
     public Guid? CommunityId { get; init; }
 
@@ -35,6 +36,10 @@ public sealed class WorkAreaSnapshotRequest
 public sealed class SeasonStatusRequest
 {
     [Required] public SeasonStatus? Status { get; init; }
+
+    /// <summary>Source season version; an older snapshot is ignored. Parish also sends parishId and dates (ignored).</summary>
+    [Range(0, long.MaxValue)]
+    public long? Version { get; init; }
 }
 
 /// <summary>Interim feed of <c>task_projection</c> until TaskExecution publishes <c>task.*</c> events.</summary>

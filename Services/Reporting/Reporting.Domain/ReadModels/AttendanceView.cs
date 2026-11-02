@@ -13,7 +13,8 @@ public sealed class AttendanceView
 
     public Guid TaskId { get; private set; }
 
-    public Guid WorkAreaId { get; private set; }
+    /// <summary>Null while TaskExecution's event carries no work area and the task is not projected.</summary>
+    public Guid? WorkAreaId { get; private set; }
 
     public Guid SeasonId { get; private set; }
 
@@ -26,7 +27,7 @@ public sealed class AttendanceView
 
     public DateTimeOffset ApprovedAt { get; private set; }
 
-    public static AttendanceView Create(Guid attendanceId, Guid volunteerUserId, Guid taskId, Guid workAreaId, Guid seasonId, Guid parishId) =>
+    public static AttendanceView Create(Guid attendanceId, Guid volunteerUserId, Guid taskId, Guid? workAreaId, Guid seasonId, Guid parishId) =>
         new()
         {
             AttendanceId = attendanceId,
@@ -36,6 +37,9 @@ public sealed class AttendanceView
             SeasonId = seasonId,
             ParishId = parishId
         };
+
+    /// <summary>The task became known after its hours: the attendance now counts for that work area.</summary>
+    public void AssignWorkArea(Guid workAreaId) => WorkAreaId ??= workAreaId;
 
     /// <summary>A corrected approval replaces the hours (latest approval wins).</summary>
     public void Approve(decimal hours, DateTimeOffset at)

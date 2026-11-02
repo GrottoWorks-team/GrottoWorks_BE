@@ -27,7 +27,8 @@ public static class InternalEventEndpoints
         CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(
-            new IncomingEvent(request.EventId!.Value, request.EventType!.Trim(), request.Version, request.OccurredAt, request.Payload!.Value),
+            new IncomingEvent(request.EventId!.Value, request.EventType!.Trim(), request.Version, request.OccurredAt, request.Payload!.Value,
+                request.ParishId, request.SeasonId, request.AggregateId, request.AggregateVersion),
             cancellationToken);
         return Results.Ok(ApiResults.Ok(result, httpContext));
     }

@@ -13,6 +13,8 @@ COPY ["Services/Resource/Resource.Application/Resource.Application.csproj", "Ser
 COPY ["Services/Resource/Resource.Infrastructure/Resource.Infrastructure.csproj", "Services/Resource/Resource.Infrastructure/"]
 COPY ["Services/Resource/Resource.Domain/Resource.Domain.csproj", "Services/Resource/Resource.Domain/"]
 COPY ["Services/Resource/Resource.Contracts/Resource.Contracts.csproj", "Services/Resource/Resource.Contracts/"]
+COPY ["Services/TaskExecution/TaskExecution.Contracts/TaskExecution.Contracts.csproj", "Services/TaskExecution/TaskExecution.Contracts/"]
+COPY ["BuildingBlocks/BuildingBlocks.Messaging/BuildingBlocks.Messaging.csproj", "BuildingBlocks/BuildingBlocks.Messaging/"]
 COPY ["BuildingBlocks/BuildingBlocks.Web/BuildingBlocks.Web.csproj", "BuildingBlocks/BuildingBlocks.Web/"]
 COPY ["BuildingBlocks/BuildingBlocks.Security/BuildingBlocks.Security.csproj", "BuildingBlocks/BuildingBlocks.Security/"]
 RUN dotnet restore "./Services/Resource/Resource.Api/./Resource.Api.csproj"

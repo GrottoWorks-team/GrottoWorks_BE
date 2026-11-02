@@ -61,6 +61,25 @@ Ngoài parish → 404; season ARCHIVED → 409 `SEASON_READ_ONLY`.
   response item trả `checkVersion` để gửi `If-Match` lần sau.
 - Event (đang log, chờ outbox F-PLT-05): `readiness.item.failed`, `readiness.area.ready`, `readiness.area.reopened`.
 
+## File bằng chứng (F-NTF-01)
+
+`evidenceFileIds` / `attachReadinessEvidence` chỉ nhận file đã upload xong (`UPLOADED`/`ATTACHED`), purpose
+`READINESS_EVIDENCE`, do chính người gọi upload — kiểm tra qua NotificationAudit `GET /internal/files/{id}`
+(`NotificationAuditClient:BaseAddress`). Sai → 422 `FILE_NOT_FOUND` / `FILE_NOT_UPLOADED` / `FILE_PURPOSE_MISMATCH` /
+`FILE_NOT_OWNED`; NotificationAudit không trả lời → 503 `FILE_SERVICE_UNAVAILABLE`. Không cấu hình địa chỉ → bỏ qua kiểm tra.
+
+## Event từ TaskExecution
+
+`TaskIntegrationEvent` qua RabbitMQ (`TaskEvents:Enabled`) hoặc `POST /internal/task-events`: `task.status.changed`,
+`task.assignment.responded` (ACCEPTED) cập nhật `task_projection` của task đã project (BuildingBlocks README §5.6).
+Feed scope của Parish (`/internal/season-scopes`, `/internal/work-area-scopes`) nhận đúng body Parish đang gửi (không cần
+`seasonStatus`, có projection `season_scope`).
+
+## Outbox (event ra ngoài)
+
+Event (bảng "Event" ở trên) ghi vào `integration_event_outbox`, `OutboxDispatcher` đẩy lên RabbitMQ dưới dạng
+`ReadinessIntegrationEvent` (BuildingBlocks README §5.7). Broker chết → event nằm chờ, tự gửi lại khi broker sống.
+
 ## Việc còn mở
 
 - Cột kỹ thuật ngoài ERD v3.6.2: `readiness_item.item_position` (thứ tự hiển thị), `readiness_item.evidence_file_ids`

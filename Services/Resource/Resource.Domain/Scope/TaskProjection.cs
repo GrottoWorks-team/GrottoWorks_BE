@@ -48,6 +48,12 @@ public sealed class TaskProjection
 
     public long SourceVersion { get; private set; }
 
+    /// <summary>
+    /// Optimistic concurrency token (<c>xmin</c>): two task events applied at once (e.g. two ACCEPTED assignments) must not
+    /// overwrite each other's assignee list — the loser gets 409 and is redelivered.
+    /// </summary>
+    public uint RowVersion { get; private set; }
+
     public DateTimeOffset UpdatedAt { get; private set; }
 
     public bool IsClosed => Status is ProjectedTaskStatus.Completed or ProjectedTaskStatus.Cancelled;
@@ -73,6 +79,38 @@ public sealed class TaskProjection
         }
 
         Copy(snapshot, now);
+        return true;
+    }
+
+    /// <summary><c>task.status.changed</c>: only the status moves; an older aggregate version changes nothing.</summary>
+    public bool ApplyStatus(ProjectedTaskStatus status, long version, DateTimeOffset now)
+    {
+        if (version < SourceVersion)
+        {
+            return false;
+        }
+
+        Status = status;
+        SourceVersion = version;
+        UpdatedAt = now.ToUniversalTime();
+        return true;
+    }
+
+    /// <summary><c>task.assignment.responded</c> ACCEPTED: the volunteer now holds an accepted assignment.</summary>
+    public bool AddAssignee(Guid userId, long version, DateTimeOffset now)
+    {
+        if (version < SourceVersion)
+        {
+            return false;
+        }
+
+        if (!AssigneeUserIds.Contains(userId))
+        {
+            AssigneeUserIds = [.. AssigneeUserIds, userId];
+        }
+
+        SourceVersion = version;
+        UpdatedAt = now.ToUniversalTime();
         return true;
     }
 

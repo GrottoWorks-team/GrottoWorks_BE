@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Reporting.Application.ReadModels;
+using TaskExecution.Contracts.Events;
 using Reporting.Application.Recognition;
 using Reporting.Domain;
 using Reporting.Domain.Inbox;
@@ -10,7 +11,17 @@ using Resource.Contracts.Events;
 namespace Reporting.Application.Ingestion;
 
 /// <summary>One integration event as delivered (envelope of BuildingBlocks README §2 + the broker message id).</summary>
-public sealed record IncomingEvent(Guid EventId, string EventType, int Version, DateTimeOffset? OccurredAt, JsonElement Payload);
+/// <param name="ParishId">Envelope context (TaskExecution events); Resource / Readiness carry it in the payload.</param>
+public sealed record IncomingEvent(
+    Guid EventId,
+    string EventType,
+    int Version,
+    DateTimeOffset? OccurredAt,
+    JsonElement Payload,
+    Guid? ParishId = null,
+    Guid? SeasonId = null,
+    Guid? AggregateId = null,
+    long? AggregateVersion = null);
 
 public enum IngestionOutcome
 {
@@ -34,7 +45,7 @@ public interface IInboxStore
 /// will call this handler; until the outbox exists the producers (or a seed script) post to <c>POST /internal/events</c>.
 /// Events not used by Reporting are acknowledged as IGNORED.
 /// </summary>
-public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecorder recorder, ReadModelProjector projector)
+public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecorder recorder, ReadModelProjector projector, IReadModelStore readModels)
 {
     /// <summary>Raised by the store when the same event id was committed concurrently.</summary>
     public const string AlreadyProcessed = "EVENT_ALREADY_PROCESSED";
@@ -54,10 +65,11 @@ public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecor
             return new IngestionResult(incoming.EventId, incoming.EventType, IngestionOutcome.Duplicate, 0, 0);
         }
 
+        var hours = incoming.EventType == TaskHoursApproved.EventType ? await HoursAsync(incoming, readModels, cancellationToken) : null;
         var drafts = incoming.EventType switch
         {
             TaskCompletionReviewed.EventType => FromTaskReview(Read<TaskCompletionReviewed>(incoming)),
-            AttendanceHoursApproved.EventType => FromAttendance(Read<AttendanceHoursApproved>(incoming)),
+            TaskHoursApproved.EventType => FromAttendance(hours!),
             PurchaseDeliveryConfirmed.EventType => FromPurchase(Read<PurchaseDeliveryConfirmed>(incoming)),
             ContributionReceiptConfirmed.EventType => FromReceipt(Read<ContributionReceiptConfirmed>(incoming)),
             ContributionDonationAdjusted.EventType => FromAdjustment(Read<ContributionDonationAdjusted>(incoming)),
@@ -65,7 +77,7 @@ public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecor
             _ => null
         };
 
-        var projected = await projector.ApplyAsync(incoming, type => Read(incoming, type), cancellationToken);
+        var projected = await projector.ApplyAsync(incoming, type => Read(incoming, type), hours, cancellationToken);
         var now = DateTimeOffset.UtcNow;
         if (drafts is null && !projected)
         {
@@ -143,10 +155,25 @@ public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecor
             .ToList();
     }
 
-    private static List<ContributionDraft> FromAttendance(AttendanceHoursApproved attendance) =>
+    /// <summary>TaskExecution's hours event: parish / season from the envelope, work area from the payload or the task projection.</summary>
+    private static async Task<ApprovedHours> HoursAsync(IncomingEvent incoming, IReadModelStore readModels, CancellationToken cancellationToken)
+    {
+        var payload = Read<TaskHoursApproved>(incoming);
+        if (incoming.ParishId is not { } parishId || incoming.SeasonId is not { } seasonId || incoming.AggregateId is not { } taskId ||
+            payload.ApprovedMinutes < 0)
+        {
+            throw DomainRuleException.Validation("EVENT_PAYLOAD_INVALID", "attendance.hours.approved needs parishId, seasonId, the task as aggregateId and approvedMinutes >= 0.");
+        }
+
+        var workAreaId = payload.WorkAreaId ?? (await readModels.GetTaskAsync(taskId, cancellationToken))?.WorkAreaId;
+        return new ApprovedHours(payload.AttendanceId, taskId, workAreaId, seasonId, parishId, payload.VolunteerUserId,
+            Math.Round(payload.ApprovedMinutes / 60m, 2), incoming.OccurredAt ?? payload.CheckOutAt ?? DateTimeOffset.UtcNow);
+    }
+
+    private static List<ContributionDraft> FromAttendance(ApprovedHours attendance) =>
     [
         ContributionDraft.ForUser(ContributionType.VolunteerHours, attendance.VolunteerUserId, attendance.SeasonId, attendance.ParishId,
-            attendance.WorkAreaId, "ATTENDANCE", attendance.AttendanceId, $"{attendance.ApprovedHours:0.##} giờ làm được duyệt", attendance.ApprovedAt)
+            attendance.WorkAreaId, "ATTENDANCE", attendance.AttendanceId, $"{attendance.Hours:0.##} giờ làm được duyệt", attendance.ApprovedAt)
     ];
 
     private static List<ContributionDraft> FromPurchase(PurchaseDeliveryConfirmed purchase) =>

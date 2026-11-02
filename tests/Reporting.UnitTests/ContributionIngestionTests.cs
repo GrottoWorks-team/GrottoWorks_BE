@@ -26,7 +26,8 @@ public sealed class ContributionIngestionTests
     private readonly FakeReadModelStore _readModels = new();
     private readonly FakeUserDirectory _users = new();
 
-    private IntegrationEventHandler Handler => new(_store, new ContributionRecorder(_store, _catalog, _publisher), new Reporting.Application.ReadModels.ReadModelProjector(_readModels));
+    private IntegrationEventHandler Handler =>
+        new(_store, new ContributionRecorder(_store, _catalog, _publisher), new Reporting.Application.ReadModels.ReadModelProjector(_readModels), _readModels);
 
     private RecognitionRule Rule(string typeCode, int points, DateOnly? from = null, DateOnly? to = null, string? name = null)
     {
@@ -38,6 +39,13 @@ public sealed class ContributionIngestionTests
 
     private static IncomingEvent Event<T>(string type, T payload, Guid? id = null) =>
         new(id ?? Guid.NewGuid(), type, 1, DateTimeOffset.UtcNow, JsonSerializer.SerializeToElement(payload, Json));
+
+    /// <summary>attendance.hours.approved exactly as TaskExecution's outbox publishes it (no work area in the payload).</summary>
+    private IncomingEvent Hours(Guid volunteer, DateTimeOffset at, Guid? taskId = null, int minutes = 300) =>
+        new(Guid.NewGuid(), TaskHoursApproved.EventType, 1, at,
+            JsonSerializer.SerializeToElement(new { attendanceId = Guid.NewGuid(), assignmentId = Guid.NewGuid(), volunteerUserId = volunteer,
+                checkInAt = at.AddMinutes(-minutes), checkOutAt = at, approvedMinutes = minutes, previousApprovedMinutes = 0 }, Json),
+            _parishId, _seasonId, taskId ?? Guid.NewGuid(), 4);
 
     private TaskCompletionReviewed Review(string decision, params Guid[] volunteers) =>
         new(Guid.NewGuid(), _workAreaId, _seasonId, _parishId, "Treo đèn", "WORK", decision, volunteers, Guid.NewGuid(), Dec10);
@@ -154,12 +162,9 @@ public sealed class ContributionIngestionTests
         _catalog.Rules.Add(v2);
         var volunteer = Guid.NewGuid();
 
-        AttendanceHoursApproved Hours(DateTimeOffset at) =>
-            new(Guid.NewGuid(), Guid.NewGuid(), _workAreaId, _seasonId, _parishId, volunteer, 5, Guid.NewGuid(), at);
-
-        await Handler.HandleAsync(Event(AttendanceHoursApproved.EventType, Hours(Dec10)));
+        await Handler.HandleAsync(Hours(volunteer, Dec10));
         // 2026-12-10 17:30 UTC is 2026-12-11 in Vietnam: version 2.
-        await Handler.HandleAsync(Event(AttendanceHoursApproved.EventType, Hours(new DateTimeOffset(2026, 12, 10, 17, 30, 0, TimeSpan.Zero))));
+        await Handler.HandleAsync(Hours(volunteer, new DateTimeOffset(2026, 12, 10, 17, 30, 0, TimeSpan.Zero)));
 
         _store.Points.Select(p => p.AwardedPoints).Should().Equal(20, 25);
         _store.Points[0].Reason.Should().Be("Giờ làm (v1)");
@@ -265,5 +270,75 @@ public sealed class ContributionIngestionTests
             .GetSeasonAsync(_seasonId);
 
         season.Ranking.Select(r => (r.Rank, r.TotalPoints)).Should().Equal((1, 20), (1, 20), (3, 10));
+    }
+
+    [Fact]
+    public async Task Task_hours_event_takes_the_work_area_from_the_task_projection()
+    {
+        var task = Reporting.Domain.Scope.TaskProjection.FromSnapshot(new Reporting.Domain.Scope.TaskSnapshot(Guid.NewGuid(), _workAreaId, "Treo đèn",
+            Reporting.Domain.Scope.ProjectedTaskType.Work, Reporting.Domain.Scope.ProjectedTaskStatus.InProgress, null, [], 1), Dec10);
+        _readModels.Tasks.Add(task);
+        Rule(ContributionType.VolunteerHours, 20);
+        var volunteer = Guid.NewGuid();
+
+        await Handler.HandleAsync(Hours(volunteer, Dec10, task.TaskId, 150));
+        await Handler.HandleAsync(Hours(volunteer, Dec10, Guid.NewGuid()));
+
+        var known = _readModels.Attendance.Single(a => a.TaskId == task.TaskId);
+        (known.WorkAreaId, known.ApprovedHours).Should().Be((_workAreaId, 2.5m));
+        _readModels.Attendance.Single(a => a.TaskId != task.TaskId).WorkAreaId.Should().BeNull("unknown task, no work area in the payload");
+        _store.Contributions.Should().HaveCount(2).And.OnlyContain(c => c.ParishId == _parishId && c.SeasonId == _seasonId);
+        _store.Points.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Task_status_and_accepted_assignment_update_the_task_projection()
+    {
+        var task = Reporting.Domain.Scope.TaskProjection.FromSnapshot(new Reporting.Domain.Scope.TaskSnapshot(Guid.NewGuid(), _workAreaId, "Treo đèn",
+            Reporting.Domain.Scope.ProjectedTaskType.Work, Reporting.Domain.Scope.ProjectedTaskStatus.Open, null, [], 1), Dec10);
+        _readModels.Tasks.Add(task);
+        var volunteer = Guid.NewGuid();
+
+        IncomingEvent TaskEvent(string type, object payload, long version) =>
+            new(Guid.NewGuid(), type, 1, Dec10, JsonSerializer.SerializeToElement(payload, Json), _parishId, _seasonId, task.TaskId, version);
+
+        (await Handler.HandleAsync(TaskEvent("task.assignment.responded", new { volunteerUserId = volunteer, decision = "ACCEPTED" }, 2)))
+            .Outcome.Should().Be(IngestionOutcome.Applied);
+        await Handler.HandleAsync(TaskEvent("task.status.changed", new { status = "IN_PROGRESS" }, 3));
+        await Handler.HandleAsync(TaskEvent("task.status.changed", new { status = "OPEN" }, 2));
+
+        task.AssigneeUserIds.Should().Equal(volunteer);
+        task.Status.Should().Be(Reporting.Domain.Scope.ProjectedTaskStatus.InProgress);
+        (await Handler.HandleAsync(new IncomingEvent(Guid.NewGuid(), "task.status.changed", 1, Dec10,
+            JsonSerializer.SerializeToElement(new { status = "DONE" }, Json), _parishId, _seasonId, Guid.NewGuid(), 1)))
+            .Outcome.Should().Be(IngestionOutcome.Ignored, "unknown tasks are not projected");
+    }
+
+    [Fact]
+    public async Task Hours_received_before_the_task_get_its_work_area_once_the_task_is_projected()
+    {
+        var taskId = Guid.NewGuid();
+        await Handler.HandleAsync(Hours(Guid.NewGuid(), Dec10, taskId, 90));
+        _readModels.Attendance.Single().WorkAreaId.Should().BeNull();
+
+        var scopes = new FakeScopeStore();
+        var area = scopes.Seed(_parishId, _seasonId);
+        await new Reporting.Application.Scope.ApplyTaskSnapshotHandler(new FakeTaskStore(), scopes, _readModels).HandleAsync(
+            new Reporting.Domain.Scope.TaskSnapshot(taskId, area.WorkAreaId, "Treo đèn", Reporting.Domain.Scope.ProjectedTaskType.Work,
+                Reporting.Domain.Scope.ProjectedTaskStatus.InProgress, null, [], 1));
+
+        _readModels.Attendance.Single().WorkAreaId.Should().Be(area.WorkAreaId);
+    }
+
+    private sealed class FakeTaskStore : Reporting.Application.Scope.ITaskProjectionStore
+    {
+        private readonly List<Reporting.Domain.Scope.TaskProjection> _tasks = [];
+
+        public Task<Reporting.Domain.Scope.TaskProjection?> GetAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_tasks.FirstOrDefault(t => t.TaskId == taskId));
+
+        public void Add(Reporting.Domain.Scope.TaskProjection task) => _tasks.Add(task);
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

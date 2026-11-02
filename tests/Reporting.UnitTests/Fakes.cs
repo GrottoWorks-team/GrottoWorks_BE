@@ -101,6 +101,13 @@ public sealed class FakeScopeStore : Reporting.Application.Scope.IWorkAreaScopeS
 
     public void Add(Reporting.Domain.Scope.WorkAreaScope scope) => Scopes.Add(scope);
 
+    public List<Reporting.Domain.Scope.SeasonScope> Seasons { get; } = [];
+
+    public Task<Reporting.Domain.Scope.SeasonScope?> GetSeasonAsync(Guid seasonId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Seasons.FirstOrDefault(season => season.SeasonId == seasonId));
+
+    public void AddSeason(Reporting.Domain.Scope.SeasonScope season) => Seasons.Add(season);
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Reporting.Domain.Scope.WorkAreaScope Seed(Guid parishId, Guid seasonId, Guid? leaderId = null, Guid? officerId = null, string name = "Hang đá")
@@ -230,14 +237,20 @@ public sealed class FakeReadModelStore : Reporting.Application.ReadModels.IReadM
     public Task<IReadOnlyList<Reporting.Domain.ReadModels.DonationView>> ListDonationsAsync(Guid parishId, Guid seasonId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.DonationView>>(Donations.Where(d => d.ParishId == parishId && d.SeasonId == seasonId).ToList());
 
+    public Task<IReadOnlyList<Reporting.Domain.ReadModels.AttendanceView>> ListAttendanceWithoutAreaAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.AttendanceView>>(Attendance.Where(a => a.TaskId == taskId && a.WorkAreaId == null).ToList());
+
     public Task<IReadOnlyList<Reporting.Domain.ReadModels.AttendanceView>> ListAttendanceAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.AttendanceView>>(Attendance.Where(a => workAreaIds.Contains(a.WorkAreaId)).ToList());
+        Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.AttendanceView>>(Attendance.Where(a => a.WorkAreaId is { } area && workAreaIds.Contains(area)).ToList());
 
     public Task<IReadOnlyList<Reporting.Domain.ReadModels.ReadinessAreaView>> ListReadinessAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.ReadinessAreaView>>(Readiness.Where(r => workAreaIds.Contains(r.WorkAreaId)).ToList());
 
     public Task<IReadOnlyList<Reporting.Domain.ReadModels.ReadinessHistoryEntry>> ListReadinessHistoryAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.ReadinessHistoryEntry>>(History.Where(h => workAreaIds.Contains(h.WorkAreaId)).ToList());
+
+    public Task<Reporting.Domain.Scope.TaskProjection?> GetTaskAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Tasks.FirstOrDefault(t => t.TaskId == taskId));
 
     public Task<IReadOnlyList<Reporting.Domain.Scope.TaskProjection>> ListTasksAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Reporting.Domain.Scope.TaskProjection>>(Tasks.Where(t => workAreaIds.Contains(t.WorkAreaId)).ToList());

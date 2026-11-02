@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<ApplyWorkAreaSnapshotHandler>();
         services.AddScoped<ApplySeasonStatusHandler>();
         services.AddScoped<ApplyTaskSnapshotHandler>();
+        services.AddScoped<ApplyTaskEventHandler>();
         services.AddScoped<WorkAreaAccess>();
 
         // F-RES-03 material requirements

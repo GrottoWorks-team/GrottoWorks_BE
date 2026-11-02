@@ -26,6 +26,7 @@ public sealed class PurchaseTests
     private readonly FakePurchaseStore _purchases = new();
     private readonly FakeTaskProjectionStore _tasks = new();
     private readonly FakeIntegrationEventPublisher _events = new();
+    private readonly FakeFileVerifier _files = new();
     private readonly WorkAreaScope _area;
     private readonly Guid _leader;
     private readonly Material _cable;
@@ -63,7 +64,7 @@ public sealed class PurchaseTests
     private RecordPurchaseCommandHandler Record(Guid? buyer = null)
     {
         var user = User(buyer ?? _buyer, GrottoWorksRoles.Volunteer);
-        return new(Loader(user), _tasks, _purchases, Context(user), user);
+        return new(Loader(user), _tasks, _purchases, Context(user), user, _files);
     }
 
     private ConfirmPurchaseDeliveryCommandHandler Confirm(Guid? officer = null)
@@ -187,14 +188,14 @@ public sealed class PurchaseTests
         (await Fails(() => Confirm().HandleAsync(Delivered(purchase, 10)))).Code.Should().Be("PURCHASE_INVALID_STATE");
 
         var buyer = User(_buyer, GrottoWorksRoles.Volunteer);
-        var resubmitted = await new AttachPurchaseReceiptsCommandHandler(Context(buyer), _purchases, buyer)
+        var resubmitted = await new AttachPurchaseReceiptsCommandHandler(Context(buyer), _purchases, buyer, _files)
             .HandleAsync(new AttachPurchaseReceiptsCommand(purchase.Id, [Guid.NewGuid()]));
         resubmitted.Status.Should().Be(PurchaseStatus.Submitted);
         resubmitted.ReceiptFileIds.Should().ContainSingle();
         resubmitted.InfoRequestReason.Should().BeNull();
 
         var stranger = User(Guid.NewGuid(), GrottoWorksRoles.Volunteer);
-        (await Fails(() => new AttachPurchaseReceiptsCommandHandler(Context(stranger), _purchases, stranger)
+        (await Fails(() => new AttachPurchaseReceiptsCommandHandler(Context(stranger), _purchases, stranger, _files)
             .HandleAsync(new AttachPurchaseReceiptsCommand(purchase.Id, [Guid.NewGuid()])))).Code.Should().Be("PURCHASE_NOT_FOUND");
     }
 
@@ -207,5 +208,20 @@ public sealed class PurchaseTests
         var dto = await new GetPurchaseRequestQueryHandler(Loader(buyer), _tasks, _purchases, buyer).HandleAsync(_request.PurchaseRequestId);
 
         dto.Purchases.Should().ContainSingle().Which.BuyerUserId.Should().Be(_buyer);
+    }
+
+    [Fact]
+    public async Task Receipts_must_be_completed_purchase_receipt_uploads_of_the_buyer()
+    {
+        var receipt = Guid.NewGuid();
+        _files.Reject = DomainRuleException.Validation("FILE_NOT_OWNED", "someone else's file");
+
+        var command = Bought(10) with { ReceiptFileIds = [receipt] };
+        (await Fails(() => Record().HandleAsync(command))).Code.Should().Be("FILE_NOT_OWNED");
+
+        _purchases.Purchases.Should().BeEmpty();
+        var call = _files.Calls.Should().ContainSingle().Subject;
+        call.Ids.Should().Equal(receipt);
+        (call.Purpose, call.Uploader).Should().Be(("PURCHASE_RECEIPT", _buyer));
     }
 }

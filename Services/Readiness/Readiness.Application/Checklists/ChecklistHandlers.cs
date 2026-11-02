@@ -1,5 +1,6 @@
 using BuildingBlocks.Security;
 using Readiness.Application.Abstractions;
+using Readiness.Application.Files;
 using Readiness.Application.Scope;
 using Readiness.Contracts.Events;
 using Readiness.Domain;
@@ -167,7 +168,8 @@ public sealed class InspectionCommandHandler(
     IReadinessCheckStore store,
     ITaskProjectionStore tasks,
     IIntegrationEventPublisher publisher,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IFileVerifier files)
 {
     public Task<ReadinessItemDto> RecordResultAsync(ItemResultCommand command, CancellationToken cancellationToken = default) =>
         InspectAsync(command, recheck: false, cancellationToken);
@@ -200,6 +202,7 @@ public sealed class InspectionCommandHandler(
     private async Task<ReadinessItemDto> InspectAsync(ItemResultCommand command, bool recheck, CancellationToken cancellationToken)
     {
         var (checklist, scope) = await loader.ForLeaderAsync(command.CheckId, command.Version, cancellationToken);
+        await files.EnsureAttachableAsync(command.EvidenceFileIds, FilePurposes.ReadinessEvidence, currentUser.UserId, cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var item = recheck
             ? checklist.Recheck(command.ItemId, command.Result, command.Note, currentUser.UserId, now)
@@ -228,13 +231,14 @@ public sealed class InspectionCommandHandler(
 
 /// <summary>
 /// F-RDY-03 <c>attachReadinessEvidence</c>: the leader of the work area, or a volunteer assigned to the item's corrective
-/// task ("Fix and Upload Evidence", BA 8.12). File ids are kept until NotificationAudit (F-NTF-01) validates them.
+/// task ("Fix and Upload Evidence", BA 8.12). Files must be completed READINESS_EVIDENCE uploads of the caller (F-NTF-01).
 /// </summary>
 public sealed class AttachEvidenceCommandHandler(
     ChecklistLoader loader,
     IReadinessCheckStore store,
     ITaskProjectionStore tasks,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IFileVerifier files)
 {
     public async Task<ReadinessItemDto> HandleAsync(AttachEvidenceCommand command, CancellationToken cancellationToken = default)
     {
@@ -249,6 +253,7 @@ public sealed class AttachEvidenceCommandHandler(
         }
 
         WorkAreaAccess.EnsureWritable(scope);
+        await files.EnsureAttachableAsync(command.FileIds, FilePurposes.ReadinessEvidence, currentUser.UserId, cancellationToken);
         item.AttachEvidence(command.FileIds);
         await store.SaveChangesAsync(cancellationToken);
         return ReadinessItemDto.From(item, checklist.Version);

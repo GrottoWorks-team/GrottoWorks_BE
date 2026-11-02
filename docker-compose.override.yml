@@ -117,8 +117,13 @@ services:
       - MessageBroker__Host=amqp://rabbitmq:5672
       - MessageBroker__UserName=${RABBITMQ_DEFAULT_USER:-grottoworks}
       - MessageBroker__Password=${RABBITMQ_DEFAULT_PASS:-grottoworks}
+      - TaskEvents__Enabled=${TASK_EVENTS_ENABLED:-true}
+      - NotificationAuditClient__BaseAddress=http://notificationaudit.api:8080/
+      - Outbox__DispatchEnabled=${OUTBOX_DISPATCH_ENABLED:-true}
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     ports:
       - "6103:8080"
@@ -131,8 +136,16 @@ services:
       - Jwt__SigningKey=${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY (>= 32 chars) in .env}
       - InternalApi__ApiKey=${INTERNAL_API_KEY:-dev-internal-api-key-change-me-0123456789}
       - Database__MigrateOnStartup=true
+      - TaskEvents__Enabled=${TASK_EVENTS_ENABLED:-true}
+      - MessageBroker__Host=amqp://rabbitmq:5672
+      - MessageBroker__UserName=${RABBITMQ_DEFAULT_USER:-grottoworks}
+      - MessageBroker__Password=${RABBITMQ_DEFAULT_PASS:-grottoworks}
+      - NotificationAuditClient__BaseAddress=http://notificationaudit.api:8080/
+      - Outbox__DispatchEnabled=${OUTBOX_DISPATCH_ENABLED:-true}
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     ports:
       - "6105:8080"
@@ -146,8 +159,16 @@ services:
       - IdentityClient__BaseAddress=http://identity.api:8080/
       - InternalApi__ApiKey=${INTERNAL_API_KEY:-dev-internal-api-key-change-me-0123456789}
       - Database__MigrateOnStartup=true
+      - TaskEvents__Enabled=${TASK_EVENTS_ENABLED:-true}
+      - MessageBroker__Host=amqp://rabbitmq:5672
+      - MessageBroker__UserName=${RABBITMQ_DEFAULT_USER:-grottoworks}
+      - MessageBroker__Password=${RABBITMQ_DEFAULT_PASS:-grottoworks}
+      - Outbox__DispatchEnabled=${OUTBOX_DISPATCH_ENABLED:-true}
+      - IntegrationEvents__ConsumeEnabled=${INTEGRATION_EVENTS_ENABLED:-true}
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     ports:
       - "6106:8080"

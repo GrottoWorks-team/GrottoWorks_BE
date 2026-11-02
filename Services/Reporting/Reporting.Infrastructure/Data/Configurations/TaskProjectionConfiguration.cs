@@ -20,6 +20,7 @@ public sealed class TaskProjectionConfiguration : IEntityTypeConfiguration<TaskP
         builder.Property(task => task.AssigneeUserIds).HasColumnName("assignee_user_ids").HasColumnType("uuid[]").IsRequired();
         builder.Property(task => task.DueAt).HasColumnName("due_at").HasColumnType("timestamp with time zone");
         builder.Property(task => task.SourceVersion).HasColumnName("source_version").IsRequired();
+        builder.Property(task => task.RowVersion).IsRowVersion();
         builder.Property(task => task.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone").IsRequired();
 
         builder.HasIndex(task => task.WorkAreaId, "ix_task_projection_work_area");

@@ -7,6 +7,7 @@
     <!-- Consumer side of the events Resource and Readiness publish (contract-first records). -->
     <ProjectReference Include="..\..\Resource\Resource.Contracts\Resource.Contracts.csproj" />
     <ProjectReference Include="..\..\Readiness\Readiness.Contracts\Readiness.Contracts.csproj" />
+    <ProjectReference Include="..\..\TaskExecution\TaskExecution.Contracts\TaskExecution.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

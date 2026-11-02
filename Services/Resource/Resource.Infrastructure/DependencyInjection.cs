@@ -1,4 +1,8 @@
+using BuildingBlocks.Messaging.MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Resource.Infrastructure.Outbox;
+using Resource.Application.Files;
+using Resource.Infrastructure.Files;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Resource.Application.Abstractions;
@@ -17,7 +21,7 @@ using Resource.Application.Users;
 using Resource.Infrastructure.Contributions;
 using Resource.Infrastructure.Identity;
 using Resource.Infrastructure.Data;
-using Resource.Infrastructure.Observability;
+using Resource.Infrastructure.Messaging;
 
 namespace Resource.Infrastructure;
 
@@ -32,7 +36,9 @@ public static class DependencyInjection
         }
 
         services.AddDbContext<ResourceDbContext>(options => options.UseNpgsql(connectionString));
-        services.AddScoped<IIntegrationEventPublisher, LoggingIntegrationEventPublisher>();
+        // Integration events go through the transactional outbox (integration_event_outbox).
+        services.AddHttpContextAccessor();
+        services.AddScoped<IIntegrationEventPublisher, OutboxIntegrationEventPublisher>();
         services.AddScoped<IMaterialCatalogStore, MaterialCatalogStore>();
         services.AddScoped<IWorkAreaScopeStore, WorkAreaScopeStore>();
         services.AddScoped<ITaskProjectionStore, TaskProjectionStore>();
@@ -59,6 +65,38 @@ public static class DependencyInjection
                 client.Timeout = Timeout.InfiniteTimeSpan;
             })
             .AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
+
+        // RabbitMQ: consumers of TaskExecution events (TaskEvents:Enabled) and the outbox dispatcher (Outbox:DispatchEnabled).
+        // Without the broker, events stay in the outbox and the /internal endpoints still accept events.
+        var consumeTaskEvents = configuration.GetValue("TaskEvents:Enabled", false);
+        var dispatchOutbox = configuration.GetValue("Outbox:DispatchEnabled", false);
+        if (consumeTaskEvents || dispatchOutbox)
+        {
+            services.AddMessageBroker(configuration, consumeTaskEvents ? typeof(TaskIntegrationEventConsumer).Assembly : null);
+        }
+
+        if (dispatchOutbox)
+        {
+            services.AddHostedService<OutboxDispatcher>();
+        }
+
+        // F-NTF-01 file checks (evidence, receipts); skipped when NotificationAudit is not configured.
+        if (Uri.TryCreate(configuration[NotificationAuditClientOptions.BaseAddressConfigurationKey], UriKind.Absolute, out var files) &&
+            (files.Scheme == Uri.UriSchemeHttp || files.Scheme == Uri.UriSchemeHttps))
+        {
+            services.AddSingleton(new NotificationAuditClientOptions(files, configuration["InternalApi:ApiKey"] ?? string.Empty));
+            services.AddHttpContextAccessor();
+            services.AddHttpClient<IFileVerifier, NotificationAuditFileVerifier>(client =>
+                {
+                    client.BaseAddress = files;
+                    client.Timeout = Timeout.InfiniteTimeSpan;
+                })
+                .AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
+        }
+        else
+        {
+            services.AddSingleton<IFileVerifier, NoFileVerifier>();
+        }
 
         return services;
     }

@@ -1,4 +1,5 @@
 using BuildingBlocks.Web;
+using TaskExecution.Contracts.Events;
 using Resource.Api.Common;
 using Resource.Api.Requests;
 using Resource.Application.Scope;
@@ -23,6 +24,7 @@ public static class InternalScopeEndpoints
         group.MapPut("/work-area-scopes/{workAreaId:guid}", PutWorkAreaAsync).WithName("internalPutWorkAreaScope");
         group.MapPut("/season-scopes/{seasonId:guid}", PutSeasonAsync).WithName("internalPutSeasonStatus");
         group.MapPut("/task-scopes/{taskId:guid}", PutTaskAsync).WithName("internalPutTaskScope");
+        group.MapPost("/task-events", PostTaskEventAsync).WithName("internalPostTaskEvent");
         group.MapPost("/support-transfers", StartSupportTransferAsync).WithName("internalStartSupportTransfer");
     }
 
@@ -40,7 +42,7 @@ public static class InternalScopeEndpoints
                 request.ParishId!.Value,
                 request.Name,
                 request.Status!.Value,
-                request.SeasonStatus!.Value,
+                request.SeasonStatus,
                 request.CommunityId,
                 request.LeaderUserId,
                 request.MaterialOfficerUserId,
@@ -91,7 +93,18 @@ public static class InternalScopeEndpoints
         ApplySeasonStatusHandler handler,
         CancellationToken cancellationToken)
     {
-        var updated = await handler.HandleAsync(new SeasonStatusChange(seasonId, request.Status!.Value), cancellationToken);
+        var updated = await handler.HandleAsync(new SeasonStatusChange(seasonId, request.Status!.Value, request.Version), cancellationToken);
         return Results.Ok(ApiResults.Ok(new { seasonId, workAreasUpdated = updated }, httpContext));
+    }
+
+    /// <summary>A TaskExecution outbox event posted as-is (same envelope the broker carries).</summary>
+    private static async Task<IResult> PostTaskEventAsync(
+        TaskIntegrationEvent message,
+        HttpContext httpContext,
+        ApplyTaskEventHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var applied = await handler.HandleAsync(message, cancellationToken);
+        return Results.Ok(ApiResults.Ok(new { message.EventId, message.EventType, applied }, httpContext));
     }
 }

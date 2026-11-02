@@ -9,12 +9,15 @@ public sealed class ReadinessDbContext(DbContextOptions<ReadinessDbContext> opti
 {
     public DbSet<WorkAreaScope> WorkAreaScopes => Set<WorkAreaScope>();
 
+    public DbSet<SeasonScope> SeasonScopes => Set<SeasonScope>();
+
     public DbSet<TaskProjection> TaskProjections => Set<TaskProjection>();
 
     public DbSet<ReadinessChecklist> Checklists => Set<ReadinessChecklist>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // integration_event_outbox is configured by Outbox/OutboxMessageConfiguration (same assembly).
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ReadinessDbContext).Assembly);
     }
 

@@ -28,7 +28,7 @@ public sealed record TaskProjectionDto(
 }
 
 /// <summary>Applies a task snapshot (internal feed today, <c>task.*</c> consumers later) — idempotent by version.</summary>
-public sealed class ApplyTaskSnapshotHandler(ITaskProjectionStore store, IWorkAreaScopeStore scopes)
+public sealed class ApplyTaskSnapshotHandler(ITaskProjectionStore store, IWorkAreaScopeStore scopes, ReadModels.IReadModelStore readModels)
 {
     public async Task<(TaskProjectionDto Task, bool Applied)> HandleAsync(TaskSnapshot snapshot, CancellationToken cancellationToken = default)
     {
@@ -43,6 +43,12 @@ public sealed class ApplyTaskSnapshotHandler(ITaskProjectionStore store, IWorkAr
         {
             var created = TaskProjection.FromSnapshot(snapshot, now);
             store.Add(created);
+            // Hours approved before the task was projected now count for its work area (same unit of work).
+            foreach (var attendance in await readModels.ListAttendanceWithoutAreaAsync(created.TaskId, cancellationToken))
+            {
+                attendance.AssignWorkArea(created.WorkAreaId);
+            }
+
             await store.SaveChangesAsync(cancellationToken);
             return (TaskProjectionDto.From(created), true);
         }

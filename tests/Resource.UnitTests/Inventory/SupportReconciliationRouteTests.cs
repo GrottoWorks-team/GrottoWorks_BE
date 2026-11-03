@@ -14,9 +14,10 @@ public sealed class SupportReconciliationRouteTests
     {
         var builder=WebApplication.CreateBuilder(new WebApplicationOptions {EnvironmentName="Testing"});
         builder.Services.AddScoped<SupportReconciliationQueries>();
+        builder.Services.AddScoped<SupportTransferOperationHandler>();
         await using var app=builder.Build();app.MapInternalSupportReconciliationEndpoints();
         var routes=((IEndpointRouteBuilder)app).DataSources.SelectMany(source=>source.Endpoints).OfType<RouteEndpoint>().ToList();
-        routes.Should().HaveCount(2);
+        routes.Should().HaveCount(3);
         foreach(var route in routes)
         {
             route.RoutePattern.RawText.Should().StartWith("/internal/");

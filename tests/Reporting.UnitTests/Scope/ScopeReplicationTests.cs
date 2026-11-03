@@ -8,6 +8,116 @@ namespace Reporting.UnitTests.Scope;
 
 public sealed class ScopeReplicationTests
 {
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Equal_version_season_and_area_snapshots_leave_all_fields_and_timestamps_unchanged(bool changed)
+    {
+        var now = new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero);
+        var parent = Season();
+        var season = SeasonScope.Create(parent.SeasonId, SeasonStatus.Active, parent.Version, now);
+        season.Apply(changed ? SeasonStatus.Archived : SeasonStatus.Active, parent.Version, now.AddHours(1)).Should().BeFalse();
+        season.Status.Should().Be(SeasonStatus.Active);
+        season.UpdatedAt.Should().Be(now);
+        season.SourceVersion.Should().Be(parent.Version);
+
+        var original = ScopeReplicationMapping.Area(Area(parent), parent) with { SeasonStatus = SeasonStatus.Active };
+        var area = WorkAreaScope.FromSnapshot(original, now);
+        var incoming = changed ? original with
+        {
+            Name = "Changed", Status = WorkAreaStatus.Completed, SeasonStatus = SeasonStatus.Archived,
+            LeaderUserId = Guid.NewGuid(), MaterialOfficerUserId = Guid.NewGuid(), CommunityId = Guid.NewGuid()
+        } : original;
+        area.Apply(incoming, now.AddHours(1)).Should().BeFalse();
+        area.Should().BeEquivalentTo(WorkAreaScope.FromSnapshot(original, now));
+    }
+
+    [Fact]
+    public void Identical_season_status_fanout_does_not_touch_child_timestamp()
+    {
+        var now = new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero);
+        var parent = Season();
+        var area = WorkAreaScope.FromSnapshot(ScopeReplicationMapping.Area(Area(parent), parent) with
+            { SeasonStatus = SeasonStatus.Active }, now);
+        area.ApplySeasonStatus(SeasonStatus.Active, now.AddHours(1));
+        area.UpdatedAt.Should().Be(now);
+        area.ApplySeasonStatus(SeasonStatus.Archived, now.AddHours(2));
+        area.UpdatedAt.Should().Be(now.AddHours(2));
+        area.ApplySeasonStatus(SeasonStatus.Archived, now.AddHours(3));
+        area.UpdatedAt.Should().Be(now.AddHours(2));
+    }
+
+    [Fact]
+    public async Task Newer_area_snapshot_uses_canonical_parent_even_when_explicit_embedded_status_is_stale()
+    {
+        var now = new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero);
+        var parent = Season();
+        var original = ScopeReplicationMapping.Area(Area(parent), parent) with { SeasonStatus = SeasonStatus.Active };
+        var scopes = new FakeScopeStore();
+        scopes.AddSeason(SeasonScope.Create(parent.SeasonId, SeasonStatus.Archived, parent.Version + 1, now));
+        scopes.Add(WorkAreaScope.FromSnapshot(original, now));
+        var handler = new ApplyWorkAreaSnapshotHandler(scopes);
+
+        var result = await handler.HandleAsync(original with { Version = original.Version + 1, Name = "New name" });
+
+        result.Applied.Should().BeTrue();
+        result.Scope.Name.Should().Be("New name");
+        result.Scope.SeasonStatus.Should().Be(SeasonStatus.Archived);
+        scopes.Seasons.Single().UpdatedAt.Should().Be(now);
+        var created = await handler.HandleAsync(original with { WorkAreaId = Guid.NewGuid() });
+        created.Scope.SeasonStatus.Should().Be(SeasonStatus.Archived);
+    }
+
+    [Fact]
+    public async Task Independent_parent_advancement_fans_out_despite_equal_area_version_and_replays_preserve_timestamps()
+    {
+        var now = new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero);
+        var parent = Season();
+        var sourceArea = Area(parent);
+        var original = ScopeReplicationMapping.Area(sourceArea, parent) with { SeasonStatus = SeasonStatus.Active };
+        var scopes = new FakeScopeStore();
+        scopes.AddSeason(SeasonScope.Create(parent.SeasonId, SeasonStatus.Active, parent.Version, now));
+        scopes.Add(WorkAreaScope.FromSnapshot(original, now));
+        var handler = CreateReplicationHandler(scopes);
+        PlanningScopeSnapshot Snapshot(SeasonScopeSnapshot season, WorkAreaScopeSnapshot area) =>
+            new(Guid.NewGuid(), "work-area", area.WorkAreaId, area.Version, now.AddHours(1), season, area);
+
+        // A new broker identity must still respect each aggregate's source version.
+        await handler.ApplyAsync(Snapshot(parent, sourceArea), default);
+        scopes.Seasons.Single().UpdatedAt.Should().Be(now);
+        scopes.Scopes.Single().UpdatedAt.Should().Be(now);
+        await handler.ApplyAsync(Snapshot(parent with { Status = "ARCHIVED" },
+            sourceArea with { Name = "Conflicting area", LeaderUserId = Guid.NewGuid() }), default);
+        scopes.Seasons.Single().Status.Should().Be(SeasonStatus.Active);
+        scopes.Seasons.Single().UpdatedAt.Should().Be(now);
+        scopes.Scopes.Single().Should().BeEquivalentTo(WorkAreaScope.FromSnapshot(original, now));
+
+        var advanced = parent with { Status = "ARCHIVED", Version = parent.Version + 1 };
+        await handler.ApplyAsync(Snapshot(advanced, sourceArea), default);
+        var area = scopes.Scopes.Single();
+        area.SeasonStatus.Should().Be(SeasonStatus.Archived);
+        area.SourceVersion.Should().Be(original.Version);
+        area.Name.Should().Be(original.Name);
+        var updatedAt = area.UpdatedAt;
+        var parentUpdatedAt = scopes.Seasons.Single().UpdatedAt;
+        updatedAt.Should().BeAfter(now);
+
+        await handler.ApplyAsync(Snapshot(advanced, sourceArea), default);
+        await handler.ApplyAsync(Snapshot(parent, sourceArea), default);
+        area.UpdatedAt.Should().Be(updatedAt);
+        scopes.Seasons.Single().UpdatedAt.Should().Be(parentUpdatedAt);
+        area.SeasonStatus.Should().Be(SeasonStatus.Archived);
+
+        // A newer parent version with the same status advances only the parent timestamp/version.
+        await handler.ApplyAsync(Snapshot(advanced with { Version = advanced.Version + 1 }, sourceArea), default);
+        area.UpdatedAt.Should().Be(updatedAt);
+        scopes.Seasons.Single().SourceVersion.Should().Be(advanced.Version + 1);
+    }
+
+    private static ScopeReplicationHandler CreateReplicationHandler(FakeScopeStore scopes) =>
+        new(new MemoryInbox(), new(scopes), new(scopes), new(new FakeTaskProjectionStore(), scopes, new FakeReadModelStore()));
+
     [Fact]
     public async Task Full_snapshot_links_hours_received_before_the_task_was_known()
     {

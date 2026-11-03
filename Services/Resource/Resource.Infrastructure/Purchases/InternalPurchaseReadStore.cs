@@ -16,14 +16,18 @@ public sealed class InternalPurchaseReadStore(ResourceDbContext db) : IInternalP
         if (request is null) return null;
         var scope = await db.WorkAreaScopes.AsNoTracking().FirstOrDefaultAsync(x => x.WorkAreaId == request.WorkAreaId, ct)
             ?? throw new Resource.Domain.DomainRuleException("WORK_AREA_NOT_PROJECTED", "Purchase request scope is unavailable.", Resource.Domain.DomainErrorKind.ServiceUnavailable);
-        var purchases = await db.Purchases.AsNoTracking().Where(x => x.PurchaseRequestId == id).OrderBy(x => x.PurchaseId)
-            .Select(x => new InternalPurchaseDelivery(x.PurchaseId, x.TaskId, x.Status.ToString(), x.ConfirmedAt, x.Version,
-                x.ConfirmedByUserId,x.BuyerUserId)).ToListAsync(ct);
+        // Read xmin as its native uint. Widening it inside a LINQ projection produces the
+        // unsupported PostgreSQL cast xid::bigint, including when there are no purchases.
+        var rows = await db.Purchases.AsNoTracking().Where(x => x.PurchaseRequestId == id).OrderBy(x => x.PurchaseId)
+            .Select(x => new { x.PurchaseId, x.TaskId, x.Status, x.ConfirmedAt, x.Version,
+                x.ConfirmedByUserId, x.BuyerUserId }).ToListAsync(ct);
+        var purchases = rows.Select(x => new InternalPurchaseDelivery(x.PurchaseId, x.TaskId, Code(x.Status),
+            x.ConfirmedAt, x.Version, x.ConfirmedByUserId, x.BuyerUserId)).ToList();
         return new(request.PurchaseRequestId, request.PurchaseRequestId, scope.WorkAreaId, scope.SeasonId, scope.ParishId,
             Code(request.Status), request.Version, request.ApprovedByUserId, request.ApprovedAt,
             request.Items.OrderBy(x => x.PurchaseRequestItemId).Select(x => new InternalPurchaseRequestLine(x.PurchaseRequestItemId,
                 x.MaterialId, x.RequestedQuantity, x.EstimatedCost)).ToList(),
-            purchases.Select(x => x with { Status = JsonNamingPolicy.SnakeCaseUpper.ConvertName(x.Status) }).ToList());
+            purchases);
     }
 
     public async Task<InternalPurchaseRequestPage> ListAsync(Guid? afterId, int limit, CancellationToken ct)

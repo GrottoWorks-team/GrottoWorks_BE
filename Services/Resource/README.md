@@ -1,5 +1,7 @@
 # Resource Service
 
+Purchase-request submit/approve/reject now wrap business saves, state history and integration-outbox writes in the same PostgreSQL transaction. The existing publisher writes through the same scoped ResourceDbContext; failure before commit rolls back all three. This does not claim that every other Resource producer has already been audited for atomicity.
+
 Vật tư, tồn kho, mua sắm, quyên góp, đồ mượn (owner: Vũ — spec §5.2, tag `Materials`, `Purchases`, `Contributions`).
 Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-09, 10, 11 — S5/S6; F-RES-12, 13 — S5; F-RES-13b, 13c, 15, 16 — S6; F-RES-17, 18, 20 — S7; F-RES-14 — S8.
 

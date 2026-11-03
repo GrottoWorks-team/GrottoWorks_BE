@@ -93,6 +93,43 @@ public sealed class PurchaseRequestTests
         (await act.Should().ThrowAsync<DomainRuleException>()).Which;
 
     [Fact]
+    public async Task Submission_keeps_business_save_and_outbox_write_inside_one_transaction()
+    {
+        var request = await Planning(Line(_cable, 30));
+        _events.BeforePublish = () => _store.IsInTransaction.Should().BeTrue();
+        await Submit().HandleAsync(new PurchaseRequestCommand(request.Id, request.Version));
+        _store.TransactionCommits.Should().Be(1);
+        _store.IsInTransaction.Should().BeFalse();
+        _events.Events.Should().ContainSingle(row => row.EventType == PurchaseRequestSubmitted.EventType);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Both_decisions_write_the_event_before_the_transaction_commits(bool approve)
+    {
+        var request = await Pending(Line(_cable, 30));
+        _events.BeforePublish = () => _store.IsInTransaction.Should().BeTrue();
+        var command = new PurchaseRequestCommand(request.Id, request.Version, approve ? null : "Not needed");
+        if (approve) await Decide().ApproveAsync(command);
+        else await Decide().RejectAsync(command);
+        _store.TransactionCommits.Should().Be(2);
+        _events.Events.Should().ContainSingle(row => row.EventType == PurchaseRequestDecided.EventType);
+    }
+
+    [Fact]
+    public async Task Outbox_failure_aborts_the_command_without_committing_the_transaction()
+    {
+        var request = await Planning(Line(_cable, 30));
+        _events.BeforePublish = () => throw new TimeoutException("Simulated outbox storage failure");
+        Func<Task> submit = () => Submit().HandleAsync(new PurchaseRequestCommand(request.Id, request.Version));
+        await submit.Should().ThrowAsync<TimeoutException>();
+        _store.TransactionCommits.Should().Be(0);
+        _store.TransactionFailures.Should().Be(1);
+        _store.IsInTransaction.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Officer_creates_a_planning_request_with_estimated_total()
     {
         var dto = await Planning(Line(_cable, 30, 450_000m), Line(_paint, 2, 120_000m, "Sơn lại tượng"));

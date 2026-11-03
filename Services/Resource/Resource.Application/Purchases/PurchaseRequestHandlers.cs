@@ -303,7 +303,10 @@ public sealed class SubmitPurchaseRequestCommandHandler(
     IIntegrationEventPublisher publisher,
     ICurrentUser currentUser)
 {
-    public async Task<PurchaseRequestDto> HandleAsync(PurchaseRequestCommand command, CancellationToken cancellationToken = default)
+    public Task<PurchaseRequestDto> HandleAsync(PurchaseRequestCommand command, CancellationToken cancellationToken = default) =>
+        store.InTransactionAsync(() => SubmitInTransactionAsync(command, cancellationToken), cancellationToken);
+
+    private async Task<PurchaseRequestDto> SubmitInTransactionAsync(PurchaseRequestCommand command, CancellationToken cancellationToken)
     {
         var (request, _) = await loader.ForReadAsync(command.PurchaseRequestId, cancellationToken);
         var scope = await access.ForMaterialOfficerWriteAsync(request.WorkAreaId, cancellationToken);
@@ -350,7 +353,10 @@ public sealed class DecidePurchaseRequestCommandHandler(
     public Task<PurchaseRequestDto> RejectAsync(PurchaseRequestCommand command, CancellationToken cancellationToken = default) =>
         DecideAsync(command, approve: false, cancellationToken);
 
-    private async Task<PurchaseRequestDto> DecideAsync(PurchaseRequestCommand command, bool approve, CancellationToken cancellationToken)
+    private Task<PurchaseRequestDto> DecideAsync(PurchaseRequestCommand command, bool approve, CancellationToken cancellationToken) =>
+        store.InTransactionAsync(() => DecideInTransactionAsync(command, approve, cancellationToken), cancellationToken);
+
+    private async Task<PurchaseRequestDto> DecideInTransactionAsync(PurchaseRequestCommand command, bool approve, CancellationToken cancellationToken)
     {
         var (request, _) = await loader.ForReadAsync(command.PurchaseRequestId, cancellationToken);
         var scope = await access.ForLeaderWriteAsync(request.WorkAreaId, cancellationToken);

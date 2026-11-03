@@ -83,6 +83,7 @@ public sealed class FakeCatalogStore : IMaterialCatalogStore
 
 public sealed class FakeIntegrationEventPublisher : IIntegrationEventPublisher
 {
+    public Action? BeforePublish { get; set; }
     public sealed record Published(string EventType, int Version, object Payload, string AggregateType, Guid AggregateId);
 
     public List<Published> Events { get; } = [];
@@ -90,6 +91,7 @@ public sealed class FakeIntegrationEventPublisher : IIntegrationEventPublisher
     public Task PublishAsync<TPayload>(string eventType, int version, TPayload payload, string aggregateType, Guid aggregateId, CancellationToken cancellationToken = default)
         where TPayload : class
     {
+        BeforePublish?.Invoke();
         Events.Add(new Published(eventType, version, payload, aggregateType, aggregateId));
         return Task.CompletedTask;
     }
@@ -243,6 +245,24 @@ public sealed class FakeInventoryStore(FakeRequirementStore requirements) : Reso
 
 public sealed class FakePurchaseRequestStore : Resource.Application.Purchases.IPurchaseRequestStore
 {
+    public bool IsInTransaction { get; private set; }
+    public int TransactionCommits { get; private set; }
+    public int TransactionFailures { get; private set; }
+
+    public async Task<T> InTransactionAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        IsInTransaction = true;
+        try
+        {
+            var result = await operation();
+            TransactionCommits++;
+            return result;
+        }
+        catch { TransactionFailures++; throw; }
+        finally { IsInTransaction = false; }
+    }
+
     public List<Resource.Domain.Purchases.PurchaseRequest> Requests { get; } = [];
 
     public List<Resource.Domain.Purchases.PurchaseRequestStateChange> History { get; } = [];

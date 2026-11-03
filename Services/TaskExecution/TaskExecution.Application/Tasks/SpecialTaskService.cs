@@ -61,7 +61,7 @@ public sealed class SpecialTaskService(ITaskRepository tasks,ISpecialTaskStore s
                     command.RequiredVolunteers,command.StartAt,command.Deadline),command.RequestedByUserId);
                 task.SetSpecialType(TaskType.Corrective);tasks.Add(task);
                 store.SaveCorrective(key,command.ReadinessItemId,fingerprint,TaskDto.From(task));
-                events.Record("task.created",task,area,new {taskId=task.Id,workAreaId=area.WorkAreaId,leaderUserId=area.LeaderUserId,readinessItemId=command.ReadinessItemId,taskType="CORRECTIVE"});
+                events.Record("task.created",task,area,new {taskId=task.Id,workAreaId=area.WorkAreaId,leaderUserId=area.LeaderUserId,readinessItemId=command.ReadinessItemId,taskType="CORRECTIVE"},command.RequestedByUserId);
                 await tasks.SaveChangesAsync(ct);return TaskDto.From(task);
             },ct);
         },ct);

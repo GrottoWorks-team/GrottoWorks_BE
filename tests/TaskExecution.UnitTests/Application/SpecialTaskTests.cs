@@ -13,6 +13,14 @@ namespace TaskExecution.UnitTests.Application;
 public sealed class SpecialTaskTests
 {
     [Fact]
+    public async Task Internal_corrective_audit_uses_the_verified_requesting_leader_not_an_absent_JWT_user()
+    {
+        var f=new Fixture();var leader=f.Source.User.UserId;f.Source.User.UserId=Guid.Empty;
+        var command=new CorrectiveTaskCommand(f.Source.Area.WorkAreaId,Guid.NewGuid(),leader,"Repair",null,null,TaskPriority.Medium,60,1,null,f.Command().Deadline);
+        await f.Service.CorrectiveAsync(Guid.NewGuid().ToString("D"),command,default);
+        f.Source.Events.Items.Single(row=>row.EventType=="task.created").ActorId.Should().Be(leader);
+    }
+    [Fact]
     public async Task Approved_purchase_derives_its_area_and_one_buyer_slot_from_the_source()
     {
         var f=new Fixture();var id=Guid.NewGuid();

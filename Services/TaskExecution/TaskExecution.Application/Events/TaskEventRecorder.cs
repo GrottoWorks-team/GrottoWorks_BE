@@ -20,10 +20,10 @@ public sealed class TaskEventRecorder(ITaskEventOutbox outbox, ICurrentUser user
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public void Record(string eventType, WorkTask task, WorkAreaScope area, object payload)
+    public void Record(string eventType, WorkTask task, WorkAreaScope area, object payload,Guid? verifiedActorId=null)
     {
         outbox.Add(new TaskIntegrationEvent(Guid.NewGuid(), eventType, 1, DateTimeOffset.UtcNow,
-            context.CorrelationId, user.UserId, area.ParishId, area.SeasonId,
+            context.CorrelationId, verifiedActorId ?? user.UserId, area.ParishId, area.SeasonId,
             "task", task.Id, task.Version, JsonSerializer.SerializeToElement(payload, JsonOptions)));
     }
 }

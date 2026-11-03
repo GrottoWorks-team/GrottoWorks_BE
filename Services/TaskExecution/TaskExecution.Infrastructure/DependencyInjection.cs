@@ -34,6 +34,10 @@ public static class DependencyInjection
         }).AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<IVolunteerScheduleReader, TaskExecution.Infrastructure.Assignments.VolunteerScheduleReader>();
         var redis = configuration.GetConnectionString("Redis");
+        var cacheSeconds = configuration.GetValue("Matching:CacheSeconds", 60);
+        if (cacheSeconds is < 1 or > 300)
+            throw new InvalidOperationException("Matching:CacheSeconds must be between 1 and 300.");
+        services.AddSingleton(new TaskExecution.Infrastructure.Identity.VolunteerDirectoryCacheOptions(cacheSeconds));
         if (string.IsNullOrWhiteSpace(redis)) services.AddDistributedMemoryCache(options => options.SizeLimit = 16 * 1024 * 1024);
         else services.AddStackExchangeRedisCache(options =>
         {

@@ -25,7 +25,7 @@ public sealed class VolunteerDirectoryCacheTests
         second.Items.Single().UserId.Should().Be(first.Items.Single().UserId);
         fixture.Transport.Calls.Should().Be(1);
         fixture.Cache.LastKey.Should().Contain(fixture.ParishId.ToString("N")).And.EndWith(":all:1:100");
-        fixture.Cache.Expiry.Should().Be(TimeSpan.FromSeconds(30));
+        fixture.Cache.Expiry.Should().Be(TimeSpan.FromSeconds(60));
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public sealed class VolunteerDirectoryCacheTests
             Transport = new(JsonSerializer.Serialize(new { data = new[] { User }, page = new { page = 1, size = 100, totalItems = 1 } }, JsonOptions));
             var source = new IdentityVolunteerDirectory(new HttpClient(Transport) { BaseAddress = new("http://identity.api:8080/") },
                 new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["InternalApi:ApiKey"] = new string('k', 32) }).Build(), new Correlation());
-            Client = new(source, Cache, new(Clock), NullLogger<CachedVolunteerDirectory>.Instance);
+            Client = new(source, Cache, new(Clock), NullLogger<CachedVolunteerDirectory>.Instance, new(60));
         }
     }
     private sealed class Correlation : ITaskCorrelationContext { public string CorrelationId => "cache-test"; }

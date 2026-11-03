@@ -24,7 +24,7 @@ Assignment/application validation reads declared levels from Identity's internal
 
 Identity pages are fetched in batches of 100 (at most 10,000 source candidates; larger directories return `503`, never a silently truncated shortlist). Local schedule conflicts use one database query for the candidate batch. Known availability ranks first, then absence of known conflicts, same community, name and ID. Missing availability or Task start time is reported as undetermined.
 
-Directory pages are cached for 30 seconds under parish/community/page keys. Configure `ConnectionStrings:Redis` (`redis:6379` in Docker); without it the service uses a bounded local memory cache. Cache operations have a 200 ms budget; failure bypasses caching for 30 seconds and falls back to Identity HTTP. Cached payloads are validated again against their tenant/filter. Assignment mutations always revalidate Identity directly and do not authorize from the matching cache.
+Directory pages are cached for 60 seconds by default (`Matching:CacheSeconds`, 1–300) under parish/community/page keys. Configure `ConnectionStrings:Redis` (`redis:6379` in Docker); without it the service uses a bounded local memory cache. Cache operations have a 200 ms budget; failure bypasses caching for 30 seconds and falls back to Identity HTTP. Cached payloads are validated again against their tenant/filter. Assignment mutations always revalidate Identity directly and do not authorize from the matching cache.
 
 ## Task material requirements
 

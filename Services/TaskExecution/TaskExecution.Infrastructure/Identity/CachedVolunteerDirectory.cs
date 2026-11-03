@@ -5,6 +5,8 @@ using TaskExecution.Application.Tasks;
 
 namespace TaskExecution.Infrastructure.Identity;
 
+public sealed record VolunteerDirectoryCacheOptions(int LifetimeSeconds);
+
 public sealed class VolunteerDirectoryCacheGate(TimeProvider clock)
 {
     private long pausedUntil;
@@ -13,7 +15,7 @@ public sealed class VolunteerDirectoryCacheGate(TimeProvider clock)
 }
 
 public sealed class CachedVolunteerDirectory(IdentityVolunteerDirectory source, IDistributedCache cache,
-    VolunteerDirectoryCacheGate gate, ILogger<CachedVolunteerDirectory> logger) : IVolunteerDirectory
+    VolunteerDirectoryCacheGate gate, ILogger<CachedVolunteerDirectory> logger, VolunteerDirectoryCacheOptions options) : IVolunteerDirectory
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -48,7 +50,7 @@ public sealed class CachedVolunteerDirectory(IdentityVolunteerDirectory source, 
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 timeout.CancelAfter(TimeSpan.FromMilliseconds(200));
                 await cache.SetAsync(key, JsonSerializer.SerializeToUtf8Bytes(result, JsonOptions),
-                    new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30) }, timeout.Token);
+                    new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(options.LifetimeSeconds) }, timeout.Token);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch (Exception exception) when (IsCacheFailure(exception)) { Pause(exception); }

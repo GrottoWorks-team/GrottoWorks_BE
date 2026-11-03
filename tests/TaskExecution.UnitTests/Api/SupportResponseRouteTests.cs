@@ -28,7 +28,9 @@ public sealed class SupportResponseRouteTests
         Roles(create).Should().BeEquivalentTo("VOLUNTEER","MO");
         create.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Select(meta=>meta.StatusCode)
             .Should().Contain(new[] {201,400,401,403,404,409,412,422,503});
-        Roles(routes.Single(route=>route.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName=="listSupportResponses")).Should().Equal("LEADER");
+        var list=routes.Single(route=>route.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName=="listSupportResponses");
+        list.RoutePattern.RawText.Should().Be("/api/v1/support-requests/{requestId:guid}/responses");
+        Roles(list).Should().Equal("LEADER");
         var summary=routes.Single(route=>route.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName=="getCrossCommunitySupportSummary");
         summary.RoutePattern.RawText.Should().Be("/api/v1/seasons/{seasonId:guid}/support-summary");
         Roles(summary).Should().Equal("PARISH");

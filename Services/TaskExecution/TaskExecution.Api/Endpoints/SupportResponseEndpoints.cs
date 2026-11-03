@@ -25,13 +25,13 @@ public static class SupportResponseEndpoints
 {
     public static void MapSupportResponseEndpoints(this IEndpointRouteBuilder app)
     {
-        var group=app.MapGroup("/api/v1/support-requests/{requestId:guid}/responses").WithTags("Support").RequireAuthorization();
-        group.MapPost("",CreateAsync).WithName("respondToSupportRequest")
+        var group=app.MapGroup("").WithTags("Support").RequireAuthorization();
+        group.MapPost("/api/v1/support-requests/{requestId:guid}/responses",CreateAsync).WithName("respondToSupportRequest")
             .RequireAuthorization(policy=>policy.RequireRole(GrottoWorksRoles.Volunteer,GrottoWorksRoles.MaterialOfficer))
             .Produces<ApiResponse<SupportResponseDto>>(201).Produces<ProblemDetails>(400).Produces<ProblemDetails>(401)
             .Produces<ProblemDetails>(403).Produces<ProblemDetails>(404).Produces<ProblemDetails>(409)
             .Produces<ProblemDetails>(412).Produces<ProblemDetails>(422).Produces<ProblemDetails>(503);
-        group.MapGet("",ListAsync).WithName("listSupportResponses")
+        group.MapGet("/api/v1/support-requests/{requestId:guid}/responses",ListAsync).WithName("listSupportResponses")
             .RequireAuthorization(policy=>policy.RequireRole(GrottoWorksRoles.Leader))
             .Produces<ApiResponse<IReadOnlyList<SupportResponseDto>>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401)
             .Produces<ProblemDetails>(403).Produces<ProblemDetails>(404);

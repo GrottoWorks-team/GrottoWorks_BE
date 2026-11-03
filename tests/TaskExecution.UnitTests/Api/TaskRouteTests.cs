@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Routing;
@@ -44,38 +45,38 @@ public sealed class TaskRouteTests
         var ready = endpoints.Single(endpoint =>
             endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == "markTaskReady");
 
-        list.RoutePattern.RawText.Should().Be("/api/v1/work-areas/{workAreaId}/tasks");
-        detail.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId}");
+        list.RoutePattern.RawText.Should().Be("/api/v1/work-areas/{workAreaId:guid}/tasks");
+        detail.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId:guid}");
         list.Metadata.GetMetadata<IAuthorizeData>().Should().NotBeNull();
         detail.Metadata.GetMetadata<IAuthorizeData>().Should().NotBeNull();
         list.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
             .Select(metadata => metadata.StatusCode).Should().Contain([200, 400, 401, 403, 404]);
         detail.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
             .Select(metadata => metadata.StatusCode).Should().Contain([200, 400, 401, 403, 404]);
-        create.RoutePattern.RawText.Should().Be("/api/v1/work-areas/{workAreaId}/tasks");
-        create.Metadata.GetOrderedMetadata<IAuthorizeData>()
-            .Should().Contain(data => data.Roles == GrottoWorksRoles.Leader);
+        create.RoutePattern.RawText.Should().Be("/api/v1/work-areas/{workAreaId:guid}/tasks");
+        Roles(create).Should().Equal(GrottoWorksRoles.Leader);
         create.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
             .Select(metadata => metadata.StatusCode).Should().Contain([201, 400, 401, 403, 404, 409, 422]);
-        update.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId}");
-        update.Metadata.GetOrderedMetadata<IAuthorizeData>()
-            .Should().Contain(data => data.Roles == GrottoWorksRoles.Leader);
+        update.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId:guid}");
+        Roles(update).Should().Equal(GrottoWorksRoles.Leader);
         update.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
             .Select(metadata => metadata.StatusCode).Should().Contain([200, 400, 401, 403, 404, 409, 412, 422]);
-        criteria.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId}/completion-criteria");
-        criteria.Metadata.GetOrderedMetadata<IAuthorizeData>()
-            .Should().Contain(data => data.Roles == GrottoWorksRoles.Leader);
+        criteria.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId:guid}/completion-criteria");
+        Roles(criteria).Should().Equal(GrottoWorksRoles.Leader);
         criteria.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
             .Select(metadata => metadata.StatusCode).Should().Contain([200, 400, 401, 403, 404, 409, 412, 422]);
-        skills.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId}/skills");
-        skills.Metadata.GetOrderedMetadata<IAuthorizeData>()
-            .Should().Contain(data => data.Roles == GrottoWorksRoles.Leader);
+        skills.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId:guid}/skills");
+        Roles(skills).Should().Equal(GrottoWorksRoles.Leader);
         skills.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
             .Select(metadata => metadata.StatusCode).Should().Contain([200, 400, 401, 403, 404, 409, 412, 422]);
         ready.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId:guid}/ready");
-        ready.Metadata.GetOrderedMetadata<IAuthorizeData>()
-            .Should().Contain(data => data.Roles == GrottoWorksRoles.Leader);
+        Roles(ready).Should().Equal(GrottoWorksRoles.Leader);
         ready.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
             .Select(metadata => metadata.StatusCode).Should().Contain([200, 400, 401, 403, 404, 409, 412]);
     }
+    private static IEnumerable<string> Roles(RouteEndpoint endpoint) =>
+        endpoint.Metadata.GetOrderedMetadata<AuthorizationPolicy>()
+            .SelectMany(policy => policy.Requirements)
+            .OfType<RolesAuthorizationRequirement>()
+            .SelectMany(requirement => requirement.AllowedRoles);
 }

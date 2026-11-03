@@ -46,7 +46,9 @@ public sealed class TaskScopeOutboxTests
     [Fact]
     public void Outbox_has_unique_aggregate_version_and_pending_index()
     {
-        using var db = CreateDatabase();
+        using var db = new ParishCoordinationDbContext(
+            new DbContextOptionsBuilder<ParishCoordinationDbContext>()
+                .UseNpgsql("Host=localhost;Database=metadata_only").Options);
         var entity = db.Model.FindEntityType(typeof(TaskScopeOutbox))!;
         entity.GetTableName().Should().Be("task_scope_outbox");
         entity.GetIndexes().Should().Contain(index => index.IsUnique && index.Properties.Count == 3);

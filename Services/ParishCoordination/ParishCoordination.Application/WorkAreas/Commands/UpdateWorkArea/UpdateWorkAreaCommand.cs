@@ -8,4 +8,8 @@ public sealed record UpdateWorkAreaCommand(
     Guid? CategoryId,
     DateOnly? StartDate,
     DateOnly? Deadline,
-    int? ExpectedVersion);
+    int? ExpectedVersion,
+    bool ShouldUpdateLatitude = false,
+    decimal? Latitude = null,
+    bool ShouldUpdateLongitude = false,
+    decimal? Longitude = null);

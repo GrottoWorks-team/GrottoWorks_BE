@@ -92,7 +92,11 @@ public sealed class UpdateWorkAreaCommandHandler(
             categoryId,
             startDate,
             deadline,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            command.ShouldUpdateLatitude,
+            command.Latitude,
+            command.ShouldUpdateLongitude,
+            command.Longitude);
 
         try
         {

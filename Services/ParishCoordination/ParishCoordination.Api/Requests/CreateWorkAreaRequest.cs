@@ -18,6 +18,12 @@ public sealed class CreateWorkAreaRequest : IValidatableObject
 
     public DateOnly? Deadline { get; init; }
 
+    [Range(typeof(decimal), "-90", "90")]
+    public decimal? Latitude { get; init; }
+
+    [Range(typeof(decimal), "-180", "180")]
+    public decimal? Longitude { get; init; }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (string.IsNullOrWhiteSpace(Name))

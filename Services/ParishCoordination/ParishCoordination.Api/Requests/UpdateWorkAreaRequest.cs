@@ -15,13 +15,36 @@ public sealed class UpdateWorkAreaRequest : IValidatableObject
 
     public DateOnly? Deadline { get; init; }
 
+    private decimal? latitude;
+    private decimal? longitude;
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool HasLatitude { get; private set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool HasLongitude { get; private set; }
+
+    [Range(typeof(decimal), "-90", "90")]
+    public decimal? Latitude
+    {
+        get => latitude;
+        init { latitude = value; HasLatitude = true; }
+    }
+
+    [Range(typeof(decimal), "-180", "180")]
+    public decimal? Longitude
+    {
+        get => longitude;
+        init { longitude = value; HasLongitude = true; }
+    }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (Name is null &&
             Description is null &&
             CategoryId is null &&
             StartDate is null &&
-            Deadline is null)
+            Deadline is null && !HasLatitude && !HasLongitude)
         {
             yield return new ValidationResult(
                 "At least one field must be provided.",

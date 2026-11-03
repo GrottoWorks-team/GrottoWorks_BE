@@ -14,11 +14,13 @@ public sealed record SeasonSnapshot(
 public sealed record WorkAreaSnapshot(
     Guid SeasonId, Guid ParishId, string Name, Guid? CommunityId,
     Guid? LeaderUserId, Guid? MaterialOfficerUserId, DateOnly? StartDate,
-    DateOnly? Deadline, string Status, long Version)
+    DateOnly? Deadline, string Status, long Version,
+    decimal? Latitude = null, decimal? Longitude = null)
 {
     public static WorkAreaSnapshot From(WorkArea area, Season season) => new(
         area.SeasonId, season.ParishId, area.Name, area.CommunityId, area.LeaderUserId,
-        area.MaterialOfficerUserId, area.StartDate, area.Deadline, ScopeJson.Status(area.Status), area.Version);
+        area.MaterialOfficerUserId, area.StartDate, area.Deadline, ScopeJson.Status(area.Status), area.Version,
+        area.Latitude, area.Longitude);
 }
 
 public sealed record WorkAreaDelivery(SeasonSnapshot Season, WorkAreaSnapshot WorkArea);

@@ -25,6 +25,33 @@ public sealed class UpdateWorkAreaHandlerTests
         Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
 
     [Fact]
+    public async Task Coordinate_only_update_keeps_planning_fields_and_can_clear_latitude()
+    {
+        var area = BuildWorkArea();
+        var repository = WorkAreas(area);
+        var handler = Handler(repository, Seasons(BuildSeason()), Categories(), User(GrottoWorksRoles.Parish, ParishNorth));
+        var originalName = area.Name;
+
+        var updated = await handler.HandleAsync(new UpdateWorkAreaCommand(
+            WorkAreaId, null, false, null, null, null, null, 1,
+            ShouldUpdateLatitude: true, Latitude: 10.1234567m,
+            ShouldUpdateLongitude: true, Longitude: 106.1234567m));
+
+        updated.Outcome.Should().Be(UpdateWorkAreaOutcome.Success);
+        updated.WorkArea!.Latitude.Should().Be(10.1234567m);
+        area.Name.Should().Be(originalName);
+        area.Version.Should().Be(2);
+
+        var cleared = await handler.HandleAsync(new UpdateWorkAreaCommand(
+            WorkAreaId, null, false, null, null, null, null, 2,
+            ShouldUpdateLatitude: true, Latitude: null));
+
+        cleared.WorkArea!.Latitude.Should().BeNull();
+        cleared.WorkArea.Longitude.Should().Be(106.1234567m);
+        repository.SaveChangesCount.Should().Be(2);
+    }
+
+    [Fact]
     public async Task Parish_user_updates_work_area_in_its_parish()
     {
         var workAreas = WorkAreas(BuildWorkArea());

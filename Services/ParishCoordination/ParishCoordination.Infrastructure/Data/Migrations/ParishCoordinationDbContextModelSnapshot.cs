@@ -203,6 +203,8 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("ParishCoordination.Domain.Entities.WorkArea", b =>
                 {
+                    b.Property<decimal?>("Latitude").HasColumnName("latitude").HasPrecision(10, 7).HasColumnType("numeric(10,7)");
+                    b.Property<decimal?>("Longitude").HasColumnName("longitude").HasPrecision(10, 7).HasColumnType("numeric(10,7)");
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
@@ -273,7 +275,11 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
 
                     b.HasIndex("SeasonId");
 
-                    b.ToTable("work_area", (string)null);
+                    b.ToTable("work_area", (string)null, table =>
+                    {
+                        table.HasCheckConstraint("work_area_latitude_range", "latitude IS NULL OR latitude BETWEEN -90 AND 90");
+                        table.HasCheckConstraint("work_area_longitude_range", "longitude IS NULL OR longitude BETWEEN -180 AND 180");
+                    });
                 });
 
             modelBuilder.Entity("ParishCoordination.Domain.Entities.WorkAreaCategory", b =>

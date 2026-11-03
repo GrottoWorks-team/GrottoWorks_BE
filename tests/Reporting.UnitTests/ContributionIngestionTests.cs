@@ -6,6 +6,7 @@ using Reporting.Application.Users;
 using Reporting.Contracts.Events;
 using Reporting.Domain;
 using Reporting.Domain.Recognition;
+using Reporting.Domain.Scope;
 using Resource.Contracts.Events;
 
 namespace Reporting.UnitTests;
@@ -53,6 +54,120 @@ public sealed class ContributionIngestionTests
     private ContributionReceiptConfirmed Receipt(Guid donationId, Guid? donorUserId, string type = "MONEY", bool first = true) =>
         new(donationId, Guid.NewGuid(), Guid.NewGuid(), donorUserId, _parishId, _seasonId, null, type, type == "MONEY" ? 500_000m : null, "VND",
             type == "MONEY" ? [] : [new ContributionReceiptLine(Guid.NewGuid(), Guid.NewGuid(), 10, 2, 8)], false, first, Guid.NewGuid(), Dec10);
+
+    private IncomingEvent LegacyReview(Guid taskId, Guid leader, Guid volunteer, string decision = "APPROVED") =>
+        new(Guid.NewGuid(), TaskCompletionReviewed.EventType, 1, Dec10,
+            JsonSerializer.SerializeToElement(new { taskId, workAreaId = _workAreaId, approved = decision == "APPROVED", decision,
+                status = decision == "APPROVED" ? "COMPLETED" : "REVISION_REQUIRED", leaderUserId = leader,
+                recipientUserIds = new[] { leader, volunteer } }, Json), _parishId, _seasonId, taskId, 4);
+
+    private void ProjectTask(Guid taskId, ProjectedTaskType type, params Guid[] volunteers) =>
+        _readModels.Tasks.Add(TaskProjection.FromSnapshot(new TaskSnapshot(taskId, _workAreaId, "Treo đèn", type,
+            ProjectedTaskStatus.Completed, type == ProjectedTaskType.Purchase ? Guid.NewGuid() : null, volunteers, 4), Dec10));
+
+    [Fact]
+    public async Task Legacy_work_review_uses_projection_participants_and_envelope_context()
+    {
+        Rule(ContributionType.TaskCompletion, 10);
+        var (taskId, leader, volunteer, other) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        ProjectTask(taskId, ProjectedTaskType.Work, volunteer, other);
+        var incoming = LegacyReview(taskId, leader, volunteer);
+
+        var result = await Handler.HandleAsync(incoming);
+
+        result.Outcome.Should().Be(IngestionOutcome.Applied);
+        result.ContributionsRecorded.Should().Be(2);
+        result.PointsAwarded.Should().Be(2);
+        _store.Contributions.Select(c => c.ContributedByUserId).Should().BeEquivalentTo(new[] { volunteer, other });
+        _store.Contributions.Should().OnlyContain(c => c.ParishId == _parishId && c.SeasonId == _seasonId &&
+            c.WorkAreaId == _workAreaId && c.ReferenceId == taskId && c.ContributionDate == Dec10 && c.Description == "Hoàn thành task Treo đèn");
+        _store.Points.Should().NotContain(p => p.AwardedToUserId == leader);
+        (await Handler.HandleAsync(incoming)).Outcome.Should().Be(IngestionOutcome.Duplicate);
+        _store.Processed.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Legacy_purchase_review_earns_credit_only_from_resource_delivery()
+    {
+        Rule(ContributionType.TaskCompletion, 10);
+        Rule(ContributionType.PurchaseAssistance, 5);
+        var (taskId, buyer) = (Guid.NewGuid(), Guid.NewGuid());
+        ProjectTask(taskId, ProjectedTaskType.Purchase, buyer);
+
+        var result = await Handler.HandleAsync(LegacyReview(taskId, Guid.NewGuid(), buyer));
+
+        result.Outcome.Should().Be(IngestionOutcome.Applied);
+        result.ContributionsRecorded.Should().Be(0);
+        result.PointsAwarded.Should().Be(0);
+        _store.Contributions.Should().BeEmpty();
+        _store.Points.Should().BeEmpty();
+        var delivery = new PurchaseDeliveryConfirmed(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), _workAreaId, _seasonId, _parishId,
+            buyer, Guid.NewGuid(), 120_000m, "VND", "COMPLETED", [], Dec10);
+        await Handler.HandleAsync(Event(PurchaseDeliveryConfirmed.EventType, delivery));
+
+        _store.Contributions.Should().ContainSingle().Which.ContributionTypeId.Should().Be(_catalog.Type(ContributionType.PurchaseAssistance).ContributionTypeId);
+        _store.Points.Should().ContainSingle().Which.AwardedToUserId.Should().Be(buyer);
+    }
+
+    [Fact]
+    public async Task Legacy_review_without_projection_is_retryable_and_does_not_enter_inbox()
+    {
+        Rule(ContributionType.TaskCompletion, 10);
+        var (taskId, volunteer) = (Guid.NewGuid(), Guid.NewGuid());
+        var incoming = LegacyReview(taskId, Guid.NewGuid(), volunteer);
+        var act = () => Handler.HandleAsync(incoming);
+
+        var exception = (await act.Should().ThrowAsync<DomainRuleException>()).Which;
+        exception.Code.Should().Be("EVENT_CONTEXT_UNAVAILABLE");
+        exception.Kind.Should().Be(DomainErrorKind.ServiceUnavailable);
+        exception.Message.Should().Contain(taskId.ToString());
+        _store.Processed.Should().BeEmpty();
+        _store.Contributions.Should().BeEmpty();
+        _store.Points.Should().BeEmpty();
+        _publisher.Events.Should().BeEmpty();
+
+        ProjectTask(taskId, ProjectedTaskType.Work, volunteer);
+        (await Handler.HandleAsync(incoming)).ContributionsRecorded.Should().Be(1);
+        _store.Processed.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Legacy_revision_required_review_preserves_no_credit_without_projection()
+    {
+        var result = await Handler.HandleAsync(LegacyReview(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "REVISION_REQUIRED"));
+
+        result.Outcome.Should().Be(IngestionOutcome.Applied);
+        result.ContributionsRecorded.Should().Be(0);
+        _store.Processed.Should().ContainSingle();
+    }
+
+    [Theory]
+    [InlineData("taskId")]
+    [InlineData("workAreaId")]
+    [InlineData("decision")]
+    [InlineData("taskType")]
+    [InlineData("parishId")]
+    [InlineData("seasonId")]
+    [InlineData("reviewedAt")]
+    [InlineData("volunteerUserIds")]
+    public async Task Invalid_full_review_is_rejected_before_inbox(string field)
+    {
+        var payload = JsonSerializer.SerializeToNode(Review("APPROVED", Guid.NewGuid()), Json)!.AsObject();
+        payload[field] = field switch
+        {
+            "taskId" or "workAreaId" or "parishId" or "seasonId" => JsonSerializer.SerializeToNode(Guid.Empty),
+            "reviewedAt" => JsonSerializer.SerializeToNode(default(DateTimeOffset)),
+            "volunteerUserIds" => JsonSerializer.SerializeToNode(new[] { Guid.Empty }),
+            _ => JsonSerializer.SerializeToNode(field == "decision" ? "" : "UNKNOWN")
+        };
+        var incoming = new IncomingEvent(Guid.NewGuid(), TaskCompletionReviewed.EventType, 1, null, JsonSerializer.SerializeToElement(payload, Json));
+
+        var act = () => Handler.HandleAsync(incoming);
+
+        (await act.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("EVENT_PAYLOAD_INVALID");
+        _store.Processed.Should().BeEmpty();
+        _store.Contributions.Should().BeEmpty();
+    }
 
     [Fact]
     public async Task Approved_task_credits_each_volunteer_once_with_points_and_events()

@@ -28,6 +28,8 @@ public sealed class SystemExportContractTests
             stream.Should().NotBeNull();
             using var reader = new StreamReader(stream!);
             var source = reader.ReadToEnd();
+            source.Should().Contain("await using var writer = new StreamWriter",
+                "HTTP export streams must not synchronously flush during disposal under Kestrel");
             source.Should().NotContain("SELECT *").And.NotContain("Serialize(entity");
             var tableMatches = Regex.Matches(source, "\\[\"(?<table>[a-z_]+)\"\\] = \\[(?<columns>[^;]+?)\\],");
             tableMatches.Should().NotBeEmpty();

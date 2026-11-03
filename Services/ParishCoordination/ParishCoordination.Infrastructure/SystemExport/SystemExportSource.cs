@@ -25,7 +25,7 @@ public sealed class SystemExportSource(ParishCoordinationDbContext db)
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken);
         await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY", cancellationToken);
         var startedAt = DateTimeOffset.UtcNow;
-        using var writer = new StreamWriter(destination, new UTF8Encoding(false), 65536, leaveOpen: true);
+        await using var writer = new StreamWriter(destination, new UTF8Encoding(false), 65536, leaveOpen: true);
         await writer.WriteLineAsync(JsonSerializer.Serialize(new { type = "begin", service = "ParishCoordination", schemaVersion = 1, startedAt }).AsMemory(), cancellationToken);
         var counts = new Dictionary<string, long>();
         foreach (var (table, columns) in Columns)

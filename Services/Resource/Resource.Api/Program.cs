@@ -1,3 +1,4 @@
+using Resource.Api.SystemExport;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BuildingBlocks.Security;
@@ -21,6 +22,7 @@ builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationM
 
 // { data, meta } envelope, 422 field validation + correlationId, exception → RFC 9457 (F-PLT-03).
 builder.Services.AddGrottoWorksWeb();
+builder.Services.AddGrottoWorksObservability(builder.Configuration, "Resource");
 builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails += context =>
@@ -79,6 +81,8 @@ if (app.Configuration.GetValue("Database:MigrateOnStartup", true))
             "Database migration failed. The service stays up; /health/ready reports Unhealthy.");
     }
 }
+
+app.MapSystemExportEndpoints();
 
 app.Run();
 

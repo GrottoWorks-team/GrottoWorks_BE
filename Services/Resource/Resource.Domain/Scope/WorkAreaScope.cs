@@ -65,7 +65,7 @@ public sealed class WorkAreaScope
         return scope;
     }
 
-    /// <summary>Returns false (and changes nothing) when the snapshot is older than what is stored.</summary>
+    /// <summary>Returns false (and changes nothing) when the snapshot is equal to or older than what is stored.</summary>
     public bool Apply(WorkAreaSnapshot snapshot, DateTimeOffset now)
     {
         if (snapshot.WorkAreaId != WorkAreaId)
@@ -73,7 +73,7 @@ public sealed class WorkAreaScope
             throw new ArgumentException("Snapshot belongs to another work area.", nameof(snapshot));
         }
 
-        if (snapshot.Version < SourceVersion)
+        if (snapshot.Version <= SourceVersion)
         {
             return false;
         }
@@ -85,6 +85,8 @@ public sealed class WorkAreaScope
     /// <summary>Season events carry no work-area version, so they only move the season state.</summary>
     public void ApplySeasonStatus(SeasonStatus seasonStatus, DateTimeOffset now)
     {
+        if (SeasonStatus == seasonStatus) return;
+
         SeasonStatus = seasonStatus;
         UpdatedAt = now.ToUniversalTime();
     }

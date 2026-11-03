@@ -35,13 +35,17 @@ public sealed class WorkAreaScopeTests
     }
 
     [Fact]
-    public async Task Same_version_is_reapplied_idempotently()
+    public async Task Same_version_is_ignored_without_saving_or_changing_timestamp()
     {
         var handler = new ApplyWorkAreaSnapshotHandler(_store);
         var id = Guid.NewGuid();
         await handler.HandleAsync(Snapshot(id, 4));
+        var updatedAt = _store.Scopes.Single().UpdatedAt;
+        var saves = _store.SaveChangesCount;
 
-        (await handler.HandleAsync(Snapshot(id, 4))).Applied.Should().BeTrue();
+        (await handler.HandleAsync(Snapshot(id, 4))).Applied.Should().BeFalse();
+        _store.Scopes.Single().UpdatedAt.Should().Be(updatedAt);
+        _store.SaveChangesCount.Should().Be(saves);
     }
 
     [Fact]

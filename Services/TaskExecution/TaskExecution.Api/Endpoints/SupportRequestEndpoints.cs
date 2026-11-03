@@ -7,6 +7,7 @@ using TaskExecution.Domain.Support;
 using BuildingBlocks.Pagination;
 using TaskExecution.Api.Common;
 using System.Text.Json.Serialization;
+using TaskExecution.Api.Requests;
 
 namespace TaskExecution.Api.Endpoints;
 
@@ -44,6 +45,11 @@ public static partial class SupportRequestEndpoints
     public static void MapSupportRequestEndpoints(this IEndpointRouteBuilder app)
     {
         var group=app.MapGroup("/api/v1").WithTags("Support").RequireAuthorization();
+        group.MapPost("/support-requests/{requestId:guid}/publish",PublishAsync).WithName("publishSupportRequest")
+            .RequireAuthorization(p=>p.RequireRole(GrottoWorksRoles.Leader))
+            .Produces<ApiResponse<SupportRequestDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401)
+            .Produces<ProblemDetails>(403).Produces<ProblemDetails>(404).Produces<ProblemDetails>(409)
+            .Produces<ProblemDetails>(412).Produces<ProblemDetails>(422).Produces<ProblemDetails>(503);
         group.MapGet("/support-requests",ListAsync).WithName("listSupportRequests")
             .Produces<PagedResponse<SupportRequestDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401)
             .Produces<ProblemDetails>(403);
@@ -60,6 +66,15 @@ public static partial class SupportRequestEndpoints
             .Produces<ApiResponse<SupportRequestDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401)
             .Produces<ProblemDetails>(403).Produces<ProblemDetails>(404).Produces<ProblemDetails>(409)
             .Produces<ProblemDetails>(412).Produces<ProblemDetails>(422).Produces<ProblemDetails>(503);
+    }
+    private static async Task<IResult> PublishAsync(Guid requestId,
+        [FromBody(EmptyBodyBehavior=Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] VersionedCommandRequest? request,
+        [FromHeader(Name="If-Match")] string? ifMatch,PublishSupportRequestHandler handler,HttpContext context,CancellationToken ct)
+    {
+        var version=TaskVersionPrecondition.Resolve(request?.Version,ifMatch,"SUPPORT_REQUEST_VERSION_MISMATCH");
+        var result=await handler.HandleAsync(requestId,version,ct);
+        context.Response.Headers.ETag=$"\"{result.Version}\"";
+        return Results.Ok(ApiResults.Ok(result,context));
     }
     private static async Task<IResult> CreateAsync(CreateSupportRequest request,SupportRequestService service,HttpContext context,CancellationToken ct)
     {

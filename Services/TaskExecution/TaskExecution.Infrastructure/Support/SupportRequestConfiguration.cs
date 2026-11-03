@@ -33,6 +33,10 @@ public sealed class SupportPositionConfiguration : IEntityTypeConfiguration<Supp
         b.Property(r=>r.Id).HasColumnName("support_request_position_id").ValueGeneratedNever();b.Property(r=>r.RequestId).HasColumnName("support_request_id");
         b.Property(r=>r.Name).HasColumnName("position_name").HasMaxLength(150);b.Property(r=>r.RequiredVolunteerCount).HasColumnName("required_volunteer_count");
         b.Property(r=>r.Note).HasColumnName("position_note").HasMaxLength(2000);
+        b.Property(r=>r.TaskId).HasColumnName("task_id");
+        b.HasOne<TaskExecution.Domain.Tasks.WorkTask>().WithMany().HasForeignKey(r=>r.TaskId)
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_support_position_task");
+        b.HasIndex(r=>r.TaskId).HasDatabaseName("ix_support_request_position_task_id");
         b.HasMany(r=>r.Skills).WithOne().HasForeignKey(s=>s.PositionId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(r=>r.Skills).HasField("skills").UsePropertyAccessMode(PropertyAccessMode.Field);
     }

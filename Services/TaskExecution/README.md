@@ -1,5 +1,11 @@
 # TaskExecution integration
 
+## Support publication
+
+`POST /api/v1/support-requests/{requestId}/publish` is restricted to the assigned Leader and validates the current caller through Identity. It accepts optional body version / `If-Match`, returns the standard Support Request envelope and a new ETag. STAFFING requires positions, MATERIAL requires material lines, MIXED requires both. Positions accept nullable `taskId` during planning (including legacy data), but publication requires every position's Task to exist in the same Work Area and not be completed/cancelled. Task rows are checked in a single batch under share locks until publication commits.
+
+Publication locks the Support Request, updates its state/version and records `support.request.published` in the same local transaction. The event includes skill/level, position/Task and material requirements without copying private notes. Delivery uses the existing outbox; candidate notification fan-out and staffing/material response workflows are separate integrations. Migration adds nullable Task references without guessing links for existing positions.
+
 Assignment events carry `assignmentType` and the Work Area's `leaderUserId`, so consumers can distinguish a direct assignment, an application and its decision. Attendance requests carry the task and leader IDs. Both correction approval and rejection emit `attendance.request.reviewed` with `reviewType=CORRECTION`; approved-hour changes remain a separate event for reporting. These additive fields are captured with the business transaction, not resolved from mutable ownership later. Older payloads without workflow context require reconciliation rather than guessing the recipient.
 
 Task events are recorded in `task_event_outbox` in the same database transaction as the business operation.

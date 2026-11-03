@@ -6,6 +6,16 @@ namespace TaskExecution.UnitTests.Api;
 public sealed class TaskGatewayRouteTests
 {
     [Fact]
+    public void Support_publication_routes_only_post_to_task_with_authentication()
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(GetGatewaySettingsPath()));
+        var route = document.RootElement.GetProperty("ReverseProxy").GetProperty("Routes").GetProperty("task-support-request-publish-route");
+        route.GetProperty("ClusterId").GetString().Should().Be("task");
+        route.GetProperty("AuthorizationPolicy").GetString().Should().Be("authenticated");
+        route.GetProperty("Match").GetProperty("Path").GetString().Should().Be("/api/v1/support-requests/{requestId}/publish");
+        route.GetProperty("Match").GetProperty("Methods").EnumerateArray().Select(value => value.GetString()).Should().Equal("POST");
+    }
+    [Fact]
     public void Task_material_update_routes_to_task_without_overriding_resource_reports()
     {
         using var document = JsonDocument.Parse(File.ReadAllText(GetGatewaySettingsPath()));

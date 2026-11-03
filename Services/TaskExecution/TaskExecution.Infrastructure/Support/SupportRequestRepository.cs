@@ -8,6 +8,25 @@ namespace TaskExecution.Infrastructure.Support;
 
 public sealed partial class SupportRequestRepository(TaskExecutionDbContext db) : ISupportRequestRepository
 {
+    public async Task<T> InRequestTransactionAsync<T>(Guid requestId,Func<Task<T>> operation,CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var key = $"support-request:{requestId:D}";
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({key},0))", cancellationToken);
+        var result = await operation();
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
+    public async Task<IReadOnlyList<SupportPositionTask>> GetPositionTasksAsync(IReadOnlyCollection<Guid> taskIds,CancellationToken cancellationToken)
+    {
+        if (taskIds.Count == 0) return [];
+        var ids = taskIds.Distinct().ToArray();
+        // Keep each checked Task state stable until publication commits, including concurrent cancellation.
+        return await db.Tasks.FromSqlInterpolated($"SELECT * FROM task WHERE task_id = ANY({ids}) ORDER BY task_id FOR SHARE")
+            .AsNoTracking().Select(task => new SupportPositionTask(task.Id,task.WorkAreaId,task.Status)).ToListAsync(cancellationToken);
+    }
+
     public async Task<(IReadOnlyList<SupportRequest> Items,long Total)> GetPageAsync(Guid? parishId,Guid? seasonId,Guid? areaId,
         SupportType? type,SupportRequestStatus? status,int page,int size,bool descending,CancellationToken ct)
     {

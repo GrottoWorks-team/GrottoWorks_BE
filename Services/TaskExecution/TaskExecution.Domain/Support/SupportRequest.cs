@@ -3,7 +3,7 @@ namespace TaskExecution.Domain.Support;
 public enum SupportType { Staffing, Material, Mixed }
 public enum SupportRequestStatus { Planning, Published, PartiallyFulfilled, Fulfilled, Closed, Cancelled }
 public sealed record SupportSkillInput(Guid SkillId,string? RequiredSkillLevel);
-public sealed record SupportPositionInput(Guid? Id,string Name,int RequiredVolunteerCount,string? Note,IReadOnlyList<SupportSkillInput> Skills);
+public sealed record SupportPositionInput(Guid? Id,string Name,int RequiredVolunteerCount,string? Note,IReadOnlyList<SupportSkillInput> Skills,Guid? TaskId=null);
 public sealed record SupportMaterialInput(Guid? Id,Guid MaterialId,decimal RequiredQuantity,string? Note);
 
 public sealed partial class SupportRequest
@@ -118,7 +118,9 @@ public sealed partial class SupportRequest
             if (string.IsNullOrWhiteSpace(name) || name.Length>150 || input.RequiredVolunteerCount<=0)
                 throw DomainRuleException.Validation("SUPPORT_POSITION_INVALID","Each position requires a name (1–150) and a positive headcount.");
             if (!names.Add(name)) throw DomainRuleException.Validation("SUPPORT_POSITION_DUPLICATE","Position names must not repeat.");
-            rows.Add(SupportPosition.Create(input.Id??Guid.NewGuid(),requestId,name,input.RequiredVolunteerCount,NormalizeNote(input.Note),input.Skills));
+            if (input.TaskId == Guid.Empty)
+                throw DomainRuleException.Validation("SUPPORT_POSITION_TASK_INVALID", "A supplied task ID must not be empty.");
+            rows.Add(SupportPosition.Create(input.Id??Guid.NewGuid(),requestId,name,input.RequiredVolunteerCount,NormalizeNote(input.Note),input.Skills,input.TaskId));
         }
         return rows;
     }
@@ -151,13 +153,14 @@ public sealed class SupportPosition
     private SupportPosition() { }
     public Guid Id {get;private set;}
     public Guid RequestId {get;private set;}
+    public Guid? TaskId {get;private set;}
     public string Name {get;private set;}="";
     public int RequiredVolunteerCount {get;private set;}
     public string? Note {get;private set;}
     public IReadOnlyCollection<SupportPositionSkill> Skills=>skills;
-    internal static SupportPosition Create(Guid id,Guid request,string name,int count,string? note,IReadOnlyList<SupportSkillInput> inputs)
+    internal static SupportPosition Create(Guid id,Guid request,string name,int count,string? note,IReadOnlyList<SupportSkillInput> inputs,Guid? taskId)
     {
-        var row=new SupportPosition {Id=id,RequestId=request,Name=name,RequiredVolunteerCount=count,Note=note};
+        var row=new SupportPosition {Id=id,RequestId=request,TaskId=taskId,Name=name,RequiredVolunteerCount=count,Note=note};
         var ids=new HashSet<Guid>();
         foreach(var input in inputs)
         {
@@ -171,7 +174,7 @@ public sealed class SupportPosition
     }
     internal void Apply(SupportPosition source)
     {
-        Name=source.Name;RequiredVolunteerCount=source.RequiredVolunteerCount;Note=source.Note;
+        Name=source.Name;RequiredVolunteerCount=source.RequiredVolunteerCount;Note=source.Note;TaskId=source.TaskId;
         var merged=new List<SupportPositionSkill>(source.skills.Count);
         foreach(var next in source.skills)
         {

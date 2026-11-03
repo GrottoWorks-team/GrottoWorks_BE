@@ -17,8 +17,15 @@ public sealed class SupportRequestRouteTests
     {
         var builder=WebApplication.CreateBuilder(new WebApplicationOptions {EnvironmentName="Testing"});
         builder.Services.AddScoped<SupportRequestService>();
+        builder.Services.AddScoped<PublishSupportRequestHandler>();
         await using var app=builder.Build();app.MapSupportRequestEndpoints();
         var routes=((IEndpointRouteBuilder)app).DataSources.SelectMany(s=>s.Endpoints).OfType<RouteEndpoint>().ToList();
+        var publish=routes.Single(e=>e.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName=="publishSupportRequest");
+        publish.RoutePattern.RawText.Should().Be("/api/v1/support-requests/{requestId:guid}/publish");
+        publish.Metadata.GetOrderedMetadata<AuthorizationPolicy>().SelectMany(p=>p.Requirements)
+            .OfType<RolesAuthorizationRequirement>().SelectMany(r=>r.AllowedRoles).Should().Equal("LEADER");
+        publish.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Select(p=>p.StatusCode)
+            .Should().Contain(new[] {200,400,401,403,404,409,412,422,503});
         var create=routes.Single(e=>e.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName=="createSupportRequest");
         create.RoutePattern.RawText.Should().Be("/api/v1/support-requests");
         create.Metadata.GetOrderedMetadata<AuthorizationPolicy>().SelectMany(p=>p.Requirements)

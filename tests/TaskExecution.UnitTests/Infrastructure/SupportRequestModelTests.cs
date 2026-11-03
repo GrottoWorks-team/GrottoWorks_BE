@@ -14,6 +14,10 @@ public sealed class SupportRequestModelTests
             .UseNpgsql("Host=localhost;Database=model_only;Username=test;Password=test").Options);
         var request=db.Model.FindEntityType(typeof(SupportRequest))!;
         request.FindProperty(nameof(SupportRequest.Version))!.IsConcurrencyToken.Should().BeTrue();
+        var position=db.Model.FindEntityType(typeof(SupportPosition))!;
+        position.FindProperty(nameof(SupportPosition.TaskId))!.IsNullable.Should().BeTrue();
+        position.GetForeignKeys().Should().Contain(key=>key.PrincipalEntityType.ClrType==typeof(TaskExecution.Domain.Tasks.WorkTask)
+            && key.DeleteBehavior==DeleteBehavior.Restrict);
         db.Model.FindEntityType(typeof(SupportPositionSkill))!.FindPrimaryKey()!.Properties.Should().HaveCount(2);
         db.Model.FindEntityType(typeof(SupportMaterial))!.GetIndexes().Should().Contain(i=>i.IsUnique);
         db.Database.HasPendingModelChanges().Should().BeFalse();

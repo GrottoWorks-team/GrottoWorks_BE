@@ -92,6 +92,8 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
             return MapWorkAreaAssignment(message, out requiresContext);
         if (message.EventType == "support.member.reviewed")
             return MapSupportDecision(message, out requiresContext);
+        if (message.EventType is "support.material.approved" or "support.material.reviewed")
+            return MapSupportMaterialDecision(message, out requiresContext);
 
         if (message.EventType is "purchase.request.submitted" or "purchase.request.decided" or
             "readiness.item.failed" or "recognition.entry.created")
@@ -143,10 +145,12 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
             "recognitionPointId", "donationId", "donorId", "borrowedItemId", "offeredByUserId", "reportedByUserId",
             "verifiedByUserId", "materialReportId", "reopenedByUserId", "readinessItemId", "materialId",
             "sourceWorkAreaId", "targetWorkAreaId", "requesterUserId", "approvedByUserId", "recipientUserId",
-            "requestId", "attendanceId", "correctionId", "supportMemberId"
+            "requestId", "attendanceId", "correctionId", "supportMemberId", "supportResponseMaterialId", "approvalOperationId"
         };
         var safeValues = new Dictionary<string, JsonElement>();
         if (message.EventType == "support.request.published") AddSafeSupportRequirements(message.Payload, safeValues);
+        if (message.EventType is "support.material.approved" or "support.material.reviewed" or "support.transfer.synchronized")
+            AddSafeSupportQuantities(message.Payload, safeValues);
         foreach (var field in guidFields)
         {
             if (GetGuid(message.Payload, field) is { } id)
@@ -160,7 +164,7 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
             "OPEN", "NOT_STARTED", "IN_PROGRESS", "SUBMITTED", "REVISION_REQUIRED", "COMPLETED", "CANCELLED",
             "PENDING", "ACCEPTED", "DECLINED", "APPROVED", "REJECTED", "PLANNING", "ACTIVE", "INACTIVE", "LOCKED",
             "READY", "ARCHIVED", "PLANNED", "READINESS_REVIEW", "NEEDS_CORRECTION", "PARTIALLY_FULFILLED", "FULFILLED", "CLOSED",
-            "RECEIVED", "PARTIALLY_RECEIVED", "DIRECT", "APPLICATION", "SUPPORT"
+            "RECEIVED", "PARTIALLY_RECEIVED", "TRANSFERRED", "DIRECT", "APPLICATION", "SUPPORT"
         };
         foreach (var field in new[] { "decision", "status", "previousStatus", "newStatus", "assignmentType" })
         {

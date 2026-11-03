@@ -71,6 +71,8 @@ Private copies abandoned by failed metadata writes/validation and pending object
 
 ## Internal attachment protocol
 
+Support material approvals (`support.material.approved`, rule `71000000-0000-0000-0000-000000000028`) notify the submitting source MO only after Resource has confirmed the withdrawal. Explicit Leader rejection uses `support.material.reviewed`, rule suffix `029`. A persisted stock failure keeps the offer pending and produces audit only, never a false approval/rejection notification. Safe replay retains offer/operation identities, known quantities and allowlisted failure codes; secrets/private URLs are excluded. Transfer synchronization and request closure remain audit facts; NotificationAudit does not alter inventory or Support status.
+
 API-key-protected endpoints, excluded from public OpenAPI and Gateway:
 
 - `POST /internal/files/{fileId}/attachment-reservations`

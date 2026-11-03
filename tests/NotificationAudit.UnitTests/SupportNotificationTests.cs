@@ -8,6 +8,46 @@ namespace NotificationAudit.UnitTests;
 
 public sealed class SupportNotificationTests
 {
+    [Theory]
+    [InlineData("support.material.approved","APPROVED","Material support approved")]
+    [InlineData("support.material.reviewed","REJECTED","Material support rejected")]
+    public async Task Material_decision_notifies_the_source_officer_and_retains_only_safe_context(string eventType,string status,string title)
+    {
+        var officer=Guid.NewGuid();var request=Guid.NewGuid();var item=Guid.NewGuid();var operation=Guid.NewGuid();var store=new Store();
+        await new IntegrationEventIngestionHandler(store).HandleAsync(Message(eventType,new
+        {
+            supportRequestId=request,supportResponseMaterialId=item,approvalOperationId=operation,materialOfficerUserId=officer,
+            status,approvedQuantity=5,token="secret",privateUrl="http://private/receipt"
+        }),default);
+        var notification=store.Plan!.Notifications.Should().ContainSingle().Which;
+        notification.RecipientUserId.Should().Be(officer);notification.ReferenceId.Should().Be(request);notification.Title.Should().Be(title);
+        var safe=store.Plan.SafeContext!.Payload;
+        safe.GetProperty("approvalOperationId").GetGuid().Should().Be(operation);safe.GetProperty("approvedQuantity").GetDecimal().Should().Be(5);
+        safe.GetRawText().Should().NotContain("secret").And.NotContain("private");
+        await new IntegrationEventIngestionHandler(store).HandleAsync(store.Plan.SafeContext,default);
+        store.Plan.Status.Should().Be("PROCESSED");store.Plan.Notifications.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Durable_stock_failure_is_audited_without_a_false_approval_or_rejection_notification()
+    {
+        var store=new Store();
+        await new IntegrationEventIngestionHandler(store).HandleAsync(Message("support.material.reviewed",new
+        {supportRequestId=Guid.NewGuid(),status="PENDING",errorCode="MATERIAL_INSUFFICIENT_AVAILABLE"}),default);
+        store.Plan!.Status.Should().Be("PROCESSED");store.Plan.Notifications.Should().BeEmpty();
+        store.Plan.Audit.SafeNewValue.RootElement.GetProperty("errorCode").GetString().Should().Be("MATERIAL_INSUFFICIENT_AVAILABLE");
+    }
+
+    [Fact]
+    public async Task Missing_material_recipient_stays_pending_and_invalid_quantities_are_rejected()
+    {
+        var store=new Store();var handler=new IntegrationEventIngestionHandler(store);
+        await handler.HandleAsync(Message("support.material.approved",new {supportRequestId=Guid.NewGuid(),status="APPROVED",approvedQuantity=5}),default);
+        store.Plan!.Status.Should().Be("REQUIRES_CONTEXT");
+        Func<Task> invalid=()=>handler.HandleAsync(Message("support.material.approved",new {status="APPROVED",approvedQuantity=-1}),default);
+        await invalid.Should().ThrowAsync<InvalidNotificationEventException>();
+        NotificationRuleCatalog.All[Guid.Parse("71000000-0000-0000-0000-000000000028")].Should().Be("support.material.approved");
+    }
     [Fact]
     public async Task Community_approval_requests_consent_and_retains_the_flag_for_replay()
     {

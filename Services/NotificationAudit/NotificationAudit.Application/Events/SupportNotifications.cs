@@ -4,6 +4,39 @@ namespace NotificationAudit.Application.Events;
 
 public sealed partial class IntegrationEventIngestionHandler
 {
+    private static IReadOnlyList<NotificationCandidate> MapSupportMaterialDecision(IncomingIntegrationEvent message, out bool requiresContext)
+    {
+        requiresContext=false;
+        var status=GetString(message.Payload,"status");
+        // A durable stock rejection leaves the offer pending for a new explicit approval; it is an audit fact, not a Leader rejection.
+        if(message.EventType=="support.material.reviewed" && status=="PENDING") return [];
+        var requestId=GetGuid(message.Payload,"supportRequestId");
+        var officer=GetGuid(message.Payload,"materialOfficerUserId");
+        var item=GetGuid(message.Payload,"supportResponseMaterialId");
+        requiresContext=!requestId.HasValue || !officer.HasValue || !item.HasValue ||
+            (message.EventType=="support.material.approved" ? status!="APPROVED" : status!="REJECTED");
+        if(requiresContext) return [];
+        var approved=status=="APPROVED";
+        return [new NotificationCandidate(officer!.Value,approved ? "Material support approved" : "Material support rejected",
+            approved ? "The Leader approved your material offer. The source stock withdrawal has been confirmed; receipt is still required."
+                : "The Leader rejected your material offer. No stock withdrawal was requested by this rejection.","SUPPORT_REQUEST",requestId)];
+    }
+
+    private static void AddSafeSupportQuantities(JsonElement payload, Dictionary<string,JsonElement> values)
+    {
+        foreach(var field in new[] {"approvedQuantity","receivedUsableQuantity","receivedUnusableQuantity"})
+        {
+            if(!payload.TryGetProperty(field,out var value) || value.ValueKind==JsonValueKind.Null) continue;
+            if(value.ValueKind!=JsonValueKind.Number || !value.TryGetDecimal(out var quantity) || quantity<0 ||
+                quantity>9999999999.99m || decimal.Round(quantity,2)!=quantity)
+                throw new InvalidNotificationEventException("Support material audit quantity must be a nonnegative (12,2) number.");
+            values[field]=value.Clone();
+        }
+        var error=GetString(payload,"errorCode");
+        if(error is "MATERIAL_INSUFFICIENT_AVAILABLE" or "SUPPORT_TRANSFER_CONFLICT" or "SUPPORT_TRANSFER_OTHER_SEASON" or
+            "SUPPORT_TRANSFER_SAME_WORK_AREA" or "SEASON_READ_ONLY") values["errorCode"]=JsonSerializer.SerializeToElement(error);
+    }
+
     private static IReadOnlyList<NotificationCandidate> MapSupportDecision(IncomingIntegrationEvent message, out bool requiresContext)
     {
         var requestId=GetGuid(message.Payload,"supportRequestId");

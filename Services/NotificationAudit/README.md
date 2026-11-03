@@ -18,10 +18,27 @@ Rule IDs are stable so the administration UI can update a rule without discoveri
 | `000000000008` | `planning.season.activated` |
 | `000000000009` | `planning.season.completed` |
 | `000000000010` | `planning.season.archived` |
-| `000000000011` | `resource.purchase-request.decided` |
-| `000000000012` | `readiness.inspection.completed` |
+| `000000000011` | `purchase.request.decided` |
+| `000000000012` | `readiness.area.ready` |
+| `000000000013` | `purchase.request.submitted` |
+| `000000000014` | `purchase.delivery.confirmed` |
+| `000000000015` | `material-report.submitted` |
+| `000000000016` | `material-report.verified` |
+| `000000000017` | `contribution.pledged` |
+| `000000000018` | `contribution.receipt.confirmed` |
+| `000000000019` | `contribution.donation.adjusted` |
+| `000000000020` | `loan.offer.submitted` |
+| `000000000021` | `support.transfer.confirmed` |
+| `000000000022` | `recognition.entry.created` |
+| `000000000023` | `readiness.item.failed` |
+| `000000000024` | `readiness.area.reopened` |
+| `000000000025` | `planning.work-area.assigned` |
 
 Push and email preferences are persisted but providers are not connected yet. File access across business records is also deferred to each owning service integration.
+
+Migration corrects the two legacy event aliases without changing rule IDs or the admin's enabled/disabled setting. A conflicting independently created canonical rule stops migration with a reconciliation message rather than deleting it. Seeder runs under a database advisory lock to avoid duplicates during concurrent startup.
+
+`PUT /users/me/notification-preferences` uses operation ID `replaceNotificationPreferences`. Resource history accepts `from` inclusive and `to` exclusive, normalizes offsets to UTC and rejects empty/reversed ranges. Read operations use conditional database updates, preserving the first read timestamp; read-all captures its row IDs before updating so concurrently inserted/backdated notifications remain unread. Audit preserves allowlisted state changes and a bounded business reason with credential/private-link patterns redacted.
 
 ## Integration status
 

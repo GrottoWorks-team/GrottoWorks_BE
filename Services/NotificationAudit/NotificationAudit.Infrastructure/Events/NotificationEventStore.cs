@@ -79,9 +79,9 @@ internal sealed class NotificationEventStore(
             plan.Audit.Action,
             plan.Audit.EntityType,
             plan.Audit.EntityId,
-            null,
+            plan.Audit.SafeOldValue,
             plan.Audit.SafeNewValue,
-            null,
+            plan.Audit.Reason,
             plan.Audit.CorrelationId,
             plan.Audit.OccurredAt));
 

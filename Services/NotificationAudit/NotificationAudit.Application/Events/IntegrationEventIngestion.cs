@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace NotificationAudit.Application.Events;
 
@@ -32,7 +33,9 @@ public sealed record AuditCandidate(
     Guid EntityId,
     JsonDocument SafeNewValue,
     Guid? CorrelationId,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    string? Reason = null,
+    JsonDocument? SafeOldValue = null);
 
 public sealed record EventIngestionPlan(
     Guid EventId,
@@ -171,6 +174,12 @@ public sealed class IntegrationEventIngestionHandler(INotificationEventStore sto
             var value = GetString(message.Payload, field);
             if (value is not null && states.Contains(value)) safeValues[field] = JsonSerializer.SerializeToElement(value);
         }
+        var previousStatus = GetString(message.Payload, "previousStatus");
+        var newStatus = GetString(message.Payload, "newStatus");
+        if (!safeValues.ContainsKey("status") && newStatus is not null && states.Contains(newStatus))
+            safeValues["status"] = JsonSerializer.SerializeToElement(newStatus);
+        var reason = SanitizeReason(GetString(message.Payload, "reason"));
+        if (reason is not null) safeValues["reason"] = JsonSerializer.SerializeToElement(reason);
 
         Guid? correlationId = Guid.TryParse(message.CorrelationId, out var parsedCorrelation) ? parsedCorrelation : null;
         return new AuditCandidate(
@@ -182,7 +191,10 @@ public sealed class IntegrationEventIngestionHandler(INotificationEventStore sto
             message.AggregateId,
             JsonSerializer.SerializeToDocument(safeValues),
             correlationId,
-            message.OccurredAt);
+            message.OccurredAt,
+            reason,
+            previousStatus is not null && states.Contains(previousStatus)
+                ? JsonSerializer.SerializeToDocument(new { status = previousStatus }) : null);
     }
 
     private static Guid? GetGuid(JsonElement payload, string property)
@@ -198,4 +210,15 @@ public sealed class IntegrationEventIngestionHandler(INotificationEventStore sto
 
     private static bool ValidLabel(string value, int maximumLength) => !string.IsNullOrWhiteSpace(value) && value.Length <= maximumLength &&
         value.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '.');
+
+    private static string? SanitizeReason(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var text = value.Trim();
+        if (text.Length > 2000) text = text[..2000];
+        var options = RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking;
+        text = Regex.Replace(text, @"https?://\S+", "[URL_REMOVED]", options);
+        text = Regex.Replace(text, @"\bBearer\s+[a-z0-9._~+/-]+=*", "Bearer [REDACTED]", options);
+        return Regex.Replace(text, @"\b(password|token|secret|api[-_]?key)\s*[:=]\s*[^\s,;]+", "$1=[REDACTED]", options);
+    }
 }

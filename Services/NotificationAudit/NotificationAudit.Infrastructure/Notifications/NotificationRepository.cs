@@ -30,25 +30,31 @@ internal sealed class NotificationRepository(NotificationAuditDbContext dbContex
         return (items, total);
     }
 
-    public Task<Notification?> GetForUpdateAsync(
-        Guid id,
-        Guid recipientUserId,
-        CancellationToken cancellationToken) =>
-        dbContext.Notifications.SingleOrDefaultAsync(
-            notification => notification.Id == id && notification.RecipientUserId == recipientUserId,
-            cancellationToken);
+    public async Task<bool> MarkReadAsync(Guid id, Guid recipientUserId, DateTimeOffset readAt, CancellationToken cancellationToken)
+    {
+        var owned = dbContext.Notifications.Where(notification => notification.Id == id && notification.RecipientUserId == recipientUserId);
+        var changed = await owned.Where(notification => !notification.IsRead).ExecuteUpdateAsync(setters => setters
+            .SetProperty(notification => notification.IsRead, true)
+            .SetProperty(notification => notification.ReadAt, notification => notification.ReadAt ?? readAt), cancellationToken);
+        return changed > 0 || await owned.AnyAsync(cancellationToken);
+    }
 
-    public Task MarkAllReadAsync(
+    public async Task MarkAllReadAsync(
         Guid recipientUserId,
         DateTimeOffset cutoff,
         DateTimeOffset readAt,
-        CancellationToken cancellationToken) =>
-        dbContext.Notifications
+        CancellationToken cancellationToken)
+    {
+        // Freeze membership before updating so late/backdated events are not marked by this operation.
+        var ids = await dbContext.Notifications.AsNoTracking()
             .Where(notification => notification.RecipientUserId == recipientUserId &&
                                    !notification.IsRead && notification.CreatedAt <= cutoff)
+            .Select(notification => notification.Id).ToArrayAsync(cancellationToken);
+        if (ids.Length == 0) return;
+        await dbContext.Notifications
+            .Where(notification => notification.RecipientUserId == recipientUserId && ids.Contains(notification.Id) && !notification.IsRead)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(notification => notification.IsRead, true)
-                .SetProperty(notification => notification.ReadAt, readAt), cancellationToken);
-
-    public Task SaveChangesAsync(CancellationToken cancellationToken) => dbContext.SaveChangesAsync(cancellationToken);
+                .SetProperty(notification => notification.ReadAt, notification => notification.ReadAt ?? readAt), cancellationToken);
+    }
 }

@@ -9,6 +9,25 @@ namespace NotificationAudit.UnitTests;
 public sealed class EventContextTests
 {
     [Fact]
+    public async Task Audit_keeps_reason_and_state_change_without_storing_credentials_or_private_links()
+    {
+        using var payload = JsonDocument.Parse("""{"previousStatus":"OPEN","status":"CANCELLED","reason":"Cancelled for rain; token=secret https://private.example/file"}""");
+        var store = new Store();
+        await new IntegrationEventIngestionHandler(store).HandleAsync(Message("task.status.changed", payload.RootElement), default);
+        store.Audit!.Reason.Should().Contain("Cancelled for rain").And.NotContain("secret").And.NotContain("private.example");
+        store.Audit.SafeOldValue!.RootElement.GetProperty("status").GetString().Should().Be("OPEN");
+        store.Audit.SafeNewValue.RootElement.GetProperty("status").GetString().Should().Be("CANCELLED");
+    }
+
+    [Fact]
+    public void Additive_safe_context_fields_are_compatible_with_retained_older_context()
+    {
+        const string original = "{\"eventType\":\"task.status.changed\",\"payload\":{\"status\":\"CANCELLED\"}}";
+        var inbox = NotificationEventInbox.Create(Guid.NewGuid(), "task.status.changed", "REQUIRES_CONTEXT", DateTimeOffset.UtcNow, original);
+        inbox.EnsureSameContext("{\"eventType\":\"task.status.changed\",\"payload\":{\"status\":\"CANCELLED\",\"reason\":\"Rain\"}}").Should().BeFalse();
+        inbox.SafeEnvelope.Should().Be(original);
+    }
+    [Fact]
     public async Task Pending_context_retains_only_typed_identifiers_and_known_states()
     {
         var task = Guid.NewGuid();
@@ -64,7 +83,8 @@ public sealed class EventContextTests
     {
         public IncomingIntegrationEvent? Context { get; private set; }
         public string? Status { get; private set; }
+        public AuditCandidate? Audit { get; private set; }
         public Task StoreAsync(EventIngestionPlan plan, CancellationToken cancellationToken)
-        { Context = plan.SafeContext; Status = plan.Status; return Task.CompletedTask; }
+        { Context = plan.SafeContext; Status = plan.Status; Audit = plan.Audit; return Task.CompletedTask; }
     }
 }

@@ -79,7 +79,7 @@ public static class NotificationAuditEndpoints
             .WithName("getNotificationPreferences").WithTags("Notifications").RequireAuthorization()
             .Produces<ApiResponse<NotificationPreferenceDto>>().Produces<ProblemDetails>(401);
         app.MapPut("/api/v1/users/me/notification-preferences", UpdateNotificationPreferencesAsync)
-            .WithName("updateNotificationPreferences").WithTags("Notifications").RequireAuthorization()
+            .WithName("replaceNotificationPreferences").WithTags("Notifications").RequireAuthorization()
             .Produces<ApiResponse<NotificationPreferenceDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401).Produces<ProblemDetails>(422);
 
         app.MapPatch("/api/v1/notification-rules/{ruleId:guid}", UpdateNotificationRuleAsync)
@@ -99,7 +99,7 @@ public static class NotificationAuditEndpoints
         app.MapGet("/api/v1/resource-history/{resourceType}/{resourceId:guid}", GetResourceHistoryAsync)
             .WithName("getResourceHistory").WithTags("Audit")
             .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Admin))
-            .Produces<ApiResponse<IReadOnlyList<StateChangeDto>>>().Produces<ProblemDetails>(401).Produces<ProblemDetails>(403);
+            .Produces<ApiResponse<IReadOnlyList<StateChangeDto>>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401).Produces<ProblemDetails>(403);
     }
 
     private static async Task<IResult> ListActivityLogsAsync(
@@ -136,10 +136,12 @@ public static class NotificationAuditEndpoints
     private static async Task<IResult> GetResourceHistoryAsync(
         string resourceType,
         Guid resourceId,
+        DateTimeOffset? from,
+        DateTimeOffset? to,
         HttpContext httpContext,
         GetResourceHistoryHandler handler,
         CancellationToken cancellationToken) =>
-        Results.Ok(ApiResults.Ok(await handler.HandleAsync(resourceType, resourceId, cancellationToken), httpContext));
+        Results.Ok(ApiResults.Ok(await handler.HandleAsync(resourceType, resourceId, from, to, cancellationToken), httpContext));
 
     private static async Task<IResult> CreateUploadRequestAsync(
         CreateUploadRequest request,

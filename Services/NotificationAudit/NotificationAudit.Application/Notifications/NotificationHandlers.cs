@@ -14,9 +14,8 @@ public interface INotificationRepository
         int page,
         int size,
         CancellationToken cancellationToken);
-    Task<Notification?> GetForUpdateAsync(Guid id, Guid recipientUserId, CancellationToken cancellationToken);
+    Task<bool> MarkReadAsync(Guid id, Guid recipientUserId, DateTimeOffset readAt, CancellationToken cancellationToken);
     Task MarkAllReadAsync(Guid recipientUserId, DateTimeOffset cutoff, DateTimeOffset readAt, CancellationToken cancellationToken);
-    Task SaveChangesAsync(CancellationToken cancellationToken);
 }
 
 public sealed class ListNotificationsHandler(ICurrentUser currentUser, INotificationRepository repository)
@@ -57,19 +56,16 @@ public sealed class MarkNotificationReadHandler(
 {
     public async Task HandleAsync(Guid notificationId, CancellationToken cancellationToken)
     {
-        var notification = await repository.GetForUpdateAsync(
+        var found = await repository.MarkReadAsync(
             notificationId,
             currentUser.UserId,
+            timeProvider.GetUtcNow(),
             cancellationToken);
-        if (notification is null)
+        if (!found)
         {
             throw new DomainException("NOTIFICATION_NOT_FOUND", "The notification does not exist.", 404);
         }
 
-        if (notification.MarkRead(timeProvider.GetUtcNow()))
-        {
-            await repository.SaveChangesAsync(cancellationToken);
-        }
     }
 }
 

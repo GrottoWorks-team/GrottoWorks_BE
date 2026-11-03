@@ -6,6 +6,16 @@ namespace ParishCoordination.Infrastructure.Events;
 
 public static class PlanningSnapshotMapper
 {
+    public static JsonElement SeasonPayload(SeasonScopeSnapshot season, IEnumerable<WorkArea> areas)
+    {
+        var payload = JsonSerializer.SerializeToNode(season, new JsonSerializerOptions(JsonSerializerDefaults.Web))!.AsObject();
+        var recipients = areas.Where(area => area.SeasonId == season.SeasonId)
+            .SelectMany(area => new[] { area.LeaderUserId, area.MaterialOfficerUserId })
+            .Where(id => id.HasValue && id.Value != Guid.Empty).Select(id => id!.Value).Distinct().Order().ToArray();
+        payload["recipientUserIds"] = JsonSerializer.SerializeToNode(recipients);
+        return JsonSerializer.SerializeToElement(payload);
+    }
+
     public static JsonElement AssignmentPayload(WorkAreaScopeSnapshot area, bool communityChanged,
         bool leaderChanged, bool materialOfficerChanged)
     {

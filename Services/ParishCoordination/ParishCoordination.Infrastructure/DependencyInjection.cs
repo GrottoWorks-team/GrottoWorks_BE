@@ -13,6 +13,8 @@ using ParishCoordination.Application.Users;
 using ParishCoordination.Infrastructure.TaskScopeSync;
 using Microsoft.Extensions.Http.Resilience;
 using ParishCoordination.Infrastructure.TaskExecution;
+using ParishCoordination.Infrastructure.Events;
+using ParishCoordination.Infrastructure.Lifecycle;
 
 namespace ParishCoordination.Infrastructure;
 
@@ -32,12 +34,23 @@ public static class DependencyInjection
 
         services.AddDbContext<ParishCoordinationDbContext>(options =>
             options.UseNpgsql(connectionString));
-        if (configuration.GetValue("PlanningEvents:DispatchEnabled", false))
+        services.AddSingleton(TimeProvider.System);
+        var scopeDelivery = ScopeDeliveryOptions.FromConfiguration(configuration);
+        services.AddSingleton(scopeDelivery);
+        var planningDispatch = configuration.GetValue("PlanningEvents:DispatchEnabled", false);
+        var lifecycleEnabled = configuration.GetValue("LifecycleEvents:Enabled", false);
+        if (planningDispatch || lifecycleEnabled)
+            BuildingBlocks.Messaging.MassTransit.Extensions.AddMessageBroker(services, configuration,
+                lifecycleEnabled ? typeof(LifecycleTaskSnapshotConsumer).Assembly : null);
+        if (lifecycleEnabled)
         {
-            services.AddSingleton(TimeProvider.System);
+            services.AddScoped<LifecycleEventProcessor>();
+            services.AddHostedService<LifecycleRecoveryWorker>();
+        }
+        if (planningDispatch)
+        {
             services.AddScoped<ParishCoordination.Infrastructure.Events.PlanningSnapshotReconciliation>();
             services.AddHostedService<ParishCoordination.Infrastructure.Events.PlanningSnapshotReconciliationWorker>();
-            BuildingBlocks.Messaging.MassTransit.Extensions.AddMessageBroker(services, configuration);
             services.AddHostedService<ParishCoordination.Infrastructure.Events.PlanningEventDispatcher>();
         }
 
@@ -50,7 +63,7 @@ public static class DependencyInjection
 
         var syncOptions = TaskScopeSyncOptions.FromConfiguration(configuration);
         services.AddSingleton(syncOptions);
-        if (syncOptions.Enabled)
+        if (syncOptions.Enabled && !scopeDelivery.UseBroker)
         {
             services.AddScoped<TaskScopeBackfill>();
             services.AddHttpClient<ITaskScopeDelivery, HttpTaskScopeDelivery>(client =>

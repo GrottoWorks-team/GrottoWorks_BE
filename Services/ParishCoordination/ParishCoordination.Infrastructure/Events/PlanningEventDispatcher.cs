@@ -46,6 +46,7 @@ public sealed class PlanningEventDispatcher(IServiceScopeFactory scopes, ILogger
         using var scope = scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ParishCoordinationDbContext>();
         var publisher = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+        var brokerScopes = scope.ServiceProvider.GetRequiredService<ScopeDeliveryOptions>().UseBroker;
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         await using var lockCommand = db.Database.GetDbConnection().CreateCommand();
         lockCommand.Transaction = transaction.GetDbTransaction();
@@ -53,12 +54,14 @@ public sealed class PlanningEventDispatcher(IServiceScopeFactory scopes, ILogger
         if (!(bool)(await lockCommand.ExecuteScalarAsync(cancellationToken))!) return 0;
 
         // A failed earlier event blocks only its aggregate, not unrelated tasks.
-        var rows = await db.PlanningEventOutbox.FromSqlRaw("""
+        var rows = await db.PlanningEventOutbox.FromSqlInterpolated($"""
             SELECT current.* FROM planning_event_outbox current
             WHERE current.published_at IS NULL AND current.next_attempt_at <= now()
+              AND ({brokerScopes} OR current.event_type <> 'scope.snapshot')
               AND NOT EXISTS (
                 SELECT 1 FROM planning_event_outbox earlier
                 WHERE earlier.aggregate_id = current.aggregate_id
+                  AND ({brokerScopes} OR earlier.event_type <> 'scope.snapshot')
                   AND earlier.published_at IS NULL AND earlier.sequence < current.sequence)
             ORDER BY current.sequence LIMIT 50 FOR UPDATE OF current
             """).ToListAsync(cancellationToken);

@@ -107,6 +107,26 @@ public sealed class Season
         Version++;
     }
 
+    public bool ReconcileReadiness(IReadOnlyCollection<WorkAreaStatus> areaStatuses, DateTimeOffset now)
+    {
+        if (Status is not (SeasonStatus.Active or SeasonStatus.Ready)) return false;
+        var target = areaStatuses.Count > 0 && areaStatuses.All(status => status == WorkAreaStatus.Ready)
+            ? SeasonStatus.Ready : SeasonStatus.Active;
+        if (Status == target) return false;
+        Status = target;
+        UpdatedAt = now;
+        Version++;
+        return true;
+    }
+
+    public void CompleteWorkAreas(IReadOnlyCollection<WorkArea> areas, DateTimeOffset now)
+    {
+        if (Status != SeasonStatus.Completed || areas.Count == 0 ||
+            areas.Any(area => area.SeasonId != Id || area.Status != WorkAreaStatus.Ready))
+            throw new InvalidOperationException("Season completion requires every Work Area to be READY.");
+        foreach (var area in areas) area.Complete(now);
+    }
+
     public void Archive(DateTimeOffset updatedAtUtc)
     {
         if (Status is not SeasonStatus.Completed)

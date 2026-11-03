@@ -35,6 +35,23 @@ public sealed class ParishCoordinationDbContext(DbContextOptions<ParishCoordinat
         bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         ChangeTracker.DetectChanges();
+        var changesPlanning = ChangeTracker.Entries().Any(entry =>
+            entry.Entity is Season or WorkArea && entry.State is EntityState.Added or EntityState.Modified);
+        if (changesPlanning && Database.IsRelational() && Database.CurrentTransaction is null)
+        {
+            await using var transaction = await Database.BeginTransactionAsync(cancellationToken);
+            await Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(71110305)", cancellationToken);
+            var result = await SavePlanningChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+        return await SavePlanningChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private async Task<int> SavePlanningChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+    {
+        await ReconcileSeasonChangesAsync(cancellationToken);
+        ChangeTracker.DetectChanges();
         var seasons = ChangeTracker.Entries<Season>()
             .Where(entry => entry.State is EntityState.Added or EntityState.Modified)
             .Select(entry => entry.Entity).ToList();
@@ -58,7 +75,12 @@ public sealed class ParishCoordinationDbContext(DbContextOptions<ParishCoordinat
                     _ => null
                 };
                 if (eventType is not null)
-                    await StageAsync(DomainEvent(snapshot, eventType, "season", snapshot.Season), cancellationToken);
+                {
+                    var recipients = await WorkAreas.Where(area => area.SeasonId == season.Id).ToListAsync(cancellationToken);
+                    var payload = PlanningSnapshotMapper.SeasonPayload(snapshot.Season,
+                        recipients.Concat(WorkAreas.Local.Where(area => area.SeasonId == season.Id)).DistinctBy(area => area.Id));
+                    await StageAsync(DomainEvent(snapshot, eventType, "season", payload), cancellationToken);
+                }
             }
         }
 
@@ -84,6 +106,42 @@ public sealed class ParishCoordinationDbContext(DbContextOptions<ParishCoordinat
 
         // EF commits the business changes and snapshots in the same SaveChanges transaction.
         return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private async Task ReconcileSeasonChangesAsync(CancellationToken cancellationToken)
+    {
+        ChangeTracker.DetectChanges();
+        var changedSeasons = ChangeTracker.Entries<Season>()
+            .Where(entry => entry.State is EntityState.Added or EntityState.Modified).ToList();
+        var changedAreas = ChangeTracker.Entries<WorkArea>()
+            .Where(entry => entry.State is EntityState.Added or EntityState.Modified).ToList();
+        var seasonIds = changedSeasons.Select(entry => entry.Entity.Id)
+            .Concat(changedAreas.Select(entry => entry.Entity.SeasonId)).Distinct().Order().ToArray();
+        foreach (var seasonId in seasonIds)
+        {
+            var season = Seasons.Local.SingleOrDefault(x => x.Id == seasonId)
+                ?? await Seasons.SingleOrDefaultAsync(x => x.Id == seasonId, cancellationToken);
+            if (season is null) throw new InvalidOperationException("A Work Area must have an owning Season.");
+            var stored = await Seasons.AsNoTracking().SingleOrDefaultAsync(x => x.Id == seasonId, cancellationToken);
+            if (stored?.Status == ParishCoordination.Domain.Enums.SeasonStatus.Archived)
+                throw new InvalidOperationException("An archived Season is immutable.");
+            if (stored?.Status == ParishCoordination.Domain.Enums.SeasonStatus.Completed && changedAreas.Any(x => x.Entity.SeasonId == seasonId))
+                throw new InvalidOperationException("Completed Season Work Areas are immutable.");
+            var persistedAreas = await WorkAreas.Where(x => x.SeasonId == seasonId).ToListAsync(cancellationToken);
+            var areas = persistedAreas.Concat(WorkAreas.Local.Where(x => x.SeasonId == seasonId)).DistinctBy(x => x.Id).ToList();
+            var entry = Entry(season);
+            if (entry.State == EntityState.Modified && season.Status == ParishCoordination.Domain.Enums.SeasonStatus.Completed &&
+                entry.Property(x => x.Status).OriginalValue == ParishCoordination.Domain.Enums.SeasonStatus.Ready)
+            {
+                // Same transaction/lock as inbound lifecycle events, including every area version and outbox.
+                if (stored is null || stored.Version != entry.Property(x => x.Version).OriginalValue ||
+                    areas.Count == 0 || areas.Any(x => x.Status != ParishCoordination.Domain.Enums.WorkAreaStatus.Ready))
+                    throw new ParishCoordination.Application.Seasons.SeasonConcurrencyException(
+                        new InvalidOperationException("Season readiness changed before completion."));
+                season.CompleteWorkAreas(areas, season.UpdatedAt ?? DateTimeOffset.UtcNow);
+            }
+            else season.ReconcileReadiness(areas.Select(x => x.Status).ToArray(), DateTimeOffset.UtcNow);
+        }
     }
 
     private PlanningEventOutboxMessage DomainEvent<T>(PlanningScopeSnapshot snapshot, string eventType,

@@ -148,6 +148,38 @@ public sealed class WorkArea
 
     public Guid Id { get; private set; }
 
+    public bool ReconcileExecution(long eligibleTasks, long completedTasks, bool workStarted,
+        bool countsVerified, bool readinessConfirmed, bool readinessReopened, DateTimeOffset now)
+    {
+        if (eligibleTasks < 0 || completedTasks < 0 || completedTasks > eligibleTasks)
+            throw new ArgumentOutOfRangeException(nameof(completedTasks));
+        if (Status == WorkAreaStatus.Completed) return false;
+
+        var allCompleted = countsVerified && eligibleTasks > 0 && completedTasks == eligibleTasks;
+        var target = Status;
+        if (readinessReopened)
+            target = WorkAreaStatus.NeedsCorrection;
+        else if (allCompleted && (workStarted || Status != WorkAreaStatus.Planned))
+            target = readinessConfirmed ? WorkAreaStatus.Ready : WorkAreaStatus.ReadinessReview;
+        else if (workStarted || Status is WorkAreaStatus.Ready or WorkAreaStatus.ReadinessReview)
+            target = WorkAreaStatus.InProgress;
+
+        if (Status == target) return false;
+        Status = target;
+        UpdatedAt = now;
+        Version++;
+        return true;
+    }
+
+    public void Complete(DateTimeOffset now)
+    {
+        if (Status != WorkAreaStatus.Ready)
+            throw new InvalidOperationException("Only a READY Work Area can be completed.");
+        Status = WorkAreaStatus.Completed;
+        UpdatedAt = now;
+        Version++;
+    }
+
     public decimal? Latitude { get; private set; }
     public decimal? Longitude { get; private set; }
 

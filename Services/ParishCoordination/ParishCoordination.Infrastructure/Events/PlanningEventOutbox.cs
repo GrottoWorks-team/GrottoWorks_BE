@@ -44,6 +44,17 @@ public sealed class PlanningEventOutboxMessage
         LastError = null;
     }
 
+    public bool ScheduleSnapshotReplay(DateTimeOffset now)
+    {
+        if (!IsScopeSnapshot) throw new InvalidOperationException("Only technical planning snapshots may be reconciled.");
+        if (!PublishedAt.HasValue) return false;
+        PublishedAt = null;
+        Attempts = 0;
+        LastError = null;
+        NextAttemptAt = now;
+        return true;
+    }
+
     public void MarkFailed(DateTimeOffset now)
     {
         Attempts++;

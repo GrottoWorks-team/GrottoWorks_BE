@@ -34,6 +34,9 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString));
         if (configuration.GetValue("PlanningEvents:DispatchEnabled", false))
         {
+            services.AddSingleton(TimeProvider.System);
+            services.AddScoped<ParishCoordination.Infrastructure.Events.PlanningSnapshotReconciliation>();
+            services.AddHostedService<ParishCoordination.Infrastructure.Events.PlanningSnapshotReconciliationWorker>();
             BuildingBlocks.Messaging.MassTransit.Extensions.AddMessageBroker(services, configuration);
             services.AddHostedService<ParishCoordination.Infrastructure.Events.PlanningEventDispatcher>();
         }

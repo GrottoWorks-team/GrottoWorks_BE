@@ -1,3 +1,4 @@
+using Identity.Api.SystemExport;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -80,6 +81,8 @@ builder.Services
     });
 builder.Services.AddAuthorization();
 
+BuildingBlocks.Web.GrottoWorksObservability.AddGrottoWorksObservability(builder.Services,builder.Configuration,"Identity");
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -127,5 +130,7 @@ if (app.Configuration.GetValue("Database:MigrateOnStartup", true))
             "Database migration/seed failed. The service stays up; /health/ready reports Unhealthy.");
     }
 }
+
+app.MapSystemExportEndpoints();
 
 app.Run();

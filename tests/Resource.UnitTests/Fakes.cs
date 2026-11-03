@@ -590,6 +590,13 @@ public sealed class FakePurchaseStore : Resource.Application.Purchases.IPurchase
 /// <summary>Accepts every file unless <see cref="Reject"/> is set (then throws it, like the NotificationAudit check).</summary>
 public sealed class FakeFileVerifier : Resource.Application.Files.IFileVerifier
 {
+    public async Task<IAsyncDisposable> ReserveAsync(IReadOnlyCollection<Guid> ids, string purpose, Guid userId, Guid referenceId, CancellationToken ct = default)
+    {
+        await EnsureAttachableAsync(ids, purpose, userId, ct);
+        return new TestReservation();
+    }
+    private sealed class TestReservation : IAsyncDisposable { public ValueTask DisposeAsync() => ValueTask.CompletedTask; }
+
     public List<(IReadOnlyCollection<Guid> Ids, string Purpose, Guid Uploader)> Calls { get; } = [];
 
     public Resource.Domain.DomainRuleException? Reject { get; set; }

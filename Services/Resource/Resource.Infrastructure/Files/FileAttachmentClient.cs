@@ -14,12 +14,12 @@ public sealed record NotificationAuditClientOptions(Uri BaseAddress, string Inte
 }
 
 /// <summary>Typed client for NotificationAudit <c>GET /internal/files/{id}</c>, forwarding the correlation id.</summary>
-public sealed class NotificationAuditFileVerifier(
+public sealed class FileAttachmentClient(
     HttpClient httpClient,
     NotificationAuditClientOptions options,
     IHttpContextAccessor httpContextAccessor,
-    ILogger<NotificationAuditFileVerifier> logger)
-    : IFileVerifier
+    ILogger<FileAttachmentClient> logger)
+
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -94,6 +94,49 @@ public sealed class NotificationAuditFileVerifier(
             throw Unavailable();
         }
     }
+
+    public async Task CommandAsync(Resource.Domain.Files.AttachmentIntent intent, string action, CancellationToken ct)
+    {
+        object payload = action.Length == 0
+            ? new { reservationId = intent.Id, uploadedByUserId = intent.UploadedByUserId, service = "Resource", referenceType = "PURCHASE", referenceId = intent.ReferenceId,
+                purpose = intent.Purpose == "PURCHASE_RECEIPT" ? "PURCHASE_RECEIPT" : "READINESS_EVIDENCE" }
+            : new { reservationId = intent.Id, service = "Resource", referenceType = "PURCHASE", referenceId = intent.ReferenceId };
+        using var response = await PostAsync($"internal/files/{intent.FileId:D}/attachment-reservations{action}", payload, ct);
+    }
+
+    public async Task<RecordFileDownload> DownloadAsync(Guid fileId, Guid referenceId, CancellationToken ct)
+    {
+        using var response = await PostAsync($"internal/files/{fileId:D}/record-download-url",
+            new { service = "Resource", referenceType = "PURCHASE", referenceId }, ct);
+        try { return (await response.Content.ReadFromJsonAsync<DownloadEnvelope>(JsonOptions, ct))?.Data ?? throw Unavailable(); }
+        catch (JsonException) { throw Unavailable(); }
+    }
+
+    private async Task<HttpResponseMessage> PostAsync(string path, object payload, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(options.InternalApiKey) || options.InternalApiKey.Length < 32) throw Unavailable();
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(payload) };
+            request.Headers.TryAddWithoutValidation("X-Internal-Api-Key", options.InternalApiKey);
+            request.Headers.TryAddWithoutValidation("X-Correlation-Id", httpContextAccessor.HttpContext?.TraceIdentifier ?? Guid.NewGuid().ToString("N"));
+            var response = await httpClient.SendAsync(request, ct);
+            if (response.IsSuccessStatusCode) return response;
+            var status = response.StatusCode;
+            response.Dispose();
+            if (status == HttpStatusCode.NotFound && path.EndsWith("/release", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.NoContent);
+            if (status is HttpStatusCode.UnprocessableEntity or HttpStatusCode.NotFound or HttpStatusCode.Forbidden)
+                throw DomainRuleException.Validation("FILE_ATTACHMENT_INVALID", "The file cannot be attached to this record.");
+            if (status == HttpStatusCode.Conflict)
+                throw new DomainRuleException("FILE_ATTACHMENT_CONFLICT", "The file is reserved for another business record.");
+            throw Unavailable();
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception exception) when (exception is not DomainRuleException) { throw Unavailable(); }
+    }
+
+    private sealed record DownloadEnvelope(RecordFileDownload? Data);
 
     private static DomainRuleException Unavailable() =>
         new("FILE_SERVICE_UNAVAILABLE", "Files cannot be checked right now; try again shortly.", DomainErrorKind.ServiceUnavailable);

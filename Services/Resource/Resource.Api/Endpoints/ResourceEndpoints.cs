@@ -8,6 +8,7 @@ public static class ResourceEndpoints
         app.MapCatalogEndpoints();
         app.MapInternalScopeEndpoints();
         app.MapInternalMaterialEndpoints();
+        app.MapInternalPurchaseEndpoints();
         app.MapInternalSupportReconciliationEndpoints();
         app.MapRequirementEndpoints();
         app.MapInventoryEndpoints();
@@ -18,6 +19,7 @@ public static class ResourceEndpoints
         app.MapDonationEndpoints();
         app.MapMaterialReportEndpoints();
         app.MapBorrowedItemEndpoints();
+        app.MapRecordFileEndpoints();
         return app;
     }
 }

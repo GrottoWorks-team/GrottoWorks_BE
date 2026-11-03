@@ -1683,6 +1683,7 @@ namespace Resource.Infrastructure.Data.Migrations
 #pragma warning restore 612, 618
             modelBuilder.ApplyConfiguration(new Resource.Infrastructure.Scope.TaskMaterialPlanConfiguration());
             modelBuilder.ApplyConfiguration(new Resource.Infrastructure.Inventory.SupportTransferOperationConfiguration());
+            modelBuilder.ApplyConfiguration(new Resource.Infrastructure.Files.AttachmentIntentConfiguration());
             modelBuilder.ApplyConfiguration(new Resource.Infrastructure.Scope.TaskMaterialPlanItemConfiguration());
             modelBuilder.ApplyConfiguration(new Resource.Infrastructure.Messaging.ScopeReplicationReceiptConfiguration());
         }

@@ -130,6 +130,8 @@ public static class DependencyInjection
         // F-RES-13c receipts of pledges
         services.AddScoped<RecordDonationReceiptCommandHandler>();
 
+        services.AddScoped<Resource.Application.Files.PurchaseReceiptDownload>();
+        services.AddScoped<InternalPurchaseQueries>();
         return services;
     }
 }

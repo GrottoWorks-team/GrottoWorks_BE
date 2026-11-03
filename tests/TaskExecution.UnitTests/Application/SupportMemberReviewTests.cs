@@ -61,7 +61,11 @@ public sealed class SupportMemberReviewTests
         var dto=await f.Handler.HandleAsync(f.Member.Id,false," unavailable ",1);
         dto.Status.Should().Be(SupportMemberStatus.Rejected);dto.Reason.Should().Be("unavailable");
         f.Base.Source.Store.Items.Should().BeEmpty();f.Base.Request.Responses.Should().ContainSingle();
-        f.Base.Source.Events.Items.Should().ContainSingle().Which.EventType.Should().Be(TaskEventTypes.SupportMemberReviewed);
+        var message=f.Base.Source.Events.Items.Should().ContainSingle().Which;
+        message.EventType.Should().Be(TaskEventTypes.SupportMemberReviewed);
+        message.Payload.GetProperty("reason").GetString().Should().Be("unavailable");
+        message.Payload.GetProperty("previousStatus").GetString().Should().Be("PENDING");
+        message.Payload.GetProperty("status").GetString().Should().Be("REJECTED");
     }
 
     [Fact]

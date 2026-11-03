@@ -80,6 +80,7 @@ public sealed class ReviewSupportMemberHandler(ISupportRequestRepository request
             request.SeasonId,"support_request",request.Id,request.Version,JsonSerializer.SerializeToElement(new
             {
                 supportRequestId=request.Id,supportMemberId=member.Id,workAreaId=request.WorkAreaId,volunteerUserId=member.VolunteerId,
-                assignmentId=member.AssignmentId,decision=member.Status==SupportMemberStatus.Approved ? "APPROVED" : "REJECTED"
+                assignmentId=member.AssignmentId,decision=member.Status==SupportMemberStatus.Approved ? "APPROVED" : "REJECTED",
+                previousStatus="PENDING",status=JsonNamingPolicy.SnakeCaseUpper.ConvertName(member.Status.ToString()),reason=member.ReviewReason
             })));
 }

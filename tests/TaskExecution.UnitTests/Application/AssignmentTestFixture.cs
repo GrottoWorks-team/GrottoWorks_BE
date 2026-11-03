@@ -95,7 +95,7 @@ internal sealed class AssignmentTestFixture
         public void Add(TaskIntegrationEvent message) => Items.Add(message);
     }
     private sealed class TestCorrelation : ITaskCorrelationContext { public string CorrelationId => "assignment-test"; }
-    private sealed class TestScopes(SeasonScope season,WorkAreaScope area) : IScopeProjectionStore
+    internal sealed class TestScopes(SeasonScope season,WorkAreaScope area) : IScopeProjectionStore
     {
         public Task<SeasonScope?> GetSeasonAsync(Guid id,CancellationToken ct=default) => System.Threading.Tasks.Task.FromResult<SeasonScope?>(season);
         public Task<WorkAreaScope?> GetWorkAreaAsync(Guid id,CancellationToken ct=default) => System.Threading.Tasks.Task.FromResult<WorkAreaScope?>(area);
@@ -103,7 +103,7 @@ internal sealed class AssignmentTestFixture
         public void Add(WorkAreaScope row) => throw new NotSupportedException();
         public Task SaveChangesAsync(CancellationToken ct=default) => throw new NotSupportedException();
     }
-    private sealed class TestTasks(WorkTask task) : ITaskRepository
+    internal sealed class TestTasks(WorkTask task) : ITaskRepository
     {
         public Task<WorkTask?> GetByIdAsync(Guid id,CancellationToken ct=default) => System.Threading.Tasks.Task.FromResult(id==task.Id?task:null);
         public Task<WorkTask?> GetByIdForUpdateAsync(Guid id,CancellationToken ct=default) => GetByIdAsync(id,ct);

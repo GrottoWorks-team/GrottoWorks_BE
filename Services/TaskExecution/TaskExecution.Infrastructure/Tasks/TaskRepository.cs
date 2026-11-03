@@ -9,7 +9,8 @@ namespace TaskExecution.Infrastructure.Tasks;
 public sealed class TaskRepository(TaskExecutionDbContext dbContext) : ITaskRepository
 {
     public Task<WorkTask?> GetByIdAsync(Guid taskId, CancellationToken cancellationToken = default) =>
-        dbContext.Tasks.AsNoTracking().SingleOrDefaultAsync(task => task.Id == taskId, cancellationToken);
+        dbContext.Tasks.AsNoTracking().Include(task => task.Skills)
+            .SingleOrDefaultAsync(task => task.Id == taskId, cancellationToken);
 
     public Task<WorkTask?> GetByIdForUpdateAsync(Guid taskId, CancellationToken cancellationToken = default) =>
         dbContext.Tasks

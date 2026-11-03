@@ -37,7 +37,7 @@ public sealed class IdentityUserLookup(HttpClient client, IConfiguration configu
         "Identity user validation is temporarily unavailable.", DomainErrorKind.ServiceUnavailable);
     private sealed record UserEnvelope(IReadOnlyList<IdentityUser>? Data);
 
-    private static bool ValidSkills(IdentityUser user)
+    internal static bool ValidSkills(IdentityUser user)
     {
         if (user.SkillIds is null || user.Skills is null || user.Skills.Any(skill => skill is null || skill.SkillId == Guid.Empty ||
             skill.SkillLevel is not (null or "BASIC" or "INTERMEDIATE" or "ADVANCED" or "EXPERT"))) return false;

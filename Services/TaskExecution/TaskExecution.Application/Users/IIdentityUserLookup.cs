@@ -4,9 +4,11 @@ using TaskExecution.Domain;
 namespace TaskExecution.Application.Users;
 
 public sealed record IdentityUser(Guid UserId, string DisplayName, string Status, string Role,
-    Guid? ParishId, Guid? CommunityId, IReadOnlyList<Guid> SkillIds, IReadOnlyList<IdentitySkill>? Skills = null);
+    Guid? ParishId, Guid? CommunityId, IReadOnlyList<Guid> SkillIds, IReadOnlyList<IdentitySkill>? Skills = null,
+    IReadOnlyList<IdentityAvailability>? Availability = null);
 
 public sealed record IdentitySkill(Guid SkillId, string? SkillLevel);
+public sealed record IdentityAvailability(DateTimeOffset AvailableFrom, DateTimeOffset AvailableTo);
 
 public static class VolunteerSkills
 {

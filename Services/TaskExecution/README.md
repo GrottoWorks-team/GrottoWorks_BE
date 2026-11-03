@@ -18,6 +18,12 @@ Task and Support requirements use `BASIC < INTERMEDIATE < ADVANCED < EXPERT`, no
 
 Assignment/application validation reads declared levels from Identity's internal user view and checks each minimum. Identity must return matching `skillIds` and `skills` collections using the canonical catalog; missing/invalid upstream data returns `503` rather than bypassing validation. The existing explicit Leader override still records its reason and actor.
 
+## Volunteer matching
+
+`GET /api/v1/tasks/{taskId}/volunteer-matches` is restricted to the assigned Leader. Optional `communityId` filters the directory; `limit` defaults to 20, maximum 100. Results include active volunteers of the same parish meeting every required skill/minimum, excluding existing pending/accepted/working/completed assignments or applications for that Task. Schedule conflicts and declared availability remain advisory warnings.
+
+Identity pages are fetched in batches of 100 (at most 10,000 source candidates; larger directories return `503`, never a silently truncated shortlist). Local schedule conflicts use one database query for the candidate batch. Known availability ranks first, then absence of known conflicts, same community, name and ID. Missing availability or Task start time is reported as undetermined. Redis caching of directory pages is a separate integration step; assignment mutations always revalidate Identity.
+
 ## Full task snapshots
 
 Every saved Task change also stages a `TaskScopeSnapshot` in the same unit of work. This technical message includes parent Season/Work Area scopes and effective assignees (accepted, in progress, completed), allowing receivers to bootstrap a missing Task projection. Pending applications and unconfirmed direct assignments are excluded. Snapshot IDs are stable per Task/version; business event envelopes and IDs remain independent.

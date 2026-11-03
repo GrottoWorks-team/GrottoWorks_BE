@@ -7,6 +7,7 @@ public static class TaskExecutionEndpoints
         app.MapInternalScopeEndpoints();
         app.MapInternalTaskCountEndpoints();
         app.MapTaskEndpoints();
+        app.MapVolunteerMatchEndpoints();
         app.MapAssignmentEndpoints();
         app.MapApplicationEndpoints();
         app.MapMyTasksEndpoints();

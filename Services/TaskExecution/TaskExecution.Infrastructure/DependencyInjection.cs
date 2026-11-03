@@ -27,6 +27,12 @@ public static class DependencyInjection
         services.AddScoped<ITaskRepository, TaskRepository>();
         services.AddScoped<IWorkAreaTaskCountReader, WorkAreaTaskCountReader>();
         services.AddScoped<IMyTasksStore, MyTasksStore>();
+        services.AddScoped<IVolunteerScheduleReader, TaskExecution.Infrastructure.Assignments.VolunteerScheduleReader>();
+        services.AddHttpClient<IVolunteerDirectory, TaskExecution.Infrastructure.Identity.IdentityVolunteerDirectory>(client =>
+        {
+            client.BaseAddress = new Uri(configuration["IdentityClient:BaseAddress"] ?? "http://localhost:6100/");
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<TaskExecution.Application.Support.ISupportRequestRepository, TaskExecution.Infrastructure.Support.SupportRequestRepository>();
         services.AddScoped<TaskExecution.Application.Attendance.IAttendanceStore, TaskExecution.Infrastructure.Attendance.AttendanceStore>();
         services.AddScoped<TaskExecution.Application.Attendance.IAttendanceReadStore, TaskExecution.Infrastructure.Attendance.AttendanceReadStore>();

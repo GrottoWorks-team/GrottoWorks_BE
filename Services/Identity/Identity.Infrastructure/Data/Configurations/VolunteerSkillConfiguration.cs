@@ -8,7 +8,8 @@ public sealed class VolunteerSkillConfiguration : IEntityTypeConfiguration<Volun
 {
     public void Configure(EntityTypeBuilder<VolunteerSkill> builder)
     {
-        builder.ToTable("volunteer_skill");
+        builder.ToTable("volunteer_skill", table => table.HasCheckConstraint("volunteer_skill_level_valid",
+            "skill_level IS NULL OR skill_level IN ('BASIC','INTERMEDIATE','ADVANCED','EXPERT')"));
 
         builder.HasKey(link => link.VolunteerSkillId);
 

@@ -347,7 +347,8 @@ namespace Identity.Infrastructure.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_volunteer_skill_user_skill");
 
-                    b.ToTable("volunteer_skill", (string)null);
+                    b.ToTable("volunteer_skill", (string)null, table => table.HasCheckConstraint("volunteer_skill_level_valid",
+                        "skill_level IS NULL OR skill_level IN ('BASIC','INTERMEDIATE','ADVANCED','EXPERT')"));
                 });
 
             modelBuilder.Entity("Identity.Domain.Entities.AppUser", b =>

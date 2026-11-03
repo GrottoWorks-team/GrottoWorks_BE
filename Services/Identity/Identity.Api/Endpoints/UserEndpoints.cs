@@ -84,7 +84,9 @@ public static class UserEndpoints
         CancellationToken cancellationToken)
     {
         var profile = await handler.HandleAsync(
-            new ReplaceMySkillsCommand(request.SkillIds!),
+            new ReplaceMySkillsCommand(
+                request.SkillIds ?? request.Skills!.Select(skill => skill.SkillId).ToList(),
+                request.Skills?.Select(skill => new VolunteerSkillInput(skill.SkillId, skill.SkillLevel)).ToList()),
             cancellationToken);
 
         return Results.Ok(ApiResults.Ok(profile, httpContext));

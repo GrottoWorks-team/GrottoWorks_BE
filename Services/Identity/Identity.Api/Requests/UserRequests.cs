@@ -18,12 +18,22 @@ public sealed class UpdateProfileRequest
 }
 
 /// <summary>F-IDN-07 <c>SkillIdList</c>: the complete set of declared skills (empty clears them).</summary>
-public sealed class ReplaceSkillsRequest
+public sealed class ReplaceSkillsRequest : IValidatableObject
 {
-    [Required(ErrorMessage = "skillIds is required (send an empty array to clear).")]
     [MaxLength(50, ErrorMessage = "At most 50 skills can be declared.")]
     public List<Guid>? SkillIds { get; init; }
+
+    [MaxLength(50)]
+    public List<DeclaredSkillRequest>? Skills { get; init; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if ((SkillIds is null) == (Skills is null))
+            yield return new ValidationResult("Provide either skillIds or skills, not both (an empty array clears all skills).");
+    }
 }
+
+public sealed record DeclaredSkillRequest(Guid SkillId, [property: StringLength(30)] string? SkillLevel);
 
 /// <summary>F-IDN-07 <c>AvailabilitySlot</c>: UTC date-time range, <c>availableTo</c> after <c>availableFrom</c>.</summary>
 public sealed class AvailabilitySlotRequest

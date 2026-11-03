@@ -254,6 +254,14 @@ public sealed class AppUser
     /// F-IDN-07 <c>replaceMySkills</c>: the declared skill set becomes exactly <paramref name="skillIds"/>.
     /// Links that stay are kept as-is (their level/note survive); unique (user, skill) holds by construction.
     /// </summary>
+    public void ReplaceSkillLevels(IReadOnlyList<VolunteerSkillInput> skills, DateTimeOffset now)
+    {
+        var normalized = skills.Select(skill => new VolunteerSkillInput(skill.SkillId, SkillLevels.Normalize(skill.SkillLevel))).ToList();
+        ReplaceSkills(normalized.Select(skill => skill.SkillId).ToList(), now);
+        foreach (var skill in normalized)
+            VolunteerSkills.Single(link => link.SkillId == skill.SkillId).UpdateLevel(skill.SkillLevel);
+    }
+
     public void ReplaceSkills(IReadOnlyCollection<Guid> skillIds, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(skillIds);

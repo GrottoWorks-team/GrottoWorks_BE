@@ -17,6 +17,8 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
 
     internal static void BuildCurrentModel(ModelBuilder modelBuilder)
     {
+        new TaskExecution.Infrastructure.Scopes.ScopeInboxConfiguration().Configure(modelBuilder.Entity<TaskExecution.Infrastructure.Scopes.ScopeInboxMessage>());
+        new TaskExecution.Infrastructure.Scopes.UserStatusProjectionConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Scopes.UserStatusProjection>());
         BuildScopeModelCore(modelBuilder);
         BuildTaskModel(modelBuilder);
         modelBuilder.Entity("TaskExecution.Domain.Tasks.WorkTask", builder =>

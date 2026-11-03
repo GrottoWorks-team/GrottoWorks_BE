@@ -8,6 +8,8 @@ namespace TaskExecution.Infrastructure.Data;
 public sealed class TaskExecutionDbContext(DbContextOptions<TaskExecutionDbContext> options) : DbContext(options)
 {
     public DbSet<SeasonScope> SeasonScopes => Set<SeasonScope>();
+    public DbSet<TaskExecution.Infrastructure.Scopes.ScopeInboxMessage> ScopeEventInbox => Set<TaskExecution.Infrastructure.Scopes.ScopeInboxMessage>();
+    public DbSet<UserStatusProjection> UserStatusProjections => Set<UserStatusProjection>();
     public DbSet<WorkAreaScope> WorkAreaScopes => Set<WorkAreaScope>();
     public DbSet<WorkTask> Tasks => Set<WorkTask>();
     public DbSet<TaskSkill> TaskSkills => Set<TaskSkill>();

@@ -13,6 +13,9 @@ COPY ["Services/TaskExecution/TaskExecution.Domain/TaskExecution.Domain.csproj",
 COPY ["Services/TaskExecution/TaskExecution.Contracts/TaskExecution.Contracts.csproj", "Services/TaskExecution/TaskExecution.Contracts/"]
 COPY ["BuildingBlocks/BuildingBlocks.Web/BuildingBlocks.Web.csproj", "BuildingBlocks/BuildingBlocks.Web/"]
 COPY ["BuildingBlocks/BuildingBlocks.Security/BuildingBlocks.Security.csproj", "BuildingBlocks/BuildingBlocks.Security/"]
+COPY ["BuildingBlocks/BuildingBlocks.Messaging/BuildingBlocks.Messaging.csproj", "BuildingBlocks/BuildingBlocks.Messaging/"]
+COPY ["Services/Identity/Identity.Contracts/Identity.Contracts.csproj", "Services/Identity/Identity.Contracts/"]
+COPY ["Services/ParishCoordination/ParishCoordination.Contracts/ParishCoordination.Contracts.csproj", "Services/ParishCoordination/ParishCoordination.Contracts/"]
 RUN dotnet restore "./Services/TaskExecution/TaskExecution.Api/TaskExecution.Api.csproj"
 COPY . .
 WORKDIR "/src/Services/TaskExecution/TaskExecution.Api"

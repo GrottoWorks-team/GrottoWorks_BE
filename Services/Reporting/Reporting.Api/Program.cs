@@ -1,3 +1,4 @@
+using Reporting.Api.SystemExport;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BuildingBlocks.Security;
@@ -43,6 +44,8 @@ builder.Services.ConfigureHttpJsonOptions(options =>
         new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseUpper, allowIntegerValues: false));
 });
 
+builder.Services.AddGrottoWorksObservability(builder.Configuration,"Reporting");
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -79,6 +82,8 @@ if (app.Configuration.GetValue("Database:MigrateOnStartup", true))
             "Database migration failed. The service stays up; /health/ready reports Unhealthy.");
     }
 }
+
+app.MapSystemExportEndpoints();
 
 app.Run();
 

@@ -81,6 +81,7 @@ app.MapCommunityEndpoints();
 app.MapSeasonEndpoints();
 app.MapWorkAreaEndpoints();
 app.MapWorkAreaCategoryEndpoints();
+app.MapInternalNotificationAudienceEndpoints();
 app.MapGrottoWorksHealthEndpoints();
 
 // Apply pending migrations at startup so `docker compose up` yields a ready service.

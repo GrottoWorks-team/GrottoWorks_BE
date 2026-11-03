@@ -58,6 +58,7 @@ public static class DependencyInjection
         services.AddScoped<ICommunityRepository, CommunityRepository>();
         services.AddScoped<ISeasonRepository, SeasonRepository>();
         services.AddScoped<IWorkAreaRepository, WorkAreaRepository>();
+        services.AddScoped<INotificationAudienceQuery, NotificationAudienceQuery>();
         services.AddScoped<IWorkAreaCategoryRepository, WorkAreaCategoryRepository>();
         services.AddScoped<IParishCoordinationDataSeeder, ParishCoordinationDataSeeder>();
 

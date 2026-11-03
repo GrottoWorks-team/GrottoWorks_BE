@@ -13,6 +13,23 @@ namespace TaskExecution.UnitTests.Application;
 
 public sealed class SupportMemberReviewTests
 {
+    [Fact]
+    public async Task Cancelling_the_task_cancels_support_members_and_recomputes_fulfillment_without_deleting_history()
+    {
+        var f=new Fixture();f.Base.Source.Support.Rows.Add(f.Base.Request);
+        var approved=await f.Handler.HandleAsync(f.Member.Id,true,null,1);
+        var reviewer=f.Member.ReviewedBy;var reviewedAt=f.Member.ReviewedAt;
+        await f.Base.Source.Service.CancelTaskAsync(f.Base.Source.Task.Id,"Cancelled event",f.Base.Source.Task.Version);
+        f.Member.Status.Should().Be(SupportMemberStatus.Cancelled);
+        f.Member.AssignmentId.Should().Be(approved.AssignmentId);
+        f.Member.ReviewedBy.Should().Be(reviewer);f.Member.ReviewedAt.Should().Be(reviewedAt);
+        f.Base.Request.Status.Should().Be(SupportRequestStatus.Published);
+        f.Base.Request.Responses.Should().ContainSingle().Which.Status.Should().Be(SupportResponseStatus.Cancelled);
+        f.Base.Source.Store.Items.Should().ContainSingle().Which.Status.Should().Be(AssignmentStatus.Cancelled);
+        var version=f.Base.Request.Version;
+        f.Base.Request.CancelAssignments([approved.AssignmentId!.Value],DateTimeOffset.UtcNow).Should().BeFalse();
+        f.Base.Request.Version.Should().Be(version);
+    }
     [Theory]
     [InlineData(TaskState.Open)]
     [InlineData(TaskState.NotStarted)]

@@ -22,6 +22,7 @@ internal sealed class AssignmentTestFixture
     public TestAssignments Store { get; } = new();
     public TestUsers Identity { get; } = new();
     public TestEvents Events { get; } = new();
+    public TestSupportLifecycle Support {get;}=new();
     public AssignmentService Service { get; }
 
     public AssignmentTestFixture()
@@ -35,7 +36,7 @@ internal sealed class AssignmentTestFixture
         Identity.Items[User.UserId] = new(User.UserId,"Leader","ACTIVE","LEADER",User.ParishId,null,[]);
         Identity.Items[VolunteerId] = new(VolunteerId,"Volunteer","ACTIVE","VOLUNTEER",User.ParishId,null,[]);
         Service = new AssignmentService(Store,new TestTasks(Task),new TaskScopeAccess(new TestScopes(Season,Area),User),
-            new ActiveUserAccess(Identity,User),User,new TaskEventRecorder(Events,User,new TestCorrelation()));
+            new ActiveUserAccess(Identity,User),User,new TaskEventRecorder(Events,User,new TestCorrelation()),Support);
     }
 
     public AssignVolunteerCommand Command() => new(Task.Id,VolunteerId,null,false,false,null);
@@ -95,6 +96,12 @@ internal sealed class AssignmentTestFixture
     {
         public List<TaskIntegrationEvent> Items { get; } = [];
         public void Add(TaskIntegrationEvent message) => Items.Add(message);
+    }
+    internal sealed class TestSupportLifecycle : TaskExecution.Application.Support.ISupportAssignmentLifecycle
+    {
+        public List<TaskExecution.Domain.Support.SupportRequest> Rows {get;}=[];
+        public Task CancelAssignmentsAsync(IReadOnlyCollection<Guid> ids,DateTimeOffset now,CancellationToken ct)
+        { foreach(var request in Rows) request.CancelAssignments(ids,now);return System.Threading.Tasks.Task.CompletedTask; }
     }
     internal sealed class TestCorrelation : ITaskCorrelationContext { public string CorrelationId => "assignment-test"; }
     internal sealed class TestScopes(SeasonScope season,WorkAreaScope area) : IScopeProjectionStore

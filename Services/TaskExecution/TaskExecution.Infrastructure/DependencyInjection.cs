@@ -57,6 +57,7 @@ public static class DependencyInjection
             client.Timeout = Timeout.InfiniteTimeSpan;
         }).AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<TaskExecution.Application.Support.ISupportRequestRepository, TaskExecution.Infrastructure.Support.SupportRequestRepository>();
+        services.AddScoped<TaskExecution.Application.Support.ISupportAssignmentLifecycle,TaskExecution.Infrastructure.Support.SupportAssignmentLifecycle>();
         services.AddScoped<TaskExecution.Application.Attendance.IAttendanceStore, TaskExecution.Infrastructure.Attendance.AttendanceStore>();
         services.AddScoped<TaskExecution.Application.Attendance.IAttendanceReadStore, TaskExecution.Infrastructure.Attendance.AttendanceReadStore>();
         services.AddScoped<TaskExecution.Application.Attendance.ILongOpenAttendanceStore, TaskExecution.Infrastructure.Attendance.LongOpenAttendanceStore>();

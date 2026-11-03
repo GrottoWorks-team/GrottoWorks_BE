@@ -81,6 +81,13 @@ public sealed class SupportResponseMember
             throw DomainRuleException.Validation("SUPPORT_REJECTION_REASON_REQUIRED","Rejection requires a reason of 1–500 characters.");
     }
 
+    internal bool CancelAssignment(IReadOnlySet<Guid> assignmentIds)
+    {
+        if(Status!=SupportMemberStatus.Approved || !AssignmentId.HasValue || !assignmentIds.Contains(AssignmentId.Value)) return false;
+        Status=SupportMemberStatus.Cancelled;Version++;
+        return true;
+    }
+
     internal void Review(bool approve,Guid? assignmentId,Guid reviewer,string? reason,int? expectedVersion,DateTimeOffset now)
     {
         EnsureReviewAllowed(expectedVersion,approve,reason);
@@ -115,13 +122,34 @@ public sealed partial class SupportRequest
         EnsureMemberReviewAllowed(member,approve,reason,expectedVersion);
         member.Review(approve,assignmentId,reviewer,reason,expectedVersion,now);
         response.RefreshMemberStatus();
+        RefreshStaffingFulfillment();
+        UpdatedAt=now.ToUniversalTime();Version++;
+    }
+
+    public bool CancelAssignments(IReadOnlyCollection<Guid> assignmentIds,DateTimeOffset now)
+    {
+        var ids=assignmentIds.ToHashSet();var changed=false;
+        foreach(var response in responses)
+        {
+            var responseChanged=false;
+            foreach(var member in response.Members) responseChanged|=member.CancelAssignment(ids);
+            if(!responseChanged) continue;
+            response.RefreshMemberStatus();changed=true;
+        }
+        if(!changed) return false;
+        if(Status is not (SupportRequestStatus.Closed or SupportRequestStatus.Cancelled)) RefreshStaffingFulfillment();
+        UpdatedAt=now.ToUniversalTime();Version++;
+        return true;
+    }
+
+    private void RefreshStaffingFulfillment()
+    {
         var accepted=responses.SelectMany(row=>row.Members)
             .Where(row=>row.Status is SupportMemberStatus.Approved or SupportMemberStatus.Completed).ToList();
-        var staffingSatisfied=positions.All(position=>accepted.Count(row=>row.PositionId==position.Id)>=position.RequiredVolunteerCount);
+        var staffingSatisfied=positions.Count>0 && positions.All(position=>accepted.Count(row=>row.PositionId==position.Id)>=position.RequiredVolunteerCount);
         // Material fulfillment is added only from Resource receipt facts, never from staffing approval.
         Status=SupportType==SupportType.Staffing && staffingSatisfied ? SupportRequestStatus.Fulfilled
             : accepted.Count>0 ? SupportRequestStatus.PartiallyFulfilled : SupportRequestStatus.Published;
-        UpdatedAt=now.ToUniversalTime();Version++;
     }
 
     private readonly List<SupportResponse> responses=[];

@@ -88,6 +88,9 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
             "attendance.request.submitted" or "attendance.request.reviewed")
             return MapTaskWorkflow(message, out requiresContext);
 
+        if (message.EventType == "planning.work-area.assigned")
+            return MapWorkAreaAssignment(message, out requiresContext);
+
         if (message.EventType == "attendance.session.open-too-long")
         {
             var volunteerId = GetGuid(payload, "volunteerUserId");
@@ -152,6 +155,11 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
         }
         var reviewType = GetString(message.Payload, "reviewType");
         if (reviewType is "CHECK_IN" or "CORRECTION") safeValues["reviewType"] = JsonSerializer.SerializeToElement(reviewType);
+        foreach (var field in new[] { "communityChanged", "leaderChanged", "materialOfficerChanged" })
+        {
+            if (message.Payload.TryGetProperty(field, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                safeValues[field] = value.Clone();
+        }
         var previousStatus = GetString(message.Payload, "previousStatus");
         var newStatus = GetString(message.Payload, "newStatus");
         if (!safeValues.ContainsKey("status") && newStatus is not null && states.Contains(newStatus))

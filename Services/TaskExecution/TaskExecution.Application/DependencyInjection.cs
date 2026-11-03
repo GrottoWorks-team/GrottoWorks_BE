@@ -40,6 +40,7 @@ public static class DependencyInjection
         services.AddScoped<GetTaskQueryHandler>();
         services.AddScoped<CreateTaskCommandHandler>();
         services.AddScoped<TaskReviewService>();
+        services.AddScoped<SpecialTaskService>();
         services.AddScoped<UpdateTaskCommandHandler>();
         services.AddScoped<ReplaceCompletionCriteriaCommandHandler>();
         services.AddScoped<ReplaceTaskSkillsCommandHandler>();
@@ -47,4 +48,3 @@ public static class DependencyInjection
         return services;
     }
 }
-

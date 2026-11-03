@@ -24,6 +24,8 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
         modelBuilder.ApplyConfiguration(new TaskExecution.Infrastructure.Tasks.ProgressEvidenceConfiguration());
         modelBuilder.ApplyConfiguration(new TaskExecution.Infrastructure.Tasks.TaskCompletionReviewConfiguration());
         modelBuilder.ApplyConfiguration(new TaskExecution.Infrastructure.Tasks.FileAttachmentIntentConfiguration());
+        modelBuilder.ApplyConfiguration(new TaskExecution.Infrastructure.Tasks.CorrectiveTaskReplayConfiguration());
+        modelBuilder.ApplyConfiguration(new TaskExecution.Infrastructure.Tasks.PurchaseApprovalProjectionConfiguration());
         BuildScopeModelCore(modelBuilder);
         BuildTaskModel(modelBuilder);
         modelBuilder.Entity("TaskExecution.Domain.Tasks.WorkTask", builder =>
@@ -189,4 +191,3 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
         });
     }
 }
-

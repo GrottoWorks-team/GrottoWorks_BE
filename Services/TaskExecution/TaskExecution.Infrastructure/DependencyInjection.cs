@@ -27,8 +27,11 @@ public static class DependencyInjection
         services.AddScoped<IScopeSnapshotTransaction, ScopeSnapshotTransaction>();
         services.AddScoped<ITaskRepository, TaskRepository>();
         services.AddScoped<ITaskReviewStore, TaskReviewStore>();
+        services.AddScoped<ISpecialTaskStore, SpecialTaskStore>();
         services.AddScoped<FileAttachmentRecovery>();
         services.AddHostedService<FileAttachmentRecoveryWorker>();
+        services.AddScoped<PurchaseTaskEventHandler>();
+        services.AddHostedService<PurchaseTaskRecoveryWorker>();
         services.AddHttpClient<ITaskFileGateway,TaskFileGateway>(client=>
         {
             client.BaseAddress=new Uri(configuration["NotificationAuditClient:BaseAddress"] ?? "http://localhost:6107/");
@@ -132,4 +135,3 @@ public static class DependencyInjection
         return services;
     }
 }
-

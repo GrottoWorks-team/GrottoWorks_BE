@@ -73,3 +73,72 @@ The dispatcher publishes snapshots using their own strongly typed message contra
 Existing pending rows keep their retry backoff. Published technical snapshots are requeued without changing their event ID or stored envelope; business events are never replayed by reconciliation. Receivers must keep inbox/version checks. The worker shares the dispatch advisory lock and retries failed scans without affecting business HTTP requests.
 
 Snapshots now include a complete `materials` array, including an empty array after clearing requirements. Legacy messages without that field carry `null`, meaning no material information rather than clear-all. Snapshot ID generation uses a new identity revision so reconciliation can send the complete representation without mutating older outbox envelopes. The save hook merges database rows and tracked material additions/updates/deletions even when the mutation did not load the material navigation.
+
+
+## Progress, review, special tasks, and durable evidence
+
+Task progress is append-only: `GET/POST /api/v1/tasks/{taskId}/progress`. POST takes
+`percentComplete` (integer 0–100), `note`, `evidence: [{fileId, caption}]`, and optional
+`version`/`If-Match`. Up to ten distinct completed PROGRESS_EVIDENCE files owned by
+the submitting volunteer may be attached. Only an active volunteer with an accepted
+or in-progress assignment may submit. Progress at 100 does not automatically complete a Task.
+
+`POST /submit` and `/resubmit` take `note`, `evidence`, and `version`; these create a
+100-percent submission. First submit requires IN_PROGRESS; resubmit requires
+REVISION_REQUIRED. Both emit `task.progress.submitted` with the responsible leader.
+`GET /review-package` aggregates criteria, all progress/evidence, reviews, approved
+attendance hours, and Resource material summary. Resource dependency failure is 503.
+Leader `POST /approve` and `/request-revision` take `reason` and `version`; revision
+requires a reason. Approval updates the selected submission approval, Task,
+assignments, Support members, and outbox atomically. `task.completion.reviewed`
+owns review notifications; the companion status event has
+`notificationSuperseded=true` to prevent duplicate notifications.
+
+Evidence download is `GET /api/v1/tasks/{taskId}/progress/{progressId}/evidence/{fileId}/download-url`.
+It checks Task scope and exact evidence membership, finalizes the durable attachment
+idempotently, then obtains a record-authorized URL from NotificationAudit.
+
+The source saves attachment intents before remote reservation, reserves under the
+Task mutation lock before saving progress, and retains these intents across rollback
+or restart. A worker checks pending intents every 15 seconds, with a five-minute
+initial recovery delay. It acquires the same Task lock before deciding whether to
+finalize committed progress or release abandoned reservations. Failure is retried
+with bounded backoff. Operations already released by recovery cannot later commit.
+Configure `NotificationAuditClient:BaseAddress` (default `http://localhost:6107/`)
+and the shared `InternalApi:ApiKey` (minimum 32 characters).
+
+`POST /api/v1/purchase-requests/{requestId}/purchase-tasks` takes the flat planning
+fields `name`, `description`, `completionCriteria`, `priority`, `estimatedMinutes`,
+`startAt`, `deadline`. Work Area comes from the authoritative Resource snapshot;
+Task has exactly one buyer slot. Creation requires APPROVED from Resource. Buyer
+acceptance emits `task.purchase-task.assigned`. Resource
+`purchase.delivery.confirmed` completes the purchase Task even when PR is still
+PARTIALLY_RECEIVED. An inbox prevents duplicates; missing Task/assignment facts
+fail for retry rather than acknowledge and discard. A keyset recovery scan every
+30 seconds checks Resource confirmed purchases and completes missed deliveries.
+`PurchaseEvents:ConsumeEnabled` enables broker ingestion; HTTP reconciliation is
+registered independently. Manual review is unavailable for PURCHASE Tasks.
+
+`POST /internal/tasks` is API-key protected, excluded from OpenAPI and requires
+`Idempotency-Key`. Body is `{workAreaId, readinessItemId, requestedByUserId, name,
+description, completionCriteria, priority, estimatedMinutes, requiredVolunteers,
+startAt, deadline}`. The requesting user must be the active assigned Leader.
+It creates OPEN CORRECTIVE Tasks with normal schedule validation. Both readiness
+item and idempotency key are locked; identical retries return the saved response,
+while changed input conflicts. Readiness callers must use this exact contract.
+
+Migrations (authored only, not executed):
+- `20261103220000_AddTaskProgressReview`
+- `20261103220001_AddTaskFileAttachmentIntents`
+- `20261103220002_AddSpecialTaskSynchronization`
+
+Targeted Domain, Contracts, Application, Infrastructure, API and unit-test project
+compilation succeeded with project references disabled. No unit tests or runtime
+integration checks were executed. Gateway route registration, deployment settings,
+and Readiness client integration remain owned by the parent/coordinating agents.
+
+Latest checkpoint: after the initial successful unit-test project compilation,
+additional HTTP-contract and Support completion tests were written. A subsequent
+compile was blocked by shared Messaging/Security NU1301 dependency assets errors
+(NuGet socket access denied); the parent must compile the latest additions.
+See TASKEXECUTION_HANDOFF.md for exact changed paths and integration details.

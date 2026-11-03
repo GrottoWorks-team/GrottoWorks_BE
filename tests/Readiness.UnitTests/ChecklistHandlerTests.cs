@@ -269,18 +269,40 @@ public sealed class ChecklistHandlerTests
         _store.Checklists[0].Items[0].Status.Should().Be(ItemStatus.Recheck);
     }
 
-    [Fact]
-    public async Task Evidence_must_be_a_completed_readiness_upload_of_the_caller()
+    [Theory]
+    [InlineData(false, InspectionResult.Passed)]
+    [InlineData(false, InspectionResult.Failed)]
+    [InlineData(true, InspectionResult.Passed)]
+    [InlineData(true, InspectionResult.Failed)]
+    public async Task Evidence_must_be_a_completed_readiness_upload_of_the_caller(bool recheck, InspectionResult result)
     {
         var (_, check) = await CreateAsync();
+        var checklist = _store.Checklists[0];
+        var item = checklist.Items[0];
+        if (recheck)
+        {
+            checklist.RecordResult(item.ReadinessItemId, InspectionResult.Failed, "Original inspection", _leaderId, DateTimeOffset.UtcNow);
+            checklist.LinkCorrectiveTask(item.ReadinessItemId, Guid.NewGuid(), taskCompleted: true);
+            item.AttachEvidence([Guid.NewGuid()]);
+        }
+
+        var original = ReadinessItemDto.From(item, checklist.Version);
+        var originalStatus = checklist.Status;
+        var saves = _store.SaveChangesCount;
         var file = Guid.NewGuid();
         _files.Reject = DomainRuleException.Validation("FILE_PURPOSE_MISMATCH", "wrong purpose");
 
-        var act = () => Inspection(LeaderUser()).RecordResultAsync(
-            new ItemResultCommand(check.Id, check.Items[0].Id, null, InspectionResult.Failed, null, [file]));
+        var handler = Inspection(LeaderUser());
+        var command = new ItemResultCommand(check.Id, item.ReadinessItemId, checklist.Version, result, "Rejected inspection", [file]);
+        var act = () => recheck ? handler.RecheckAsync(command) : handler.RecordResultAsync(command);
 
         (await act.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("FILE_PURPOSE_MISMATCH");
-        _store.Checklists[0].Items[0].Status.Should().Be(ItemStatus.Pending, "nothing is recorded when a file is rejected");
+        item.Status.Should().Be(original.Status, "nothing is recorded when a file is rejected");
+        checklist.Status.Should().Be(originalStatus);
+        checklist.Version.Should().Be((uint)original.CheckVersion);
+        ReadinessItemDto.From(item, checklist.Version).Should().BeEquivalentTo(original);
+        _store.SaveChangesCount.Should().Be(saves);
+        _publisher.Events.Should().BeEmpty();
         var call = _files.Calls.Should().ContainSingle().Subject;
         call.Ids.Should().Equal(file);
         (call.Purpose, call.Uploader).Should().Be(("READINESS_EVIDENCE", _leaderId));

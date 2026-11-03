@@ -213,6 +213,8 @@ public sealed class InspectionCommandHandler(
     private async Task<ReadinessItemDto> InspectAsync(ItemResultCommand command, bool recheck, CancellationToken cancellationToken)
     {
         var (checklist, scope) = await loader.ForLeaderAsync(command.CheckId, command.Version, cancellationToken);
+        var target = checklist.Item(command.ItemId);
+        await using var reservation = await files.ReserveAsync(command.EvidenceFileIds, FilePurposes.ReadinessEvidence, currentUser.UserId, target.ReadinessItemId, cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var item = recheck
             ? checklist.Recheck(command.ItemId, command.Result, command.Note, currentUser.UserId, now)
@@ -222,7 +224,6 @@ public sealed class InspectionCommandHandler(
             item.AttachEvidence(command.EvidenceFileIds);
         }
 
-        await using var reservation = await files.ReserveAsync(command.EvidenceFileIds, FilePurposes.ReadinessEvidence, currentUser.UserId, item.ReadinessItemId, cancellationToken);
         await store.SaveChangesAsync(cancellationToken);
         if (command.Result == InspectionResult.Failed)
         {

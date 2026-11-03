@@ -11,6 +11,16 @@ namespace TaskExecution.UnitTests.Infrastructure;
 
 public sealed class SupportTransferGatewayTests
 {
+    [Theory]
+    [InlineData("COMPLETED","")]
+    [InlineData("REJECTED",null)]
+    [InlineData("REJECTED","UNKNOWN_UPSTREAM_ERROR")]
+    public async Task Invalid_terminal_decision_does_not_clear_the_durable_intent(string status,string? error)
+    {
+        var attempt=Attempt();var result=Result(attempt) with {Status=status,ErrorCode=error};
+        Func<Task> execute=()=>Client(new Transport(HttpStatusCode.OK,JsonSerializer.Serialize(new {data=result}))).ExecuteAsync(attempt,default);
+        await execute.Should().ThrowAsync<DomainRuleException>().Where(exception=>exception.Kind==DomainErrorKind.ServiceUnavailable);
+    }
     [Fact]
     public async Task Command_keeps_attempt_identity_api_key_and_correlation()
     {

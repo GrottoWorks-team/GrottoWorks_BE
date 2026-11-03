@@ -35,6 +35,7 @@ public sealed class SupportMaterialReviewEvents(ITaskEventOutbox outbox)
             {
                 supportRequestId = request.Id, supportResponseMaterialId = item.Id, workAreaId = request.WorkAreaId,
                 sourceWorkAreaId = item.SourceWorkAreaId, materialId = item.MaterialId, materialOfficerUserId = submitter,
+                previousStatus = "PENDING",
                 approvalOperationId = item.ApprovalOperationId, approvedQuantity = item.ApprovedQuantity,
                 status = item.Status.ToString().ToUpperInvariant(), errorCode = item.ApprovalErrorCode, reason = item.ReviewReason
             })));
@@ -109,10 +110,12 @@ public sealed class SupportMaterialApprovalProcessor(ISupportRequestRepository r
 
     public static void ValidateDecision(SupportTransferAttempt attempt, SupportTransferDecision decision)
     {
+        var terminalOutcome = (decision.Status == "COMPLETED" && decision.ErrorCode is null) ||
+            (decision.Status == "REJECTED" && decision.ErrorCode is ("MATERIAL_INSUFFICIENT_AVAILABLE" or "SUPPORT_TRANSFER_CONFLICT" or
+                "SUPPORT_TRANSFER_OTHER_SEASON" or "SUPPORT_TRANSFER_SAME_WORK_AREA" or "SEASON_READ_ONLY"));
         if (decision.OperationId != attempt.OperationId || decision.ItemId != attempt.ItemId || decision.SourceWorkAreaId != attempt.SourceWorkAreaId ||
             decision.TargetWorkAreaId != attempt.TargetWorkAreaId || decision.MaterialId != attempt.MaterialId || decision.Quantity != attempt.Quantity ||
-            decision.ApproverId != attempt.ApproverId || decision.DecidedAt == default || decision.Status is not ("COMPLETED" or "REJECTED") ||
-            (decision.Status == "REJECTED") != !string.IsNullOrWhiteSpace(decision.ErrorCode))
+            decision.ApproverId != attempt.ApproverId || decision.DecidedAt == default || !terminalOutcome)
             throw new DomainRuleException("RESOURCE_SERVICE_UNAVAILABLE", "Resource returned an inconsistent approval decision.", DomainErrorKind.ServiceUnavailable);
     }
 }

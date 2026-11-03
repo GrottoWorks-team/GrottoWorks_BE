@@ -24,6 +24,8 @@ public sealed class SupportTransferSynchronizationTests
         await sync.ApplyAsync(lookup.Row!,"replay",default);
         f.Item.Version.Should().Be(version);
         f.Source.Events.Items.Count(row=>row.EventType=="support.transfer.synchronized").Should().Be(1);
+        f.Source.Events.Items.Single(row=>row.EventType=="support.transfer.synchronized").Payload.GetProperty("status").GetString()
+            .Should().Be("PARTIALLY_FULFILLED");
     }
 
     [Fact]

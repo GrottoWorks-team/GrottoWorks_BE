@@ -41,6 +41,8 @@ public sealed class SupportResponseMaterial
 
     internal void BeginApproval(decimal quantity, Guid actor, string correlationId, DateTimeOffset now)
     {
+        if (actor == Guid.Empty || string.IsNullOrWhiteSpace(correlationId) || correlationId.Length > 200)
+            throw DomainRuleException.Validation("SUPPORT_MATERIAL_APPROVAL_INVALID", "Approval requires an actor and valid correlation identity.");
         if (Status != SupportMaterialStatus.Pending)
             throw new DomainRuleException("SUPPORT_MATERIAL_INVALID_STATE", "Only a pending offer can be approved.");
         if (quantity <= 0 || quantity > OfferedQuantity || decimal.Round(quantity, 2) != quantity)
@@ -76,7 +78,9 @@ public sealed class SupportResponseMaterial
             throw new DomainRuleException("SUPPORT_MATERIAL_INVALID_STATE", "Only a pending offer can be rejected.");
         if (string.IsNullOrWhiteSpace(reason) || reason.Trim().Length > 500)
             throw DomainRuleException.Validation("SUPPORT_REJECTION_REASON_REQUIRED", "Rejection requires a reason of 1–500 characters.");
-        Status = SupportMaterialStatus.Rejected; ApprovedBy = actor; ApprovedAt = now; ReviewReason = reason.Trim(); Version++;
+        if (actor == Guid.Empty) throw DomainRuleException.Validation("SUPPORT_MATERIAL_APPROVAL_INVALID", "A reviewer is required.");
+        // Rejection actor/time live in the review event and request audit. They are not an approval.
+        Status = SupportMaterialStatus.Rejected; ReviewReason = reason.Trim(); Version++;
     }
 
     internal bool Receive(decimal usable, decimal unusable, Guid officer, DateTimeOffset confirmedAt)

@@ -63,6 +63,7 @@ public sealed class SupportMaterialReviewTests
         await reject.Should().ThrowAsync<DomainRuleException>();
         var dto=await f.Review(false,null," no need ");
         dto.Status.Should().Be(SupportMaterialStatus.Rejected); dto.ReviewReason.Should().Be("no need");
+        dto.ApprovedBy.Should().BeNull(); dto.ApprovedAt.Should().BeNull();
         dto.Note.Should().Be("offer"); f.Gateway.Withdrawals.Should().Be(0);
     }
 

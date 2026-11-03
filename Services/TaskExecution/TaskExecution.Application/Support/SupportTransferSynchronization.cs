@@ -55,7 +55,8 @@ public sealed class SupportTransferSynchronization(ISupportRequestRepository req
                 {
                     supportRequestId = request.Id, supportResponseMaterialId = item.Id, workAreaId = request.WorkAreaId,
                     sourceWorkAreaId = item.SourceWorkAreaId, materialId = item.MaterialId, receivedUsableQuantity = usable,
-                    receivedUnusableQuantity = unusable, confirmedByUserId = officer, status = request.Status.ToString().ToUpperInvariant()
+                    receivedUnusableQuantity = unusable, confirmedByUserId = officer,
+                    status = JsonNamingPolicy.SnakeCaseUpper.ConvertName(request.Status.ToString())
                 })));
             await requests.SaveAsync(ct); return true;
         }, ct);

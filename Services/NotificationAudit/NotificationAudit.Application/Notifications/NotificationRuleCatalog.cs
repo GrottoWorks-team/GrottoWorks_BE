@@ -35,6 +35,10 @@ public static class NotificationRuleCatalog
         [Guid.Parse("71000000-0000-0000-0000-000000000026")] = "support.member.reviewed",
         [Guid.Parse("71000000-0000-0000-0000-000000000027")] = "support.request.published",
         [Guid.Parse("71000000-0000-0000-0000-000000000028")] = "support.material.approved",
-        [Guid.Parse("71000000-0000-0000-0000-000000000029")] = "support.material.reviewed"
+        [Guid.Parse("71000000-0000-0000-0000-000000000029")] = "support.material.reviewed",
+        [Guid.Parse("71000000-0000-0000-0000-000000000030")] = "task.deadline.reminder",
+        [Guid.Parse("71000000-0000-0000-0000-000000000031")] = "task.deadline.overdue",
+        [Guid.Parse("71000000-0000-0000-0000-000000000032")] = "task.progress.submitted",
+        [Guid.Parse("71000000-0000-0000-0000-000000000033")] = "task.completion.reviewed"
     });
 }

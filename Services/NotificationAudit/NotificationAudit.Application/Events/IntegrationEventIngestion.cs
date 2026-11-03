@@ -52,7 +52,7 @@ public interface INotificationEventStore
 
 public sealed class InvalidNotificationEventException(string message) : Exception(message);
 
-public sealed partial class IntegrationEventIngestionHandler(INotificationEventStore store)
+public sealed partial class IntegrationEventIngestionHandler(INotificationEventStore store,INotificationAudienceResolver? audience=null)
 {
     public async Task HandleAsync(IncomingIntegrationEvent message, CancellationToken cancellationToken)
     {
@@ -64,15 +64,30 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
         }
 
         message = message with { OccurredAt = message.OccurredAt.ToUniversalTime() };
+        var sourceMessage = message;
+        if(message.EventType=="support.request.published")AddSafeSupportRequirements(message.Payload,[]);
         var notifications = MapNotifications(message, out var requiresContext);
-        var audit = MapAudit(message);
+        if(requiresContext && audience is not null && message.EventType is ("support.request.published" or "planning.season.activated" or "planning.season.completed" or "planning.season.archived"))
+        {
+            var recipients=await audience.ResolveAsync(message,cancellationToken);
+            if(recipients is not null)
+            {
+                var fields=JsonSerializer.Deserialize<Dictionary<string,JsonElement>>(message.Payload.GetRawText())!;
+                fields["recipientUserIds"]=JsonSerializer.SerializeToElement(recipients);
+                message=message with {Payload=JsonSerializer.SerializeToElement(fields)};
+                notifications=MapNotifications(message,out requiresContext);
+            }
+        }
+        // Audience resolution is derived context, not an immutable fact in the producer's envelope.
+        // Replays must compare the original source even if responsibilities have since changed.
+        var audit = MapAudit(sourceMessage);
         var plan = new EventIngestionPlan(
             message.EventId,
             message.EventType,
             requiresContext ? "REQUIRES_CONTEXT" : "PROCESSED",
             notifications,
             audit,
-            message with { Payload = audit.SafeNewValue.RootElement.Clone(), CorrelationId = audit.CorrelationId?.ToString() ?? "" });
+            sourceMessage with { Payload = audit.SafeNewValue.RootElement.Clone(), CorrelationId = audit.CorrelationId?.ToString() ?? "" });
         await store.StoreAsync(plan, cancellationToken);
     }
 
@@ -83,6 +98,12 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
         requiresContext = false;
         var payload = message.Payload;
         var taskId = GetGuid(payload, "taskId") ?? message.AggregateId;
+
+        if(message.EventType=="task.status.changed" && payload.TryGetProperty("notificationSuperseded",out var superseded) && superseded.ValueKind==JsonValueKind.True)
+        {requiresContext=false;return [];}
+        if(message.EventType is "planning.season.activated" or "planning.season.completed" or "planning.season.archived" or "support.request.published" or "task.progress.submitted" or "task.completion.reviewed" ||
+            (message.EventType=="task.status.changed" && GetString(payload,"status") is "COMPLETED" or "REVISION_REQUIRED"))
+            return MapResolvedWorkflow(message,out requiresContext);
 
         if (message.EventType is "task.assignment.created" or "task.assignment.responded" or
             "attendance.request.submitted" or "attendance.request.reviewed")
@@ -148,6 +169,7 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
             "requestId", "attendanceId", "correctionId", "supportMemberId", "supportResponseMaterialId", "approvalOperationId"
         };
         var safeValues = new Dictionary<string, JsonElement>();
+        if(ReadRecipientIds(message.Payload) is { } recipients) safeValues["recipientUserIds"]=JsonSerializer.SerializeToElement(recipients);
         if (message.EventType == "support.request.published") AddSafeSupportRequirements(message.Payload, safeValues);
         if (message.EventType is "support.material.approved" or "support.material.reviewed" or "support.transfer.synchronized")
             AddSafeSupportQuantities(message.Payload, safeValues);
@@ -173,7 +195,7 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
         }
         var reviewType = GetString(message.Payload, "reviewType");
         if (reviewType is "CHECK_IN" or "CORRECTION") safeValues["reviewType"] = JsonSerializer.SerializeToElement(reviewType);
-        foreach (var field in new[] { "communityChanged", "leaderChanged", "materialOfficerChanged", "mandatory", "requiresConfirmation" })
+        foreach (var field in new[] { "communityChanged", "leaderChanged", "materialOfficerChanged", "mandatory", "requiresConfirmation", "notificationSuperseded" })
         {
             if (message.Payload.TryGetProperty(field, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False)
                 safeValues[field] = value.Clone();

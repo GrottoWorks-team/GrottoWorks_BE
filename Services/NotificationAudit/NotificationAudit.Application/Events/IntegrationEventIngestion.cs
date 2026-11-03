@@ -90,6 +90,8 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
 
         if (message.EventType == "planning.work-area.assigned")
             return MapWorkAreaAssignment(message, out requiresContext);
+        if (message.EventType == "support.member.reviewed")
+            return MapSupportDecision(message, out requiresContext);
 
         if (message.EventType is "purchase.request.submitted" or "purchase.request.decided" or
             "readiness.item.failed" or "recognition.entry.created")
@@ -121,7 +123,7 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
         }
 
         // These are notification events; until their recipient mapping is resolved, retain the safe context.
-        requiresContext = message.EventType is "planning.work-area.assigned" or "planning.season.activated" or
+        requiresContext = message.EventType is "support.request.published" or "planning.work-area.assigned" or "planning.season.activated" or
             "planning.season.completed" or "planning.season.archived" or "purchase.request.submitted" or
             "purchase.request.decided" or "purchase.delivery.confirmed" or "contribution.pledged" or
             "contribution.receipt.confirmed" or "contribution.donation.adjusted" or "loan.offer.submitted" or
@@ -141,9 +143,10 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
             "recognitionPointId", "donationId", "donorId", "borrowedItemId", "offeredByUserId", "reportedByUserId",
             "verifiedByUserId", "materialReportId", "reopenedByUserId", "readinessItemId", "materialId",
             "sourceWorkAreaId", "targetWorkAreaId", "requesterUserId", "approvedByUserId", "recipientUserId",
-            "requestId", "attendanceId", "correctionId"
+            "requestId", "attendanceId", "correctionId", "supportMemberId"
         };
         var safeValues = new Dictionary<string, JsonElement>();
+        if (message.EventType == "support.request.published") AddSafeSupportRequirements(message.Payload, safeValues);
         foreach (var field in guidFields)
         {
             if (GetGuid(message.Payload, field) is { } id)

@@ -31,6 +31,8 @@ public static class NotificationRuleCatalog
         [Guid.Parse("71000000-0000-0000-0000-000000000022")] = "recognition.entry.created",
         [Guid.Parse("71000000-0000-0000-0000-000000000023")] = "readiness.item.failed",
         [Guid.Parse("71000000-0000-0000-0000-000000000024")] = "readiness.area.reopened",
-        [Guid.Parse("71000000-0000-0000-0000-000000000025")] = "planning.work-area.assigned"
+        [Guid.Parse("71000000-0000-0000-0000-000000000025")] = "planning.work-area.assigned",
+        [Guid.Parse("71000000-0000-0000-0000-000000000026")] = "support.member.reviewed",
+        [Guid.Parse("71000000-0000-0000-0000-000000000027")] = "support.request.published"
     });
 }

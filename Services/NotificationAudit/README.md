@@ -33,6 +33,8 @@ Rule IDs are stable so the administration UI can update a rule without discoveri
 | `000000000023` | `readiness.item.failed` |
 | `000000000024` | `readiness.area.reopened` |
 | `000000000025` | `planning.work-area.assigned` |
+| `000000000026` | `support.member.reviewed` |
+| `000000000027` | `support.request.published` |
 
 Push and email preferences are persisted but providers are not connected yet. File access across business records is also deferred to each owning service integration.
 
@@ -47,6 +49,7 @@ Migration corrects the two legacy event aliases without changing rule IDs or the
 - Check-in requests notify the Leader; check-in and correction decisions notify the Volunteer. Volunteer cancellation and direct acceptance remain audit-only facts. Long-open attendance events notify the Volunteer and Leader once each.
 - Work Area assignment notifications use the source `leaderChanged`/`materialOfficerChanged` flags, notify only new role holders and deduplicate a user holding both roles. Community-only changes are audit-only. Legacy events missing those facts stay pending; current ownership is not evidence of which role changed in an old event.
 - Purchase requests awaiting review notify the source Leader; decisions notify the requester. Mandatory failed readiness items notify the source Leader (optional failed items remain audit-only). Recognition entries notify the awarded user. Each mapping requires its typed business-reference ID and uses fixed safe text, never private payload notes/URLs.
+- Support member approval/rejection notifies the named Volunteer and links the Support Request. The accompanying SUPPORT assignment fact stays audit-only to avoid duplicate decision notifications. Published Support Requests retain typed position/Task/skill-level/material requirements as `REQUIRES_CONTEXT`; matching/candidate fan-out is still required before that notification is considered delivered. Private position names and notes are not copied into retained context.
 - Events without enough recipient context are retained as `REQUIRES_CONTEXT` and never reported as delivered notifications.
 - TaskExecution now has an outbox dispatcher, disabled by default until consumer/backfill integration is ready. Wiring other source publishers remains part of the later integration commits.
 - Audit ingestion stores only an allowlist of non-secret payload fields. Tokens, passwords, private URLs, and arbitrary payload content are not copied.

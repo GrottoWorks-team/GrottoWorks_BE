@@ -20,6 +20,9 @@ public sealed partial class IntegrationEventIngestionHandler
 
         switch (message.EventType)
         {
+            case "task.assignment.created" when assignmentType == "SUPPORT":
+                // The same transaction emits support.member.reviewed, which owns the Volunteer notification.
+                return [];
             case "task.assignment.created" when assignmentType == "DIRECT":
                 recipient = volunteerId;
                 title = "New task assignment";

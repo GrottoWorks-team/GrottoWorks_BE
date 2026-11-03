@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
+using System.Text.Json;
 using NotificationAudit.Application.Events;
 using NotificationAudit.Domain.Audit;
 using NotificationAudit.Domain.Notifications;
@@ -14,18 +14,30 @@ internal sealed class NotificationEventStore(
     public async Task StoreAsync(EventIngestionPlan plan, CancellationToken cancellationToken)
     {
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        if (await dbContext.NotificationEventInbox.AnyAsync(item => item.EventId == plan.EventId, cancellationToken))
+        var key = $"notification-inbox:{plan.EventId:D}";
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({key}, 0))", cancellationToken);
+        var existing = await dbContext.NotificationEventInbox.SingleOrDefaultAsync(item => item.EventId == plan.EventId, cancellationToken);
+        var safeEnvelope = plan.SafeContext is null ? null : JsonSerializer.Serialize(plan.SafeContext, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        if (plan.Status is not ("PROCESSED" or "REQUIRES_CONTEXT") ||
+            (plan.Status == "REQUIRES_CONTEXT" && safeEnvelope is null))
+            throw new InvalidNotificationEventException("An unresolved event must retain its safe source context.");
+        if (existing is not null)
         {
-            await transaction.CommitAsync(cancellationToken);
-            return;
+            if (existing.EventType != plan.EventType)
+                throw new InvalidNotificationEventException("An event ID was reused for another event type.");
+            var adoptedContext = existing.EnsureSameContext(safeEnvelope);
+            if (existing.Status == "PROCESSED" || plan.Status == "REQUIRES_CONTEXT")
+            {
+                if (adoptedContext) await dbContext.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return;
+            }
         }
 
         var now = timeProvider.GetUtcNow();
-        dbContext.NotificationEventInbox.Add(NotificationEventInbox.Create(
-            plan.EventId,
-            plan.EventType,
-            plan.Status,
-            now));
+        var inbox = existing ?? NotificationEventInbox.Create(plan.EventId, plan.EventType, plan.Status, now, safeEnvelope);
+        if (existing is null) dbContext.NotificationEventInbox.Add(inbox);
 
         if (plan.Status == "PROCESSED")
         {
@@ -36,12 +48,15 @@ internal sealed class NotificationEventStore(
 
             if (ruleEnabled)
             {
-                foreach (var candidate in plan.Notifications)
+                var candidates = plan.Notifications.GroupBy(candidate => candidate.RecipientUserId)
+                    .Select(group => group.First()).ToArray();
+                var recipients = candidates.Select(candidate => candidate.RecipientUserId).ToArray();
+                var preferences = await dbContext.NotificationPreferences.AsNoTracking()
+                    .Where(preference => recipients.Contains(preference.UserId))
+                    .ToDictionaryAsync(preference => preference.UserId, preference => preference.InAppEnabled, cancellationToken);
+                foreach (var candidate in candidates)
                 {
-                    var userEnabled = await dbContext.NotificationPreferences.AsNoTracking()
-                        .Where(preference => preference.UserId == candidate.RecipientUserId)
-                        .Select(preference => (bool?)preference.InAppEnabled)
-                        .SingleOrDefaultAsync(cancellationToken) ?? true;
+                    var userEnabled = preferences.GetValueOrDefault(candidate.RecipientUserId, true);
                     if (!userEnabled) continue;
 
                     dbContext.Notifications.Add(Notification.Create(
@@ -56,7 +71,8 @@ internal sealed class NotificationEventStore(
             }
         }
 
-        dbContext.ActivityLogs.Add(ActivityLog.Create(
+        // Resolving context later must not append the original audit entry a second time.
+        if (existing is null) dbContext.ActivityLogs.Add(ActivityLog.Create(
             plan.Audit.ActorUserId,
             plan.Audit.ParishId,
             plan.Audit.SeasonId,
@@ -69,17 +85,9 @@ internal sealed class NotificationEventStore(
             plan.Audit.CorrelationId,
             plan.Audit.OccurredAt));
 
-        try
-        {
-            await dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-        }
-        catch (DbUpdateException exception) when (IsDuplicateEvent(exception))
-        {
-            await transaction.RollbackAsync(cancellationToken);
-        }
+        if (plan.Status == "PROCESSED") inbox.MarkProcessed(now);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
-    private static bool IsDuplicateEvent(DbUpdateException exception) =>
-        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
 }

@@ -31,6 +31,8 @@ Push and email preferences are persisted but providers are not connected yet. Fi
 - TaskExecution now has an outbox dispatcher, disabled by default until consumer/backfill integration is ready. Wiring other source publishers remains part of the later integration commits.
 - Audit ingestion stores only an allowlist of non-secret payload fields. Tokens, passwords, private URLs, and arbitrary payload content are not copied.
 
+Inbox writes take a PostgreSQL transaction advisory lock per event ID. Only already processed copies of that event are ignored; unrelated unique/DB failures propagate for retry. Unresolved events retain a typed, redacted `safe_envelope` for later context resolution. Reprocessing the same context can finish a pending inbox without duplicating its audit row. Reusing an ID with conflicting context is rejected. Legacy inbox rows have no retained context until the original event is replayed; a context-resolution worker is still a subsequent integration step.
+
 ## File finalization and deletion
 
 Completion copies the pending upload to a fresh private key, then inspects that exact copy before committing metadata. The pending object is retained until the database commit succeeds, so a failed save can be retried. Repeated completion of an uploaded file returns its existing reference. Inspection reads at most 20 MiB, checks the actual byte count and honors cancellation rather than trusting the object-size header.

@@ -12,7 +12,9 @@ public sealed record IncomingTaskEvent(
     Guid SeasonId,
     string AggregateType,
     Guid AggregateId,
-    JsonElement Payload);
+    JsonElement Payload,
+    int SchemaVersion = 1,
+    long? AggregateVersion = null);
 
 public sealed record NotificationCandidate(
     Guid RecipientUserId,
@@ -37,7 +39,8 @@ public sealed record EventIngestionPlan(
     string EventType,
     string Status,
     IReadOnlyList<NotificationCandidate> Notifications,
-    AuditCandidate Audit);
+    AuditCandidate Audit,
+    IncomingTaskEvent? SafeContext = null);
 
 public interface INotificationEventStore
 {
@@ -50,11 +53,14 @@ public sealed class TaskEventIngestionHandler(INotificationEventStore store)
 {
     public async Task HandleAsync(IncomingTaskEvent message, CancellationToken cancellationToken)
     {
-        if (message.EventId == Guid.Empty || string.IsNullOrWhiteSpace(message.EventType))
+        if (message.EventId == Guid.Empty || message.AggregateId == Guid.Empty || message.OccurredAt == default ||
+            message.SchemaVersion != 1 || message.AggregateVersion is <= 0 || message.Payload.ValueKind != JsonValueKind.Object ||
+            !ValidLabel(message.EventType, 100) || !ValidLabel(message.AggregateType, 50))
         {
             throw new InvalidNotificationEventException("The integration event has no identity or event type.");
         }
 
+        message = message with { OccurredAt = message.OccurredAt.ToUniversalTime() };
         var notifications = MapNotifications(message, out var requiresContext);
         var audit = MapAudit(message);
         var plan = new EventIngestionPlan(
@@ -62,7 +68,8 @@ public sealed class TaskEventIngestionHandler(INotificationEventStore store)
             message.EventType,
             requiresContext ? "REQUIRES_CONTEXT" : "PROCESSED",
             notifications,
-            audit);
+            audit,
+            message with { Payload = audit.SafeNewValue.RootElement.Clone(), CorrelationId = audit.CorrelationId?.ToString() ?? "" });
         await store.StoreAsync(plan, cancellationToken);
     }
 
@@ -89,7 +96,7 @@ public sealed class TaskEventIngestionHandler(INotificationEventStore store)
         {
             var volunteerId = GetGuid(payload, "volunteerUserId");
             var decision = GetString(payload, "decision");
-            if (!volunteerId.HasValue || string.IsNullOrWhiteSpace(decision))
+            if (!volunteerId.HasValue || decision is not ("APPROVED" or "REJECTED"))
             {
                 requiresContext = true;
                 return [];
@@ -126,18 +133,32 @@ public sealed class TaskEventIngestionHandler(INotificationEventStore store)
 
     private static AuditCandidate MapAudit(IncomingTaskEvent message)
     {
-        var allowedFields = new[]
+        var guidFields = new[]
         {
             "taskId", "workAreaId", "assignmentId", "attendanceRequestId", "attendanceSessionId",
-            "volunteerUserId", "leaderUserId", "decision", "status"
+            "volunteerUserId", "leaderUserId", "seasonId", "parishId", "communityId", "materialOfficerUserId",
+            "purchaseRequestId", "supportRequestId", "supportResponseId", "readinessChecklistId", "itemId", "userId"
         };
         var safeValues = new Dictionary<string, JsonElement>();
-        foreach (var field in allowedFields)
+        foreach (var field in guidFields)
         {
-            if (message.Payload.ValueKind == JsonValueKind.Object && message.Payload.TryGetProperty(field, out var value))
+            if (GetGuid(message.Payload, field) is { } id)
             {
-                safeValues[field] = value.Clone();
+                safeValues[field] = JsonSerializer.SerializeToElement(id);
             }
+        }
+
+        var states = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "OPEN", "NOT_STARTED", "IN_PROGRESS", "SUBMITTED", "REVISION_REQUIRED", "COMPLETED", "CANCELLED",
+            "PENDING", "ACCEPTED", "DECLINED", "APPROVED", "REJECTED", "PLANNING", "ACTIVE", "INACTIVE", "LOCKED",
+            "READY", "ARCHIVED", "PLANNED", "READINESS_REVIEW", "NEEDS_CORRECTION", "PARTIALLY_FULFILLED", "FULFILLED", "CLOSED",
+            "RECEIVED", "PARTIALLY_RECEIVED", "DIRECT", "APPLICATION", "SUPPORT"
+        };
+        foreach (var field in new[] { "decision", "status", "previousStatus", "newStatus", "assignmentType" })
+        {
+            var value = GetString(message.Payload, field);
+            if (value is not null && states.Contains(value)) safeValues[field] = JsonSerializer.SerializeToElement(value);
         }
 
         Guid? correlationId = Guid.TryParse(message.CorrelationId, out var parsedCorrelation) ? parsedCorrelation : null;
@@ -156,11 +177,14 @@ public sealed class TaskEventIngestionHandler(INotificationEventStore store)
     private static Guid? GetGuid(JsonElement payload, string property)
     {
         if (payload.ValueKind != JsonValueKind.Object || !payload.TryGetProperty(property, out var value)) return null;
-        return value.ValueKind == JsonValueKind.String && Guid.TryParse(value.GetString(), out var parsed) ? parsed : null;
+        return value.ValueKind == JsonValueKind.String && Guid.TryParse(value.GetString(), out var parsed) && parsed != Guid.Empty ? parsed : null;
     }
 
     private static string? GetString(JsonElement payload, string property) =>
         payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString()
             : null;
+
+    private static bool ValidLabel(string value, int maximumLength) => !string.IsNullOrWhiteSpace(value) && value.Length <= maximumLength &&
+        value.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '.');
 }

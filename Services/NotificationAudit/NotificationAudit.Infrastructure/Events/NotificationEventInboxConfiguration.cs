@@ -15,6 +15,7 @@ internal sealed class NotificationEventInboxConfiguration : IEntityTypeConfigura
         builder.Property(message => message.ReceivedAt).HasColumnName("received_at");
         builder.Property(message => message.ProcessedAt).HasColumnName("processed_at");
         builder.Property(message => message.LastError).HasColumnName("last_error").HasMaxLength(2000);
+        builder.Property(message => message.SafeEnvelope).HasColumnName("safe_envelope").HasColumnType("jsonb");
         builder.HasIndex(message => new { message.Status, message.ReceivedAt })
             .HasDatabaseName("ix_notification_event_inbox_status_received_at");
     }

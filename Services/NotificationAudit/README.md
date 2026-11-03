@@ -43,7 +43,8 @@ Migration corrects the two legacy event aliases without changing rule IDs or the
 ## Integration status
 
 - The service has a transactional inbox and RabbitMQ consumers for TaskExecution, Identity, ParishCoordination, Resource, Readiness and Reporting business envelopes. They share schema validation, safe-context retention and audit ingestion.
-- Direct assignment, attendance review, and long-open attendance events have complete recipient context and can create in-app notifications.
+- Direct assignments notify the Volunteer; applications notify the Leader; application decisions notify the Volunteer; direct declines notify the Leader. Workflow type is mandatory for assignment events, so ambiguous legacy messages remain pending rather than notifying the wrong person.
+- Check-in requests notify the Leader; check-in and correction decisions notify the Volunteer. Volunteer cancellation and direct acceptance remain audit-only facts. Long-open attendance events notify the Volunteer and Leader once each.
 - Events without enough recipient context are retained as `REQUIRES_CONTEXT` and never reported as delivered notifications.
 - TaskExecution now has an outbox dispatcher, disabled by default until consumer/backfill integration is ready. Wiring other source publishers remains part of the later integration commits.
 - Audit ingestion stores only an allowlist of non-secret payload fields. Tokens, passwords, private URLs, and arbitrary payload content are not copied.

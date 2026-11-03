@@ -12,7 +12,7 @@ public sealed class TaskEventIngestionTests
     {
         var volunteerId = Guid.NewGuid();
         var taskId = Guid.NewGuid();
-        using var payload = JsonDocument.Parse($$"""{"volunteerUserId":"{{volunteerId}}","taskId":"{{taskId}}"}""");
+        using var payload = JsonDocument.Parse($$"""{"volunteerUserId":"{{volunteerId}}","taskId":"{{taskId}}","assignmentType":"DIRECT"}""");
         var message = Create("task.assignment.created", payload.RootElement);
 
         var notifications = IntegrationEventIngestionHandler.MapNotifications(message, out var requiresContext);

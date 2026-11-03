@@ -52,7 +52,7 @@ public interface INotificationEventStore
 
 public sealed class InvalidNotificationEventException(string message) : Exception(message);
 
-public sealed class IntegrationEventIngestionHandler(INotificationEventStore store)
+public sealed partial class IntegrationEventIngestionHandler(INotificationEventStore store)
 {
     public async Task HandleAsync(IncomingIntegrationEvent message, CancellationToken cancellationToken)
     {
@@ -84,34 +84,9 @@ public sealed class IntegrationEventIngestionHandler(INotificationEventStore sto
         var payload = message.Payload;
         var taskId = GetGuid(payload, "taskId") ?? message.AggregateId;
 
-        if (message.EventType == "task.assignment.created")
-        {
-            var volunteerId = GetGuid(payload, "volunteerUserId");
-            if (!volunteerId.HasValue)
-            {
-                requiresContext = true;
-                return [];
-            }
-            return [new NotificationCandidate(volunteerId.Value, "New task assignment", "You have received a new task assignment.", "TASK", taskId)];
-        }
-
-        if (message.EventType == "attendance.request.reviewed")
-        {
-            var volunteerId = GetGuid(payload, "volunteerUserId");
-            var decision = GetString(payload, "decision");
-            if (!volunteerId.HasValue || decision is not ("APPROVED" or "REJECTED"))
-            {
-                requiresContext = true;
-                return [];
-            }
-            var approved = decision.Equals("APPROVED", StringComparison.OrdinalIgnoreCase);
-            return [new NotificationCandidate(
-                volunteerId.Value,
-                approved ? "Check-in approved" : "Check-in rejected",
-                approved ? "Your attendance request was approved." : "Your attendance request was rejected.",
-                "TASK",
-                taskId)];
-        }
+        if (message.EventType is "task.assignment.created" or "task.assignment.responded" or
+            "attendance.request.submitted" or "attendance.request.reviewed")
+            return MapTaskWorkflow(message, out requiresContext);
 
         if (message.EventType == "attendance.session.open-too-long")
         {
@@ -151,7 +126,8 @@ public sealed class IntegrationEventIngestionHandler(INotificationEventStore sto
             "requestedByUserId", "decidedByUserId", "confirmedByUserId", "buyerUserId", "awardedToUserId",
             "recognitionPointId", "donationId", "donorId", "borrowedItemId", "offeredByUserId", "reportedByUserId",
             "verifiedByUserId", "materialReportId", "reopenedByUserId", "readinessItemId", "materialId",
-            "sourceWorkAreaId", "targetWorkAreaId", "requesterUserId", "approvedByUserId", "recipientUserId"
+            "sourceWorkAreaId", "targetWorkAreaId", "requesterUserId", "approvedByUserId", "recipientUserId",
+            "requestId", "attendanceId", "correctionId"
         };
         var safeValues = new Dictionary<string, JsonElement>();
         foreach (var field in guidFields)
@@ -174,6 +150,8 @@ public sealed class IntegrationEventIngestionHandler(INotificationEventStore sto
             var value = GetString(message.Payload, field);
             if (value is not null && states.Contains(value)) safeValues[field] = JsonSerializer.SerializeToElement(value);
         }
+        var reviewType = GetString(message.Payload, "reviewType");
+        if (reviewType is "CHECK_IN" or "CORRECTION") safeValues["reviewType"] = JsonSerializer.SerializeToElement(reviewType);
         var previousStatus = GetString(message.Payload, "previousStatus");
         var newStatus = GetString(message.Payload, "newStatus");
         if (!safeValues.ContainsKey("status") && newStatus is not null && states.Contains(newStatus))

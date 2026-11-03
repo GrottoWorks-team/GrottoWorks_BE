@@ -27,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<GetSeasonReadinessQueryHandler>();
         services.AddScoped<CorrectiveTaskSync>();
 
+        services.AddScoped<Readiness.Application.Files.ReadinessEvidenceDownload>();
         return services;
     }
 }

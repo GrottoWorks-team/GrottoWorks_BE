@@ -24,7 +24,7 @@ public sealed class ChecklistHandlerTests
     private FakeCurrentUser LeaderUser() => new(_leaderId, GrottoWorksRoles.Leader, _parishId);
 
     private InspectionCommandHandler Inspection(ICurrentUser user) =>
-        new(new ChecklistLoader(_store, Access(user)), _store, _tasks, _publisher, user, _files);
+        new(new ChecklistLoader(_store, Access(user)), _store, _tasks, _publisher, user, _files, new FakeCorrectiveTaskCreator());
 
     private async Task<(WorkAreaScope Scope, ReadinessCheckDto Check)> CreateAsync(
         SeasonStatus seasonStatus = SeasonStatus.Active,
@@ -123,7 +123,7 @@ public sealed class ChecklistHandlerTests
         await handler.RecordResultAsync(new ItemResultCommand(check.Id, check.Items[0].Id, null, InspectionResult.Failed, null, []));
 
         var missing = () => handler.LinkCorrectiveTaskAsync(new LinkCorrectiveTaskCommand(check.Id, check.Items[0].Id, null, null));
-        (await missing.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("CORRECTIVE_TASK_CREATE_UNAVAILABLE");
+        (await missing.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("CORRECTIVE_TASK_DEFINITION_REQUIRED");
 
         var workTask = _tasks.Seed(scope.WorkAreaId, ProjectedTaskType.Work);
         var wrongType = () => handler.LinkCorrectiveTaskAsync(new LinkCorrectiveTaskCommand(check.Id, check.Items[0].Id, null, workTask.TaskId));

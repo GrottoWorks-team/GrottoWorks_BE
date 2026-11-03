@@ -134,6 +134,13 @@ public sealed class FakeReadinessCheckStore : IReadinessCheckStore
 /// <summary>Accepts every file unless <see cref="Reject"/> is set (then throws it, like the NotificationAudit check).</summary>
 public sealed class FakeFileVerifier : Readiness.Application.Files.IFileVerifier
 {
+    public async Task<IAsyncDisposable> ReserveAsync(IReadOnlyCollection<Guid> ids, string purpose, Guid userId, Guid referenceId, CancellationToken ct = default)
+    {
+        await EnsureAttachableAsync(ids, purpose, userId, ct);
+        return new TestReservation();
+    }
+    private sealed class TestReservation : IAsyncDisposable { public ValueTask DisposeAsync() => ValueTask.CompletedTask; }
+
     public List<(IReadOnlyCollection<Guid> Ids, string Purpose, Guid Uploader)> Calls { get; } = [];
 
     public Readiness.Domain.DomainRuleException? Reject { get; set; }
@@ -145,3 +152,14 @@ public sealed class FakeFileVerifier : Readiness.Application.Files.IFileVerifier
     }
 }
 
+
+public sealed class FakeCorrectiveTaskCreator : Readiness.Application.Checklists.ICorrectiveTaskCreator
+{
+    public List<Readiness.Application.Checklists.CorrectiveTaskCreationRequest> Requests { get; } = [];
+    public Guid TaskId { get; } = Guid.NewGuid();
+    public Task<Readiness.Application.Checklists.CreatedCorrectiveTask> CreateAsync(Readiness.Application.Checklists.CorrectiveTaskCreationRequest request, CancellationToken ct)
+    {
+        Requests.Add(request);
+        return Task.FromResult(new Readiness.Application.Checklists.CreatedCorrectiveTask(TaskId, request.WorkAreaId, "CORRECTIVE", "OPEN"));
+    }
+}

@@ -356,6 +356,8 @@ namespace Readiness.Infrastructure.Data.Migrations
                 });
 #pragma warning restore 612, 618
             modelBuilder.ApplyConfiguration(new Readiness.Infrastructure.Messaging.ScopeReplicationReceiptConfiguration());
+            modelBuilder.ApplyConfiguration(new Readiness.Infrastructure.Files.AttachmentIntentConfiguration());
+            modelBuilder.ApplyConfiguration(new Readiness.Infrastructure.Checklists.CorrectiveTaskIntentConfiguration());
         }
     }
 }

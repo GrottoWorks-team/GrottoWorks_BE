@@ -7,6 +7,7 @@ public static class ReadinessEndpoints
     {
         app.MapInternalScopeEndpoints();
         app.MapChecklistEndpoints();
+        app.MapRecordFileEndpoints();
         return app;
     }
 }

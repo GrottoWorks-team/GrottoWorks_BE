@@ -194,7 +194,7 @@ public static class ChecklistEndpoints
         CancellationToken cancellationToken)
     {
         var item = await handler.LinkCorrectiveTaskAsync(
-            new LinkCorrectiveTaskCommand(checkId, itemId, VersionHeader.Resolve(request.Version, httpContext, VersionMismatch), request.TaskId),
+            new LinkCorrectiveTaskCommand(checkId, itemId, VersionHeader.Resolve(request.Version, httpContext, VersionMismatch), request.TaskId, request.Create),
             cancellationToken);
         return Results.Ok(ApiResults.Ok(item, httpContext));
     }

@@ -20,7 +20,8 @@ public sealed class SupportResponseRouteTests
         builder.Services.AddScoped<ReviewSupportMemberHandler>();
         builder.Services.AddScoped<ReviewSupportMaterialHandler>();
         builder.Services.AddScoped<CloseSupportRequestHandler>();
-        await using var app=builder.Build();app.MapSupportResponseEndpoints();app.MapSupportMemberReviewEndpoints();app.MapSupportMaterialReviewEndpoints();app.MapSupportClosureEndpoints();
+        builder.Services.AddScoped<GetSupportSummaryHandler>();
+        await using var app=builder.Build();app.MapSupportResponseEndpoints();app.MapSupportMemberReviewEndpoints();app.MapSupportMaterialReviewEndpoints();app.MapSupportClosureEndpoints();app.MapSupportSummaryEndpoints();
         var routes=((IEndpointRouteBuilder)app).DataSources.SelectMany(source=>source.Endpoints).OfType<RouteEndpoint>().ToList();
         var create=routes.Single(route=>route.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName=="respondToSupportRequest");
         create.RoutePattern.RawText.Should().Be("/api/v1/support-requests/{requestId:guid}/responses");
@@ -28,6 +29,10 @@ public sealed class SupportResponseRouteTests
         create.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Select(meta=>meta.StatusCode)
             .Should().Contain(new[] {201,400,401,403,404,409,412,422,503});
         Roles(routes.Single(route=>route.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName=="listSupportResponses")).Should().Equal("LEADER");
+        var summary=routes.Single(route=>route.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName=="getCrossCommunitySupportSummary");
+        summary.RoutePattern.RawText.Should().Be("/api/v1/seasons/{seasonId:guid}/support-summary");
+        Roles(summary).Should().Equal("PARISH");
+        summary.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Select(meta=>meta.StatusCode).Should().Contain(new[] {200,400,401,403,404,503});
         foreach(var operation in new[] {"approveSupportMember","rejectSupportMember","approveSupportMaterial","rejectSupportMaterial","closeSupportRequest"})
         {
             var route=routes.Single(route=>route.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName==operation);

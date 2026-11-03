@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<TaskExecution.Application.Support.SupportTransferSynchronization>();
         services.AddScoped<TaskExecution.Application.Support.SupportTransferReceiptIngestion>();
         services.AddScoped<TaskExecution.Application.Support.CloseSupportRequestHandler>();
+        services.AddScoped<TaskExecution.Application.Support.GetSupportSummaryHandler>();
         services.AddScoped<GetTaskQueryHandler>();
         services.AddScoped<CreateTaskCommandHandler>();
         services.AddScoped<UpdateTaskCommandHandler>();

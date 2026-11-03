@@ -64,6 +64,7 @@ public static class DependencyInjection
         }).AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<TaskExecution.Application.Support.ISupportRequestRepository, TaskExecution.Infrastructure.Support.SupportRequestRepository>();
         services.AddScoped<TaskExecution.Application.Support.ISupportMaterialSyncStore, TaskExecution.Infrastructure.Support.SupportMaterialSyncStore>();
+        services.AddScoped<TaskExecution.Application.Support.ISupportSummaryStore, TaskExecution.Infrastructure.Support.SupportSummaryStore>();
         services.AddHostedService<TaskExecution.Infrastructure.Support.SupportMaterialApprovalWorker>();
         services.AddHttpClient<TaskExecution.Application.Support.ISupportTransferReceiptLookup,TaskExecution.Infrastructure.Resource.SupportTransferReceiptLookup>(client=>
         {

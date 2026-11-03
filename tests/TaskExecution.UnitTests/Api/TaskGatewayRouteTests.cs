@@ -6,6 +6,17 @@ namespace TaskExecution.UnitTests.Api;
 public sealed class TaskGatewayRouteTests
 {
     [Fact]
+    public void Support_summary_takes_priority_over_the_parish_season_route()
+    {
+        using var document=JsonDocument.Parse(File.ReadAllText(GetGatewaySettingsPath()));
+        var route=document.RootElement.GetProperty("ReverseProxy").GetProperty("Routes").GetProperty("task-season-support-summary-route");
+        route.GetProperty("ClusterId").GetString().Should().Be("task");
+        route.GetProperty("Order").GetInt32().Should().Be(-1);
+        route.GetProperty("AuthorizationPolicy").GetString().Should().Be("authenticated");
+        route.GetProperty("Match").GetProperty("Path").GetString().Should().Be("/api/v1/seasons/{seasonId}/support-summary");
+        route.GetProperty("Match").GetProperty("Methods").EnumerateArray().Select(value=>value.GetString()).Should().Equal("GET");
+    }
+    [Fact]
     public void Support_response_route_keeps_resource_material_receipt_route_separate()
     {
         using var document=JsonDocument.Parse(File.ReadAllText(GetGatewaySettingsPath()));

@@ -23,6 +23,8 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+            new ParishCoordination.Infrastructure.Events.PlanningEventOutboxConfiguration()
+                .Configure(modelBuilder.Entity<ParishCoordination.Infrastructure.Events.PlanningEventOutboxMessage>());
 
             new ParishCoordination.Infrastructure.TaskScopeSync.TaskScopeOutboxConfiguration()
                 .Configure(modelBuilder.Entity<ParishCoordination.Infrastructure.TaskScopeSync.TaskScopeOutbox>());

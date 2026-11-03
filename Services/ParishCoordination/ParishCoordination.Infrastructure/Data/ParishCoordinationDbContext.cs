@@ -1,10 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using ParishCoordination.Domain.Entities;
 using ParishCoordination.Infrastructure.TaskScopeSync;
+using ParishCoordination.Infrastructure.Events;
+using ParishCoordination.Contracts.Events;
+using Microsoft.AspNetCore.Http;
+using System.Text.Json;
 
 namespace ParishCoordination.Infrastructure.Data;
 
-public sealed class ParishCoordinationDbContext(DbContextOptions<ParishCoordinationDbContext> options)
+public sealed class ParishCoordinationDbContext(DbContextOptions<ParishCoordinationDbContext> options,
+    IHttpContextAccessor? httpContextAccessor = null)
     : DbContext(options)
 {
     public DbSet<Parish> Parishes => Set<Parish>();
@@ -18,6 +23,7 @@ public sealed class ParishCoordinationDbContext(DbContextOptions<ParishCoordinat
     public DbSet<WorkAreaCategory> WorkAreaCategories => Set<WorkAreaCategory>();
 
     public DbSet<TaskScopeOutbox> TaskScopeOutbox => Set<TaskScopeOutbox>();
+    public DbSet<PlanningEventOutboxMessage> PlanningEventOutbox => Set<PlanningEventOutboxMessage>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess) =>
         SaveChangesAsync(acceptAllChangesOnSuccess).GetAwaiter().GetResult();
@@ -39,6 +45,21 @@ public sealed class ParishCoordinationDbContext(DbContextOptions<ParishCoordinat
         foreach (var season in seasons)
         {
             await EnqueueAsync(TaskScopeSync.TaskScopeOutbox.ForSeason(season), cancellationToken);
+            var snapshot = PlanningSnapshotMapper.Scope(season);
+            await StageAsync(PlanningEventOutboxMessage.Create(snapshot), cancellationToken);
+            var entry = Entry(season);
+            if (entry.State == EntityState.Modified && entry.Property(item => item.Status).IsModified)
+            {
+                var eventType = season.Status switch
+                {
+                    ParishCoordination.Domain.Enums.SeasonStatus.Active => "planning.season.activated",
+                    ParishCoordination.Domain.Enums.SeasonStatus.Completed => "planning.season.completed",
+                    ParishCoordination.Domain.Enums.SeasonStatus.Archived => "planning.season.archived",
+                    _ => null
+                };
+                if (eventType is not null)
+                    await StageAsync(DomainEvent(snapshot, eventType, "season", snapshot.Season), cancellationToken);
+            }
         }
 
         foreach (var area in areas)
@@ -46,10 +67,40 @@ public sealed class ParishCoordinationDbContext(DbContextOptions<ParishCoordinat
             var season = Seasons.Local.SingleOrDefault(item => item.Id == area.SeasonId)
                 ?? await Seasons.AsNoTracking().SingleAsync(item => item.Id == area.SeasonId, cancellationToken);
             await EnqueueAsync(TaskScopeSync.TaskScopeOutbox.ForWorkArea(area, season), cancellationToken);
+            var snapshot = PlanningSnapshotMapper.Scope(season, area);
+            await StageAsync(PlanningEventOutboxMessage.Create(snapshot), cancellationToken);
+            var entry = Entry(area);
+            var eventType = entry.State == EntityState.Added ? "planning.work-area.created"
+                : entry.Property(item => item.CommunityId).IsModified ||
+                  entry.Property(item => item.LeaderUserId).IsModified ||
+                  entry.Property(item => item.MaterialOfficerUserId).IsModified
+                    ? "planning.work-area.assigned" : "planning.work-area.updated";
+            await StageAsync(DomainEvent(snapshot, eventType, "work_area", snapshot.WorkArea!), cancellationToken);
         }
 
         // EF commits the business changes and snapshots in the same SaveChanges transaction.
         return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private PlanningEventOutboxMessage DomainEvent<T>(PlanningScopeSnapshot snapshot, string eventType,
+        string aggregateType, T payload)
+    {
+        var http = httpContextAccessor?.HttpContext;
+        Guid? actor = Guid.TryParse(http?.User.FindFirst("sub")?.Value, out var userId) ? userId : null;
+        var correlationId = http?.Request.Headers["X-Correlation-Id"].FirstOrDefault() ?? Guid.NewGuid().ToString();
+        return PlanningEventOutboxMessage.Create(new PlanningIntegrationEvent(Guid.NewGuid(), eventType, 1,
+            snapshot.CapturedAt, correlationId, actor, snapshot.Season.ParishId, snapshot.Season.SeasonId,
+            aggregateType, snapshot.AggregateId, snapshot.SourceVersion,
+            JsonSerializer.SerializeToElement(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web))));
+    }
+
+    private async Task StageAsync(PlanningEventOutboxMessage message, CancellationToken cancellationToken)
+    {
+        if (PlanningEventOutbox.Local.Any(row => row.AggregateId == message.AggregateId &&
+            row.SourceVersion == message.SourceVersion && row.EventType == message.EventType)) return;
+        if (await PlanningEventOutbox.AnyAsync(row => row.AggregateId == message.AggregateId &&
+            row.SourceVersion == message.SourceVersion && row.EventType == message.EventType, cancellationToken)) return;
+        PlanningEventOutbox.Add(message);
     }
 
     private async Task EnqueueAsync(TaskScopeOutbox message, CancellationToken cancellationToken)

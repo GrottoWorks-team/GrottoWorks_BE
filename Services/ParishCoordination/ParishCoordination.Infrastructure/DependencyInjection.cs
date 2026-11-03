@@ -32,6 +32,11 @@ public static class DependencyInjection
 
         services.AddDbContext<ParishCoordinationDbContext>(options =>
             options.UseNpgsql(connectionString));
+        if (configuration.GetValue("PlanningEvents:DispatchEnabled", false))
+        {
+            BuildingBlocks.Messaging.MassTransit.Extensions.AddMessageBroker(services, configuration);
+            services.AddHostedService<ParishCoordination.Infrastructure.Events.PlanningEventDispatcher>();
+        }
 
         services.AddScoped<IParishRepository, ParishRepository>();
         services.AddScoped<ICommunityRepository, CommunityRepository>();

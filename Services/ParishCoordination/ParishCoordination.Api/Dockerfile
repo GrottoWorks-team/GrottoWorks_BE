@@ -13,6 +13,9 @@ COPY ["Services/ParishCoordination/ParishCoordination.Application/ParishCoordina
 COPY ["Services/ParishCoordination/ParishCoordination.Infrastructure/ParishCoordination.Infrastructure.csproj", "Services/ParishCoordination/ParishCoordination.Infrastructure/"]
 COPY ["Services/ParishCoordination/ParishCoordination.Domain/ParishCoordination.Domain.csproj", "Services/ParishCoordination/ParishCoordination.Domain/"]
 COPY ["BuildingBlocks/BuildingBlocks.Web/BuildingBlocks.Web.csproj", "BuildingBlocks/BuildingBlocks.Web/"]
+COPY ["BuildingBlocks/BuildingBlocks.Security/BuildingBlocks.Security.csproj", "BuildingBlocks/BuildingBlocks.Security/"]
+COPY ["BuildingBlocks/BuildingBlocks.Messaging/BuildingBlocks.Messaging.csproj", "BuildingBlocks/BuildingBlocks.Messaging/"]
+COPY ["Services/ParishCoordination/ParishCoordination.Contracts/ParishCoordination.Contracts.csproj", "Services/ParishCoordination/ParishCoordination.Contracts/"]
 RUN dotnet restore "./Services/ParishCoordination/ParishCoordination.Api/./ParishCoordination.Api.csproj"
 COPY . .
 WORKDIR "/src/Services/ParishCoordination/ParishCoordination.Api"

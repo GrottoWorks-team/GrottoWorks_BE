@@ -16,6 +16,7 @@
     <Project Path="Services/NotificationAudit/NotificationAudit.Infrastructure/NotificationAudit.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/Services/ParishCoordination/">
+    <Project Path="Services/ParishCoordination/ParishCoordination.Contracts/ParishCoordination.Contracts.csproj" />
     <Project Path="Services/ParishCoordination/ParishCoordination.Api/ParishCoordination.Api.csproj" />
     <Project Path="Services/ParishCoordination/ParishCoordination.Application/ParishCoordination.Application.csproj" />
     <Project Path="Services/ParishCoordination/ParishCoordination.Domain/ParishCoordination.Domain.csproj" />

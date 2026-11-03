@@ -84,6 +84,9 @@ public sealed class TaskReviewService(ITaskRepository tasks, IAssignmentStore as
             store.Add(review);
             events.Record("task.completion.reviewed",task,area,new {
                 taskId,workAreaId=task.WorkAreaId,progressId=progress.Id,approved=approve,decision=approve ? "APPROVED" : "REVISION_REQUIRED",
+                seasonId=area.SeasonId,parishId=area.ParishId,taskName=task.Name,
+                taskType=System.Text.Json.JsonNamingPolicy.SnakeCaseUpper.ConvertName(task.Type.ToString()),
+                volunteerUserIds=active.Select(row=>row.VolunteerId).Distinct().ToArray(),reviewedByUserId=user.UserId,reviewedAt=now,
                 reason=review.Reason,leaderUserId=area.LeaderUserId,recipientUserIds=active.Select(row=>row.VolunteerId).Append(user.UserId).Distinct().ToArray(),
                 status=approve ? "COMPLETED" : "REVISION_REQUIRED" });
             await assignments.SaveAsync(ct);

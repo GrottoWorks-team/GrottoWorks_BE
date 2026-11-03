@@ -55,6 +55,9 @@ public sealed class PurchaseTaskEventHandler(TaskExecutionDbContext db,IScopeEve
                 $"purchase-reconciliation:{delivery.PurchaseId:D}",delivery.ConfirmedByUserId.Value,area.ParishId,area.SeasonId,"task",taskId,task.Version,
                 JsonSerializer.SerializeToElement(new {taskId,workAreaId=area.WorkAreaId,purchaseId=delivery.PurchaseId,purchaseRequestId=snapshot.Id,
                     approved=true,decision="APPROVED",status="COMPLETED",leaderUserId=area.LeaderUserId,
+                    seasonId=area.SeasonId,parishId=area.ParishId,taskName=task.Name,taskType="PURCHASE",
+                    volunteerUserIds=members.Select(row=>row.VolunteerId).Distinct().ToArray(),
+                    reviewedByUserId=delivery.ConfirmedByUserId.Value,reviewedAt=DateTimeOffset.UtcNow,
                     recipientUserIds=members.Select(row=>row.VolunteerId).Concat(area.LeaderUserId.HasValue ? new[]{area.LeaderUserId.Value} : []).Distinct().ToArray()},Json)));
             await db.SaveChangesAsync(ct);return true;
         },ct);
@@ -97,6 +100,9 @@ public sealed class PurchaseTaskEventHandler(TaskExecutionDbContext db,IScopeEve
                 outbox.Add(new TaskExecution.Contracts.Events.TaskIntegrationEvent(Guid.NewGuid(),"task.completion.reviewed",1,DateTimeOffset.UtcNow,
                     message.CorrelationId,delivery.ConfirmedByUserId,area.ParishId,area.SeasonId,"task",task.Id,task.Version,
                     JsonSerializer.SerializeToElement(new {taskId=task.Id,workAreaId=area.WorkAreaId,approved=true,status="COMPLETED",decision="APPROVED",
+                        seasonId=area.SeasonId,parishId=area.ParishId,taskName=task.Name,taskType="PURCHASE",
+                        volunteerUserIds=active.Select(row=>row.VolunteerId).Distinct().ToArray(),
+                        reviewedByUserId=delivery.ConfirmedByUserId,reviewedAt=DateTimeOffset.UtcNow,
                         purchaseRequestId=delivery.PurchaseRequestId,purchaseId=delivery.PurchaseId,leaderUserId=area.LeaderUserId,
                         recipientUserIds=active.Select(row=>row.VolunteerId).Concat(area.LeaderUserId.HasValue ? new[]{area.LeaderUserId.Value} : []).Distinct().ToArray()},Json)));
                 return true;

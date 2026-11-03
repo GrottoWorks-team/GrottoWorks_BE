@@ -23,6 +23,13 @@ public sealed class TaskReviewTests
         f.F.Task.Status.Should().Be(TaskState.Completed);f.F.Store.Items.Single().Status.Should().Be(AssignmentStatus.Completed);
         f.Store.Progress.Single().ApprovedAt.Should().NotBeNull();f.Store.Decisions.Should().ContainSingle();
         f.F.Events.Items.Last().Payload.GetProperty("recipientUserIds").EnumerateArray().Select(x=>x.GetGuid()).Should().Contain(f.F.VolunteerId);
+        var payload=f.F.Events.Items.Last().Payload;
+        payload.GetProperty("volunteerUserIds").EnumerateArray().Select(x=>x.GetGuid()).Should().Equal(f.F.VolunteerId);
+        payload.GetProperty("taskType").GetString().Should().Be("WORK");
+        payload.GetProperty("parishId").GetGuid().Should().Be(f.F.Area.ParishId);
+        payload.GetProperty("seasonId").GetGuid().Should().Be(f.F.Area.SeasonId);
+        payload.GetProperty("reviewedByUserId").GetGuid().Should().Be(f.F.User.UserId);
+        payload.GetProperty("reviewedAt").GetDateTimeOffset().Should().NotBe(default);
         progress.Evidence.Single().FileId.Should().Be(file);
     }
     [Fact]

@@ -1,3 +1,4 @@
+using ParishCoordination.Api.SystemExport;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BuildingBlocks.Security;
@@ -24,6 +25,7 @@ builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationM
 // Cross-cutting defaults (F-PLT-03): { data, meta } envelope plumbing, ProblemDetails with 422
 // field-validation status + correlationId, exception -> RFC 9457 with a stable code.
 builder.Services.AddGrottoWorksWeb();
+builder.Services.AddGrottoWorksObservability(builder.Configuration, "ParishCoordination");
 
 // Stable code for field-validation problems (API Contract 4.3). The += keeps the BuildingBlocks
 // customization (422 status + correlationId) registered above in the chain.
@@ -52,6 +54,8 @@ builder.Services.ConfigureHttpJsonOptions(options =>
             JsonNamingPolicy.SnakeCaseUpper,
             allowIntegerValues: false));
 });
+
+builder.Services.AddScoped<BuildingBlocks.Web.IIntegrationQueueProbe, ParishCoordination.Api.Diagnostics.ServiceQueueProbe>();
 
 var app = builder.Build();
 
@@ -100,5 +104,7 @@ if (app.Configuration.GetValue("Database:MigrateOnStartup", true))
             "Database migration/seed failed. The service stays up; /health/ready reports Unhealthy.");
     }
 }
+
+app.MapSystemExportEndpoints();
 
 app.Run();

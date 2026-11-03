@@ -46,6 +46,7 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapNotificationAuditEndpoints();
+app.MapInternalFileAttachmentEndpoints();
 app.MapGrottoWorksHealthEndpoints();
 
 if (app.Configuration.GetValue("Database:MigrateOnStartup", true))

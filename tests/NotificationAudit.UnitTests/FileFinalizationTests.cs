@@ -97,7 +97,7 @@ public sealed class FileFinalizationTests
         read.Should().Throw<OperationCanceledException>();
     }
 
-    private sealed class Fixture
+    internal sealed class Fixture
     {
         public List<string> Log { get; } = [];
         public User User { get; } = new();
@@ -115,7 +115,7 @@ public sealed class FileFinalizationTests
         }
     }
 
-    private sealed class User : ICurrentUser
+    internal sealed class User : ICurrentUser
     {
         public Guid UserId { get; } = Guid.NewGuid();
         public bool IsAuthenticated => true;
@@ -124,7 +124,7 @@ public sealed class FileFinalizationTests
         public Guid? CommunityId => null;
     }
 
-    private sealed class Repository(FileObject file, List<string> log) : IFileObjectRepository, IFileObjectTransaction
+    internal sealed class Repository(FileObject file, List<string> log) : IFileObjectRepository, IFileObjectTransaction
     {
         public bool FailSave { get; set; }
         public void Add(FileObject value) => throw new NotSupportedException();
@@ -141,11 +141,12 @@ public sealed class FileFinalizationTests
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
-    private sealed class Storage(List<string> log) : IFileObjectStorage
+    internal sealed class Storage(List<string> log) : IFileObjectStorage
     {
         public string? InspectedKey { get; private set; }
         public bool FailDelete { get; set; }
         public List<string> Deleted { get; } = [];
+        public List<string> Downloaded { get; } = [];
         public StoredObjectInspection Inspection { get; set; } = new(4, "image/jpeg", "checksum", "image/jpeg");
         public Task CopyToPrivateAsync(string pending, string completed, CancellationToken cancellationToken)
         { log.Add("copy"); return Task.CompletedTask; }
@@ -159,6 +160,10 @@ public sealed class FileFinalizationTests
             return Task.CompletedTask;
         }
         public Task<PresignedObjectRequest> CreateUploadRequestAsync(string key, string type, TimeSpan lifetime, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<PresignedObjectRequest> CreateDownloadRequestAsync(string key, TimeSpan lifetime, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<PresignedObjectRequest> CreateDownloadRequestAsync(string key, TimeSpan lifetime, CancellationToken cancellationToken)
+        {
+            Downloaded.Add(key);
+            return Task.FromResult(new PresignedObjectRequest("https://storage.example/file", new Dictionary<string, string>(), DateTimeOffset.UtcNow.Add(lifetime)));
+        }
     }
 }

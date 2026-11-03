@@ -115,6 +115,8 @@ public sealed class DeleteUnattachedFileHandler(
         {
             if (file.Status == FileObjectStatus.Attached)
                 throw new DomainException("FILE_ATTACHED", "An attached file cannot be deleted.", 409);
+            if (file.AttachmentReservationId.HasValue)
+                throw new DomainException("FILE_RESERVED", "The file is reserved by a business operation.", 409);
 
             // Persist the tombstone first. A failed database commit must not destroy a live object.
             file.MarkDeleted();

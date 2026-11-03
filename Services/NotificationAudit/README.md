@@ -38,3 +38,16 @@ Completion copies the pending upload to a fresh private key, then inspects that 
 Deletion commits a metadata tombstone before removing the object. Storage failures return `503`; retrying deletion retries removal even when the tombstone is already present. A failed database commit leaves the live object untouched.
 
 Private copies abandoned by failed metadata writes/validation and pending objects left by failed cleanup still need the storage-retention cleanup worker in the integration follow-up. They are never returned as completed file references.
+
+## Internal attachment protocol
+
+API-key-protected endpoints, excluded from public OpenAPI and Gateway:
+
+- `POST /internal/files/{fileId}/attachment-reservations`
+- `POST /internal/files/{fileId}/attachment-reservations/finalize`
+- `POST /internal/files/{fileId}/attachment-reservations/release`
+- `POST /internal/files/{fileId}/record-download-url`
+
+Reserve with a stable operation ID, expected uploader/purpose, owning service and business record. Reservation blocks public deletion. The owning service must save the business record plus its finalize intent atomically, then retry finalization using the same operation ID. Release only after establishing that the business operation failed; finalized attachments cannot be released through this protocol. Reservations do not expire automatically because a delayed finalize must not expose committed evidence to deletion.
+
+The record-download endpoint accepts only an attached file matching the exact service/reference. Its internal caller must first authorize the user against that business record and verify membership of the file. Public download remains uploader-only. Source-side intent workers and record-authorized public download flows are implemented separately; these endpoints alone do not complete evidence integration.

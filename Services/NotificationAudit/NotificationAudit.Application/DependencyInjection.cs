@@ -16,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<GetFileDownloadHandler>();
         services.AddScoped<DeleteUnattachedFileHandler>();
         services.AddScoped<GetInternalFileHandler>();
+        services.AddScoped<FileAttachmentHandler>();
         services.AddScoped<ListNotificationsHandler>();
         services.AddScoped<MarkNotificationReadHandler>();
         services.AddScoped<MarkAllNotificationsReadHandler>();

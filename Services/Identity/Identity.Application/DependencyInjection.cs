@@ -60,6 +60,7 @@ public static class DependencyInjection
 
         // S2: F-IDN-09 internal lookup, F-IDN-10 parish users
         services.AddScoped<GetInternalUsersQueryHandler>();
+        services.AddScoped<GetInternalVolunteersQueryHandler>();
         services.AddScoped<ListParishUsersQueryHandler>();
 
         return services;

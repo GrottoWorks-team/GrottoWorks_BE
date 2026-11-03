@@ -20,6 +20,9 @@ public sealed record InternalUserDto(
     Guid? CommunityId,
     IReadOnlyList<Guid> SkillIds)
 {
+    public IReadOnlyList<DeclaredSkillDto> Skills { get; init; } = [];
+    public IReadOnlyList<AvailabilitySlotDto> Availability { get; init; } = [];
+
     public static InternalUserDto From(AppUser user)
     {
         return new InternalUserDto(
@@ -29,7 +32,30 @@ public sealed record InternalUserDto(
             user.Role?.Code ?? string.Empty,
             user.ParishId,
             user.VolunteerProfile?.CommunityId,
-            user.VolunteerSkills.Select(link => link.SkillId).OrderBy(id => id).ToList());
+            user.VolunteerSkills.Select(link => link.SkillId).OrderBy(id => id).ToList())
+        {
+            Skills = user.VolunteerSkills.OrderBy(skill => skill.SkillId)
+                .Select(skill => new DeclaredSkillDto(skill.SkillId, skill.SkillLevel)).ToList(),
+            Availability = user.VolunteerAvailabilities.OrderBy(slot => slot.AvailableFrom)
+                .Select(slot => new AvailabilitySlotDto(slot.AvailableFrom, slot.AvailableTo, null)).ToList()
+        };
+    }
+}
+
+public sealed class GetInternalVolunteersQueryHandler(IUserAccountStore store)
+{
+    public async Task<PagedResult<InternalUserDto>> HandleAsync(
+        Guid parishId, Guid? communityId, Guid? skillId, int page, int size,
+        CancellationToken cancellationToken = default)
+    {
+        if (parishId == Guid.Empty || communityId == Guid.Empty || skillId == Guid.Empty)
+            throw new DomainException("INTERNAL_VOLUNTEER_FILTER_INVALID", "A valid parish and non-empty filter identifiers are required.");
+        if (page < 1 || size is < 1 or > 100 || (long)(page - 1) * size > int.MaxValue)
+            throw new DomainException("INTERNAL_VOLUNTEER_PAGE_INVALID", "Page must be positive and size must be between 1 and 100.");
+
+        var result = await store.SearchAsync(new UserSearchCriteria(
+            page, size, parishId, RoleCodes.Volunteer, UserStatus.Active, communityId, skillId), cancellationToken);
+        return new PagedResult<InternalUserDto>(result.Items.Select(InternalUserDto.From).ToList(), result.TotalItems);
     }
 }
 

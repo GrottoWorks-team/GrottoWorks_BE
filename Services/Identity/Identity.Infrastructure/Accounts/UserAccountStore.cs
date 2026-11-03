@@ -57,6 +57,7 @@ public sealed class UserAccountStore(IdentityDbContext dbContext) : IUserAccount
             .Include(user => user.VolunteerSkills)
             .AsSplitQuery()
             .Where(user => userIds.Contains(user.UserId))
+            .Include(user => user.VolunteerAvailabilities)
             .ToListAsync(cancellationToken);
     }
 
@@ -116,6 +117,7 @@ public sealed class UserAccountStore(IdentityDbContext dbContext) : IUserAccount
             .ThenBy(user => user.UserId)
             .Skip((criteria.Page - 1) * criteria.Size)
             .Take(criteria.Size)
+            .Include(user => user.VolunteerAvailabilities)
             .Include(user => user.Role)
             .Include(user => user.VolunteerProfile)
             .Include(user => user.VolunteerSkills)

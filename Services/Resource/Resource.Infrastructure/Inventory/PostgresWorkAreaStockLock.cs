@@ -14,6 +14,12 @@ public sealed class PostgresWorkAreaStockLock(ResourceDbContext dbContext) : IWo
 {
     public async Task<IStockLease> AcquireAsync(Guid workAreaId, CancellationToken cancellationToken = default)
     {
+        if (dbContext.Database.CurrentTransaction is not null)
+        {
+            var existingKey = BitConverter.ToInt64(workAreaId.ToByteArray(), 0);
+            await dbContext.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({existingKey})", cancellationToken);
+            return new BorrowedLease();
+        }
         var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         try
         {
@@ -26,6 +32,13 @@ public sealed class PostgresWorkAreaStockLock(ResourceDbContext dbContext) : IWo
             await transaction.DisposeAsync();
             throw;
         }
+    }
+
+    // The approval operation owns this transaction; releasing a stock lease must not commit it early.
+    private sealed class BorrowedLease : IStockLease
+    {
+        public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class Lease(IDbContextTransaction transaction) : IStockLease

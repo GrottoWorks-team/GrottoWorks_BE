@@ -67,7 +67,7 @@ public sealed class StartSupportTransferCommandHandler(
     IInventoryStore inventory,
     ISupportTransferStore store,
     IWorkAreaStockLock stockLock,
-    ShortageTracker shortages)
+    ShortageTracker shortages) : ISupportTransferStarter
 {
     public async Task<(SupportTransferDto Transfer, bool Created)> HandleAsync(StartSupportTransferCommand command, CancellationToken cancellationToken = default)
     {

@@ -65,6 +65,8 @@ public static class DependencyInjection
 
         // F-RES-20 support transfers
         services.AddScoped<StartSupportTransferCommandHandler>();
+        services.AddScoped<ISupportTransferStarter>(provider => provider.GetRequiredService<StartSupportTransferCommandHandler>());
+        services.AddScoped<SupportTransferOperationHandler>();
         services.AddScoped<ConfirmTransferReceiptCommandHandler>();
 
         // F-RES-05 shortages

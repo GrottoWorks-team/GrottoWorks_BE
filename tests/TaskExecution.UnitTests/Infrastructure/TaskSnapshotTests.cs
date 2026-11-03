@@ -9,6 +9,22 @@ namespace TaskExecution.UnitTests.Infrastructure;
 public sealed class TaskSnapshotTests
 {
     [Fact]
+    public void Material_snapshot_distinguishes_empty_list_from_legacy_missing_data()
+    {
+        var (task, area, season) = Fixture();
+        var materialId = Guid.NewGuid();
+        task.ReplaceMaterials([new(materialId, 2.5m, " note ")], null, DateTimeOffset.UtcNow);
+        var snapshot = TaskSnapshotMapper.Map(task, area, season, [], DateTimeOffset.UtcNow);
+        snapshot.Materials.Should().ContainSingle().Which.RequiredQuantity.Should().Be(2.5m);
+        snapshot.Materials!.Single().MaterialId.Should().Be(materialId);
+        snapshot.Materials.Single().Note.Should().Be("note");
+        var row = TaskEventOutboxMessage.Create(snapshot);
+        row.ToScopeSnapshot().Materials.Should().Equal(snapshot.Materials);
+        task.ReplaceMaterials([], null, DateTimeOffset.UtcNow);
+        TaskSnapshotMapper.Map(task, area, season, [], DateTimeOffset.UtcNow).Materials.Should().BeEmpty();
+        (snapshot with { Materials = null }).Materials.Should().BeNull();
+    }
+    [Fact]
     public void Snapshot_contains_parents_and_only_effective_assignees()
     {
         var (task, area, season) = Fixture();

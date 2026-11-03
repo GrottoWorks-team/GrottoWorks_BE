@@ -66,13 +66,22 @@ public sealed class TaskExecutionDbContext(DbContextOptions<TaskExecutionDbConte
             else assignments[entry.Entity.Id] = entry.Entity;
         }
 
+        var materials = await TaskMaterials.AsNoTracking().Where(row => taskIds.Contains(row.TaskId))
+            .ToDictionaryAsync(row => row.Id, cancellationToken);
+        foreach (var entry in ChangeTracker.Entries<TaskMaterial>())
+        {
+            if (!taskIds.Contains(entry.Entity.TaskId)) continue;
+            if (entry.State == EntityState.Deleted) materials.Remove(entry.Entity.Id);
+            else materials[entry.Entity.Id] = entry.Entity;
+        }
+
         var capturedAt = DateTimeOffset.UtcNow;
         var snapshots = new List<TaskExecution.Contracts.Events.TaskScopeSnapshot>(tasks.Length);
         foreach (var task in tasks)
         {
             if (!areas.TryGetValue(task.WorkAreaId, out var area) || !seasons.TryGetValue(area.SeasonId, out var season))
                 throw new InvalidOperationException("Cannot persist a task without its local parent scopes.");
-            snapshots.Add(TaskSnapshotMapper.Map(task, area, season, assignments.Values, capturedAt));
+            snapshots.Add(TaskSnapshotMapper.Map(task, area, season, assignments.Values, capturedAt, materials.Values));
         }
 
         var snapshotIds = snapshots.Select(snapshot => snapshot.EventId).ToArray();

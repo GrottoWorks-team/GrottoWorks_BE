@@ -12,6 +12,8 @@ public sealed class TaskGatewayRouteTests
         var routes=document.RootElement.GetProperty("ReverseProxy").GetProperty("Routes");
         routes.GetProperty("task-support-responses-route").GetProperty("ClusterId").GetString().Should().Be("task");
         routes.GetProperty("resource-support-material-receipt-route").GetProperty("ClusterId").GetString().Should().Be("resource");
+        routes.GetProperty("task-support-member-approve-route").GetProperty("ClusterId").GetString().Should().Be("task");
+        routes.GetProperty("task-support-member-reject-route").GetProperty("ClusterId").GetString().Should().Be("task");
     }
     [Fact]
     public void Support_publication_routes_only_post_to_task_with_authentication()

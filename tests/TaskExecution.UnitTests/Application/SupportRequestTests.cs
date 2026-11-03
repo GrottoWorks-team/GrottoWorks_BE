@@ -80,6 +80,7 @@ public sealed class SupportRequestTests
     }
     private sealed class Repository : ISupportRequestRepository
     {
+        public Task<Guid?> FindRequestIdByMemberAsync(Guid id,CancellationToken ct)=>throw new NotSupportedException();
         public Task<T> InRequestTransactionAsync<T>(Guid requestId,Func<Task<T>> operation,CancellationToken ct)=>operation();
         public Task<IReadOnlyList<SupportPositionTask>> GetPositionTasksAsync(IReadOnlyCollection<Guid> taskIds,CancellationToken ct)=>
             throw new NotSupportedException();

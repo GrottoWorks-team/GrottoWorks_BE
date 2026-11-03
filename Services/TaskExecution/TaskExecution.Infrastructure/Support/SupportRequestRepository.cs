@@ -9,6 +9,8 @@ namespace TaskExecution.Infrastructure.Support;
 
 public sealed partial class SupportRequestRepository(TaskExecutionDbContext db) : ISupportRequestRepository
 {
+    public Task<Guid?> FindRequestIdByMemberAsync(Guid memberId,CancellationToken cancellationToken)=>
+        db.Set<SupportResponseMember>().Where(member=>member.Id==memberId).Select(member=>(Guid?)member.RequestId).SingleOrDefaultAsync(cancellationToken);
     public async Task<T> InRequestTransactionAsync<T>(Guid requestId,Func<Task<T>> operation,CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -54,7 +56,12 @@ public sealed partial class SupportRequestRepository(TaskExecutionDbContext db) 
     public async Task SaveAsync(CancellationToken ct)
     {
         try {await db.SaveChangesAsync(ct);}
-        catch(DbUpdateConcurrencyException) {throw new DomainRuleException("SUPPORT_REQUEST_VERSION_MISMATCH","The request changed concurrently.",DomainErrorKind.PreconditionFailed);}
+        catch(DbUpdateConcurrencyException exception)
+        {
+            var code=exception.Entries.Any(entry=>entry.Entity is SupportResponseMember) ? "SUPPORT_MEMBER_VERSION_MISMATCH"
+                : exception.Entries.Any(entry=>entry.Entity is TaskExecution.Domain.Tasks.WorkTask) ? "TASK_VERSION_MISMATCH" : "SUPPORT_REQUEST_VERSION_MISMATCH";
+            throw new DomainRuleException(code,"The support request, member or task changed concurrently.",DomainErrorKind.PreconditionFailed);
+        }
         catch(DbUpdateException exception) when(exception.InnerException is PostgresException {SqlState:PostgresErrorCodes.UniqueViolation,ConstraintName:SupportResponseMemberConfiguration.ActiveVolunteerIndex})
         {throw new DomainRuleException("SUPPORT_MEMBER_DUPLICATE","The volunteer already has an active position in this request.");}
     }

@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<TaskExecution.Application.Support.PublishSupportRequestHandler>();
         services.AddScoped<TaskExecution.Application.Support.StaffingSupportResponseHandler>();
         services.AddScoped<TaskExecution.Application.Support.ListSupportResponsesHandler>();
+        services.AddScoped<TaskExecution.Application.Support.ReviewSupportMemberHandler>();
         services.AddScoped<GetTaskQueryHandler>();
         services.AddScoped<CreateTaskCommandHandler>();
         services.AddScoped<UpdateTaskCommandHandler>();

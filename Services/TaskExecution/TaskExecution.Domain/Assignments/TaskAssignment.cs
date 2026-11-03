@@ -1,10 +1,20 @@
 namespace TaskExecution.Domain.Assignments;
 
-public enum AssignmentType { Direct, Application }
+public enum AssignmentType { Direct, Application, Support }
 public enum AssignmentStatus { Pending, Accepted, Declined, InProgress, Completed, Cancelled }
 
 public sealed class TaskAssignment
 {
+    public static TaskAssignment AcceptSupport(Guid taskId,Guid volunteerId,Guid leaderId,DateTimeOffset requestedAt,DateTimeOffset now)
+    {
+        if(taskId==Guid.Empty || volunteerId==Guid.Empty || leaderId==Guid.Empty)
+            throw DomainRuleException.Validation("ASSIGNMENT_IDENTITY_INVALID","Task, volunteer and leader are required.");
+        return new TaskAssignment
+        {
+            Id=Guid.NewGuid(),TaskId=taskId,VolunteerId=volunteerId,AssignedBy=leaderId,Type=AssignmentType.Support,
+            Status=AssignmentStatus.Accepted,RequestedAt=requestedAt.ToUniversalTime(),AssignedAt=now.ToUniversalTime(),ApprovedAt=now.ToUniversalTime()
+        };
+    }
     private TaskAssignment() { }
     public Guid Id { get; private set; }
     public Guid TaskId { get; private set; }

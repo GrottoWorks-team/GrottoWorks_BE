@@ -22,5 +22,6 @@ public static class TaskExecutionEndpoints
         app.MapLongOpenAttendanceEndpoints();
         app.MapSupportRequestEndpoints();
         app.MapSupportResponseEndpoints();
+        app.MapSupportMemberReviewEndpoints();
     }
 }

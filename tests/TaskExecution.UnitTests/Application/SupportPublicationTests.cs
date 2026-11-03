@@ -135,6 +135,9 @@ public sealed class SupportPublicationTests
 
     internal sealed class Store : ISupportRequestRepository
     {
+        private readonly SemaphoreSlim gate=new(1,1);
+        public Task<Guid?> FindRequestIdByMemberAsync(Guid id,CancellationToken ct)=>
+            Task.FromResult(Rows.Where(row=>row.Responses.Any(response=>response.Members.Any(member=>member.Id==id))).Select(row=>(Guid?)row.Id).SingleOrDefault());
         public List<SupportRequest> Rows { get; } = [];
         public List<SupportPositionTask> Tasks { get; } = [];
         public int TaskReads { get; private set; }
@@ -142,7 +145,7 @@ public sealed class SupportPublicationTests
         private bool inTransaction;
         public bool SavedInTransaction { get; private set; }
         public async Task<T> InRequestTransactionAsync<T>(Guid requestId, Func<Task<T>> operation, CancellationToken ct)
-        { inTransaction = true; try { return await operation(); } finally { inTransaction = false; } }
+        { await gate.WaitAsync(ct); inTransaction = true; try { return await operation(); } finally { inTransaction = false; gate.Release(); } }
         public Task<IReadOnlyList<SupportPositionTask>> GetPositionTasksAsync(IReadOnlyCollection<Guid> taskIds, CancellationToken ct)
         { TaskReads++; return Task.FromResult<IReadOnlyList<SupportPositionTask>>(Tasks.Where(task => taskIds.Contains(task.Id)).ToList()); }
         public Task<SupportRequest?> GetAsync(Guid id, bool tracked, CancellationToken ct) => Task.FromResult(Rows.SingleOrDefault(row => row.Id == id));

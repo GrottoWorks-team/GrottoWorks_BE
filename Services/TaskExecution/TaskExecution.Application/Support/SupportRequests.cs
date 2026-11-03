@@ -28,6 +28,7 @@ public sealed record SupportRequestDto(Guid Id,Guid SeasonId,Guid WorkAreaId,Gui
 
 public interface ISupportRequestRepository
 {
+    Task<Guid?> FindRequestIdByMemberAsync(Guid memberId,CancellationToken cancellationToken);
     Task<T> InRequestTransactionAsync<T>(Guid requestId,Func<Task<T>> operation,CancellationToken cancellationToken);
     Task<IReadOnlyList<SupportPositionTask>> GetPositionTasksAsync(IReadOnlyCollection<Guid> taskIds,CancellationToken cancellationToken);
     Task<SupportRequest?> GetAsync(Guid id,bool tracked,CancellationToken cancellationToken);

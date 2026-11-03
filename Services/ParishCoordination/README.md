@@ -1,5 +1,7 @@
 # ParishCoordination integration
 
+`planning.work-area.assigned` preserves the Work Area snapshot and adds `communityChanged`, `leaderChanged`, and `materialOfficerChanged`. Flags compare original and current assignments inside the business transaction. A Community change does not imply either role holder was reassigned; consumers must not infer changes from current role IDs. Technical scope snapshots remain unchanged.
+
 The existing `TaskScopeSync` HTTP delivery remains enabled until the planned RabbitMQ cutover.
 
 `PlanningEvents:DispatchEnabled` defaults to false. When enabled, business events and technical planning snapshots use the transactional planning outbox. A reconciliation worker scans existing Seasons, then Work Areas, at startup and every 30 minutes (`PlanningEvents:ReconcileIntervalMinutes`, 1–1440). Keyset batches of 100 use repeatable-read transactions and the same advisory lock as the dispatcher.

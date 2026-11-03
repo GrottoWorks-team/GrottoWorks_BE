@@ -70,12 +70,16 @@ public sealed class ParishCoordinationDbContext(DbContextOptions<ParishCoordinat
             var snapshot = PlanningSnapshotMapper.Scope(season, area);
             await StageAsync(PlanningEventOutboxMessage.Create(snapshot), cancellationToken);
             var entry = Entry(area);
+            var communityChanged = entry.Property(item => item.CommunityId).OriginalValue != area.CommunityId;
+            var leaderChanged = entry.Property(item => item.LeaderUserId).OriginalValue != area.LeaderUserId;
+            var officerChanged = entry.Property(item => item.MaterialOfficerUserId).OriginalValue != area.MaterialOfficerUserId;
             var eventType = entry.State == EntityState.Added ? "planning.work-area.created"
-                : entry.Property(item => item.CommunityId).IsModified ||
-                  entry.Property(item => item.LeaderUserId).IsModified ||
-                  entry.Property(item => item.MaterialOfficerUserId).IsModified
+                : communityChanged || leaderChanged || officerChanged
                     ? "planning.work-area.assigned" : "planning.work-area.updated";
-            await StageAsync(DomainEvent(snapshot, eventType, "work_area", snapshot.WorkArea!), cancellationToken);
+            var payload = eventType == "planning.work-area.assigned"
+                ? PlanningSnapshotMapper.AssignmentPayload(snapshot.WorkArea!, communityChanged, leaderChanged, officerChanged)
+                : JsonSerializer.SerializeToElement(snapshot.WorkArea!, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            await StageAsync(DomainEvent(snapshot, eventType, "work_area", payload), cancellationToken);
         }
 
         // EF commits the business changes and snapshots in the same SaveChanges transaction.

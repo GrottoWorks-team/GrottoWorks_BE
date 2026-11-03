@@ -6,6 +6,17 @@ namespace ParishCoordination.Infrastructure.Events;
 
 public static class PlanningSnapshotMapper
 {
+    public static JsonElement AssignmentPayload(WorkAreaScopeSnapshot area, bool communityChanged,
+        bool leaderChanged, bool materialOfficerChanged)
+    {
+        // Keep all existing snapshot fields; the additive flags describe this transaction, not current ownership.
+        var payload = JsonSerializer.SerializeToNode(area, new JsonSerializerOptions(JsonSerializerDefaults.Web))!.AsObject();
+        payload["communityChanged"] = communityChanged;
+        payload["leaderChanged"] = leaderChanged;
+        payload["materialOfficerChanged"] = materialOfficerChanged;
+        return JsonSerializer.SerializeToElement(payload);
+    }
+
     public static SeasonScopeSnapshot Season(Season season) => new(season.Id, season.ParishId,
         season.StartDate, season.EndDate, Status(season.Status), season.Version);
 

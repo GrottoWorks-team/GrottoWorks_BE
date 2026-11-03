@@ -7,6 +7,7 @@ public sealed record SupportMemberInput(Guid PositionId,Guid VolunteerId);
 public sealed class SupportResponse
 {
     private readonly List<SupportResponseMember> members=[];
+    private readonly List<SupportResponseMaterial> materials=[];
     private SupportResponse() { }
     public Guid Id {get;private set;}
     public Guid RequestId {get;private set;}
@@ -19,35 +20,40 @@ public sealed class SupportResponse
     public DateTimeOffset CreatedAt {get;private set;}
     public int Version {get;private set;}=1;
     public IReadOnlyCollection<SupportResponseMember> Members=>members;
+    public IReadOnlyCollection<SupportResponseMaterial> Materials=>materials;
 
-    internal static SupportResponse Staffing(Guid requestId,Guid actor,Guid? communityId,IReadOnlyList<SupportMemberInput> inputs,
-        string? note,DateTimeOffset now)
+    internal static SupportResponse Create(Guid requestId,Guid actor,Guid? communityId,IReadOnlyList<SupportMemberInput> inputs,
+        IReadOnlyList<SupportMaterialOfferInput> offers,IReadOnlyDictionary<Guid,SupportMaterial> demands,string? note,DateTimeOffset now)
     {
-        if(actor==Guid.Empty || communityId==Guid.Empty || inputs.Count==0)
-            throw DomainRuleException.Validation("SUPPORT_RESPONSE_INVALID","An actor and at least one named participant are required.");
+        if(actor==Guid.Empty || communityId==Guid.Empty || (inputs.Count==0 && offers.Count==0))
+            throw DomainRuleException.Validation("SUPPORT_RESPONSE_INVALID","An actor and at least one participant or material offer are required.");
         if(inputs.Any(member=>member.PositionId==Guid.Empty || member.VolunteerId==Guid.Empty) ||
             inputs.Select(member=>member.VolunteerId).Distinct().Count()!=inputs.Count)
             throw DomainRuleException.Validation("SUPPORT_MEMBER_INVALID","Participants must have valid identities and may appear only once.");
-        if(communityId is null && (inputs.Count!=1 || inputs[0].VolunteerId!=actor))
+        if(inputs.Count>0 && communityId is null && (inputs.Count!=1 || inputs[0].VolunteerId!=actor))
             throw DomainRuleException.Forbidden("SUPPORT_RESPONSE_ACCESS_DENIED","Individual volunteers may only offer themselves.");
         if(note?.Length>2000) throw DomainRuleException.Validation("SUPPORT_NOTE_INVALID","Note must not exceed 2000 characters.");
         var response=new SupportResponse
         {
-            Id=Guid.NewGuid(),RequestId=requestId,SubmittedBy=actor,VolunteerId=communityId is null ? actor : null,
+            Id=Guid.NewGuid(),RequestId=requestId,SubmittedBy=actor,VolunteerId=communityId is null && inputs.Count>0 ? actor : null,
             RespondingCommunityId=communityId,ResponseQuantity=inputs.Count,Note=string.IsNullOrWhiteSpace(note) ? null : note.Trim(),
             CreatedAt=now.ToUniversalTime()
         };
         response.members.AddRange(inputs.Select(member=>SupportResponseMember.Offer(response.Id,requestId,member)));
+        response.materials.AddRange(offers.Select(offer=>SupportResponseMaterial.Offer(response.Id,requestId,demands[offer.RequestMaterialId].MaterialId,offer)));
         return response;
     }
 
     internal void RefreshMemberStatus()
     {
-        var accepted=members.Count(member=>member.Status is SupportMemberStatus.Approved or SupportMemberStatus.Completed);
-        Status=accepted==members.Count ? SupportResponseStatus.Accepted
+        var accepted=members.Count(member=>member.Status is SupportMemberStatus.Approved or SupportMemberStatus.Completed)
+            + materials.Count(material=>material.Status is SupportMaterialStatus.Approved or SupportMaterialStatus.Transferred);
+        var total=members.Count+materials.Count;
+        Status=accepted==total ? SupportResponseStatus.Accepted
             : accepted>0 ? SupportResponseStatus.PartiallyAccepted
-            : members.All(member=>member.Status==SupportMemberStatus.Cancelled) ? SupportResponseStatus.Cancelled
-            : members.All(member=>member.Status is SupportMemberStatus.Rejected or SupportMemberStatus.Cancelled) ? SupportResponseStatus.Rejected
+            : members.All(member=>member.Status==SupportMemberStatus.Cancelled) && materials.All(material=>material.Status==SupportMaterialStatus.Cancelled) ? SupportResponseStatus.Cancelled
+            : members.All(member=>member.Status is SupportMemberStatus.Rejected or SupportMemberStatus.Cancelled) &&
+              materials.All(material=>material.Status is SupportMaterialStatus.Rejected or SupportMaterialStatus.Cancelled) ? SupportResponseStatus.Rejected
             : SupportResponseStatus.Pending;
         Version++;
     }
@@ -147,9 +153,12 @@ public sealed partial class SupportRequest
         var accepted=responses.SelectMany(row=>row.Members)
             .Where(row=>row.Status is SupportMemberStatus.Approved or SupportMemberStatus.Completed).ToList();
         var staffingSatisfied=positions.Count>0 && positions.All(position=>accepted.Count(row=>row.PositionId==position.Id)>=position.RequiredVolunteerCount);
-        // Material fulfillment is added only from Resource receipt facts, never from staffing approval.
-        Status=SupportType==SupportType.Staffing && staffingSatisfied ? SupportRequestStatus.Fulfilled
-            : accepted.Count>0 ? SupportRequestStatus.PartiallyFulfilled : SupportRequestStatus.Published;
+        var receipts=responses.SelectMany(row=>row.Materials).Where(row=>row.Status==SupportMaterialStatus.Transferred).ToList();
+        var materialSatisfied=materials.Count>0 && materials.All(demand=>receipts.Where(row=>row.RequestMaterialId==demand.Id)
+            .Sum(row=>row.ReceivedUsableQuantity ?? 0)>=demand.RequiredQuantity);
+        var fulfilled=(SupportType==SupportType.Material || staffingSatisfied) && (SupportType==SupportType.Staffing || materialSatisfied);
+        Status=fulfilled ? SupportRequestStatus.Fulfilled
+            : accepted.Count>0 || receipts.Any(row=>row.ReceivedUsableQuantity>0) ? SupportRequestStatus.PartiallyFulfilled : SupportRequestStatus.Published;
     }
 
     private readonly List<SupportResponse> responses=[];
@@ -162,9 +171,26 @@ public sealed partial class SupportRequest
     }
 
     public SupportResponse OfferStaffing(Guid actor,Guid? communityId,IReadOnlyList<SupportMemberInput> inputs,string? note,DateTimeOffset now)
+        =>OfferResponse(actor,communityId,inputs,[],note,now);
+
+    public void ValidateMaterialOffers(IReadOnlyList<SupportMaterialOfferInput> offers)
+    {
+        if(offers.Count>0 && SupportType==SupportType.Staffing)
+            throw DomainRuleException.Validation("SUPPORT_TYPE_MISMATCH","This request does not accept material offers.");
+        if(offers.Any(offer=>!materials.Any(demand=>demand.Id==offer.RequestMaterialId)))
+            throw DomainRuleException.Validation("SUPPORT_MATERIAL_MEMBERSHIP_INVALID","A material demand belongs to another request.");
+        if(offers.Any(offer=>offer.SourceWorkAreaId==WorkAreaId))
+            throw DomainRuleException.Validation("SUPPORT_TRANSFER_SAME_WORK_AREA","Source and target must be different work areas.");
+        if(offers.Select(offer=>(offer.RequestMaterialId,offer.SourceWorkAreaId)).Distinct().Count()!=offers.Count)
+            throw DomainRuleException.Validation("SUPPORT_MATERIAL_DUPLICATE","A material demand/source pair may only appear once.");
+        foreach(var offer in offers) SupportResponseMaterial.ValidateOffer(offer);
+    }
+
+    public SupportResponse OfferResponse(Guid actor,Guid? communityId,IReadOnlyList<SupportMemberInput> inputs,
+        IReadOnlyList<SupportMaterialOfferInput> offers,string? note,DateTimeOffset now)
     {
         EnsureAcceptsResponses();
-        if(SupportType==SupportType.Material)
+        if(inputs.Count>0 && SupportType==SupportType.Material)
             throw DomainRuleException.Validation("SUPPORT_TYPE_MISMATCH","This request does not recruit volunteers.");
         if(inputs.Any(member=>!positions.Any(position=>position.Id==member.PositionId)))
             throw DomainRuleException.Validation("SUPPORT_POSITION_MEMBERSHIP_INVALID","Each position must belong to this support request.");
@@ -173,7 +199,8 @@ public sealed partial class SupportRequest
             .Select(member=>member.VolunteerId).ToHashSet();
         if(inputs.Any(member=>active.Contains(member.VolunteerId)))
             throw new DomainRuleException("SUPPORT_MEMBER_DUPLICATE","A volunteer already has an active position in this request.");
-        var response=SupportResponse.Staffing(Id,actor,communityId,inputs,note,now);
+        ValidateMaterialOffers(offers);
+        var response=SupportResponse.Create(Id,actor,communityId,inputs,offers,materials.ToDictionary(demand=>demand.Id),note,now);
         responses.Add(response);
         UpdatedAt=now.ToUniversalTime();Version++;
         return response;

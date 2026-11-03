@@ -14,7 +14,8 @@ public sealed class SupportAssignmentLifecycle(TaskExecutionDbContext db) : ISup
             .Where(request=>request.Responses.Any(response=>response.Members.Any(member=>member.AssignmentId.HasValue &&
                 assignmentIds.Contains(member.AssignmentId.Value) && member.Status==SupportMemberStatus.Approved)))
             .Include(request=>request.Positions).Include(request=>request.Materials)
-            .Include(request=>request.Responses).ThenInclude(response=>response.Members).AsSplitQuery().ToListAsync(cancellationToken);
+            .Include(request=>request.Responses).ThenInclude(response=>response.Members)
+            .Include(request=>request.Responses).ThenInclude(response=>response.Materials).AsSplitQuery().ToListAsync(cancellationToken);
         foreach(var request in requests) request.CancelAssignments(assignmentIds,now);
         // The Task's transaction commits these aggregate versions and the cancellation outbox together.
     }

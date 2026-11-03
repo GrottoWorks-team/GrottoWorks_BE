@@ -117,7 +117,12 @@ public sealed class StaffingSupportResponseTests
     internal static SupportMemberInput Member(SupportPublicationTests.Fixture fixture)=>new(fixture.Request.Positions.Single().Id,fixture.Source.VolunteerId);
     private static TaskScopeAccess Scopes(SupportPublicationTests.Fixture fixture)=>new(
         new AssignmentTestFixture.TestScopes(fixture.Source.Season,fixture.Source.Area),fixture.Source.User);
-    private static StaffingSupportResponseHandler Handler(SupportPublicationTests.Fixture fixture)=>new(fixture.Store,Scopes(fixture),
+    private static SupportResponseHandler Handler(SupportPublicationTests.Fixture fixture)=>new(fixture.Store,Scopes(fixture),
         new AssignmentTestFixture.TestScopes(fixture.Source.Season,fixture.Source.Area),new ActiveUserAccess(fixture.Source.Identity,fixture.Source.User),
-        fixture.Source.Identity,fixture.Source.User,TimeProvider.System);
+        fixture.Source.Identity,fixture.Source.User,TimeProvider.System,new ValidateSupportMaterialOffers(
+            new AssignmentTestFixture.TestScopes(fixture.Source.Season,fixture.Source.Area),new UnusedInventory()));
+    private sealed class UnusedInventory : ISupportMaterialAvailability
+    {
+        public Task<IReadOnlyList<SupportMaterialAvailability>> GetAsync(Guid id,IReadOnlyCollection<Guid> ids,CancellationToken ct)=>throw new NotSupportedException();
+    }
 }

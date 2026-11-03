@@ -27,6 +27,11 @@ public static class DependencyInjection
         services.AddScoped<ITaskRepository, TaskRepository>();
         services.AddScoped<IWorkAreaTaskCountReader, WorkAreaTaskCountReader>();
         services.AddScoped<IMyTasksStore, MyTasksStore>();
+        services.AddHttpClient<TaskExecution.Application.Support.ISupportMaterialAvailability,TaskExecution.Infrastructure.Resource.SupportMaterialAvailabilityClient>(client=>
+        {
+            client.BaseAddress=new Uri(configuration["ResourceClient:BaseAddress"] ?? "http://localhost:6103/");
+            client.Timeout=Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options=>options.TotalRequestTimeout.Timeout=TimeSpan.FromSeconds(10));
         services.AddHttpClient<IMaterialCatalogLookup, TaskExecution.Infrastructure.Resource.MaterialCatalogLookup>(client =>
         {
             client.BaseAddress = new Uri(configuration["ResourceClient:BaseAddress"] ?? "http://localhost:6103/");

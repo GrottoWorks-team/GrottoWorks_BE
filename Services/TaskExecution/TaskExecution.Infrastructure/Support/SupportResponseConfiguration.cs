@@ -25,6 +25,9 @@ public sealed class SupportResponseConfiguration : IEntityTypeConfiguration<Supp
         b.HasMany(row=>row.Members).WithOne().HasForeignKey(row=>new {row.RequestId,row.ResponseId})
             .HasPrincipalKey(row=>new {row.RequestId,row.Id}).OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_support_member_response");
         b.Navigation(row=>row.Members).HasField("members").UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasMany(row=>row.Materials).WithOne().HasForeignKey(row=>new {row.RequestId,row.ResponseId})
+            .HasPrincipalKey(row=>new {row.RequestId,row.Id}).OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_support_offer_response");
+        b.Navigation(row=>row.Materials).HasField("materials").UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasIndex(row=>new {row.RequestId,row.CreatedAt,row.Id}).HasDatabaseName("ix_support_response_request_created");
     }
 }

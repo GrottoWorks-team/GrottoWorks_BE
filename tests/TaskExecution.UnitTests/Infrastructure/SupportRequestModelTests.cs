@@ -23,6 +23,9 @@ public sealed class SupportRequestModelTests
         var member=db.Model.FindEntityType(typeof(SupportResponseMember))!;
         member.GetIndexes().Should().Contain(index=>index.IsUnique && index.GetFilter()!=null && index.Properties.Any(property=>property.Name==nameof(SupportResponseMember.RequestId)));
         member.GetForeignKeys().Should().Contain(key=>key.PrincipalEntityType.ClrType==typeof(SupportPosition) && key.Properties.Count==2);
+        var offer=db.Model.FindEntityType(typeof(SupportResponseMaterial))!;
+        offer.FindProperty(nameof(SupportResponseMaterial.OfferedQuantity))!.GetPrecision().Should().Be(12);
+        offer.GetForeignKeys().Should().Contain(key=>key.PrincipalEntityType.ClrType==typeof(SupportMaterial) && key.Properties.Count==2);
         db.Database.HasPendingModelChanges().Should().BeFalse();
     }
 }

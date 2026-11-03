@@ -14,17 +14,31 @@ public sealed record SupportMemberDto(Guid Id,Guid PositionId,Guid VolunteerId,S
         member.Status,member.AssignmentId,member.Version,member.ReviewedBy,member.ReviewedAt,member.ReviewReason);
 }
 public sealed record SupportResponseDto(Guid Id,Guid RequestId,Guid? VolunteerId,Guid? RespondingCommunityId,SupportResponseStatus Status,
-    int ResponseQuantity,string? Note,DateTimeOffset CreatedAt,int Version,IReadOnlyList<SupportMemberDto> Members,IReadOnlyList<object> Materials)
+    int ResponseQuantity,string? Note,DateTimeOffset CreatedAt,int Version,IReadOnlyList<SupportMemberDto> Members,IReadOnlyList<SupportResponseMaterialDto> Materials)
 {
     public static SupportResponseDto From(SupportResponse response)=>new(response.Id,response.RequestId,response.VolunteerId,
         response.RespondingCommunityId,response.Status,response.ResponseQuantity,response.Note,response.CreatedAt,response.Version,
-        response.Members.OrderBy(member=>member.Id).Select(SupportMemberDto.From).ToList(),[]);
+        response.Members.OrderBy(member=>member.Id).Select(SupportMemberDto.From).ToList(),
+        response.Materials.OrderBy(material=>material.Id).Select(SupportResponseMaterialDto.From).ToList());
 }
 
-public sealed class StaffingSupportResponseHandler(ISupportRequestRepository requests,TaskScopeAccess scopes,IScopeProjectionStore scopeStore,
-    ActiveUserAccess access,IIdentityUserBatchLookup identity,ICurrentUser user,TimeProvider clock)
+public sealed record SupportResponseMaterialDto(Guid Id,Guid RequestMaterialId,Guid SourceWorkAreaId,Guid MaterialId,decimal OfferedQuantity,
+    decimal? ApprovedQuantity,decimal? ReceivedUsableQuantity,decimal? ReceivedUnusableQuantity,SupportMaterialStatus Status,
+    Guid? ApprovedBy,DateTimeOffset? ApprovedAt,Guid? ReceivedConfirmedBy,DateTimeOffset? ReceivedConfirmedAt,string? Note,int Version)
+{
+    public static SupportResponseMaterialDto From(SupportResponseMaterial row)=>new(row.Id,row.RequestMaterialId,row.SourceWorkAreaId,row.MaterialId,
+        row.OfferedQuantity,row.ApprovedQuantity,row.ReceivedUsableQuantity,row.ReceivedUnusableQuantity,row.Status,row.ApprovedBy,row.ApprovedAt,
+        row.ReceivedConfirmedBy,row.ReceivedConfirmedAt,row.Note,row.Version);
+}
+
+public sealed class SupportResponseHandler(ISupportRequestRepository requests,TaskScopeAccess scopes,IScopeProjectionStore scopeStore,
+    ActiveUserAccess access,IIdentityUserBatchLookup identity,ICurrentUser user,TimeProvider clock,ValidateSupportMaterialOffers materialOffers)
 {
     public Task<SupportResponseDto> HandleAsync(Guid requestId,Guid? communityId,IReadOnlyList<SupportMemberInput> members,string? note,
+        CancellationToken cancellationToken=default)=>HandleAsync(requestId,communityId,members,[],note,cancellationToken);
+
+    public Task<SupportResponseDto> HandleAsync(Guid requestId,Guid? communityId,IReadOnlyList<SupportMemberInput> members,
+        IReadOnlyList<SupportMaterialOfferInput> materials,string? note,
         CancellationToken cancellationToken=default) => requests.InRequestTransactionAsync(requestId,async ()=>
     {
         if(user.Role is not (GrottoWorksRoles.Volunteer or GrottoWorksRoles.MaterialOfficer))
@@ -37,7 +51,20 @@ public sealed class StaffingSupportResponseHandler(ISupportRequestRepository req
         if(season.IsReadOnly) throw new DomainRuleException("SEASON_READ_ONLY","The archived season is read-only.");
         var caller=await access.EnsureCallerAsync(area.ParishId,cancellationToken);
         request.EnsureAcceptsResponses();
-        if(members.Count==0 || members.Any(member=>member.PositionId==Guid.Empty || member.VolunteerId==Guid.Empty))
+        if(members.Count==0 && materials.Count==0) throw DomainRuleException.Validation("SUPPORT_RESPONSE_INVALID","A response must offer people or materials.");
+        if(members.Count>0) await ValidateMembersAsync(request,area,caller,communityId,members,cancellationToken);
+        else if(communityId.HasValue && (communityId==Guid.Empty || caller.CommunityId!=communityId))
+            throw DomainRuleException.Forbidden("SUPPORT_COMMUNITY_ACCESS_DENIED","The responding community does not match the caller.");
+        await materialOffers.HandleAsync(request,area,caller,materials,cancellationToken);
+        var response=request.OfferResponse(caller.UserId,communityId,members,materials,note,clock.GetUtcNow());
+        await requests.SaveAsync(cancellationToken);
+        return SupportResponseDto.From(response);
+    },cancellationToken);
+
+    private async Task ValidateMembersAsync(SupportRequest request,WorkAreaScope area,IdentityUser caller,Guid? communityId,
+        IReadOnlyList<SupportMemberInput> members,CancellationToken cancellationToken)
+    {
+        if(members.Any(member=>member.PositionId==Guid.Empty || member.VolunteerId==Guid.Empty))
             throw DomainRuleException.Validation("SUPPORT_MEMBER_INVALID","At least one valid named participant is required.");
         if(communityId.HasValue)
         {
@@ -63,10 +90,7 @@ public sealed class StaffingSupportResponseHandler(ISupportRequestRepository req
             if(positions[member.PositionId].Skills.Any(skill=>!VolunteerSkills.Meets(volunteer,skill.SkillId,skill.RequiredSkillLevel)))
                 throw new DomainRuleException("SUPPORT_SKILL_MISMATCH","Every required skill and minimum level must be met; Support has no skill override.");
         }
-        var response=request.OfferStaffing(caller.UserId,communityId,members,note,clock.GetUtcNow());
-        await requests.SaveAsync(cancellationToken);
-        return SupportResponseDto.From(response);
-    },cancellationToken);
+    }
 }
 
 public sealed class ListSupportResponsesHandler(ISupportRequestRepository requests,TaskScopeAccess scopes)

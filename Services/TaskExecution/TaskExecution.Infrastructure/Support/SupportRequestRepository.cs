@@ -34,7 +34,8 @@ public sealed partial class SupportRequestRepository(TaskExecutionDbContext db) 
         SupportType? type,SupportRequestStatus? status,int page,int size,bool descending,CancellationToken ct)
     {
         var query=db.SupportRequests.AsNoTracking()
-            .Include(r=>r.Positions).ThenInclude(p=>p.Skills).Include(r=>r.Materials).Include(r=>r.Responses).ThenInclude(r=>r.Members).AsSplitQuery()
+            .Include(r=>r.Positions).ThenInclude(p=>p.Skills).Include(r=>r.Materials).Include(r=>r.Responses).ThenInclude(r=>r.Members)
+            .Include(r=>r.Responses).ThenInclude(r=>r.Materials).AsSplitQuery()
             .Where(request=>db.WorkAreaScopes.Any(area=>area.WorkAreaId==request.WorkAreaId &&
                 (!parishId.HasValue || area.ParishId==parishId.Value)));
         if (seasonId.HasValue) query=query.Where(r=>r.SeasonId==seasonId.Value);
@@ -49,7 +50,7 @@ public sealed partial class SupportRequestRepository(TaskExecutionDbContext db) 
     public Task<SupportRequest?> GetAsync(Guid id,bool tracked,CancellationToken ct)
     {
         var query=db.SupportRequests.Include(r=>r.Positions).ThenInclude(p=>p.Skills).Include(r=>r.Materials)
-            .Include(r=>r.Responses).ThenInclude(r=>r.Members).AsSplitQuery();
+            .Include(r=>r.Responses).ThenInclude(r=>r.Members).Include(r=>r.Responses).ThenInclude(r=>r.Materials).AsSplitQuery();
         return (tracked ? query : query.AsNoTracking()).SingleOrDefaultAsync(r=>r.Id==id,ct);
     }
     public void Add(SupportRequest request)=>db.SupportRequests.Add(request);

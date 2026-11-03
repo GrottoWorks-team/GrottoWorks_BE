@@ -16,7 +16,7 @@ public sealed class SupportResponseRouteTests
     public async Task Staffing_routes_preserve_operations_roles_and_response_contracts()
     {
         var builder=WebApplication.CreateBuilder(new WebApplicationOptions {EnvironmentName="Testing"});
-        builder.Services.AddScoped<StaffingSupportResponseHandler>();builder.Services.AddScoped<ListSupportResponsesHandler>();
+        builder.Services.AddScoped<SupportResponseHandler>();builder.Services.AddScoped<ListSupportResponsesHandler>();
         builder.Services.AddScoped<ReviewSupportMemberHandler>();
         await using var app=builder.Build();app.MapSupportResponseEndpoints();app.MapSupportMemberReviewEndpoints();
         var routes=((IEndpointRouteBuilder)app).DataSources.SelectMany(source=>source.Endpoints).OfType<RouteEndpoint>().ToList();

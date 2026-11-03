@@ -63,6 +63,7 @@ public sealed class SupportMaterialConfiguration : IEntityTypeConfiguration<Supp
     {
         b.ToTable("support_request_material",t=>t.HasCheckConstraint("support_request_material_positive_quantity","required_quantity>0"));b.HasKey(r=>r.Id);
         b.Property(r=>r.Id).HasColumnName("support_request_material_id").ValueGeneratedNever();b.Property(r=>r.RequestId).HasColumnName("support_request_id");
+        b.HasAlternateKey(r=>new {r.RequestId,r.Id}).HasName("ak_support_demand_request_id");
         b.Property(r=>r.MaterialId).HasColumnName("material_id");b.Property(r=>r.RequiredQuantity).HasColumnName("required_quantity").HasPrecision(12,2);
         b.Property(r=>r.Note).HasColumnName("material_note").HasMaxLength(2000);
         b.HasIndex(r=>new {r.RequestId,r.MaterialId}).IsUnique();

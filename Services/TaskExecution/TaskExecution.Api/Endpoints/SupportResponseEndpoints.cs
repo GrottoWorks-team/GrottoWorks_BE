@@ -9,11 +9,16 @@ using TaskExecution.Domain.Support;
 namespace TaskExecution.Api.Endpoints;
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed class StaffingSupportResponseRequest
+public sealed class SupportResponseRequest : IValidatableObject
 {
     public Guid? RespondingCommunityId {get;init;}
-    [Required,MinLength(1)] public IReadOnlyList<SupportMemberInput>? Members {get;init;}
+    [Required] public IReadOnlyList<SupportMemberInput> Members {get;init;}=[];
+    [Required] public IReadOnlyList<SupportMaterialOfferInput> Materials {get;init;}=[];
     [StringLength(2000)] public string? Note {get;init;}
+    public IEnumerable<ValidationResult> Validate(ValidationContext context)
+    {
+        if(Members is {Count:0} && Materials is {Count:0}) yield return new("Offer at least one member or material.",[nameof(Members),nameof(Materials)]);
+    }
 }
 
 public static class SupportResponseEndpoints
@@ -31,10 +36,10 @@ public static class SupportResponseEndpoints
             .Produces<ApiResponse<IReadOnlyList<SupportResponseDto>>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401)
             .Produces<ProblemDetails>(403).Produces<ProblemDetails>(404);
     }
-    private static async Task<IResult> CreateAsync(Guid requestId,StaffingSupportResponseRequest request,
-        StaffingSupportResponseHandler handler,HttpContext context,CancellationToken ct)
+    private static async Task<IResult> CreateAsync(Guid requestId,SupportResponseRequest request,
+        SupportResponseHandler handler,HttpContext context,CancellationToken ct)
     {
-        var result=await handler.HandleAsync(requestId,request.RespondingCommunityId,request.Members!,request.Note,ct);
+        var result=await handler.HandleAsync(requestId,request.RespondingCommunityId,request.Members,request.Materials,request.Note,ct);
         context.Response.Headers.ETag=$"\"{result.Version}\"";
         return Results.Created($"/api/v1/support-requests/{requestId}/responses",ApiResults.Ok(result,context));
     }

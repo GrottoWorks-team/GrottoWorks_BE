@@ -91,6 +91,17 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
         if (message.EventType == "planning.work-area.assigned")
             return MapWorkAreaAssignment(message, out requiresContext);
 
+        if (message.EventType is "purchase.request.submitted" or "purchase.request.decided" or
+            "readiness.item.failed" or "recognition.entry.created")
+            return MapUpstreamWorkflow(message, out requiresContext);
+
+        if (message.EventType == "task.status.changed" && GetString(payload, "status") is "COMPLETED" or "REVISION_REQUIRED")
+        {
+            // Review-result recipient context is added with the Task review workflow; do not lose these notifications.
+            requiresContext = true;
+            return [];
+        }
+
         if (message.EventType == "attendance.session.open-too-long")
         {
             var volunteerId = GetGuid(payload, "volunteerUserId");
@@ -155,7 +166,7 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
         }
         var reviewType = GetString(message.Payload, "reviewType");
         if (reviewType is "CHECK_IN" or "CORRECTION") safeValues["reviewType"] = JsonSerializer.SerializeToElement(reviewType);
-        foreach (var field in new[] { "communityChanged", "leaderChanged", "materialOfficerChanged" })
+        foreach (var field in new[] { "communityChanged", "leaderChanged", "materialOfficerChanged", "mandatory" })
         {
             if (message.Payload.TryGetProperty(field, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False)
                 safeValues[field] = value.Clone();

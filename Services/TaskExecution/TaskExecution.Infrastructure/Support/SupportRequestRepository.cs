@@ -13,6 +13,12 @@ public sealed partial class SupportRequestRepository(TaskExecutionDbContext db) 
         db.Set<SupportResponseMember>().Where(member=>member.Id==memberId).Select(member=>(Guid?)member.RequestId).SingleOrDefaultAsync(cancellationToken);
     public async Task<T> InRequestTransactionAsync<T>(Guid requestId,Func<Task<T>> operation,CancellationToken cancellationToken)
     {
+        if (db.Database.CurrentTransaction is not null)
+        {
+            var existingKey = $"support-request:{requestId:D}";
+            await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({existingKey},0))", cancellationToken);
+            return await operation();
+        }
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var key = $"support-request:{requestId:D}";
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({key},0))", cancellationToken);

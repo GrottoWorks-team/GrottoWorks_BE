@@ -79,6 +79,25 @@ public sealed class SupportResponseMaterial
         Status = SupportMaterialStatus.Rejected; ApprovedBy = actor; ApprovedAt = now; ReviewReason = reason.Trim(); Version++;
     }
 
+    internal bool Receive(decimal usable, decimal unusable, Guid officer, DateTimeOffset confirmedAt)
+    {
+        if (Status is not (SupportMaterialStatus.Approved or SupportMaterialStatus.Transferred) || ApprovedQuantity is null)
+            throw new DomainRuleException("SUPPORT_TRANSFER_NOT_APPROVED", "Reconcile the withdrawal before applying its receipt.");
+        if (usable < 0 || unusable < 0 || usable + unusable > ApprovedQuantity || decimal.Round(usable,2) != usable ||
+            decimal.Round(unusable,2) != unusable || officer == Guid.Empty || confirmedAt == default)
+            throw DomainRuleException.Validation("SUPPORT_TRANSFER_RESULT_INVALID", "The received quantities or confirmation identity are invalid.");
+        if (Status == SupportMaterialStatus.Transferred)
+        {
+            if (ReceivedUsableQuantity != usable || ReceivedUnusableQuantity != unusable ||
+                ReceivedConfirmedBy != officer || ReceivedConfirmedAt != confirmedAt)
+                throw new DomainRuleException("SUPPORT_TRANSFER_RESULT_CONFLICT", "A confirmed receipt cannot be rewritten.");
+            return false;
+        }
+        ReceivedUsableQuantity = usable; ReceivedUnusableQuantity = unusable;
+        ReceivedConfirmedBy = officer; ReceivedConfirmedAt = confirmedAt.ToUniversalTime();
+        Status = SupportMaterialStatus.Transferred; Version++; return true;
+    }
+
     internal static SupportResponseMaterial Offer(Guid responseId,Guid requestId,Guid materialId,SupportMaterialOfferInput input)
     {
         ValidateOffer(input);

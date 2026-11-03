@@ -36,6 +36,13 @@ public sealed partial class SupportRequest
             throw new DomainRuleException("SUPPORT_REQUEST_INVALID_STATE", "The support request is not open for review.");
     }
 
+    public bool ReceiveMaterial(Guid itemId, decimal usable, decimal unusable, Guid officer, DateTimeOffset confirmedAt, DateTimeOffset now)
+    {
+        var item = GetMaterialOffer(itemId);
+        if (!item.Receive(usable, unusable, officer, confirmedAt)) return false;
+        MaterialChanged(item, now); return true;
+    }
+
     private void MaterialChanged(SupportResponseMaterial item, DateTimeOffset now)
     {
         responses.Single(response => response.Id == item.ResponseId).RefreshMemberStatus();

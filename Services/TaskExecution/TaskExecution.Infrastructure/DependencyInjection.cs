@@ -65,6 +65,11 @@ public static class DependencyInjection
         services.AddScoped<TaskExecution.Application.Support.ISupportRequestRepository, TaskExecution.Infrastructure.Support.SupportRequestRepository>();
         services.AddScoped<TaskExecution.Application.Support.ISupportMaterialSyncStore, TaskExecution.Infrastructure.Support.SupportMaterialSyncStore>();
         services.AddHostedService<TaskExecution.Infrastructure.Support.SupportMaterialApprovalWorker>();
+        services.AddHttpClient<TaskExecution.Application.Support.ISupportTransferReceiptLookup,TaskExecution.Infrastructure.Resource.SupportTransferReceiptLookup>(client=>
+        {
+            client.BaseAddress=new Uri(configuration["ResourceClient:BaseAddress"] ?? "http://localhost:6103/");
+            client.Timeout=Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options=>options.TotalRequestTimeout.Timeout=TimeSpan.FromSeconds(10));
         services.AddHttpClient<TaskExecution.Application.Support.ISupportTransferGateway,TaskExecution.Infrastructure.Resource.SupportTransferGateway>(client=>
         {
             client.BaseAddress=new Uri(configuration["ResourceClient:BaseAddress"] ?? "http://localhost:6103/");
@@ -98,7 +103,7 @@ public static class DependencyInjection
         services.AddScoped<PlanningScopeIngestionHandler>();
         services.AddScoped<IdentityStatusIngestionHandler>();
         var dispatch = configuration.GetValue("Outbox:DispatchEnabled", false);
-        var consume = configuration.GetValue("PlanningEvents:ConsumeEnabled", false);
+        var consume = configuration.GetValue("PlanningEvents:ConsumeEnabled", false) || configuration.GetValue("SupportTransfers:ConsumeEnabled",false);
         if (dispatch || consume)
         {
             BuildingBlocks.Messaging.MassTransit.Extensions.AddMessageBroker(services, configuration,

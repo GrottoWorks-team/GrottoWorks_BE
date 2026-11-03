@@ -27,6 +27,7 @@ public sealed class SupportMaterialApprovalWorker(IServiceScopeFactory scopes, I
                         {
                             await using var scope=scopes.CreateAsyncScope();
                             await scope.ServiceProvider.GetRequiredService<SupportMaterialApprovalProcessor>().ProcessAsync(id,stoppingToken);
+                            await scope.ServiceProvider.GetRequiredService<SupportTransferSynchronization>().ReconcileAsync(id,stoppingToken);
                         }
                         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { throw; }
                         catch (Exception exception)

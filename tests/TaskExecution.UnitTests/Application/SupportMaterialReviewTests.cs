@@ -103,7 +103,7 @@ public sealed class SupportMaterialReviewTests
         }
         public Task<SupportResponseMaterialDto> Review(bool approve,decimal? quantity,string? reason=null)=>Handler.HandleAsync(Item.Id,approve,quantity,reason,Item.Version);
     }
-    private sealed class SyncStore(SupportRequest request) : ISupportMaterialSyncStore
+    internal sealed class SyncStore(SupportRequest request) : ISupportMaterialSyncStore
     {
         public Task<Guid?> FindRequestIdAsync(Guid id,CancellationToken ct)=>Task.FromResult<Guid?>(request.Responses.SelectMany(r=>r.Materials).Any(r=>r.Id==id) ? request.Id : null);
         public Task<IReadOnlyList<Guid>> GetPendingItemsAsync(Guid? after,int size,CancellationToken ct)=>throw new NotSupportedException();

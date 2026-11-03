@@ -21,6 +21,7 @@ public static class DependencyInjection
         services.AddScoped<CreateMaterialCategoryCommandHandler>();
         services.AddScoped<UpdateMaterialCategoryCommandHandler>();
         services.AddScoped<ListMaterialsQueryHandler>();
+        services.AddScoped<GetInternalMaterialsHandler>();
         services.AddScoped<CreateMaterialCommandHandler>();
         services.AddScoped<UpdateMaterialCommandHandler>();
 

@@ -5,6 +5,8 @@ Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 �
 
 ## Kiến trúc
 
+`GET /internal/materials?ids={id}&ids={id}` supplies catalog references to TaskExecution. The API requires the internal API key, is hidden from OpenAPI and has no Gateway route. It accepts 1–100 non-empty IDs, deduplicates them and omits unknown IDs; inactive entries are returned with `INACTIVE` so callers can reject new usage. It does not expose stock or accept catalog writes.
+
 ### Scope replication qua RabbitMQ
 
 Khi `TaskEvents:Enabled=true`, Resource nhận `PlanningScopeSnapshot` tại queue `resource-planning-scopes` và `TaskScopeSnapshot` tại queue `resource-task-snapshots`. Task snapshot chứa scope cha nên có thể tạo projection còn thiếu. Inbox và các thay đổi projection được commit cùng transaction; advisory lock theo Season phối hợp hai queue. Snapshot cũ không ghi đè source version mới. Không lấy trạng thái Season từ snapshot con để ghi đè projection Season hiện tại.

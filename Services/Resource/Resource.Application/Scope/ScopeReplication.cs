@@ -50,7 +50,8 @@ public static class ScopeReplicationMapping
 }
 
 public sealed class ScopeReplicationHandler(IScopeReplicationInbox inbox,
-    ApplySeasonStatusHandler seasons, ApplyWorkAreaSnapshotHandler areas, ApplyTaskSnapshotHandler tasks)
+    ApplySeasonStatusHandler seasons, ApplyWorkAreaSnapshotHandler areas, ApplyTaskSnapshotHandler tasks,
+    TaskMaterialPlanProjector materialPlans)
 {
     public Task ApplyAsync(PlanningScopeSnapshot snapshot, CancellationToken cancellationToken)
     {
@@ -94,6 +95,9 @@ public sealed class ScopeReplicationHandler(IScopeReplicationInbox inbox,
             await seasons.HandleAsync(new(season.SeasonId, status, season.Version), cancellationToken);
             await areas.HandleAsync(area, cancellationToken);
             await tasks.HandleAsync(task, cancellationToken);
+            if (snapshot.Materials is not null)
+                await materialPlans.ApplyAsync(snapshot.TaskId, snapshot.WorkAreaId, season.ParishId, season.SeasonId,
+                    snapshot.SourceVersion, snapshot.Materials, cancellationToken);
         }, cancellationToken);
     }
 }

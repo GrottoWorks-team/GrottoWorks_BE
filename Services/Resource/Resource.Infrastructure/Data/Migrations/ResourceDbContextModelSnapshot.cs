@@ -1681,6 +1681,8 @@ namespace Resource.Infrastructure.Data.Migrations
                     b.Navigation("StateChanges");
                 });
 #pragma warning restore 612, 618
+            modelBuilder.ApplyConfiguration(new Resource.Infrastructure.Scope.TaskMaterialPlanConfiguration());
+            modelBuilder.ApplyConfiguration(new Resource.Infrastructure.Scope.TaskMaterialPlanItemConfiguration());
             modelBuilder.ApplyConfiguration(new Resource.Infrastructure.Messaging.ScopeReplicationReceiptConfiguration());
         }
     }

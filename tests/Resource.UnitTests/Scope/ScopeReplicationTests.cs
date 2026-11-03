@@ -15,7 +15,7 @@ public sealed class ScopeReplicationTests
         var tasks = new FakeTaskProjectionStore();
         var inbox = new MemoryInbox();
         var handler = new ScopeReplicationHandler(inbox, new(scopes), new(scopes),
-            new(tasks, scopes, new(new FakePurchaseRequestStore())));
+            new(tasks, scopes, new(new FakePurchaseRequestStore())), new(new FakeTaskMaterialPlanStore()));
         var source = TaskSnapshot();
 
         await handler.ApplyAsync(source, default);

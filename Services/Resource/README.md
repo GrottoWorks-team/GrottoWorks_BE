@@ -13,6 +13,8 @@ Khi `TaskEvents:Enabled=true`, Resource nhận `PlanningScopeSnapshot` tại que
 
 Các producer mới vẫn chưa được bật tự động. Backfill/reconciliation và cutover HTTP sẽ được thực hiện sau khi các phía nhận đã sẵn sàng. Consumer business event cũ tiếp tục tồn tại; snapshot kỹ thuật không thay thế integration event nghiệp vụ.
 
+`resource-task-materials` consumes `task.materials.changed` into `task_material_plan`/`task_material_plan_item`. Complete Task snapshots also restore this replica in the same inbox transaction as parent/task projections. Legacy snapshots with no material field preserve the current plan; an explicit empty array clears it at the new source version. Replay/stale messages cannot restore an older plan. These tables are Resource-owned projections; TaskExecution still owns `task_material`. Consumption does not rewrite the Leader's manual `material_requirement`, inventory ledger or allocation history.
+
 ```
 Services/Resource/
 ├── Resource.Domain/          # Catalog, Scope (projection), Inventory (requirement, ledger, InventoryCalculator), Purchases

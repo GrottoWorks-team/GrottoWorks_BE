@@ -30,6 +30,8 @@ public static class DependencyInjection
         services.AddScoped<ApplySeasonStatusHandler>();
         services.AddScoped<ApplyTaskSnapshotHandler>();
         services.AddScoped<ScopeReplicationHandler>();
+        services.AddScoped<TaskMaterialPlanProjector>();
+        services.AddScoped<TaskMaterialEventIngestion>();
         services.AddScoped<ApplyTaskEventHandler>();
         services.AddScoped<WorkAreaAccess>();
 

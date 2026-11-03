@@ -13,6 +13,7 @@ public static class DependencyInjection
         services.AddScoped<ApplyWorkAreaSnapshotHandler>();
         services.AddScoped<ApplySeasonStatusHandler>();
         services.AddScoped<ApplyTaskSnapshotHandler>();
+        services.AddScoped<ScopeReplicationHandler>();
         services.AddScoped<ApplyTaskEventHandler>();
         services.AddScoped<WorkAreaAccess>();
 

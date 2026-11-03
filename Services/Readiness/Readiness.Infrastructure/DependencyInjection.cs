@@ -30,6 +30,7 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
         services.AddScoped<IIntegrationEventPublisher, OutboxIntegrationEventPublisher>();
         services.AddScoped<IWorkAreaScopeStore, WorkAreaScopeStore>();
+        services.AddScoped<IScopeReplicationInbox, ScopeReplicationInbox>();
         services.AddScoped<ITaskProjectionStore, TaskProjectionStore>();
         services.AddScoped<IReadinessCheckStore, ReadinessCheckStore>();
         // RabbitMQ: consumers of TaskExecution events (TaskEvents:Enabled) and the outbox dispatcher (Outbox:DispatchEnabled).

@@ -5,6 +5,12 @@ tag `Readiness`). Trạng thái: F-RDY-02..06 — S6..S8 (làm 27/10).
 
 ## Kiến trúc
 
+### Scope replication qua RabbitMQ
+
+Khi `TaskEvents:Enabled=true`, Readiness nhận `PlanningScopeSnapshot` tại `readiness-planning-scopes` và `TaskScopeSnapshot` tại `readiness-task-snapshots`. Snapshot Task chứa scope cha để tạo projection còn thiếu; cập nhật corrective checklist vẫn đi qua `ApplyTaskSnapshotHandler` hiện có. Inbox và mọi thay đổi nằm trong cùng transaction. Advisory lock theo Season phối hợp hai queue; parent source version mới hơn không bị snapshot Task cũ ghi đè.
+
+Producer mới chưa được bật tự động. Backfill/reconciliation và cutover HTTP tiếp tục là bước riêng sau khi mọi phía nhận sẵn sàng. Snapshot kỹ thuật không thay thế integration event nghiệp vụ.
+
 ```
 Services/Readiness/
 ├── Readiness.Domain/          # Checklists (ReadinessChecklist, ReadinessItem), Scope (work_area_scope, task_projection)

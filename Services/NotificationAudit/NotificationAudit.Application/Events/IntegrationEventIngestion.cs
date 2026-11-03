@@ -169,7 +169,7 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
         }
         var reviewType = GetString(message.Payload, "reviewType");
         if (reviewType is "CHECK_IN" or "CORRECTION") safeValues["reviewType"] = JsonSerializer.SerializeToElement(reviewType);
-        foreach (var field in new[] { "communityChanged", "leaderChanged", "materialOfficerChanged", "mandatory" })
+        foreach (var field in new[] { "communityChanged", "leaderChanged", "materialOfficerChanged", "mandatory", "requiresConfirmation" })
         {
             if (message.Payload.TryGetProperty(field, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False)
                 safeValues[field] = value.Clone();

@@ -8,6 +8,24 @@ namespace NotificationAudit.UnitTests;
 
 public sealed class SupportNotificationTests
 {
+    [Fact]
+    public async Task Community_approval_requests_consent_and_retains_the_flag_for_replay()
+    {
+        var store=new Store();
+        await new IntegrationEventIngestionHandler(store).HandleAsync(Message("support.member.reviewed",new
+        {supportRequestId=Guid.NewGuid(),volunteerUserId=Guid.NewGuid(),decision="APPROVED",requiresConfirmation=true}),default);
+        store.Plan!.Notifications.Should().ContainSingle().Which.Title.Should().Be("Support nomination awaiting your response");
+        store.Plan.SafeContext!.Payload.GetProperty("requiresConfirmation").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public void Declined_nomination_notifies_the_leader_without_a_second_approval_notification()
+    {
+        var leader=Guid.NewGuid();
+        var candidates=IntegrationEventIngestionHandler.MapNotifications(Message("task.assignment.responded",new
+        {taskId=Guid.NewGuid(),assignmentType="SUPPORT",decision="DECLINED",leaderUserId=leader}),out var pending);
+        pending.Should().BeFalse();candidates.Should().ContainSingle().Which.RecipientUserId.Should().Be(leader);
+    }
     [Theory]
     [InlineData("APPROVED","Support participation approved")]
     [InlineData("REJECTED","Support participation rejected")]

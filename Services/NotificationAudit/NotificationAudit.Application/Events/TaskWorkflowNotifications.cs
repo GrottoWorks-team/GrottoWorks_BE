@@ -38,12 +38,12 @@ public sealed partial class IntegrationEventIngestionHandler
                 title = decision == "ACCEPTED" ? "Task application approved" : "Task application rejected";
                 body = decision == "ACCEPTED" ? "Your task application was approved." : "Your task application was rejected.";
                 break;
-            case "task.assignment.responded" when assignmentType == "DIRECT" && decision == "DECLINED":
+            case "task.assignment.responded" when assignmentType is "DIRECT" or "SUPPORT" && decision == "DECLINED":
                 recipient = leaderId;
                 title = "Task assignment declined";
                 body = "A volunteer has declined a task assignment.";
                 break;
-            case "task.assignment.responded" when assignmentType == "DIRECT" && decision == "ACCEPTED":
+            case "task.assignment.responded" when assignmentType is "DIRECT" or "SUPPORT" && decision == "ACCEPTED":
                 // Acceptance remains an audit fact; BA only requires a Leader alert on decline.
                 return [];
             case "attendance.request.submitted":

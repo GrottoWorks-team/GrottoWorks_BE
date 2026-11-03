@@ -12,6 +12,14 @@ public sealed partial class IntegrationEventIngestionHandler
         requiresContext=!requestId.HasValue || !volunteerId.HasValue || decision is not ("APPROVED" or "REJECTED");
         if(requiresContext) return [];
         var approved=decision=="APPROVED";
+        if(approved && message.Payload.TryGetProperty("requiresConfirmation",out var confirmation))
+        {
+            if(confirmation.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                throw new InvalidNotificationEventException("Support confirmation flag must be a boolean.");
+            if(confirmation.GetBoolean())
+                return [new NotificationCandidate(volunteerId!.Value,"Support nomination awaiting your response",
+                    "A community nominated you for a support task. Please accept or decline the assignment.","SUPPORT_REQUEST",requestId)];
+        }
         return [new NotificationCandidate(volunteerId!.Value,approved ? "Support participation approved" : "Support participation rejected",
             approved ? "Your offer to participate in a support task was approved." : "Your offer to participate in a support task was rejected.",
             "SUPPORT_REQUEST",requestId)];

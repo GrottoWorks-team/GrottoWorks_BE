@@ -42,6 +42,11 @@ public static class DependencyInjection
             client.Timeout = Timeout.InfiniteTimeSpan;
         }).AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<TaskExecution.Application.Events.ITaskEventOutbox, TaskExecution.Infrastructure.Events.TaskEventOutbox>();
+        if (configuration.GetValue("Outbox:DispatchEnabled", false))
+        {
+            BuildingBlocks.Messaging.MassTransit.Extensions.AddMessageBroker(services, configuration);
+            services.AddHostedService<TaskExecution.Infrastructure.Events.TaskEventDispatcher>();
+        }
         return services;
     }
 }

@@ -67,6 +67,17 @@ public sealed class SupportNominationConsentTests
         f.Base.Request.Status.Should().Be(SupportRequestStatus.Fulfilled);
     }
 
+    [Fact]
+    public async Task Completion_requires_consent_and_is_idempotent()
+    {
+        var pending=new Fixture();var nomination=await pending.Approve();
+        pending.Base.Request.CompleteAssignments([nomination.AssignmentId!.Value],DateTimeOffset.UtcNow).Should().BeEmpty();
+        pending.AsVolunteer();await pending.Base.Source.Service.RespondAsync(nomination.AssignmentId.Value,true,null,1);
+        var completed=pending.Base.Request.CompleteAssignments([nomination.AssignmentId.Value],DateTimeOffset.UtcNow);
+        completed.Should().ContainSingle().Which.Status.Should().Be(SupportMemberStatus.Completed);
+        pending.Base.Request.CompleteAssignments([nomination.AssignmentId.Value],DateTimeOffset.UtcNow).Should().BeEmpty();
+    }
+
     private sealed class Fixture
     {
         public SupportPublicationTests.Fixture Base {get;}=new();

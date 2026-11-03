@@ -20,6 +20,10 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
         modelBuilder.ApplyConfiguration(new TaskExecution.Infrastructure.Data.Configurations.TaskMaterialConfiguration());
         new TaskExecution.Infrastructure.Scopes.ScopeInboxConfiguration().Configure(modelBuilder.Entity<TaskExecution.Infrastructure.Scopes.ScopeInboxMessage>());
         new TaskExecution.Infrastructure.Scopes.UserStatusProjectionConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Scopes.UserStatusProjection>());
+        modelBuilder.ApplyConfiguration(new TaskExecution.Infrastructure.Tasks.TaskProgressConfiguration());
+        modelBuilder.ApplyConfiguration(new TaskExecution.Infrastructure.Tasks.ProgressEvidenceConfiguration());
+        modelBuilder.ApplyConfiguration(new TaskExecution.Infrastructure.Tasks.TaskCompletionReviewConfiguration());
+        modelBuilder.ApplyConfiguration(new TaskExecution.Infrastructure.Tasks.FileAttachmentIntentConfiguration());
         BuildScopeModelCore(modelBuilder);
         BuildTaskModel(modelBuilder);
         modelBuilder.Entity("TaskExecution.Domain.Tasks.WorkTask", builder =>
@@ -185,3 +189,4 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
         });
     }
 }
+

@@ -26,6 +26,19 @@ public static class DependencyInjection
         services.AddScoped<IScopeProjectionStore, ScopeProjectionStore>();
         services.AddScoped<IScopeSnapshotTransaction, ScopeSnapshotTransaction>();
         services.AddScoped<ITaskRepository, TaskRepository>();
+        services.AddScoped<ITaskReviewStore, TaskReviewStore>();
+        services.AddScoped<FileAttachmentRecovery>();
+        services.AddHostedService<FileAttachmentRecoveryWorker>();
+        services.AddHttpClient<ITaskFileGateway,TaskFileGateway>(client=>
+        {
+            client.BaseAddress=new Uri(configuration["NotificationAuditClient:BaseAddress"] ?? "http://localhost:6107/");
+            client.Timeout=Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options=> { options.TotalRequestTimeout.Timeout=TimeSpan.FromSeconds(10);options.Retry.DisableForUnsafeHttpMethods(); });
+        services.AddHttpClient<ITaskResourceGateway,TaskExecution.Infrastructure.Resource.TaskResourceGateway>(client=>
+        {
+            client.BaseAddress=new Uri(configuration["ResourceClient:BaseAddress"] ?? "http://localhost:6103/");
+            client.Timeout=Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options=>options.TotalRequestTimeout.Timeout=TimeSpan.FromSeconds(10));
         services.AddScoped<IWorkAreaTaskCountReader, WorkAreaTaskCountReader>();
         services.AddScoped<IMyTasksStore, MyTasksStore>();
         services.AddHttpClient<TaskExecution.Application.Support.ISupportMaterialAvailability,TaskExecution.Infrastructure.Resource.SupportMaterialAvailabilityClient>(client=>
@@ -104,7 +117,7 @@ public static class DependencyInjection
         services.AddScoped<PlanningScopeIngestionHandler>();
         services.AddScoped<IdentityStatusIngestionHandler>();
         var dispatch = configuration.GetValue("Outbox:DispatchEnabled", false);
-        var consume = configuration.GetValue("PlanningEvents:ConsumeEnabled", false) || configuration.GetValue("SupportTransfers:ConsumeEnabled",false);
+        var consume = configuration.GetValue("PlanningEvents:ConsumeEnabled", false) || configuration.GetValue("SupportTransfers:ConsumeEnabled",false) || configuration.GetValue("PurchaseEvents:ConsumeEnabled",false);
         if (dispatch || consume)
         {
             BuildingBlocks.Messaging.MassTransit.Extensions.AddMessageBroker(services, configuration,
@@ -119,3 +132,4 @@ public static class DependencyInjection
         return services;
     }
 }
+

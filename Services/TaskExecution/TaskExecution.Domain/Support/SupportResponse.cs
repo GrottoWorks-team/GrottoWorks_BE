@@ -90,6 +90,12 @@ public sealed class SupportResponseMember
             throw DomainRuleException.Validation("SUPPORT_REJECTION_REASON_REQUIRED","Rejection requires a reason of 1–500 characters.");
     }
 
+    internal bool CompleteAssignment(IReadOnlySet<Guid> assignmentIds)
+    {
+        if(Status!=SupportMemberStatus.Approved || !ParticipationAccepted || !AssignmentId.HasValue || !assignmentIds.Contains(AssignmentId.Value)) return false;
+        Status=SupportMemberStatus.Completed;Version++;return true;
+    }
+
     internal bool CancelAssignment(IReadOnlySet<Guid> assignmentIds)
     {
         if(Status!=SupportMemberStatus.Approved || !AssignmentId.HasValue || !assignmentIds.Contains(AssignmentId.Value)) return false;
@@ -150,6 +156,20 @@ public sealed partial class SupportRequest
         response.RefreshMemberStatus();
         RefreshStaffingFulfillment();
         UpdatedAt=now.ToUniversalTime();Version++;
+    }
+
+    public IReadOnlyList<SupportResponseMember> CompleteAssignments(IReadOnlyCollection<Guid> assignmentIds,DateTimeOffset now)
+    {
+        var ids=assignmentIds.ToHashSet();var completed=new List<SupportResponseMember>();
+        foreach(var response in responses)
+        {
+            var changed=false;
+            foreach(var member in response.Members)
+                if(member.CompleteAssignment(ids)) {completed.Add(member);changed=true;}
+            if(changed) response.RefreshMemberStatus();
+        }
+        if(completed.Count>0) {UpdatedAt=now.ToUniversalTime();Version++;}
+        return completed;
     }
 
     public bool CancelAssignments(IReadOnlyCollection<Guid> assignmentIds,DateTimeOffset now)

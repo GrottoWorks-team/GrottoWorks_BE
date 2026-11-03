@@ -55,6 +55,9 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
                 volunteerUserId = user.UserId, leaderUserId = area.LeaderUserId, assignmentType = assignment.Type==AssignmentType.Support ? "SUPPORT" : "DIRECT",
                 decision = accept ? "ACCEPTED" : "DECLINED", reason = assignment.ResponseReason
             });
+            if(accept && task.Type==TaskType.Purchase)
+                events.Record("task.purchase-task.assigned",task,area,new {taskId=task.Id,purchaseRequestId=task.PurchaseRequestId,
+                    workAreaId=area.WorkAreaId,buyerUserId=assignment.VolunteerId,assignmentId=assignment.Id,leaderUserId=area.LeaderUserId});
             await assignments.SaveAsync(cancellationToken);
             return AssignmentDto.From(assignment);
         }, cancellationToken);
@@ -74,7 +77,7 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
 
             var existing = await assignments.ListAsync(task.Id, cancellationToken);
             EnsureNoDuplicate(existing, command.VolunteerId);
-            EnsureCapacity(existing, task.RequiredVolunteerCount, command.OverrideCapacity);
+            EnsureCapacity(existing, task.RequiredVolunteerCount, task.Type!=TaskType.Purchase && command.OverrideCapacity);
             EnsureSkills(task, volunteer, command.OverrideSkillMismatch);
 
             var assignment = TaskAssignment.Assign(task.Id, volunteer.UserId, user.UserId, command.Note,

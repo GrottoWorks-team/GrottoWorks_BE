@@ -6,7 +6,7 @@ public sealed record TaskScopeSnapshot(
     Guid TaskId, Guid WorkAreaId, string Name, string TaskType, string Status,
     Guid? PurchaseRequestId, IReadOnlyList<Guid> AssigneeUserIds, long SourceVersion,
     TaskSeasonSnapshot Season, TaskWorkAreaSnapshot WorkArea,
-    IReadOnlyList<TaskMaterialSnapshot>? Materials = null);
+    IReadOnlyList<TaskMaterialSnapshot>? Materials = null, DateTimeOffset? Deadline = null);
 
 public sealed record TaskMaterialSnapshot(Guid MaterialId, decimal RequiredQuantity, string? Note);
 

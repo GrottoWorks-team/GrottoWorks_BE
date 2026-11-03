@@ -106,6 +106,8 @@ internal sealed class AssignmentTestFixture
     internal sealed class TestSupportLifecycle : TaskExecution.Application.Support.ISupportAssignmentLifecycle
     {
         public List<TaskExecution.Domain.Support.SupportRequest> Rows {get;}=[];
+        public Task CompleteAssignmentsAsync(IReadOnlyCollection<Guid> ids,DateTimeOffset now,CancellationToken ct)
+        { foreach(var request in Rows) request.CompleteAssignments(ids,now);return System.Threading.Tasks.Task.CompletedTask; }
         public Task CancelAssignmentsAsync(IReadOnlyCollection<Guid> ids,DateTimeOffset now,CancellationToken ct)
         { foreach(var request in Rows) request.CancelAssignments(ids,now);return System.Threading.Tasks.Task.CompletedTask; }
         public Task RespondAsync(Guid id,bool accept,string? reason,DateTimeOffset now,CancellationToken ct)

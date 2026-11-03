@@ -41,6 +41,7 @@ public sealed class TaskSnapshotTests
         snapshot.AssigneeUserIds.Should().Equal(accepted.VolunteerId);
         snapshot.Season.ParishId.Should().Be(season.ParishId);
         snapshot.WorkArea.LeaderUserId.Should().Be(area.LeaderUserId);
+        snapshot.Deadline.Should().Be(task.Deadline);
         snapshot.TaskType.Should().Be("WORK");
         snapshot.Status.Should().Be("OPEN");
         snapshot.SourceVersion.Should().Be(task.Version);

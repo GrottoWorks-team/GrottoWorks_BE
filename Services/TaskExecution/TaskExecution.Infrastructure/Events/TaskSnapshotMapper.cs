@@ -18,7 +18,7 @@ public static class TaskSnapshotMapper
 
         // Stable across a retry or reconciliation of the same source version.
         // New identity revision permits a complete backfill without rewriting old immutable envelopes.
-        var identity = SHA256.HashData(Encoding.UTF8.GetBytes($"task-scope:materials:{task.Id:D}:{task.Version}"));
+        var identity = SHA256.HashData(Encoding.UTF8.GetBytes($"task-scope:deadline-v2:{task.Id:D}:{task.Version}"));
         var recipients = assignments.Where(row => row.TaskId == task.Id &&
                 row.Status is AssignmentStatus.Accepted or AssignmentStatus.InProgress or AssignmentStatus.Completed)
             .Select(row => row.VolunteerId).Distinct().Order().ToArray();
@@ -32,6 +32,6 @@ public static class TaskSnapshotMapper
                 area.CommunityId, area.LeaderUserId, area.MaterialOfficerUserId, area.StartDate, area.Deadline,
                 EnumText.ToText(area.Status), area.SourceVersion),
             (materials ?? task.Materials).Where(row => row.TaskId == task.Id).OrderBy(row => row.MaterialId)
-                .Select(row => new TaskMaterialSnapshot(row.MaterialId, row.RequiredQuantity, row.Note)).ToArray());
+                .Select(row => new TaskMaterialSnapshot(row.MaterialId, row.RequiredQuantity, row.Note)).ToArray(), task.Deadline);
     }
 }

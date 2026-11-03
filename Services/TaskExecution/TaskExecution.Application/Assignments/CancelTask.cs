@@ -28,7 +28,8 @@ public sealed partial class AssignmentService
             {
                 taskId,workAreaId=area.WorkAreaId,
                 previousStatus=JsonNamingPolicy.SnakeCaseUpper.ConvertName(previousStatus.ToString()),
-                status="CANCELLED",reason=task.CancellationReason
+                status="CANCELLED",reason=task.CancellationReason,leaderUserId=area.LeaderUserId,
+                recipientUserIds=rows.Select(row=>row.VolunteerId).Append(user.UserId).Distinct().ToArray()
             });
             await assignments.SaveAsync(cancellationToken);
             return TaskDto.From(task);

@@ -118,6 +118,12 @@ public sealed class TaskAssignment
         Version++;
     }
 
+    public void CompleteForTask()
+    {
+        if (Status is not (AssignmentStatus.Accepted or AssignmentStatus.InProgress)) return;
+        Status=AssignmentStatus.Completed; Version++;
+    }
+
     public void CancelForTask(string reason)
     {
         if (Status is not (AssignmentStatus.Pending or AssignmentStatus.Accepted or AssignmentStatus.InProgress)) return;

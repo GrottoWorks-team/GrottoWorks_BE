@@ -7,7 +7,9 @@ using TaskExecution.Infrastructure.Events;
 namespace TaskExecution.Infrastructure.Data;
 
 /// <summary>task_db - data owned exclusively by TaskExecution.</summary>
-public sealed class TaskExecutionDbContext(DbContextOptions<TaskExecutionDbContext> options) : DbContext(options)
+public sealed class TaskExecutionDbContext(DbContextOptions<TaskExecutionDbContext> options,
+    BuildingBlocks.Security.ICurrentUser? currentUser = null,
+    TaskExecution.Application.Events.ITaskCorrelationContext? correlation = null) : DbContext(options)
 {
     public DbSet<SeasonScope> SeasonScopes => Set<SeasonScope>();
     public DbSet<TaskExecution.Infrastructure.Scopes.ScopeInboxMessage> ScopeEventInbox => Set<TaskExecution.Infrastructure.Scopes.ScopeInboxMessage>();
@@ -82,6 +84,39 @@ public sealed class TaskExecutionDbContext(DbContextOptions<TaskExecutionDbConte
             if (!areas.TryGetValue(task.WorkAreaId, out var area) || !seasons.TryGetValue(area.SeasonId, out var season))
                 throw new InvalidOperationException("Cannot persist a task without its local parent scopes.");
             snapshots.Add(TaskSnapshotMapper.Map(task, area, season, assignments.Values, capturedAt, materials.Values));
+            if(task.Type==TaskExecution.Domain.Tasks.TaskType.Purchase && !EventOutbox.Local.Any(row=>row.AggregateId==task.Id && row.EventType=="task.purchase-task.assigned"))
+            {
+                var newlyAccepted=ChangeTracker.Entries<TaskAssignment>().Where(row=>row.Entity.TaskId==task.Id &&
+                    row.Entity.Status==TaskExecution.Domain.Assignments.AssignmentStatus.Accepted &&
+                    (row.State==EntityState.Added || row.Property(x=>x.Status).OriginalValue!=row.Entity.Status)).ToArray();
+                foreach(var accepted in newlyAccepted)
+                    EventOutbox.Add(TaskEventOutboxMessage.Create(new TaskExecution.Contracts.Events.TaskIntegrationEvent(Guid.NewGuid(),
+                        "task.purchase-task.assigned",1,capturedAt,correlation?.CorrelationId ?? $"task:{task.Id:D}:{task.Version}",
+                        currentUser?.UserId ?? task.CreatedByUserId,area.ParishId,area.SeasonId,"task",task.Id,task.Version,
+                        System.Text.Json.JsonSerializer.SerializeToElement(new {taskId=task.Id,purchaseRequestId=task.PurchaseRequestId,
+                            workAreaId=area.WorkAreaId,buyerUserId=accepted.Entity.VolunteerId,assignmentId=accepted.Entity.Id,leaderUserId=area.LeaderUserId}))));
+            }
+            var entry=Entry(task);
+            var created=entry.State==EntityState.Added;
+            var statusChanged=!created && entry.Property(row=>row.Status).OriginalValue!=task.Status;
+            var eventType=created ? "task.created" : statusChanged ? "task.status.changed" : "task.updated";
+            if(!EventOutbox.Local.Any(row=>row.EventType==eventType && row.AggregateId==task.Id && row.ToMessage().AggregateVersion==task.Version))
+            {
+                var recipients=assignments.Values.Where(row=>row.TaskId==task.Id && row.Status is
+                    TaskExecution.Domain.Assignments.AssignmentStatus.Pending or TaskExecution.Domain.Assignments.AssignmentStatus.Accepted or
+                    TaskExecution.Domain.Assignments.AssignmentStatus.InProgress or TaskExecution.Domain.Assignments.AssignmentStatus.Completed)
+                    .Select(row=>row.VolunteerId).Concat(area.LeaderUserId.HasValue ? new[]{area.LeaderUserId.Value} : []).Distinct().ToArray();
+                EventOutbox.Add(TaskEventOutboxMessage.Create(new TaskExecution.Contracts.Events.TaskIntegrationEvent(
+                    Guid.NewGuid(),eventType,1,capturedAt,correlation?.CorrelationId ?? $"task:{task.Id:D}:{task.Version}",
+                    currentUser?.UserId is { } actor && actor!=Guid.Empty ? actor : task.CreatedByUserId,area.ParishId,area.SeasonId,
+                    "task",task.Id,task.Version,System.Text.Json.JsonSerializer.SerializeToElement(new {
+                        taskId=task.Id,workAreaId=task.WorkAreaId,taskType=TaskExecution.Infrastructure.Data.EnumText.ToText(task.Type),
+                        status=TaskExecution.Infrastructure.Data.EnumText.ToText(task.Status),leaderUserId=area.LeaderUserId,
+                        recipientUserIds=recipients,reason=task.CancellationReason,purchaseRequestId=task.PurchaseRequestId,
+                        notificationSuperseded=EventOutbox.Local.Any(row=>row.AggregateId==task.Id && row.EventType=="task.completion.reviewed"),
+                        previousStatus=created ? null : TaskExecution.Infrastructure.Data.EnumText.ToText(entry.Property(row=>row.Status).OriginalValue)
+                    },new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)))));
+            }
         }
 
         var snapshotIds = snapshots.Select(snapshot => snapshot.EventId).ToArray();

@@ -80,6 +80,8 @@ public static class DependencyInjection
         }
         if (dispatch)
         {
+            services.AddScoped<TaskExecution.Infrastructure.Events.TaskSnapshotReconciliation>();
+            services.AddHostedService<TaskExecution.Infrastructure.Events.TaskSnapshotReconciliationWorker>();
             services.AddHostedService<TaskExecution.Infrastructure.Events.TaskEventDispatcher>();
         }
         return services;

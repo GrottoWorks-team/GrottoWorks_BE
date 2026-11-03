@@ -8,6 +8,8 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 {
     public DbSet<AppUser> Users => Set<AppUser>();
 
+    public DbSet<Identity.Infrastructure.Events.IdentityEventOutboxMessage> EventOutbox => Set<Identity.Infrastructure.Events.IdentityEventOutboxMessage>();
+
     public DbSet<Role> Roles => Set<Role>();
 
     public DbSet<Skill> Skills => Set<Skill>();

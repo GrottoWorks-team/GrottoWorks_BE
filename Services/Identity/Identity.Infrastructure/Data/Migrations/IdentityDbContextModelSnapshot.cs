@@ -21,9 +21,12 @@ namespace Identity.Infrastructure.Data.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+            new Identity.Infrastructure.Events.IdentityEventOutboxConfiguration()
+                .Configure(modelBuilder.Entity<Identity.Infrastructure.Events.IdentityEventOutboxMessage>());
 
             modelBuilder.Entity("Identity.Domain.Entities.AppUser", b =>
                 {
+                    b.Property<long>("StatusVersion").HasColumnName("status_version").HasColumnType("bigint").HasDefaultValue(1L);
                     b.Property<Guid>("UserId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")

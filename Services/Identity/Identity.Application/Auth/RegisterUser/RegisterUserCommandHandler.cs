@@ -50,7 +50,6 @@ public sealed class RegisterUserCommandHandler(
         user.SetPasswordHash(passwordHasher.Hash(user, command.Password), now);
 
         userAccountStore.Add(user);
-        await userAccountStore.SaveChangesAsync(cancellationToken);
 
         await eventPublisher.PublishAsync(
             IdentityUserRegistered.EventType,
@@ -66,6 +65,7 @@ public sealed class RegisterUserCommandHandler(
             user.UserId,
             cancellationToken);
 
+        await userAccountStore.SaveChangesAsync(cancellationToken);
         return UserDto.From(user);
     }
 }

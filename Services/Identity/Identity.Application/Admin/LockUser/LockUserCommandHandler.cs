@@ -40,7 +40,6 @@ public sealed class LockUserCommandHandler(
         user.Lock(now);
 
         await refreshTokenStore.RevokeAllForUserAsync(user.UserId, RefreshToken.ReasonUserBlocked, now, cancellationToken);
-        await userAccountStore.SaveChangesAsync(cancellationToken);
 
         await eventPublisher.PublishAsync(
             IdentityUserLocked.EventType,
@@ -50,6 +49,7 @@ public sealed class LockUserCommandHandler(
             user.UserId,
             cancellationToken);
 
+        await userAccountStore.SaveChangesAsync(cancellationToken);
         return AdminUserDto.From(user);
     }
 }

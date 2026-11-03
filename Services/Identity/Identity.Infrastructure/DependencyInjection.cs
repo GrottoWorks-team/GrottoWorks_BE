@@ -7,7 +7,6 @@ using Identity.Infrastructure.Accounts;
 using Identity.Infrastructure.Authentication;
 using Identity.Infrastructure.Auth;
 using Identity.Infrastructure.Data;
-using Identity.Infrastructure.Observability;
 using Identity.Infrastructure.Parish;
 using Identity.Infrastructure.PasswordReset;
 using Identity.Infrastructure.Passwording;
@@ -52,7 +51,12 @@ public static class DependencyInjection
         services.AddScoped<ISkillStore, SkillStore>();
         services.AddScoped<IPasswordHasher, PasswordHasherAdapter>();
         services.AddSingleton<IAuthenticationTokenService, TokenService>();
-        services.AddScoped<IIntegrationEventPublisher, LoggingIntegrationEventPublisher>();
+        services.AddScoped<IIntegrationEventPublisher, Identity.Infrastructure.Events.IdentityEventPublisher>();
+        if (configuration.GetValue("Outbox:DispatchEnabled", false))
+        {
+            BuildingBlocks.Messaging.MassTransit.Extensions.AddMessageBroker(services, configuration);
+            services.AddHostedService<Identity.Infrastructure.Events.IdentityEventDispatcher>();
+        }
         services.AddScoped<IReadinessProbe, DatabaseReadinessProbe>();
         // INTERIM until ParishCoordination exposes communities (F-PAR-02) — see PendingParishDirectory.
         services.AddScoped<IParishDirectory, PendingParishDirectory>();

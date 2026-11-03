@@ -10,6 +10,7 @@ public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
     public void Configure(EntityTypeBuilder<AppUser> builder)
     {
         builder.ToTable("app_user");
+        builder.Property(user => user.StatusVersion).HasColumnName("status_version").HasDefaultValue(1L);
 
         builder.HasKey(user => user.UserId);
 

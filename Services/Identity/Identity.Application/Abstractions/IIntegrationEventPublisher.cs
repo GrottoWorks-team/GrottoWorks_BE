@@ -3,7 +3,7 @@ namespace Identity.Application.Abstractions;
 /// <summary>
 /// Publishes integration events (API Contract section 8 envelope) to the messaging infrastructure.
 /// The implementation must write through the transactional outbox together with the business change
-/// once <c>BuildingBlocks.Messaging</c> (F-PLT-05) is available; until then events are logged only.
+/// The call stages the event; the caller must save through its account unit of work afterwards.
 /// </summary>
 public interface IIntegrationEventPublisher
 {

@@ -24,7 +24,6 @@ public sealed class UnlockUserCommandHandler(
         var now = DateTimeOffset.UtcNow;
         user.Unlock(now);
 
-        await userAccountStore.SaveChangesAsync(cancellationToken);
 
         await eventPublisher.PublishAsync(
             IdentityUserUnlocked.EventType,
@@ -34,6 +33,7 @@ public sealed class UnlockUserCommandHandler(
             user.UserId,
             cancellationToken);
 
+        await userAccountStore.SaveChangesAsync(cancellationToken);
         return AdminUserDto.From(user);
     }
 }

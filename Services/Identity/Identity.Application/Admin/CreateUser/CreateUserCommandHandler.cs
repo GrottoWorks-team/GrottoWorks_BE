@@ -58,7 +58,6 @@ public sealed class CreateUserCommandHandler(
         }
 
         userAccountStore.Add(user);
-        await userAccountStore.SaveChangesAsync(cancellationToken);
 
         if (user.ParishId is { } parishId)
         {
@@ -71,6 +70,7 @@ public sealed class CreateUserCommandHandler(
                 cancellationToken);
         }
 
+        await userAccountStore.SaveChangesAsync(cancellationToken);
         return AdminUserDto.From(user);
     }
 }

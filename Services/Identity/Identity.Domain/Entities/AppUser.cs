@@ -104,6 +104,8 @@ public sealed class AppUser
     /// </summary>
     public uint Version { get; private set; }
 
+    public long StatusVersion { get; private set; } = 1;
+
     public VolunteerProfile? VolunteerProfile { get; private set; }
 
     public List<VolunteerSkill> VolunteerSkills { get; private set; } = [];
@@ -187,6 +189,7 @@ public sealed class AppUser
         }
 
         Status = UserStatus.Locked;
+        StatusVersion++;
         UpdatedAt = now;
     }
 
@@ -199,6 +202,7 @@ public sealed class AppUser
         }
 
         Status = UserStatus.Active;
+        StatusVersion++;
         UpdatedAt = now;
     }
 

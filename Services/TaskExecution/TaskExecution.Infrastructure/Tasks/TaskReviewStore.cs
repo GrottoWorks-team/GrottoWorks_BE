@@ -89,7 +89,7 @@ public sealed class TaskProgressConfiguration : IEntityTypeConfiguration<TaskPro
         b.Property(x=>x.SubmittedAt).HasColumnName("submitted_at"); b.Property(x=>x.IsSubmission).HasColumnName("is_submission");
         b.Property(x=>x.ApprovedByUserId).HasColumnName("approved_by_user_id"); b.Property(x=>x.ApprovedAt).HasColumnName("approved_at");
         b.HasOne<WorkTask>().WithMany().HasForeignKey(x=>x.TaskId).OnDelete(DeleteBehavior.Restrict);
-        b.HasIndex(x=>new{x.TaskId,x.SubmittedAt});
+        b.HasIndex(x=>new{x.TaskId,x.SubmittedAt}).HasDatabaseName("ix_task_progress_history");
     }
 }
 public sealed class ProgressEvidenceConfiguration : IEntityTypeConfiguration<ProgressEvidence>
@@ -100,7 +100,7 @@ public sealed class ProgressEvidenceConfiguration : IEntityTypeConfiguration<Pro
         b.Property(x=>x.ProgressId).HasColumnName("task_progress_id");b.Property(x=>x.FileId).HasColumnName("file_id");
         b.Property(x=>x.Caption).HasColumnName("evidence_caption").HasMaxLength(255);b.Property(x=>x.UploadedAt).HasColumnName("uploaded_at");
         b.HasOne<TaskProgress>().WithMany().HasForeignKey(x=>x.ProgressId).OnDelete(DeleteBehavior.Restrict);
-        b.HasIndex(x=>x.FileId).IsUnique();
+        b.HasIndex(x=>x.FileId).IsUnique().HasDatabaseName("progress_evidence_file_id_key");
     }
 }
 public sealed class TaskCompletionReviewConfiguration : IEntityTypeConfiguration<TaskCompletionReview>
@@ -112,7 +112,7 @@ public sealed class TaskCompletionReviewConfiguration : IEntityTypeConfiguration
         b.Property(x=>x.ReviewedByUserId).HasColumnName("reviewed_by_user_id");b.Property(x=>x.Approved).HasColumnName("approved");
         b.Property(x=>x.Reason).HasColumnName("reason").HasMaxLength(2000);b.Property(x=>x.ReviewedAt).HasColumnName("reviewed_at");
         b.HasOne<TaskProgress>().WithMany().HasForeignKey(x=>x.ProgressId).OnDelete(DeleteBehavior.Restrict);
-        b.HasIndex(x=>x.ProgressId).IsUnique();
+        b.HasIndex(x=>x.ProgressId).IsUnique().HasDatabaseName("task_completion_review_task_progress_id_key");
     }
 }
 public sealed class FileAttachmentIntentConfiguration : IEntityTypeConfiguration<FileAttachmentIntent>
@@ -124,6 +124,6 @@ public sealed class FileAttachmentIntentConfiguration : IEntityTypeConfiguration
         b.Property(x=>x.UploaderId).HasColumnName("uploader_id");b.Property(x=>x.CreatedAt).HasColumnName("created_at");
         b.Property(x=>x.NextAttemptAt).HasColumnName("next_attempt_at");b.Property(x=>x.Attempts).HasColumnName("attempts");
         b.Property(x=>x.CompletedAt).HasColumnName("completed_at");b.Property(x=>x.Outcome).HasColumnName("outcome").HasMaxLength(30);
-        b.HasIndex(x=>x.NextAttemptAt).HasFilter("completed_at IS NULL");
+        b.HasIndex(x=>x.NextAttemptAt).HasFilter("completed_at IS NULL").HasDatabaseName("ix_task_file_intents_pending");
     }
 }

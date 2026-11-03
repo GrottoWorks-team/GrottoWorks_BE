@@ -1000,7 +1000,8 @@ namespace TaskExecution.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("FileId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("progress_evidence_file_id_key");
 
                     b.HasIndex("ProgressId");
 
@@ -1041,7 +1042,8 @@ namespace TaskExecution.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ProgressId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("task_completion_review_task_progress_id_key");
 
                     b.ToTable("task_completion_review", (string)null);
                 });
@@ -1123,7 +1125,7 @@ namespace TaskExecution.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TaskId", "SubmittedAt");
+                    b.HasIndex("TaskId", "SubmittedAt").HasDatabaseName("ix_task_progress_history");
 
                     b.ToTable("task_progress", null, t =>
                         {
@@ -1397,7 +1399,8 @@ namespace TaskExecution.Infrastructure.Data.Migrations
                     b.HasKey("Key");
 
                     b.HasIndex("ReadinessItemId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("corrective_task_replay_readiness_item_id_key");
 
                     b.ToTable("corrective_task_replay", (string)null);
                 });
@@ -1448,7 +1451,7 @@ namespace TaskExecution.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("NextAttemptAt")
-                        .HasFilter("completed_at IS NULL");
+                        .HasFilter("completed_at IS NULL").HasDatabaseName("ix_task_file_intents_pending");
 
                     b.ToTable("task_file_attachment_intent", (string)null);
                 });

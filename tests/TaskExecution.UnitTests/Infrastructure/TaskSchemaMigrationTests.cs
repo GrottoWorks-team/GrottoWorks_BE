@@ -8,6 +8,14 @@ namespace TaskExecution.UnitTests.Infrastructure;
 public sealed class TaskSchemaMigrationTests
 {
     [Fact]
+    public void Evidence_index_alignment_preserves_existing_rows()
+    {
+        var operations = new AlignEvidenceIndexes().UpOperations;
+        var index = operations.Should().ContainSingle().Subject.Should().BeOfType<CreateIndexOperation>().Subject;
+        index.Table.Should().Be("progress_evidence");
+        index.Columns.Should().Equal("task_progress_id");
+    }
+    [Fact]
     public void Historical_migration_designers_can_still_build_their_target_models()
     {
         var scopeModel = new AddTaskScopeProjection().TargetModel;

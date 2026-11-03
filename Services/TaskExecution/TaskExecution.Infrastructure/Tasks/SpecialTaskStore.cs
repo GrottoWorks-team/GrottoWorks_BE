@@ -44,6 +44,6 @@ public sealed class CorrectiveTaskReplayConfiguration : IEntityTypeConfiguration
         b.ToTable("corrective_task_replay");b.HasKey(x=>x.Key);b.Property(x=>x.Key).HasColumnName("idempotency_key").HasMaxLength(200);
         b.Property(x=>x.ReadinessItemId).HasColumnName("readiness_item_id");b.Property(x=>x.TaskId).HasColumnName("task_id");
         b.Property(x=>x.Fingerprint).HasColumnName("fingerprint").HasMaxLength(64);b.Property(x=>x.Response).HasColumnName("response").HasColumnType("jsonb");
-        b.HasIndex(x=>x.ReadinessItemId).IsUnique();
+        b.HasIndex(x=>x.ReadinessItemId).IsUnique().HasDatabaseName("corrective_task_replay_readiness_item_id_key");
     }
 }

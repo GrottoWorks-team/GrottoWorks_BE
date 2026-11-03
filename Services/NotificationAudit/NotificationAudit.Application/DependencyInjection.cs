@@ -27,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<GetActivityLogHandler>();
         services.AddScoped<GetResourceHistoryHandler>();
         services.AddScoped<IntegrationEventIngestionHandler>();
+        services.AddScoped<ReplayNotificationContextHandler>();
         return services;
     }
 }

@@ -35,6 +35,7 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
         services.AddScoped<IIntegrationEventPublisher, OutboxIntegrationEventPublisher>();
         services.AddScoped<IWorkAreaScopeStore, WorkAreaScopeStore>();
+        services.AddScoped<IScopeReplicationInbox, ScopeReplicationInbox>();
         services.AddScoped<ITaskProjectionStore, TaskProjectionStore>();
         services.AddScoped<IRecognitionCatalogStore, RecognitionCatalogStore>();
         services.AddScoped<ContributionStore>();

@@ -17,6 +17,7 @@ public static class DependencyInjection
         services.AddScoped<ApplyWorkAreaSnapshotHandler>();
         services.AddScoped<ApplySeasonStatusHandler>();
         services.AddScoped<ApplyTaskSnapshotHandler>();
+        services.AddScoped<ScopeReplicationHandler>();
         services.AddScoped<WorkAreaAccess>();
 
         // F-RPT-01 contribution types and recognition rules

@@ -4,7 +4,20 @@ using TaskExecution.Domain;
 namespace TaskExecution.Application.Users;
 
 public sealed record IdentityUser(Guid UserId, string DisplayName, string Status, string Role,
-    Guid? ParishId, Guid? CommunityId, IReadOnlyList<Guid> SkillIds);
+    Guid? ParishId, Guid? CommunityId, IReadOnlyList<Guid> SkillIds, IReadOnlyList<IdentitySkill>? Skills = null);
+
+public sealed record IdentitySkill(Guid SkillId, string? SkillLevel);
+
+public static class VolunteerSkills
+{
+    public static bool Meets(IdentityUser volunteer, Guid skillId, string? minimumLevel)
+    {
+        if (!volunteer.SkillIds.Contains(skillId)) return false;
+        if (minimumLevel is null) return true;
+        var declaration = volunteer.Skills?.SingleOrDefault(skill => skill.SkillId == skillId);
+        return SkillLevels.Meets(declaration?.SkillLevel, minimumLevel);
+    }
+}
 
 public interface IIdentityUserLookup
 {

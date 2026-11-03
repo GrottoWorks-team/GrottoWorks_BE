@@ -16,6 +16,8 @@ The existing HTTP scope synchronization continues until the separately planned b
 
 Task and Support requirements use `BASIC < INTERMEDIATE < ADVANCED < EXPERT`, normalized with trim/uppercase. An unspecified volunteer level does not satisfy a non-null minimum. Migration `NormalizeRequiredSkillLevels` aborts with the unmapped values when legacy data uses another level; map those values explicitly before applying the migration. Blank legacy values become null. No values are guessed or downgraded.
 
+Assignment/application validation reads declared levels from Identity's internal user view and checks each minimum. Identity must return matching `skillIds` and `skills` collections using the canonical catalog; missing/invalid upstream data returns `503` rather than bypassing validation. The existing explicit Leader override still records its reason and actor.
+
 ## Full task snapshots
 
 Every saved Task change also stages a `TaskScopeSnapshot` in the same unit of work. This technical message includes parent Season/Work Area scopes and effective assignees (accepted, in progress, completed), allowing receivers to bootstrap a missing Task projection. Pending applications and unconfirmed direct assignments are excluded. Snapshot IDs are stable per Task/version; business event envelopes and IDs remain independent.

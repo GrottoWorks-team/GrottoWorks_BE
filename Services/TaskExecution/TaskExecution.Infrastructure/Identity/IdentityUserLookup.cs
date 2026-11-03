@@ -22,8 +22,8 @@ public sealed class IdentityUserLookup(HttpClient client, IConfiguration configu
             using var response = await client.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode) throw Unavailable();
             var envelope = await response.Content.ReadFromJsonAsync<UserEnvelope>(cancellationToken);
-            if (envelope?.Data == null || envelope.Data.Count > 1 || envelope.Data.Any(row => row.UserId != userId ||
-                string.IsNullOrWhiteSpace(row.Role) || string.IsNullOrWhiteSpace(row.Status) || row.SkillIds == null))
+            if (envelope?.Data == null || envelope.Data.Count > 1 || envelope.Data.Any(row => row is null || row.UserId != userId ||
+                string.IsNullOrWhiteSpace(row.Role) || string.IsNullOrWhiteSpace(row.Status) || !ValidSkills(row)))
                 throw Unavailable();
             return envelope.Data.SingleOrDefault();
         }
@@ -36,4 +36,13 @@ public sealed class IdentityUserLookup(HttpClient client, IConfiguration configu
     private static DomainRuleException Unavailable() => new("IDENTITY_SERVICE_UNAVAILABLE",
         "Identity user validation is temporarily unavailable.", DomainErrorKind.ServiceUnavailable);
     private sealed record UserEnvelope(IReadOnlyList<IdentityUser>? Data);
+
+    private static bool ValidSkills(IdentityUser user)
+    {
+        if (user.SkillIds is null || user.Skills is null || user.Skills.Any(skill => skill is null || skill.SkillId == Guid.Empty ||
+            skill.SkillLevel is not (null or "BASIC" or "INTERMEDIATE" or "ADVANCED" or "EXPERT"))) return false;
+        if (user.SkillIds.Distinct().Count() != user.SkillIds.Count || user.Skills.Select(skill => skill.SkillId).Distinct().Count() != user.Skills.Count)
+            return false;
+        return user.SkillIds.Order().SequenceEqual(user.Skills.Select(skill => skill.SkillId).Order());
+    }
 }

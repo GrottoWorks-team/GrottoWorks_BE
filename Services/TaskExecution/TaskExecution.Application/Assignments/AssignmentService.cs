@@ -113,9 +113,11 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
 
     public static void EnsureSkills(WorkTask task, IdentityUser volunteer, bool allowOverride)
     {
-        if (task.Skills.Any(skill => skill.RequiredSkillLevel != null))
-            throw new DomainRuleException("SKILL_LEVEL_VALIDATION_UNAVAILABLE", "Identity does not expose skill levels yet.");
-        if (!allowOverride && task.Skills.Any(skill => !volunteer.SkillIds.Contains(skill.SkillId)))
-            throw new DomainRuleException("TASK_SKILL_MISMATCH", "The volunteer does not match all required skills.");
+        if (allowOverride) return;
+        foreach (var requirement in task.Skills)
+        {
+            if (!VolunteerSkills.Meets(volunteer, requirement.SkillId, requirement.RequiredSkillLevel))
+                throw new DomainRuleException("TASK_SKILL_MISMATCH", "The volunteer does not meet all required skills and minimum levels.");
+        }
     }
 }

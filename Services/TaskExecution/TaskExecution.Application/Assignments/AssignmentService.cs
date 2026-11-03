@@ -47,7 +47,8 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
             events.Record(TaskEventTypes.AssignmentResponded, task, area, new
             {
                 assignmentId = assignment.Id, taskId = task.Id, workAreaId = area.WorkAreaId,
-                volunteerUserId = user.UserId, decision = accept ? "ACCEPTED" : "DECLINED", reason = assignment.ResponseReason
+                volunteerUserId = user.UserId, leaderUserId = area.LeaderUserId, assignmentType = "DIRECT",
+                decision = accept ? "ACCEPTED" : "DECLINED", reason = assignment.ResponseReason
             });
             await assignments.SaveAsync(cancellationToken);
             return AssignmentDto.From(assignment);
@@ -81,7 +82,8 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
             events.Record(TaskEventTypes.AssignmentCreated, task, area, new
             {
                 assignmentId = assignment.Id, taskId = task.Id, workAreaId = area.WorkAreaId,
-                volunteerUserId = volunteer.UserId, status = "PENDING", assignmentType = "DIRECT"
+                volunteerUserId = volunteer.UserId, leaderUserId = area.LeaderUserId,
+                status = "PENDING", assignmentType = "DIRECT"
             });
             await assignments.SaveAsync(cancellationToken);
             return AssignmentDto.From(assignment, warnings);

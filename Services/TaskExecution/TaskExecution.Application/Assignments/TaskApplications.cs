@@ -49,7 +49,8 @@ public sealed partial class AssignmentService
             events.Record(TaskEventTypes.AssignmentResponded, task, area, new
             {
                 assignmentId = row.Id, taskId = task.Id, workAreaId = area.WorkAreaId,
-                volunteerUserId = row.VolunteerId, decision = approve ? "ACCEPTED" : "REJECTED", reason = row.ResponseReason
+                volunteerUserId = row.VolunteerId, leaderUserId = area.LeaderUserId, assignmentType = "APPLICATION",
+                decision = approve ? "ACCEPTED" : "REJECTED", reason = row.ResponseReason
             });
             await assignments.SaveAsync(cancellationToken);
             return row;
@@ -75,7 +76,8 @@ public sealed partial class AssignmentService
             events.Record(TaskEventTypes.AssignmentCreated, task, area, new
             {
                 assignmentId = application.Id, taskId, workAreaId = area.WorkAreaId,
-                volunteerUserId = user.UserId, status = "PENDING", assignmentType = "APPLICATION"
+                volunteerUserId = user.UserId, leaderUserId = area.LeaderUserId,
+                status = "PENDING", assignmentType = "APPLICATION"
             });
             await assignments.SaveAsync(cancellationToken);
             return TaskApplicationDto.From(application);

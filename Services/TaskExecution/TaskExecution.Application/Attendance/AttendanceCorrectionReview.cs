@@ -30,6 +30,12 @@ public sealed partial class AttendanceService
             }
             correction.Review(approve,user.UserId,note,version,DateTimeOffset.UtcNow);
             task.RegisterAssignmentChange(DateTimeOffset.UtcNow);
+            events.Record(TaskEventTypes.AttendanceReviewed, task, area, new
+            {
+                correctionId, taskId = task.Id, workAreaId = area.WorkAreaId, reviewType = "CORRECTION",
+                attendanceId = session.Id, assignmentId = assignment.Id, volunteerUserId = assignment.VolunteerId,
+                decision = approve ? "APPROVED" : "REJECTED"
+            });
             if (approve)
                 events.Record(TaskEventTypes.HoursApproved,task,area,new
                 {

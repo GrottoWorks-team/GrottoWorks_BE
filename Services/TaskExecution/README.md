@@ -1,5 +1,7 @@
 # TaskExecution integration
 
+Assignment events carry `assignmentType` and the Work Area's `leaderUserId`, so consumers can distinguish a direct assignment, an application and its decision. Attendance requests carry the task and leader IDs. Both correction approval and rejection emit `attendance.request.reviewed` with `reviewType=CORRECTION`; approved-hour changes remain a separate event for reporting. These additive fields are captured with the business transaction, not resolved from mutable ownership later. Older payloads without workflow context require reconciliation rather than guessing the recipient.
+
 Task events are recorded in `task_event_outbox` in the same database transaction as the business operation.
 
 ## RabbitMQ delivery

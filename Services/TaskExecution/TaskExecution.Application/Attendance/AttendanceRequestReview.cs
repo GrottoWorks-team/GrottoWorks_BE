@@ -49,7 +49,8 @@ public sealed partial class AttendanceService
             else task.RegisterAssignmentChange(DateTimeOffset.UtcNow);
             events.Record(TaskEventTypes.AttendanceReviewed,task,area,new
             {
-                requestId,assignmentId=assignment.Id,attendanceId=sessionId,volunteerUserId=request.VolunteerId,
+                requestId,taskId=task.Id,workAreaId=area.WorkAreaId,reviewType="CHECK_IN",
+                assignmentId=assignment.Id,attendanceId=sessionId,volunteerUserId=request.VolunteerId,
                 decision=approve ? "APPROVED" : "REJECTED",reviewNote=request.ReviewNote
             });
             if (approve && previous==TaskState.NotStarted)

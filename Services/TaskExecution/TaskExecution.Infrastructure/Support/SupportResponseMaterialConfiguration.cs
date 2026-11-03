@@ -22,6 +22,16 @@ public sealed class SupportResponseMaterialConfiguration : IEntityTypeConfigurat
         b.Property(row=>row.ReceivedConfirmedBy).HasColumnName("received_confirmed_by_user_id");b.Property(row=>row.ReceivedConfirmedAt).HasColumnName("received_confirmed_at");
         b.Property(row=>row.Note).HasColumnName("material_note").HasMaxLength(2000);
         b.Property(row=>row.Version).HasColumnName("version").HasDefaultValue(1).IsConcurrencyToken();
+        b.Ignore(row=>row.ApprovalPending);
+        b.Property(row=>row.ApprovalOperationId).HasColumnName("approval_operation_id");
+        b.Property(row=>row.ApprovalRequestedQuantity).HasColumnName("approval_requested_quantity").HasPrecision(12,2);
+        b.Property(row=>row.ApprovalRequestedBy).HasColumnName("approval_requested_by");
+        b.Property(row=>row.ApprovalRequestedAt).HasColumnName("approval_requested_at");
+        b.Property(row=>row.ApprovalCorrelationId).HasColumnName("approval_correlation_id").HasMaxLength(200);
+        b.Property(row=>row.ApprovalErrorCode).HasColumnName("approval_error_code").HasMaxLength(100);
+        b.Property(row=>row.ReviewReason).HasColumnName("review_reason").HasMaxLength(500);
+        b.HasIndex(row=>row.Id).HasDatabaseName("ix_support_material_pending_approval")
+            .HasFilter("material_status='PENDING' AND approval_operation_id IS NOT NULL AND approval_error_code IS NULL");
         b.HasOne<SupportMaterial>().WithMany().HasForeignKey(row=>new {row.RequestId,row.RequestMaterialId})
             .HasPrincipalKey(row=>new {row.RequestId,row.Id}).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_support_offer_demand");
         b.HasIndex(row=>new {row.RequestId,row.RequestMaterialId}).HasDatabaseName("ix_support_offer_demand");

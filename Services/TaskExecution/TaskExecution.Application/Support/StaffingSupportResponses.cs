@@ -25,11 +25,13 @@ public sealed record SupportResponseDto(Guid Id,Guid RequestId,Guid? VolunteerId
 
 public sealed record SupportResponseMaterialDto(Guid Id,Guid RequestMaterialId,Guid SourceWorkAreaId,Guid MaterialId,decimal OfferedQuantity,
     decimal? ApprovedQuantity,decimal? ReceivedUsableQuantity,decimal? ReceivedUnusableQuantity,SupportMaterialStatus Status,
-    Guid? ApprovedBy,DateTimeOffset? ApprovedAt,Guid? ReceivedConfirmedBy,DateTimeOffset? ReceivedConfirmedAt,string? Note,int Version)
+    Guid? ApprovedBy,DateTimeOffset? ApprovedAt,Guid? ReceivedConfirmedBy,DateTimeOffset? ReceivedConfirmedAt,string? Note,int Version,
+    bool PendingSync=false,string? ApprovalErrorCode=null,string? ReviewReason=null)
 {
     public static SupportResponseMaterialDto From(SupportResponseMaterial row)=>new(row.Id,row.RequestMaterialId,row.SourceWorkAreaId,row.MaterialId,
         row.OfferedQuantity,row.ApprovedQuantity,row.ReceivedUsableQuantity,row.ReceivedUnusableQuantity,row.Status,row.ApprovedBy,row.ApprovedAt,
-        row.ReceivedConfirmedBy,row.ReceivedConfirmedAt,row.Note,row.Version);
+        row.ReceivedConfirmedBy,row.ReceivedConfirmedAt,row.Note,row.Version,row.ApprovalPending || row.Status==SupportMaterialStatus.Approved,
+        row.ApprovalErrorCode,row.ReviewReason);
 }
 
 public sealed class SupportResponseHandler(ISupportRequestRepository requests,TaskScopeAccess scopes,IScopeProjectionStore scopeStore,

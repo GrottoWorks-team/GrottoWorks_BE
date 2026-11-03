@@ -30,6 +30,9 @@ public static class DependencyInjection
         services.AddScoped<TaskExecution.Application.Support.ValidateSupportMaterialOffers>();
         services.AddScoped<TaskExecution.Application.Support.ListSupportResponsesHandler>();
         services.AddScoped<TaskExecution.Application.Support.ReviewSupportMemberHandler>();
+        services.AddScoped<TaskExecution.Application.Support.ReviewSupportMaterialHandler>();
+        services.AddScoped<TaskExecution.Application.Support.SupportMaterialApprovalProcessor>();
+        services.AddScoped<TaskExecution.Application.Support.SupportMaterialReviewEvents>();
         services.AddScoped<GetTaskQueryHandler>();
         services.AddScoped<CreateTaskCommandHandler>();
         services.AddScoped<UpdateTaskCommandHandler>();

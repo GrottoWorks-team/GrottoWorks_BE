@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
 using TaskExecution.Application.Scopes;
 using TaskExecution.Application.Tasks;
 using TaskExecution.Infrastructure.Data;
@@ -62,6 +63,17 @@ public static class DependencyInjection
             client.Timeout = Timeout.InfiniteTimeSpan;
         }).AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<TaskExecution.Application.Support.ISupportRequestRepository, TaskExecution.Infrastructure.Support.SupportRequestRepository>();
+        services.AddScoped<TaskExecution.Application.Support.ISupportMaterialSyncStore, TaskExecution.Infrastructure.Support.SupportMaterialSyncStore>();
+        services.AddHostedService<TaskExecution.Infrastructure.Support.SupportMaterialApprovalWorker>();
+        services.AddHttpClient<TaskExecution.Application.Support.ISupportTransferGateway,TaskExecution.Infrastructure.Resource.SupportTransferGateway>(client=>
+        {
+            client.BaseAddress=new Uri(configuration["ResourceClient:BaseAddress"] ?? "http://localhost:6103/");
+            client.Timeout=Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options=>
+        {
+            options.TotalRequestTimeout.Timeout=TimeSpan.FromSeconds(10);
+            options.Retry.DisableForUnsafeHttpMethods();
+        });
         services.AddScoped<TaskExecution.Application.Support.ISupportAssignmentLifecycle,TaskExecution.Infrastructure.Support.SupportAssignmentLifecycle>();
         services.AddScoped<TaskExecution.Application.Attendance.IAttendanceStore, TaskExecution.Infrastructure.Attendance.AttendanceStore>();
         services.AddScoped<TaskExecution.Application.Attendance.IAttendanceReadStore, TaskExecution.Infrastructure.Attendance.AttendanceReadStore>();

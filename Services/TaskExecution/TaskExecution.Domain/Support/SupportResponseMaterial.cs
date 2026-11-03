@@ -23,6 +23,61 @@ public sealed class SupportResponseMaterial
     public DateTimeOffset? ReceivedConfirmedAt {get;private set;}
     public string? Note {get;private set;}
     public int Version {get;private set;}=1;
+    public Guid? ApprovalOperationId { get; private set; }
+    public decimal? ApprovalRequestedQuantity { get; private set; }
+    public Guid? ApprovalRequestedBy { get; private set; }
+    public DateTimeOffset? ApprovalRequestedAt { get; private set; }
+    public string? ApprovalCorrelationId { get; private set; }
+    public string? ApprovalErrorCode { get; private set; }
+    public string? ReviewReason { get; private set; }
+    public bool ApprovalPending => Status == SupportMaterialStatus.Pending && ApprovalOperationId.HasValue && ApprovalErrorCode is null;
+
+    public void EnsureVersion(int? version)
+    {
+        if (version is <= 0) throw DomainRuleException.Validation("VALIDATION_FAILED", "Version must be positive.");
+        if (version.HasValue && version != Version)
+            throw new DomainRuleException("SUPPORT_MATERIAL_VERSION_MISMATCH", "The material offer changed.", DomainErrorKind.PreconditionFailed);
+    }
+
+    internal void BeginApproval(decimal quantity, Guid actor, string correlationId, DateTimeOffset now)
+    {
+        if (Status != SupportMaterialStatus.Pending)
+            throw new DomainRuleException("SUPPORT_MATERIAL_INVALID_STATE", "Only a pending offer can be approved.");
+        if (quantity <= 0 || quantity > OfferedQuantity || decimal.Round(quantity, 2) != quantity)
+            throw DomainRuleException.Validation("SUPPORT_MATERIAL_QUANTITY_INVALID", "Approve a positive (12,2) quantity no greater than the offer.");
+        if (ApprovalPending)
+        {
+            if (quantity != ApprovalRequestedQuantity)
+                throw new DomainRuleException("SUPPORT_MATERIAL_APPROVAL_PENDING", "An immutable approval attempt is being reconciled.");
+            return;
+        }
+        ApprovalOperationId = Guid.NewGuid(); ApprovalRequestedQuantity = quantity; ApprovalRequestedBy = actor;
+        ApprovalRequestedAt = now; ApprovalCorrelationId = correlationId; ApprovalErrorCode = null; Version++;
+    }
+
+    internal bool ResolveApproval(Guid operationId, string? rejection, DateTimeOffset now)
+    {
+        if (ApprovalOperationId != operationId)
+            throw new DomainRuleException("SUPPORT_MATERIAL_OPERATION_MISMATCH", "The approval attempt does not match this offer.");
+        if (!ApprovalPending) return false;
+        ApprovalErrorCode = rejection;
+        if (rejection is null)
+        {
+            Status = SupportMaterialStatus.Approved; ApprovedQuantity = ApprovalRequestedQuantity;
+            ApprovedBy = ApprovalRequestedBy; ApprovedAt = now;
+        }
+        Version++; return true;
+    }
+
+    internal void Reject(Guid actor, string? reason, DateTimeOffset now)
+    {
+        if (ApprovalPending) throw new DomainRuleException("SUPPORT_MATERIAL_APPROVAL_PENDING", "Reconcile the in-flight withdrawal before rejecting this offer.");
+        if (Status != SupportMaterialStatus.Pending)
+            throw new DomainRuleException("SUPPORT_MATERIAL_INVALID_STATE", "Only a pending offer can be rejected.");
+        if (string.IsNullOrWhiteSpace(reason) || reason.Trim().Length > 500)
+            throw DomainRuleException.Validation("SUPPORT_REJECTION_REASON_REQUIRED", "Rejection requires a reason of 1–500 characters.");
+        Status = SupportMaterialStatus.Rejected; ApprovedBy = actor; ApprovedAt = now; ReviewReason = reason.Trim(); Version++;
+    }
 
     internal static SupportResponseMaterial Offer(Guid responseId,Guid requestId,Guid materialId,SupportMaterialOfferInput input)
     {

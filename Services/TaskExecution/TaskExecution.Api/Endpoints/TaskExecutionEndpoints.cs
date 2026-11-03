@@ -23,5 +23,6 @@ public static class TaskExecutionEndpoints
         app.MapSupportRequestEndpoints();
         app.MapSupportResponseEndpoints();
         app.MapSupportMemberReviewEndpoints();
+        app.MapSupportMaterialReviewEndpoints();
     }
 }

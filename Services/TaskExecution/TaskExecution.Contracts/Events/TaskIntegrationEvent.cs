@@ -11,6 +11,8 @@ public static class TaskEventTypes
 {
     public const string SupportRequestPublished = "support.request.published";
     public const string SupportMemberReviewed = "support.member.reviewed";
+    public const string SupportMaterialApproved = "support.material.approved";
+    public const string SupportMaterialReviewed = "support.material.reviewed";
     public const string MaterialsChanged = "task.materials.changed";
     public const string AssignmentCreated = "task.assignment.created";
     public const string AssignmentResponded = "task.assignment.responded";

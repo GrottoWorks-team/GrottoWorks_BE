@@ -59,7 +59,8 @@ public sealed partial class SupportRequestRepository(TaskExecutionDbContext db) 
         try {await db.SaveChangesAsync(ct);}
         catch(DbUpdateConcurrencyException exception)
         {
-            var code=exception.Entries.Any(entry=>entry.Entity is SupportResponseMember) ? "SUPPORT_MEMBER_VERSION_MISMATCH"
+            var code=exception.Entries.Any(entry=>entry.Entity is SupportResponseMaterial) ? "SUPPORT_MATERIAL_VERSION_MISMATCH"
+                : exception.Entries.Any(entry=>entry.Entity is SupportResponseMember) ? "SUPPORT_MEMBER_VERSION_MISMATCH"
                 : exception.Entries.Any(entry=>entry.Entity is TaskExecution.Domain.Tasks.WorkTask) ? "TASK_VERSION_MISMATCH" : "SUPPORT_REQUEST_VERSION_MISMATCH";
             throw new DomainRuleException(code,"The support request, member or task changed concurrently.",DomainErrorKind.PreconditionFailed);
         }

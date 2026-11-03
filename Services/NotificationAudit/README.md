@@ -25,11 +25,13 @@ Push and email preferences are persisted but providers are not connected yet. Fi
 
 ## Integration status
 
-- The service has a transactional inbox and a RabbitMQ consumer for `TaskIntegrationEvent`.
+- The service has a transactional inbox and RabbitMQ consumers for TaskExecution, Identity, ParishCoordination, Resource, Readiness and Reporting business envelopes. They share schema validation, safe-context retention and audit ingestion.
 - Direct assignment, attendance review, and long-open attendance events have complete recipient context and can create in-app notifications.
 - Events without enough recipient context are retained as `REQUIRES_CONTEXT` and never reported as delivered notifications.
 - TaskExecution now has an outbox dispatcher, disabled by default until consumer/backfill integration is ready. Wiring other source publishers remains part of the later integration commits.
 - Audit ingestion stores only an allowlist of non-secret payload fields. Tokens, passwords, private URLs, and arbitrary payload content are not copied.
+
+Upstream queues are `notification-audit-{identity,planning,resource,readiness,reporting}-events`; Task uses `notification-audit-task-events`. `NotificationEvents:Enabled` controls their registration. Known notification events awaiting recipient/template integration stay `REQUIRES_CONTEXT`; ordinary audit-only events complete without pretending a notification was delivered. Runtime broker wiring, templates/context resolution and catalog alignment still require the next integration steps.
 
 Inbox writes take a PostgreSQL transaction advisory lock per event ID. Only already processed copies of that event are ignored; unrelated unique/DB failures propagate for retry. Unresolved events retain a typed, redacted `safe_envelope` for later context resolution. Reprocessing the same context can finish a pending inbox without duplicating its audit row. Reusing an ID with conflicting context is rejected. Legacy inbox rows have no retained context until the original event is replayed; a context-resolution worker is still a subsequent integration step.
 

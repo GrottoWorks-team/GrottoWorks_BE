@@ -17,7 +17,7 @@ public sealed class EventContextTests
              "note":"private note","token":"secret","downloadUrl":"https://private.example/file"}
             """);
         var store = new Store();
-        await new TaskEventIngestionHandler(store).HandleAsync(Message("attendance.session.open-too-long", payload.RootElement), default);
+        await new IntegrationEventIngestionHandler(store).HandleAsync(Message("attendance.session.open-too-long", payload.RootElement), default);
         store.Status.Should().Be("REQUIRES_CONTEXT");
         store.Context!.Payload.GetProperty("taskId").GetGuid().Should().Be(task);
         var json = store.Context.Payload.GetRawText();
@@ -51,18 +51,18 @@ public sealed class EventContextTests
     {
         var store = new Store();
         using var payload = JsonDocument.Parse("{}");
-        Func<Task> ingest = () => new TaskEventIngestionHandler(store)
+        Func<Task> ingest = () => new IntegrationEventIngestionHandler(store)
             .HandleAsync(Message("task.status.changed", payload.RootElement) with { SchemaVersion = 99 }, default);
         await ingest.Should().ThrowAsync<InvalidNotificationEventException>();
         store.Context.Should().BeNull();
     }
 
-    private static IncomingTaskEvent Message(string type, JsonElement payload) => new(Guid.NewGuid(), type,
+    private static IncomingIntegrationEvent Message(string type, JsonElement payload) => new(Guid.NewGuid(), type,
         new DateTimeOffset(2026, 11, 3, 7, 0, 0, TimeSpan.FromHours(7)), Guid.NewGuid().ToString(),
         Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "task", Guid.NewGuid(), payload.Clone());
     private sealed class Store : INotificationEventStore
     {
-        public IncomingTaskEvent? Context { get; private set; }
+        public IncomingIntegrationEvent? Context { get; private set; }
         public string? Status { get; private set; }
         public Task StoreAsync(EventIngestionPlan plan, CancellationToken cancellationToken)
         { Context = plan.SafeContext; Status = plan.Status; return Task.CompletedTask; }

@@ -4,14 +4,14 @@ using TaskExecution.Contracts.Events;
 
 namespace NotificationAudit.Infrastructure.Events;
 
-public sealed class TaskIntegrationEventConsumer(TaskEventIngestionHandler handler)
+public sealed class TaskIntegrationEventConsumer(IntegrationEventIngestionHandler handler)
     : IConsumer<TaskIntegrationEvent>
 {
     public Task Consume(ConsumeContext<TaskIntegrationEvent> context)
     {
         var message = context.Message;
         return handler.HandleAsync(
-            new IncomingTaskEvent(
+            new IncomingIntegrationEvent(
                 message.EventId,
                 message.EventType,
                 message.OccurredAt,

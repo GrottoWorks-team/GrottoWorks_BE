@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace NotificationAudit.Application.Events;
 
-public sealed record IncomingTaskEvent(
+public sealed record IncomingIntegrationEvent(
     Guid EventId,
     string EventType,
     DateTimeOffset OccurredAt,
@@ -40,7 +40,7 @@ public sealed record EventIngestionPlan(
     string Status,
     IReadOnlyList<NotificationCandidate> Notifications,
     AuditCandidate Audit,
-    IncomingTaskEvent? SafeContext = null);
+    IncomingIntegrationEvent? SafeContext = null);
 
 public interface INotificationEventStore
 {
@@ -49,9 +49,9 @@ public interface INotificationEventStore
 
 public sealed class InvalidNotificationEventException(string message) : Exception(message);
 
-public sealed class TaskEventIngestionHandler(INotificationEventStore store)
+public sealed class IntegrationEventIngestionHandler(INotificationEventStore store)
 {
-    public async Task HandleAsync(IncomingTaskEvent message, CancellationToken cancellationToken)
+    public async Task HandleAsync(IncomingIntegrationEvent message, CancellationToken cancellationToken)
     {
         if (message.EventId == Guid.Empty || message.AggregateId == Guid.Empty || message.OccurredAt == default ||
             message.SchemaVersion != 1 || message.AggregateVersion is <= 0 || message.Payload.ValueKind != JsonValueKind.Object ||
@@ -74,7 +74,7 @@ public sealed class TaskEventIngestionHandler(INotificationEventStore store)
     }
 
     public static IReadOnlyList<NotificationCandidate> MapNotifications(
-        IncomingTaskEvent message,
+        IncomingIntegrationEvent message,
         out bool requiresContext)
     {
         requiresContext = false;
@@ -128,16 +128,27 @@ public sealed class TaskEventIngestionHandler(INotificationEventStore store)
                     taskId)).ToList();
         }
 
+        // These are notification events; until their recipient mapping is resolved, retain the safe context.
+        requiresContext = message.EventType is "planning.work-area.assigned" or "planning.season.activated" or
+            "planning.season.completed" or "planning.season.archived" or "purchase.request.submitted" or
+            "purchase.request.decided" or "purchase.delivery.confirmed" or "contribution.pledged" or
+            "contribution.receipt.confirmed" or "contribution.donation.adjusted" or "loan.offer.submitted" or
+            "readiness.item.failed" or "readiness.area.ready" or "readiness.area.reopened" or
+            "recognition.entry.created" or "support.transfer.confirmed" or "material-report.submitted" or "material-report.verified";
         return [];
     }
 
-    private static AuditCandidate MapAudit(IncomingTaskEvent message)
+    private static AuditCandidate MapAudit(IncomingIntegrationEvent message)
     {
         var guidFields = new[]
         {
             "taskId", "workAreaId", "assignmentId", "attendanceRequestId", "attendanceSessionId",
             "volunteerUserId", "leaderUserId", "seasonId", "parishId", "communityId", "materialOfficerUserId",
-            "purchaseRequestId", "supportRequestId", "supportResponseId", "readinessChecklistId", "itemId", "userId"
+            "purchaseRequestId", "supportRequestId", "supportResponseId", "readinessChecklistId", "itemId", "userId",
+            "requestedByUserId", "decidedByUserId", "confirmedByUserId", "buyerUserId", "awardedToUserId",
+            "recognitionPointId", "donationId", "donorId", "borrowedItemId", "offeredByUserId", "reportedByUserId",
+            "verifiedByUserId", "materialReportId", "reopenedByUserId", "readinessItemId", "materialId",
+            "sourceWorkAreaId", "targetWorkAreaId", "requesterUserId", "approvedByUserId", "recipientUserId"
         };
         var safeValues = new Dictionary<string, JsonElement>();
         foreach (var field in guidFields)

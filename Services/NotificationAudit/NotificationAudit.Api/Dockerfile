@@ -5,6 +5,13 @@ EXPOSE 8080
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
+COPY ["BuildingBlocks/BuildingBlocks.Messaging/BuildingBlocks.Messaging.csproj", "BuildingBlocks/BuildingBlocks.Messaging/"]
+COPY ["Services/TaskExecution/TaskExecution.Contracts/TaskExecution.Contracts.csproj", "Services/TaskExecution/TaskExecution.Contracts/"]
+COPY ["Services/Identity/Identity.Contracts/Identity.Contracts.csproj", "Services/Identity/Identity.Contracts/"]
+COPY ["Services/ParishCoordination/ParishCoordination.Contracts/ParishCoordination.Contracts.csproj", "Services/ParishCoordination/ParishCoordination.Contracts/"]
+COPY ["Services/Resource/Resource.Contracts/Resource.Contracts.csproj", "Services/Resource/Resource.Contracts/"]
+COPY ["Services/Readiness/Readiness.Contracts/Readiness.Contracts.csproj", "Services/Readiness/Readiness.Contracts/"]
+COPY ["Services/Reporting/Reporting.Contracts/Reporting.Contracts.csproj", "Services/Reporting/Reporting.Contracts/"]
 COPY ["Services/NotificationAudit/NotificationAudit.Api/NotificationAudit.Api.csproj", "Services/NotificationAudit/NotificationAudit.Api/"]
 COPY ["Services/NotificationAudit/NotificationAudit.Application/NotificationAudit.Application.csproj", "Services/NotificationAudit/NotificationAudit.Application/"]
 COPY ["Services/NotificationAudit/NotificationAudit.Infrastructure/NotificationAudit.Infrastructure.csproj", "Services/NotificationAudit/NotificationAudit.Infrastructure/"]

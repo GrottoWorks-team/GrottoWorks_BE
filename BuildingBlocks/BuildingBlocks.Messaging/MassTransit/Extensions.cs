@@ -28,6 +28,10 @@ public static class Extensions
 
         services.AddMassTransit(config =>
         {
+            config.AddConfigureEndpointsCallback((context,name,endpoint)=>
+            {
+                endpoint.UseConsumeFilter(typeof(MessageConsumeDiagnostics<>),context);
+            });
             config.SetKebabCaseEndpointNameFormatter();
 
             if (assembly != null)
@@ -37,8 +41,10 @@ public static class Extensions
 
             config.UsingRabbitMq((context, configurator) =>
             {
+                configurator.UsePublishFilter(typeof(MessagePublishDiagnostics<>),context);
                 configurator.Host(hostUri, hostConfigurator =>
                 {
+                    hostConfigurator.PublisherConfirmation = true;
                     hostConfigurator.Username(configuration["MessageBroker:UserName"] ?? "guest");
                     hostConfigurator.Password(configuration["MessageBroker:Password"] ?? "guest");
                 });

@@ -28,7 +28,21 @@ public static class DependencyInjection
         services.AddScoped<IWorkAreaTaskCountReader, WorkAreaTaskCountReader>();
         services.AddScoped<IMyTasksStore, MyTasksStore>();
         services.AddScoped<IVolunteerScheduleReader, TaskExecution.Infrastructure.Assignments.VolunteerScheduleReader>();
-        services.AddHttpClient<IVolunteerDirectory, TaskExecution.Infrastructure.Identity.IdentityVolunteerDirectory>(client =>
+        var redis = configuration.GetConnectionString("Redis");
+        if (string.IsNullOrWhiteSpace(redis)) services.AddDistributedMemoryCache(options => options.SizeLimit = 16 * 1024 * 1024);
+        else services.AddStackExchangeRedisCache(options =>
+        {
+            var connection = StackExchange.Redis.ConfigurationOptions.Parse(redis);
+            connection.AbortOnConnectFail = false;
+            connection.ConnectTimeout = 500;
+            connection.AsyncTimeout = 500;
+            connection.ConnectRetry = 0;
+            options.ConfigurationOptions = connection;
+            options.InstanceName = "grottoworks:task:";
+        });
+        services.AddSingleton<TaskExecution.Infrastructure.Identity.VolunteerDirectoryCacheGate>();
+        services.AddScoped<IVolunteerDirectory, TaskExecution.Infrastructure.Identity.CachedVolunteerDirectory>();
+        services.AddHttpClient<TaskExecution.Infrastructure.Identity.IdentityVolunteerDirectory>(client =>
         {
             client.BaseAddress = new Uri(configuration["IdentityClient:BaseAddress"] ?? "http://localhost:6100/");
             client.Timeout = Timeout.InfiniteTimeSpan;

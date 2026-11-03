@@ -26,12 +26,7 @@ public sealed class IdentityVolunteerDirectory(HttpClient client, IConfiguration
             if (!response.IsSuccessStatusCode) throw Unavailable();
             var envelope = await response.Content.ReadFromJsonAsync<DirectoryEnvelope>(cancellationToken);
             if (envelope?.Data is null || envelope.Page is null || envelope.Page.Page != page || envelope.Page.Size != size ||
-                envelope.Page.TotalItems < 0 || envelope.Data.Count > size ||
-                (envelope.Data.Count > 0 && envelope.Page.TotalItems < (long)(page - 1) * size + envelope.Data.Count) ||
-                envelope.Data.Any(user => user is null || user.UserId == Guid.Empty || user.ParishId != parishId ||
-                    user.Status != "ACTIVE" || user.Role != "VOLUNTEER" || string.IsNullOrWhiteSpace(user.DisplayName) ||
-                    !IdentityUserLookup.ValidSkills(user) || user.Availability is null ||
-                    user.Availability.Any(slot => slot is null || slot.AvailableFrom == default || slot.AvailableTo <= slot.AvailableFrom)))
+                !ValidPage(new(envelope.Data, envelope.Page.TotalItems), parishId, communityId, page, size))
                 throw Unavailable();
             return new(envelope.Data, envelope.Page.TotalItems);
         }
@@ -43,4 +38,13 @@ public sealed class IdentityVolunteerDirectory(HttpClient client, IConfiguration
     private static DomainRuleException Unavailable() => new("IDENTITY_SERVICE_UNAVAILABLE", "The volunteer directory is unavailable.", DomainErrorKind.ServiceUnavailable);
     private sealed record DirectoryEnvelope(IReadOnlyList<IdentityUser>? Data, DirectoryPage? Page);
     private sealed record DirectoryPage(int Page, int Size, long TotalItems);
+
+    internal static bool ValidPage(VolunteerDirectoryPage result, Guid parishId, Guid? communityId, int page, int size) =>
+        result.Items is not null && result.TotalItems >= 0 && result.Items.Count <= size &&
+        (result.Items.Count == 0 || result.TotalItems >= (long)(page - 1) * size + result.Items.Count) &&
+        result.Items.All(user => user is not null && user.UserId != Guid.Empty && user.ParishId == parishId &&
+            (!communityId.HasValue || user.CommunityId == communityId) && user.Status == "ACTIVE" &&
+            user.Role == "VOLUNTEER" && !string.IsNullOrWhiteSpace(user.DisplayName) && IdentityUserLookup.ValidSkills(user) &&
+            user.Availability is not null && user.Availability.All(slot => slot is not null &&
+                slot.AvailableFrom != default && slot.AvailableTo > slot.AvailableFrom));
 }

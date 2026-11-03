@@ -175,6 +175,7 @@ services:
 
   taskexecution.api:
     environment:
+      - ConnectionStrings__Redis=redis:6379
       - IdentityClient__BaseAddress=http://identity.api:8080/
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080

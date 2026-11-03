@@ -5,6 +5,12 @@ Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 �
 
 ## Kiến trúc
 
+### Scope replication qua RabbitMQ
+
+Khi `TaskEvents:Enabled=true`, Resource nhận `PlanningScopeSnapshot` tại queue `resource-planning-scopes` và `TaskScopeSnapshot` tại queue `resource-task-snapshots`. Task snapshot chứa scope cha nên có thể tạo projection còn thiếu. Inbox và các thay đổi projection được commit cùng transaction; advisory lock theo Season phối hợp hai queue. Snapshot cũ không ghi đè source version mới. Không lấy trạng thái Season từ snapshot con để ghi đè projection Season hiện tại.
+
+Các producer mới vẫn chưa được bật tự động. Backfill/reconciliation và cutover HTTP sẽ được thực hiện sau khi các phía nhận đã sẵn sàng. Consumer business event cũ tiếp tục tồn tại; snapshot kỹ thuật không thay thế integration event nghiệp vụ.
+
 ```
 Services/Resource/
 ├── Resource.Domain/          # Catalog, Scope (projection), Inventory (requirement, ledger, InventoryCalculator), Purchases

@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\..\ParishCoordination\ParishCoordination.Contracts\ParishCoordination.Contracts.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\BuildingBlocks.Security\BuildingBlocks.Security.csproj" />
     <ProjectReference Include="..\Resource.Domain\Resource.Domain.csproj" />
     <ProjectReference Include="..\..\TaskExecution\TaskExecution.Contracts\TaskExecution.Contracts.csproj" />

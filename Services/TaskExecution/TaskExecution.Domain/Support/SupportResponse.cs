@@ -46,7 +46,7 @@ public sealed class SupportResponse
 
     internal void RefreshMemberStatus()
     {
-        var accepted=members.Count(member=>member.Status is SupportMemberStatus.Approved or SupportMemberStatus.Completed)
+        var accepted=members.Count(member=>(member.Status==SupportMemberStatus.Approved && member.ParticipationAccepted) || member.Status==SupportMemberStatus.Completed)
             + materials.Count(material=>material.Status is SupportMaterialStatus.Approved or SupportMaterialStatus.Transferred);
         var total=members.Count+materials.Count;
         Status=accepted==total ? SupportResponseStatus.Accepted
@@ -73,6 +73,9 @@ public sealed class SupportResponseMember
     public Guid? ReviewedBy {get;private set;}
     public DateTimeOffset? ReviewedAt {get;private set;}
     public string? ReviewReason {get;private set;}
+    public bool RequiresConfirmation {get;private set;}
+    public bool ParticipationAccepted {get;private set;}
+    public string? ParticipationReason {get;private set;}
     internal static SupportResponseMember Offer(Guid responseId,Guid requestId,SupportMemberInput input)=>new()
     {Id=Guid.NewGuid(),ResponseId=responseId,RequestId=requestId,PositionId=input.PositionId,VolunteerId=input.VolunteerId};
 
@@ -94,7 +97,7 @@ public sealed class SupportResponseMember
         return true;
     }
 
-    internal void Review(bool approve,Guid? assignmentId,Guid reviewer,string? reason,int? expectedVersion,DateTimeOffset now)
+    internal void Review(bool approve,Guid? assignmentId,Guid reviewer,string? reason,int? expectedVersion,DateTimeOffset now,bool requiresConfirmation)
     {
         EnsureReviewAllowed(expectedVersion,approve,reason);
         if(reviewer==Guid.Empty || (approve && (!assignmentId.HasValue || assignmentId==Guid.Empty)))
@@ -102,6 +105,17 @@ public sealed class SupportResponseMember
         AssignmentId=approve ? assignmentId : null;
         Status=approve ? SupportMemberStatus.Approved : SupportMemberStatus.Rejected;
         ReviewedBy=reviewer;ReviewedAt=now.ToUniversalTime();ReviewReason=approve ? null : reason!.Trim();Version++;
+        RequiresConfirmation=approve && requiresConfirmation;
+        ParticipationAccepted=approve && !requiresConfirmation;
+    }
+
+    internal void RespondToNomination(bool accept,string? reason)
+    {
+        if(Status!=SupportMemberStatus.Approved || !RequiresConfirmation || ParticipationAccepted)
+            throw new DomainRuleException("SUPPORT_MEMBER_INVALID_STATE","Only a nomination awaiting its volunteer can be answered.");
+        ParticipationAccepted=accept;
+        if(!accept) {Status=SupportMemberStatus.Cancelled;ParticipationReason=reason?.Trim();}
+        Version++;
     }
 }
 
@@ -120,13 +134,13 @@ public sealed partial class SupportRequest
             throw new DomainRuleException("SUPPORT_POSITION_CAPACITY_EXCEEDED","The position has no remaining slots.");
     }
 
-    public void ReviewMember(Guid memberId,bool approve,Guid? assignmentId,Guid reviewer,string? reason,int? expectedVersion,DateTimeOffset now)
+    public void ReviewMember(Guid memberId,bool approve,Guid? assignmentId,Guid reviewer,string? reason,int? expectedVersion,DateTimeOffset now,bool requiresConfirmation=false)
     {
         var response=responses.SingleOrDefault(response=>response.Members.Any(member=>member.Id==memberId))
             ?? throw DomainRuleException.NotFound("SUPPORT_MEMBER_NOT_FOUND","The member does not exist.");
         var member=response.Members.Single(member=>member.Id==memberId);
         EnsureMemberReviewAllowed(member,approve,reason,expectedVersion);
-        member.Review(approve,assignmentId,reviewer,reason,expectedVersion,now);
+        member.Review(approve,assignmentId,reviewer,reason,expectedVersion,now,requiresConfirmation);
         response.RefreshMemberStatus();
         RefreshStaffingFulfillment();
         UpdatedAt=now.ToUniversalTime();Version++;
@@ -151,7 +165,7 @@ public sealed partial class SupportRequest
     private void RefreshStaffingFulfillment()
     {
         var accepted=responses.SelectMany(row=>row.Members)
-            .Where(row=>row.Status is SupportMemberStatus.Approved or SupportMemberStatus.Completed).ToList();
+            .Where(row=>(row.Status==SupportMemberStatus.Approved && row.ParticipationAccepted) || row.Status==SupportMemberStatus.Completed).ToList();
         var staffingSatisfied=positions.Count>0 && positions.All(position=>accepted.Count(row=>row.PositionId==position.Id)>=position.RequiredVolunteerCount);
         var receipts=responses.SelectMany(row=>row.Materials).Where(row=>row.Status==SupportMaterialStatus.Transferred).ToList();
         var materialSatisfied=materials.Count>0 && materials.All(demand=>receipts.Where(row=>row.RequestMaterialId==demand.Id)
@@ -159,6 +173,17 @@ public sealed partial class SupportRequest
         var fulfilled=(SupportType==SupportType.Material || staffingSatisfied) && (SupportType==SupportType.Staffing || materialSatisfied);
         Status=fulfilled ? SupportRequestStatus.Fulfilled
             : accepted.Count>0 || receipts.Any(row=>row.ReceivedUsableQuantity>0) ? SupportRequestStatus.PartiallyFulfilled : SupportRequestStatus.Published;
+    }
+
+    public void RespondToNomination(Guid assignmentId,bool accept,string? reason,DateTimeOffset now)
+    {
+        var response=responses.SingleOrDefault(row=>row.Members.Any(member=>member.AssignmentId==assignmentId))
+            ?? throw DomainRuleException.NotFound("SUPPORT_MEMBER_NOT_FOUND","The assignment has no support member.");
+        if(Status is SupportRequestStatus.Closed or SupportRequestStatus.Cancelled)
+            throw new DomainRuleException("SUPPORT_REQUEST_INVALID_STATE","The support request is closed.");
+        var member=response.Members.Single(row=>row.AssignmentId==assignmentId);
+        member.RespondToNomination(accept,reason);response.RefreshMemberStatus();RefreshStaffingFulfillment();
+        UpdatedAt=now.ToUniversalTime();Version++;
     }
 
     private readonly List<SupportResponse> responses=[];

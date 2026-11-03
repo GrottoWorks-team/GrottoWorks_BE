@@ -60,13 +60,14 @@ public sealed class ReviewSupportMemberHandler(ISupportRequestRepository request
                 AssignmentService.EnsureNoDuplicate(existing,member.VolunteerId);
                 AssignmentService.EnsureCapacity(existing,task.RequiredVolunteerCount,false);
 
-                var assignment=TaskAssignment.AcceptSupport(taskId,member.VolunteerId,actor.UserId,response.CreatedAt,now);
-                request.ReviewMember(memberId,true,assignment.Id,actor.UserId,null,expectedVersion,now);
+                var requiresConfirmation=response.VolunteerId!=member.VolunteerId;
+                var assignment=TaskAssignment.FromSupportResponse(taskId,member.VolunteerId,actor.UserId,response.CreatedAt,now,requiresConfirmation);
+                request.ReviewMember(memberId,true,assignment.Id,actor.UserId,null,expectedVersion,now,requiresConfirmation);
                 assignments.Add(assignment);task.RegisterAssignmentChange(now);
                 events.Record(TaskEventTypes.AssignmentCreated,task,area,new
                 {
                     assignmentId=assignment.Id,taskId,workAreaId=area.WorkAreaId,volunteerUserId=member.VolunteerId,
-                    leaderUserId=area.LeaderUserId,assignmentType="SUPPORT",status="ACCEPTED",supportRequestId=request.Id,supportMemberId=member.Id
+                    leaderUserId=area.LeaderUserId,assignmentType="SUPPORT",status=requiresConfirmation ? "PENDING" : "ACCEPTED",supportRequestId=request.Id,supportMemberId=member.Id
                 });
                 StageReviewEvent(request,member,actor.UserId,area.ParishId,now);
                 await requests.SaveAsync(ct);
@@ -81,6 +82,7 @@ public sealed class ReviewSupportMemberHandler(ISupportRequestRepository request
             {
                 supportRequestId=request.Id,supportMemberId=member.Id,workAreaId=request.WorkAreaId,volunteerUserId=member.VolunteerId,
                 assignmentId=member.AssignmentId,decision=member.Status==SupportMemberStatus.Approved ? "APPROVED" : "REJECTED",
-                previousStatus="PENDING",status=JsonNamingPolicy.SnakeCaseUpper.ConvertName(member.Status.ToString()),reason=member.ReviewReason
+                previousStatus="PENDING",status=JsonNamingPolicy.SnakeCaseUpper.ConvertName(member.Status.ToString()),reason=member.ReviewReason,
+                requiresConfirmation=member.RequiresConfirmation
             })));
 }

@@ -44,11 +44,13 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
                 throw new DomainRuleException("TASK_INVALID_STATE", "The task no longer accepts assignment responses.");
             if (accept) assignment.Accept(expectedVersion, DateTimeOffset.UtcNow);
             else assignment.Decline(reason!, expectedVersion, DateTimeOffset.UtcNow);
+            if(assignment.Type==AssignmentType.Support)
+                await support.RespondAsync(assignment.Id,accept,assignment.ResponseReason,DateTimeOffset.UtcNow,cancellationToken);
             task.RegisterAssignmentChange(DateTimeOffset.UtcNow);
             events.Record(TaskEventTypes.AssignmentResponded, task, area, new
             {
                 assignmentId = assignment.Id, taskId = task.Id, workAreaId = area.WorkAreaId,
-                volunteerUserId = user.UserId, leaderUserId = area.LeaderUserId, assignmentType = "DIRECT",
+                volunteerUserId = user.UserId, leaderUserId = area.LeaderUserId, assignmentType = assignment.Type==AssignmentType.Support ? "SUPPORT" : "DIRECT",
                 decision = accept ? "ACCEPTED" : "DECLINED", reason = assignment.ResponseReason
             });
             await assignments.SaveAsync(cancellationToken);
@@ -97,7 +99,7 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
             ?? throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
         await scopeAccess.GetWorkAreaForLeaderReadAsync(task.WorkAreaId, cancellationToken);
         return (await assignments.ListAsync(taskId, cancellationToken))
-            .Where(row => row.Type == AssignmentType.Direct || row.Status != AssignmentStatus.Pending)
+            .Where(row => row.Type is AssignmentType.Direct or AssignmentType.Support || row.Status != AssignmentStatus.Pending)
             .Select(row => AssignmentDto.From(row)).ToList();
     }
 

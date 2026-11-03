@@ -7,6 +7,15 @@ namespace TaskExecution.Infrastructure.Support;
 
 public sealed class SupportAssignmentLifecycle(TaskExecutionDbContext db) : ISupportAssignmentLifecycle
 {
+    public async Task RespondAsync(Guid assignmentId,bool accept,string? reason,DateTimeOffset now,CancellationToken cancellationToken)
+    {
+        var request=await db.SupportRequests.Where(row=>row.Responses.Any(response=>response.Members.Any(member=>member.AssignmentId==assignmentId)))
+            .Include(row=>row.Positions).Include(row=>row.Materials)
+            .Include(row=>row.Responses).ThenInclude(response=>response.Members)
+            .Include(row=>row.Responses).ThenInclude(response=>response.Materials).AsSplitQuery().SingleOrDefaultAsync(cancellationToken)
+            ?? throw TaskExecution.Domain.DomainRuleException.NotFound("SUPPORT_MEMBER_NOT_FOUND","The assignment has no support member.");
+        request.RespondToNomination(assignmentId,accept,reason,now);
+    }
     public async Task CancelAssignmentsAsync(IReadOnlyCollection<Guid> assignmentIds,DateTimeOffset now,CancellationToken cancellationToken)
     {
         if(assignmentIds.Count==0) return;

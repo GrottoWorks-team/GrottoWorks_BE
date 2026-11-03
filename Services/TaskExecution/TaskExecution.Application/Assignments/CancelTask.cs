@@ -19,7 +19,7 @@ public sealed partial class AssignmentService
             var previousStatus = task.Status;
             task.Cancel(reason,user.UserId,version,DateTimeOffset.UtcNow);
             var rows=await assignments.ListAsync(taskId,cancellationToken);
-            var supportIds=rows.Where(row=>row.Type==AssignmentType.Support && row.Status is AssignmentStatus.Accepted or AssignmentStatus.InProgress)
+            var supportIds=rows.Where(row=>row.Type==AssignmentType.Support && row.Status is AssignmentStatus.Pending or AssignmentStatus.Accepted or AssignmentStatus.InProgress)
                 .Select(row=>row.Id).ToArray();
             foreach (var row in rows)
                 row.CancelForTask(task.CancellationReason!);

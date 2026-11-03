@@ -46,6 +46,9 @@ public sealed class SupportResponseMemberConfiguration : IEntityTypeConfiguratio
         b.Property(row=>row.Version).HasColumnName("version").HasDefaultValue(1).IsConcurrencyToken();
         b.Property(row=>row.ReviewedBy).HasColumnName("reviewed_by_user_id");b.Property(row=>row.ReviewedAt).HasColumnName("reviewed_at");
         b.Property(row=>row.ReviewReason).HasColumnName("review_reason").HasMaxLength(500);
+        b.Property(row=>row.RequiresConfirmation).HasColumnName("requires_confirmation").HasDefaultValue(false);
+        b.Property(row=>row.ParticipationAccepted).HasColumnName("participation_accepted").HasDefaultValue(false);
+        b.Property(row=>row.ParticipationReason).HasColumnName("participation_reason").HasMaxLength(500);
         b.HasOne<SupportPosition>().WithMany().HasForeignKey(row=>new {row.RequestId,row.PositionId})
             .HasPrincipalKey(row=>new {row.RequestId,row.Id}).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_support_member_position");
         b.HasOne<TaskAssignment>().WithMany().HasForeignKey(row=>row.AssignmentId).OnDelete(DeleteBehavior.Restrict)

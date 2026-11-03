@@ -8,10 +8,11 @@ using TaskExecution.Domain.Support;
 namespace TaskExecution.Application.Support;
 
 public sealed record SupportMemberDto(Guid Id,Guid PositionId,Guid VolunteerId,SupportMemberStatus Status,Guid? AssignmentId,
-    int Version,Guid? ReviewedBy,DateTimeOffset? ReviewedAt,string? Reason)
+    int Version,Guid? ReviewedBy,DateTimeOffset? ReviewedAt,string? Reason,bool RequiresConfirmation=false,bool ParticipationAccepted=false,string? ParticipationReason=null)
 {
     public static SupportMemberDto From(SupportResponseMember member)=>new(member.Id,member.PositionId,member.VolunteerId,
-        member.Status,member.AssignmentId,member.Version,member.ReviewedBy,member.ReviewedAt,member.ReviewReason);
+        member.Status,member.AssignmentId,member.Version,member.ReviewedBy,member.ReviewedAt,member.ReviewReason,
+        member.RequiresConfirmation,member.ParticipationAccepted,member.ParticipationReason);
 }
 public sealed record SupportResponseDto(Guid Id,Guid RequestId,Guid? VolunteerId,Guid? RespondingCommunityId,SupportResponseStatus Status,
     int ResponseQuantity,string? Note,DateTimeOffset CreatedAt,int Version,IReadOnlyList<SupportMemberDto> Members,IReadOnlyList<SupportResponseMaterialDto> Materials)

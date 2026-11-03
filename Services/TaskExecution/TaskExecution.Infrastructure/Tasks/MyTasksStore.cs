@@ -13,7 +13,7 @@ public sealed class MyTasksStore(TaskExecutionDbContext db) : IMyTasksStore
     {
         var query = db.Tasks.AsNoTracking().Where(task =>
             db.Assignments.Any(row => row.TaskId == task.Id && row.VolunteerId == volunteerId &&
-                (row.Type == AssignmentType.Direct || row.ApprovedAt.HasValue)) &&
+                (row.Type == AssignmentType.Direct || row.Type==AssignmentType.Support || row.ApprovedAt.HasValue)) &&
             db.WorkAreaScopes.Any(area => area.WorkAreaId == task.WorkAreaId && area.ParishId == parishId &&
                 (!filter.SeasonId.HasValue || area.SeasonId == filter.SeasonId.Value)));
         if (filter.Status.HasValue) query = query.Where(task => task.Status == filter.Status.Value);

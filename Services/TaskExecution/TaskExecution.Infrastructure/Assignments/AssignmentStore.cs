@@ -67,7 +67,7 @@ public sealed class AssignmentStore(TaskExecutionDbContext db) : IAssignmentStor
                       join task in db.Tasks on assignment.TaskId equals task.Id
                       where assignment.VolunteerId == volunteerId && assignment.TaskId != taskId &&
                             (assignment.Status == AssignmentStatus.Accepted || assignment.Status == AssignmentStatus.InProgress ||
-                             (assignment.Status == AssignmentStatus.Pending && assignment.Type == AssignmentType.Direct)) &&
+                             (assignment.Status == AssignmentStatus.Pending && (assignment.Type == AssignmentType.Direct || assignment.Type==AssignmentType.Support))) &&
                             task.StartAt.HasValue && task.StartAt < deadline && task.Deadline > startAt.Value
                       select assignment.Id).AnyAsync(cancellationToken);
     }

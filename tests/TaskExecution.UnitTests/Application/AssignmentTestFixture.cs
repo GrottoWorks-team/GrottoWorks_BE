@@ -102,6 +102,8 @@ internal sealed class AssignmentTestFixture
         public List<TaskExecution.Domain.Support.SupportRequest> Rows {get;}=[];
         public Task CancelAssignmentsAsync(IReadOnlyCollection<Guid> ids,DateTimeOffset now,CancellationToken ct)
         { foreach(var request in Rows) request.CancelAssignments(ids,now);return System.Threading.Tasks.Task.CompletedTask; }
+        public Task RespondAsync(Guid id,bool accept,string? reason,DateTimeOffset now,CancellationToken ct)
+        {Rows.Single(row=>row.Responses.Any(response=>response.Members.Any(member=>member.AssignmentId==id))).RespondToNomination(id,accept,reason,now);return System.Threading.Tasks.Task.CompletedTask;}
     }
     internal sealed class TestCorrelation : ITaskCorrelationContext { public string CorrelationId => "assignment-test"; }
     internal sealed class TestScopes(SeasonScope season,WorkAreaScope area) : IScopeProjectionStore

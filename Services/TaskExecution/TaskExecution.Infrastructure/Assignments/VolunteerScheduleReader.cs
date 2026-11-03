@@ -16,7 +16,7 @@ public sealed class VolunteerScheduleReader(TaskExecutionDbContext db) : IVolunt
                          join task in db.Tasks.AsNoTracking() on assignment.TaskId equals task.Id
                          where volunteerIds.Contains(assignment.VolunteerId) && task.Id != taskId &&
                              (assignment.Status == AssignmentStatus.Accepted || assignment.Status == AssignmentStatus.InProgress ||
-                              (assignment.Status == AssignmentStatus.Pending && assignment.Type == AssignmentType.Direct)) &&
+                              (assignment.Status == AssignmentStatus.Pending && (assignment.Type == AssignmentType.Direct || assignment.Type==AssignmentType.Support))) &&
                              task.Status != TaskState.Cancelled && task.Status != TaskState.Completed &&
                              task.StartAt.HasValue && task.StartAt < deadline && task.Deadline > startAt.Value
                          select assignment.VolunteerId).Distinct().ToArrayAsync(cancellationToken);

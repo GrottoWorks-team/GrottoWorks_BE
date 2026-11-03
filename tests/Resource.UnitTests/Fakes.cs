@@ -522,6 +522,16 @@ public sealed class FakeTaskMaterialReportStore : Resource.Application.Inventory
 
 public sealed class FakeSupportTransferStore : Resource.Application.Inventory.ISupportTransferStore
 {
+    public bool InTransaction {get;private set;}
+    public int Commits {get;private set;}
+    public int Failures {get;private set;}
+    public async Task<T> InTransactionAsync<T>(Func<Task<T>> operation,CancellationToken cancellationToken=default)
+    {
+        InTransaction=true;
+        try {var result=await operation();Commits++;return result;}
+        catch {Failures++;throw;}
+        finally {InTransaction=false;}
+    }
     public List<Resource.Domain.Inventory.SupportTransfer> Transfers { get; } = [];
 
     public Task<Resource.Domain.Inventory.SupportTransfer?> GetAsync(Guid supportResponseMaterialId, CancellationToken cancellationToken = default) =>

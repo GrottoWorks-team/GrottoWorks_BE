@@ -43,6 +43,7 @@ public sealed record ConfirmTransferReceiptCommand(Guid SupportResponseMaterialI
 
 public interface ISupportTransferStore
 {
+    Task<T> InTransactionAsync<T>(Func<Task<T>> operation,CancellationToken cancellationToken=default);
     /// <summary>Tracked.</summary>
     Task<SupportTransfer?> GetAsync(Guid supportResponseMaterialId, CancellationToken cancellationToken = default);
 
@@ -85,6 +86,7 @@ public sealed class StartSupportTransferCommandHandler(
         }
 
         WorkAreaAccess.EnsureWritable(source);
+        WorkAreaAccess.EnsureWritable(target);
         var material = await catalog.GetMaterialAsync(command.MaterialId, cancellationToken)
             ?? throw DomainRuleException.Validation("MATERIAL_UNKNOWN", "The material does not exist.");
 
@@ -108,10 +110,10 @@ public sealed class StartSupportTransferCommandHandler(
                 source.WorkAreaId, material.MaterialId, TransactionType.TransferOut, transfer.Quantity, now, command.ApprovedByUserId, null,
                 TransactionReferenceType.SupportResponseMaterial, transfer.SupportResponseMaterialId));
             await store.SaveChangesAsync(cancellationToken);
+            await shortages.PublishIfChangedAsync(before, cancellationToken);
             await lease.CommitAsync(cancellationToken);
         }
 
-        await shortages.PublishIfChangedAsync(before, cancellationToken);
         return (SupportTransferDto.From(transfer), true);
     }
 
@@ -136,7 +138,10 @@ public sealed class ConfirmTransferReceiptCommandHandler(
     IIntegrationEventPublisher publisher,
     ICurrentUser currentUser)
 {
-    public async Task<SupportTransferDto> HandleAsync(ConfirmTransferReceiptCommand command, CancellationToken cancellationToken = default)
+    public Task<SupportTransferDto> HandleAsync(ConfirmTransferReceiptCommand command,CancellationToken cancellationToken=default)=>
+        store.InTransactionAsync(()=>ConfirmInTransactionAsync(command,cancellationToken),cancellationToken);
+
+    private async Task<SupportTransferDto> ConfirmInTransactionAsync(ConfirmTransferReceiptCommand command,CancellationToken cancellationToken)
     {
         var transfer = await store.GetAsync(command.SupportResponseMaterialId, cancellationToken)
             ?? throw DomainRuleException.NotFound("SUPPORT_TRANSFER_NOT_FOUND", "No approved transfer exists for this support material.");

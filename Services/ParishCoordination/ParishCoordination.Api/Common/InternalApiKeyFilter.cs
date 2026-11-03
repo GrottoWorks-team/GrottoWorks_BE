@@ -46,4 +46,3 @@ public sealed class InternalApiKeyFilter(IConfiguration configuration, ILogger<I
                 ["correlationId"] = CorrelationIdMiddlewareExtensions.GetCorrelationId(httpContext)
             });
 }
-

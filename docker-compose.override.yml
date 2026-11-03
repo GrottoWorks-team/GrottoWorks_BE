@@ -65,6 +65,10 @@ services:
 
   identity.api:
     environment:
+      - SystemExport__ApiKey=${SYSTEM_EXPORT_API_KEY:-}
+      - Observability__Enabled=${OBSERVABILITY_ENABLED:-false}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - Outbox__DispatchEnabled=true
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__IdentityDatabase=Host=postgres;Port=5432;Database=identity_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
@@ -84,6 +88,13 @@ services:
 
   parishcoordination.api:
     environment:
+      - SystemExport__ApiKey=${SYSTEM_EXPORT_API_KEY:-}
+      - Observability__Enabled=${OBSERVABILITY_ENABLED:-false}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - PlanningEvents__DispatchEnabled=true
+      - LifecycleEvents__Enabled=true
+      - ScopeDelivery__BrokerPrimaryEnabled=${BROKER_SCOPE_PRIMARY:-false}
+      - ScopeDelivery__HttpRollbackEnabled=${HTTP_SCOPE_ROLLBACK:-false}
       - TaskScopeSync__Enabled=true
       - TaskScopeSync__BaseAddress=http://taskexecution.api:8080/
       - TaskScopeSync__PollIntervalSeconds=2
@@ -107,6 +118,9 @@ services:
 
   resource.api:
     environment:
+      - SystemExport__ApiKey=${SYSTEM_EXPORT_API_KEY:-}
+      - Observability__Enabled=${OBSERVABILITY_ENABLED:-false}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__ResourceDatabase=Host=postgres;Port=5432;Database=resource_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
@@ -130,6 +144,10 @@ services:
 
   readiness.api:
     environment:
+      - TaskExecutionClient__BaseAddress=http://taskexecution.api:8080/
+      - SystemExport__ApiKey=${SYSTEM_EXPORT_API_KEY:-}
+      - Observability__Enabled=${OBSERVABILITY_ENABLED:-false}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__ReadinessDatabase=Host=postgres;Port=5432;Database=readiness_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
@@ -152,6 +170,9 @@ services:
 
   reporting.api:
     environment:
+      - SystemExport__ApiKey=${SYSTEM_EXPORT_API_KEY:-}
+      - Observability__Enabled=${OBSERVABILITY_ENABLED:-false}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__ReportingDatabase=Host=postgres;Port=5432;Database=reporting_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
@@ -175,6 +196,13 @@ services:
 
   taskexecution.api:
     environment:
+      - SystemExport__ApiKey=${SYSTEM_EXPORT_API_KEY:-}
+      - Observability__Enabled=${OBSERVABILITY_ENABLED:-false}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - Outbox__DispatchEnabled=true
+      - PlanningEvents__ConsumeEnabled=true
+      - PurchaseEvents__ConsumeEnabled=true
+      - NotificationAuditClient__BaseAddress=http://notificationaudit.api:8080/
       - ResourceClient__BaseAddress=http://resource.api:8080/
       - ConnectionStrings__Redis=redis:6379
       - IdentityClient__BaseAddress=http://identity.api:8080/
@@ -192,6 +220,25 @@ services:
 
   notificationaudit.api:
     environment:
+      - SystemExport__ApiKey=${SYSTEM_EXPORT_API_KEY:-}
+      - Observability__Enabled=${OBSERVABILITY_ENABLED:-false}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - IdentityClient__BaseAddress=http://identity.api:8080/
+      - ParishClient__BaseAddress=http://parishcoordination.api:8080/
+      - SystemJobs__ExportWorkerEnabled=true
+      - SystemJobs__CleanupEnabled=true
+      - SystemJobs__Sources__Identity__BaseUrl=http://identity.api:8080/
+      - SystemJobs__Sources__Identity__ApiKey=${SYSTEM_EXPORT_API_KEY:-}
+      - SystemJobs__Sources__ParishCoordination__BaseUrl=http://parishcoordination.api:8080/
+      - SystemJobs__Sources__ParishCoordination__ApiKey=${SYSTEM_EXPORT_API_KEY:-}
+      - SystemJobs__Sources__TaskExecution__BaseUrl=http://taskexecution.api:8080/
+      - SystemJobs__Sources__TaskExecution__ApiKey=${SYSTEM_EXPORT_API_KEY:-}
+      - SystemJobs__Sources__Resource__BaseUrl=http://resource.api:8080/
+      - SystemJobs__Sources__Resource__ApiKey=${SYSTEM_EXPORT_API_KEY:-}
+      - SystemJobs__Sources__Readiness__BaseUrl=http://readiness.api:8080/
+      - SystemJobs__Sources__Readiness__ApiKey=${SYSTEM_EXPORT_API_KEY:-}
+      - SystemJobs__Sources__Reporting__BaseUrl=http://reporting.api:8080/
+      - SystemJobs__Sources__Reporting__ApiKey=${SYSTEM_EXPORT_API_KEY:-}
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__NotificationAuditDatabase=Host=postgres;Port=5432;Database=notify_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
@@ -220,6 +267,8 @@ services:
 
   yarpapigateway:
     environment:
+      - Observability__Enabled=${OBSERVABILITY_ENABLED:-false}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - Jwt__SigningKey=${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY (>= 32 chars) in .env}
@@ -242,3 +291,31 @@ services:
       - notificationaudit.api
     ports:
       - "6102:8080"
+
+  notificationaudit.backup:
+    environment:
+      - ConnectionStrings__NotificationAuditDatabase=Host=postgres;Database=notify_db;Username=${BACKUP_JOB_DB_USER:-grottoworks_backup_jobs};Password=${BACKUP_JOB_DB_PASSWORD:-}
+      - DatabaseBackup__Databases__Identity=Host=postgres;Database=identity_db;Username=${BACKUP_DB_USER:-grottoworks_backup};Password=${BACKUP_DB_PASSWORD:-}
+      - DatabaseBackup__Databases__ParishCoordination=Host=postgres;Database=parish_db;Username=${BACKUP_DB_USER:-grottoworks_backup};Password=${BACKUP_DB_PASSWORD:-}
+      - DatabaseBackup__Databases__TaskExecution=Host=postgres;Database=task_db;Username=${BACKUP_DB_USER:-grottoworks_backup};Password=${BACKUP_DB_PASSWORD:-}
+      - DatabaseBackup__Databases__Resource=Host=postgres;Database=resource_db;Username=${BACKUP_DB_USER:-grottoworks_backup};Password=${BACKUP_DB_PASSWORD:-}
+      - DatabaseBackup__Databases__Readiness=Host=postgres;Database=readiness_db;Username=${BACKUP_DB_USER:-grottoworks_backup};Password=${BACKUP_DB_PASSWORD:-}
+      - DatabaseBackup__Databases__Reporting=Host=postgres;Database=reporting_db;Username=${BACKUP_DB_USER:-grottoworks_backup};Password=${BACKUP_DB_PASSWORD:-}
+      - DatabaseBackup__Databases__NotificationAudit=Host=postgres;Database=notify_db;Username=${BACKUP_DB_USER:-grottoworks_backup};Password=${BACKUP_DB_PASSWORD:-}
+      - DatabaseBackup__EncryptionKeyId=${BACKUP_KEY_ID:-local-v1}
+      - GROTTOWORKS_BACKUP_KEY=${GROTTOWORKS_BACKUP_KEY:-}
+      - ObjectStorage__InternalEndpoint=http://minio:9000
+      - ObjectStorage__PublicEndpoint=http://localhost:9000
+      - ObjectStorage__AccessKey=${MINIO_ROOT_USER:-grottoworks}
+      - ObjectStorage__SecretKey=${MINIO_ROOT_PASSWORD:-grottoworks_minio_1234}
+      - ObjectStorage__Bucket=grottoworks-files
+    depends_on:
+      postgres:
+        condition: service_healthy
+      notificationaudit.api:
+        condition: service_started
+      minio:
+        condition: service_started
+    read_only: true
+    tmpfs:
+      - /tmp:size=2g,mode=1777

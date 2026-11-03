@@ -59,6 +59,20 @@ services:
       context: .
       dockerfile: ApiGateway/YarpApiGateway/Dockerfile
 
+  notificationaudit.backup:
+    profiles: [backup]
+    image: ${DOCKER_REGISTRY-}notificationauditbackup
+    build:
+      context: .
+      dockerfile: Services/NotificationAudit/NotificationAudit.BackupWorker/Dockerfile
+
+  otel-collector:
+    profiles: [observability]
+    image: otel/opentelemetry-collector:0.123.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./docker/observability/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+
 volumes:
   postgres_data:
   minio_data:

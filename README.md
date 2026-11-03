@@ -460,3 +460,7 @@ Authorization: Bearer <accessToken>
 ### API trả `404` từ Gateway nhưng Swagger có endpoint
 
 Route có thể chưa được khai báo trong YARP Gateway. Frontend không nên chuyển sang gọi service trực tiếp; báo endpoint và operation ID cho backend để bổ sung route đúng service.
+
+# Implementation and integration
+
+See [INTEGRATION.md](INTEGRATION.md) for the completed PLAN feature flows, Docker configuration, broker cutover/rollback, isolated encrypted backup worker and runtime acceptance checklist. Unit tests were written without being executed; deployment verification remains separate from compilation.

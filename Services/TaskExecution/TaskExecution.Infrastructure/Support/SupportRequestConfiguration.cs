@@ -17,6 +17,9 @@ public sealed class SupportRequestConfiguration : IEntityTypeConfiguration<Suppo
         b.Property(r=>r.Status).HasColumnName("request_status").HasMaxLength(30).HasConversion(EnumText.Converter<SupportRequestStatus>());
         b.Property(r=>r.CreatedAt).HasColumnName("created_at");b.Property(r=>r.UpdatedAt).HasColumnName("updated_at");
         b.Property(r=>r.Version).HasColumnName("version").HasDefaultValue(1).IsConcurrencyToken();
+        b.Property(r=>r.ClosedBy).HasColumnName("closed_by_user_id");
+        b.Property(r=>r.ClosedAt).HasColumnName("closed_at");
+        b.Property(r=>r.CloseReason).HasColumnName("close_reason").HasMaxLength(500);
         b.HasIndex(r=>new {r.SeasonId,r.WorkAreaId});
         b.HasMany(r=>r.Positions).WithOne().HasForeignKey(p=>p.RequestId).OnDelete(DeleteBehavior.Cascade);
         b.HasMany(r=>r.Materials).WithOne().HasForeignKey(m=>m.RequestId).OnDelete(DeleteBehavior.Cascade);

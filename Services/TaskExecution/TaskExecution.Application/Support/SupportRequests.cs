@@ -16,14 +16,15 @@ public sealed record SupportPositionDto(Guid Id,string Name,int RequiredVoluntee
 public sealed record SupportMaterialDto(Guid Id,Guid MaterialId,decimal RequiredQuantity,string? Note);
 public sealed record SupportRequestDto(Guid Id,Guid SeasonId,Guid WorkAreaId,Guid RequestedBy,SupportType SupportType,string? Description,
     DateOnly? Deadline,SupportRequestStatus Status,DateTimeOffset CreatedAt,DateTimeOffset? UpdatedAt,int Version,
-    IReadOnlyList<SupportPositionDto> Positions,IReadOnlyList<SupportMaterialDto> Materials,IReadOnlyList<SupportResponseDto> Responses)
+    IReadOnlyList<SupportPositionDto> Positions,IReadOnlyList<SupportMaterialDto> Materials,IReadOnlyList<SupportResponseDto> Responses,
+    Guid? ClosedBy=null,DateTimeOffset? ClosedAt=null,string? CloseReason=null)
 {
     public static SupportRequestDto From(SupportRequest row)=>new(row.Id,row.SeasonId,row.WorkAreaId,row.RequestedBy,row.SupportType,
         row.Description,row.Deadline,row.Status,row.CreatedAt,row.UpdatedAt,row.Version,
         row.Positions.OrderBy(p=>p.Name).ThenBy(p=>p.Id).Select(p=>new SupportPositionDto(p.Id,p.Name,p.RequiredVolunteerCount,p.Note,
             p.Skills.OrderBy(s=>s.SkillId).Select(s=>new SupportSkillDto(s.SkillId,s.RequiredSkillLevel)).ToList(),p.TaskId)).ToList(),
         row.Materials.OrderBy(m=>m.MaterialId).Select(m=>new SupportMaterialDto(m.Id,m.MaterialId,m.RequiredQuantity,m.Note)).ToList(),
-        row.Responses.OrderBy(response=>response.CreatedAt).ThenBy(response=>response.Id).Select(SupportResponseDto.From).ToList());
+        row.Responses.OrderBy(response=>response.CreatedAt).ThenBy(response=>response.Id).Select(SupportResponseDto.From).ToList(),row.ClosedBy,row.ClosedAt,row.CloseReason);
 }
 
 public interface ISupportRequestRepository

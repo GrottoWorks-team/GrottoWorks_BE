@@ -98,6 +98,13 @@ public sealed class SupportResponseMaterial
         Status = SupportMaterialStatus.Transferred; Version++; return true;
     }
 
+    internal void CancelPending()
+    {
+        if (Status != SupportMaterialStatus.Pending) return;
+        if (ApprovalPending) throw new DomainRuleException("SUPPORT_MATERIAL_APPROVAL_PENDING", "An approval operation is still in flight.");
+        Status = SupportMaterialStatus.Cancelled; Version++;
+    }
+
     internal static SupportResponseMaterial Offer(Guid responseId,Guid requestId,Guid materialId,SupportMaterialOfferInput input)
     {
         ValidateOffer(input);

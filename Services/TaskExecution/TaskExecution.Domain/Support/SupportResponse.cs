@@ -117,6 +117,12 @@ public sealed class SupportResponseMember
         if(!accept) {Status=SupportMemberStatus.Cancelled;ParticipationReason=reason?.Trim();}
         Version++;
     }
+
+    internal void CancelPending()
+    {
+        if (Status != SupportMemberStatus.Pending) return;
+        Status = SupportMemberStatus.Cancelled; Version++;
+    }
 }
 
 public sealed partial class SupportRequest

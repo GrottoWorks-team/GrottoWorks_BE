@@ -94,7 +94,7 @@ internal sealed class AssignmentTestFixture
         public List<TaskIntegrationEvent> Items { get; } = [];
         public void Add(TaskIntegrationEvent message) => Items.Add(message);
     }
-    private sealed class TestCorrelation : ITaskCorrelationContext { public string CorrelationId => "assignment-test"; }
+    internal sealed class TestCorrelation : ITaskCorrelationContext { public string CorrelationId => "assignment-test"; }
     internal sealed class TestScopes(SeasonScope season,WorkAreaScope area) : IScopeProjectionStore
     {
         public Task<SeasonScope?> GetSeasonAsync(Guid id,CancellationToken ct=default) => System.Threading.Tasks.Task.FromResult<SeasonScope?>(season);

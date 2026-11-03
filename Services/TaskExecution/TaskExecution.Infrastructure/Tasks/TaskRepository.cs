@@ -15,6 +15,7 @@ public sealed class TaskRepository(TaskExecutionDbContext dbContext) : ITaskRepo
     public Task<WorkTask?> GetByIdForUpdateAsync(Guid taskId, CancellationToken cancellationToken = default) =>
         dbContext.Tasks
             .Include(task => task.Skills)
+            .Include(task => task.Materials)
             .SingleOrDefaultAsync(task => task.Id == taskId, cancellationToken);
 
     public async Task<(IReadOnlyList<WorkTask> Items, long TotalItems)> GetPagedByWorkAreaAsync(

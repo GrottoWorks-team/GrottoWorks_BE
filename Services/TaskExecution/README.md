@@ -26,6 +26,12 @@ Identity pages are fetched in batches of 100 (at most 10,000 source candidates; 
 
 Directory pages are cached for 30 seconds under parish/community/page keys. Configure `ConnectionStrings:Redis` (`redis:6379` in Docker); without it the service uses a bounded local memory cache. Cache operations have a 200 ms budget; failure bypasses caching for 30 seconds and falls back to Identity HTTP. Cached payloads are validated again against their tenant/filter. Assignment mutations always revalidate Identity directly and do not authorize from the matching cache.
 
+## Task material requirements
+
+`PUT /api/v1/tasks/{taskId}/materials` replaces all planning requirements for an `OPEN` Task managed by its Leader. Supply an array of `materialId`, `requiredQuantity`, `note`; an empty array clears the requirements. Material IDs are batch-validated against Resource's internal catalog. Missing/inactive references are rejected, decimal quantities follow `(12,2)`, and `If-Match`/ETag protect concurrent updates.
+
+Task rows and `task.materials.changed` are saved in the same transaction. No-op replacement preserves version, row identity and event count. Broker delivery, Resource's material projection and backfill remain part of the subsequent integration commit; this API does not directly modify inventory, allocation or work-area requirements.
+
 ## Full task snapshots
 
 Every saved Task change also stages a `TaskScopeSnapshot` in the same unit of work. This technical message includes parent Season/Work Area scopes and effective assignees (accepted, in progress, completed), allowing receivers to bootstrap a missing Task projection. Pending applications and unconfirmed direct assignments are excluded. Snapshot IDs are stable per Task/version; business event envelopes and IDs remain independent.

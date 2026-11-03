@@ -6,6 +6,15 @@ namespace TaskExecution.UnitTests.Api;
 public sealed class TaskGatewayRouteTests
 {
     [Fact]
+    public void Task_material_update_routes_to_task_without_overriding_resource_reports()
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(GetGatewaySettingsPath()));
+        var route = document.RootElement.GetProperty("ReverseProxy").GetProperty("Routes").GetProperty("task-materials-route");
+        route.GetProperty("ClusterId").GetString().Should().Be("task");
+        route.GetProperty("Order").GetInt32().Should().Be(-1);
+        route.GetProperty("Match").GetProperty("Methods").EnumerateArray().Select(item => item.GetString()).Should().Equal("PUT");
+    }
+    [Fact]
     public void Volunteer_matches_route_targets_task_cluster_with_high_priority()
     {
         using var document = JsonDocument.Parse(File.ReadAllText(GetGatewaySettingsPath()));

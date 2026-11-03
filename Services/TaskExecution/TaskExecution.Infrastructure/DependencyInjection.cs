@@ -27,6 +27,11 @@ public static class DependencyInjection
         services.AddScoped<ITaskRepository, TaskRepository>();
         services.AddScoped<IWorkAreaTaskCountReader, WorkAreaTaskCountReader>();
         services.AddScoped<IMyTasksStore, MyTasksStore>();
+        services.AddHttpClient<IMaterialCatalogLookup, TaskExecution.Infrastructure.Resource.MaterialCatalogLookup>(client =>
+        {
+            client.BaseAddress = new Uri(configuration["ResourceClient:BaseAddress"] ?? "http://localhost:6103/");
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<IVolunteerScheduleReader, TaskExecution.Infrastructure.Assignments.VolunteerScheduleReader>();
         var redis = configuration.GetConnectionString("Redis");
         if (string.IsNullOrWhiteSpace(redis)) services.AddDistributedMemoryCache(options => options.SizeLimit = 16 * 1024 * 1024);

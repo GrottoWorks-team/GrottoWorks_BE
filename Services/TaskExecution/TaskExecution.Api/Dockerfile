@@ -6,6 +6,7 @@ EXPOSE 8080
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
+COPY ["Services/Resource/Resource.Contracts/Resource.Contracts.csproj", "Services/Resource/Resource.Contracts/"]
 COPY ["Services/TaskExecution/TaskExecution.Api/TaskExecution.Api.csproj", "Services/TaskExecution/TaskExecution.Api/"]
 COPY ["Services/TaskExecution/TaskExecution.Application/TaskExecution.Application.csproj", "Services/TaskExecution/TaskExecution.Application/"]
 COPY ["Services/TaskExecution/TaskExecution.Infrastructure/TaskExecution.Infrastructure.csproj", "Services/TaskExecution/TaskExecution.Infrastructure/"]

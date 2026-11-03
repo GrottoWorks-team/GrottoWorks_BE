@@ -28,7 +28,8 @@ public interface IFileObjectStorage
         CancellationToken cancellationToken);
 
     Task<StoredObjectInspection> InspectAsync(string objectKey, CancellationToken cancellationToken);
-    Task CommitUploadAsync(string pendingObjectKey, string completedObjectKey, CancellationToken cancellationToken);
+    // Copy only. The pending upload remains available until the metadata transaction commits.
+    Task CopyToPrivateAsync(string pendingObjectKey, string completedObjectKey, CancellationToken cancellationToken);
     Task<PresignedObjectRequest> CreateDownloadRequestAsync(
         string objectKey,
         TimeSpan lifetime,
@@ -49,6 +50,8 @@ public sealed record StoredObjectInspection(
 
 public sealed class FileStorageUnavailableException(string message, Exception? innerException = null)
     : Exception(message, innerException);
+
+public sealed class UploadedObjectTooLargeException() : Exception("The uploaded object exceeds the inspection limit.");
 
 public sealed class FileUploadOptions
 {
@@ -107,12 +110,16 @@ public sealed class DeleteUnattachedFileHandler(
         if (file.Status == FileObjectStatus.Deleted)
         {
             await transaction.CommitAsync(cancellationToken);
-            return;
         }
-
-        if (file.Status == FileObjectStatus.Attached)
+        else
         {
-            throw new DomainException("FILE_ATTACHED", "An attached file cannot be deleted.", 409);
+            if (file.Status == FileObjectStatus.Attached)
+                throw new DomainException("FILE_ATTACHED", "An attached file cannot be deleted.", 409);
+
+            // Persist the tombstone first. A failed database commit must not destroy a live object.
+            file.MarkDeleted();
+            await repository.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
 
         try
@@ -124,9 +131,6 @@ public sealed class DeleteUnattachedFileHandler(
             throw new DomainException("FILE_STORAGE_UNAVAILABLE", "File storage is temporarily unavailable.", 503);
         }
 
-        file.MarkDeleted();
-        await repository.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
     }
 }
 
@@ -189,10 +193,18 @@ public sealed class CompleteUploadHandler(
             throw new DomainException("FILE_INVALID_STATE", "The file cannot be completed in its current state.", 409);
         }
 
+        // Each attempt freezes its own private object; the browser cannot overwrite this key.
+        var pendingObjectKey = file.ObjectKey;
+        var completedObjectKey = $"completed/{file.UploadedByUserId:N}/{file.Id:N}/{Guid.NewGuid():N}";
         StoredObjectInspection inspection;
         try
         {
-            inspection = await storage.InspectAsync(file.ObjectKey, cancellationToken);
+            await storage.CopyToPrivateAsync(pendingObjectKey, completedObjectKey, cancellationToken);
+            inspection = await storage.InspectAsync(completedObjectKey, cancellationToken);
+        }
+        catch (UploadedObjectTooLargeException)
+        {
+            throw new DomainException("FILE_SIZE_MISMATCH", "Uploaded file exceeds the permitted size.", 422);
         }
         catch (FileStorageUnavailableException)
         {
@@ -200,20 +212,13 @@ public sealed class CompleteUploadHandler(
         }
 
         ValidateStoredObject(file, request.Checksum, inspection);
-        var completedObjectKey = $"completed/{file.UploadedByUserId:N}/{file.Id:N}";
-
-        try
-        {
-            await storage.CommitUploadAsync(file.ObjectKey, completedObjectKey, cancellationToken);
-        }
-        catch (FileStorageUnavailableException)
-        {
-            throw new DomainException("FILE_STORAGE_UNAVAILABLE", "File storage is temporarily unavailable.", 503);
-        }
 
         file.Complete(completedObjectKey, inspection.Sha256, timeProvider.GetUtcNow());
         await repository.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        // Best-effort cleanup after commit; failure must not invalidate a completed upload.
+        try { await storage.DeleteAsync(pendingObjectKey, cancellationToken); }
+        catch (FileStorageUnavailableException) { }
         return Map(file);
     }
 
@@ -315,7 +320,7 @@ public sealed class CreateUploadRequestHandler(
             _ => false
         };
 
-        if (!valid)
+        if (!valid || sizeBytes <= 0)
         {
             throw new DomainException(
                 "FILE_UPLOAD_NOT_ALLOWED",

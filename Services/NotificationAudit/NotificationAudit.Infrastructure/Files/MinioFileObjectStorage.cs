@@ -19,6 +19,7 @@ public sealed class ObjectStorageOptions
 
 public sealed class MinioFileObjectStorage : IFileObjectStorage
 {
+    public const int MaximumInspectionBytes = 20 * 1024 * 1024;
     private readonly IMinioClient publicClient;
     private readonly IMinioClient internalClient;
     private readonly ObjectStorageOptions options;
@@ -44,29 +45,29 @@ public sealed class MinioFileObjectStorage : IFileObjectStorage
                 new StatObjectArgs().WithBucket(options.Bucket).WithObject(objectKey),
                 cancellationToken);
 
-            using var content = new MemoryStream(capacity: checked((int)Math.Min(stat.Size, 20L * 1024 * 1024)));
+            if (stat.Size > MaximumInspectionBytes) throw new UploadedObjectTooLargeException();
+            byte[] bytes = [];
             await internalClient.GetObjectAsync(
                 new GetObjectArgs()
                     .WithBucket(options.Bucket)
                     .WithObject(objectKey)
-                    .WithCallbackStream(stream => stream.CopyTo(content)),
+                    .WithCallbackStream(stream => bytes = ReadBounded(stream, MaximumInspectionBytes, cancellationToken)),
                 cancellationToken);
 
-            var bytes = content.ToArray();
             var checksum = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
             return new StoredObjectInspection(
-                stat.Size,
+                bytes.LongLength,
                 stat.ContentType,
                 checksum,
                 DetectContentType(bytes));
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (exception is not (OperationCanceledException or UploadedObjectTooLargeException))
         {
             throw new FileStorageUnavailableException("Could not inspect the uploaded object.", exception);
         }
     }
 
-    public async Task CommitUploadAsync(
+    public async Task CopyToPrivateAsync(
         string pendingObjectKey,
         string completedObjectKey,
         CancellationToken cancellationToken)
@@ -81,9 +82,6 @@ public sealed class MinioFileObjectStorage : IFileObjectStorage
                     .WithBucket(options.Bucket)
                     .WithObject(completedObjectKey)
                     .WithCopyObjectSource(source),
-                cancellationToken);
-            await internalClient.RemoveObjectAsync(
-                new RemoveObjectArgs().WithBucket(options.Bucket).WithObject(pendingObjectKey),
                 cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -138,6 +136,23 @@ public sealed class MinioFileObjectStorage : IFileObjectStorage
         if (content.Length >= 12 && content[..4].SequenceEqual("RIFF"u8) && content[8..12].SequenceEqual("WEBP"u8)) return "image/webp";
         if (content.StartsWith("%PDF-"u8)) return "application/pdf";
         return "application/octet-stream";
+    }
+
+    public static byte[] ReadBounded(Stream stream, int maximumBytes, CancellationToken cancellationToken)
+    {
+        if (maximumBytes < 1 || maximumBytes > MaximumInspectionBytes)
+            throw new ArgumentOutOfRangeException(nameof(maximumBytes));
+        using var content = new MemoryStream();
+        var buffer = new byte[Math.Min(81920, maximumBytes)];
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            // Read at most one byte beyond the limit, without trusting stat/Content-Length.
+            var count = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, maximumBytes - content.Length + 1));
+            if (count == 0) return content.ToArray();
+            if (content.Length + count > maximumBytes) throw new UploadedObjectTooLargeException();
+            content.Write(buffer, 0, count);
+        }
     }
 
     public async Task<PresignedObjectRequest> CreateUploadRequestAsync(

@@ -28,5 +28,13 @@ Push and email preferences are persisted but providers are not connected yet. Fi
 - The service has a transactional inbox and a RabbitMQ consumer for `TaskIntegrationEvent`.
 - Direct assignment, attendance review, and long-open attendance events have complete recipient context and can create in-app notifications.
 - Events without enough recipient context are retained as `REQUIRES_CONTEXT` and never reported as delivered notifications.
-- TaskExecution currently stores integration events in its own outbox but has no broker dispatcher yet. Publishers from TaskExecution and other source services must be connected in later integration commits.
+- TaskExecution now has an outbox dispatcher, disabled by default until consumer/backfill integration is ready. Wiring other source publishers remains part of the later integration commits.
 - Audit ingestion stores only an allowlist of non-secret payload fields. Tokens, passwords, private URLs, and arbitrary payload content are not copied.
+
+## File finalization and deletion
+
+Completion copies the pending upload to a fresh private key, then inspects that exact copy before committing metadata. The pending object is retained until the database commit succeeds, so a failed save can be retried. Repeated completion of an uploaded file returns its existing reference. Inspection reads at most 20 MiB, checks the actual byte count and honors cancellation rather than trusting the object-size header.
+
+Deletion commits a metadata tombstone before removing the object. Storage failures return `503`; retrying deletion retries removal even when the tombstone is already present. A failed database commit leaves the live object untouched.
+
+Private copies abandoned by failed metadata writes/validation and pending objects left by failed cleanup still need the storage-retention cleanup worker in the integration follow-up. They are never returned as completed file references.

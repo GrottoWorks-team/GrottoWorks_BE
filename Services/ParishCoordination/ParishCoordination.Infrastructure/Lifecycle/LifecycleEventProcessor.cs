@@ -69,7 +69,9 @@ public sealed class LifecycleEventProcessor(ParishCoordinationDbContext db, IWor
         var stored = await db.Set<LifecycleInboxMessage>().SingleOrDefaultAsync(x => x.EventId == incoming.EventId, cancellationToken);
         if (stored is not null)
         {
-            if (stored.WorkAreaId != incoming.WorkAreaId || stored.Kind != incoming.Kind || stored.Envelope != incoming.Envelope)
+            if (stored.WorkAreaId != incoming.WorkAreaId || stored.SeasonId != incoming.SeasonId ||
+                stored.ParishId != incoming.ParishId || stored.Kind != incoming.Kind ||
+                !SameEnvelope(stored.Envelope, incoming.Envelope))
                 throw new FormatException("An event ID was reused for a different lifecycle message.");
             if (stored.ProcessedAt.HasValue) { await transaction.CommitAsync(cancellationToken); return; }
         }
@@ -78,6 +80,15 @@ public sealed class LifecycleEventProcessor(ParishCoordinationDbContext db, IWor
         await ApplyAsync(stored ?? incoming, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    private static bool SameEnvelope(string stored, string incoming)
+    {
+        // jsonb rewrites whitespace and object key order. Compare every JSON value, not its storage formatting.
+        // Capture time, parent snapshots, unknown fields and array order remain part of the immutable envelope.
+        using var storedJson = JsonDocument.Parse(stored);
+        using var incomingJson = JsonDocument.Parse(incoming);
+        return JsonElement.DeepEquals(storedJson.RootElement, incomingJson.RootElement);
     }
 
     public async Task RecoverAreaAsync(Guid areaId, CancellationToken cancellationToken)

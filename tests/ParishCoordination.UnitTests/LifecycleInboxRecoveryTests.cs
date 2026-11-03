@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -15,6 +16,103 @@ namespace ParishCoordination.UnitTests;
 // InMemory tests verify ingestion decisions, not PostgreSQL transaction/lock behavior.
 public sealed class LifecycleInboxRecoveryTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Snapshot_replay_after_jsonb_reformat_preserves_inbox_and_recovers_pending_parents(bool persistParents)
+    {
+        using var fixture = await Fixture.CreateAsync(persistParents);
+        var message = fixture.Snapshot(Guid.NewGuid(), 1, "IN_PROGRESS");
+        await fixture.Processor.ReceiveAsync(message, default);
+        var stored = await fixture.Db.Set<LifecycleInboxMessage>().SingleAsync();
+        var originalEnvelope = stored.Envelope;
+        stored.Envelope = ReformatJsonb(stored.Envelope);
+        stored.Envelope.Should().NotBe(originalEnvelope);
+        var persistedEnvelope = stored.Envelope;
+        var receivedAt = stored.ReceivedAt;
+        await fixture.Db.SaveChangesAsync();
+        fixture.Db.ChangeTracker.Clear(); // A new delivery reads the database's representation.
+        if (!persistParents) await fixture.PersistParentsAsync();
+        var version = (await fixture.Db.WorkAreas.SingleAsync()).Version;
+        var outboxCount = await fixture.Db.PlanningEventOutbox.CountAsync();
+
+        await fixture.Processor.ReceiveAsync(message, default);
+
+        var inbox = await fixture.Db.Set<LifecycleInboxMessage>().SingleAsync();
+        inbox.ProcessedAt.Should().NotBeNull();
+        inbox.Envelope.Should().Be(persistedEnvelope);
+        inbox.ReceivedAt.Should().Be(receivedAt);
+        (await fixture.Db.Set<LifecycleTaskProjection>().SingleAsync()).Status.Should().Be("IN_PROGRESS");
+        if (persistParents)
+        {
+            (await fixture.Db.WorkAreas.SingleAsync()).Version.Should().Be(version);
+            (await fixture.Db.PlanningEventOutbox.CountAsync()).Should().Be(outboxCount);
+        }
+    }
+
+    [Theory]
+    [InlineData("status")]
+    [InlineData("capturedAt")]
+    [InlineData("parent")]
+    [InlineData("assignees")]
+    [InlineData("assigneeOrder")]
+    [InlineData("materials")]
+    [InlineData("extraField")]
+    public async Task Same_event_id_with_changed_content_is_still_rejected_after_jsonb_reformat(string changed)
+    {
+        using var fixture = await Fixture.CreateAsync();
+        var message = fixture.Snapshot(Guid.NewGuid(), 1, "IN_PROGRESS") with
+            { AssigneeUserIds = [Guid.NewGuid(), Guid.NewGuid()] };
+        await fixture.Processor.ReceiveAsync(message, default);
+        var stored = await fixture.Db.Set<LifecycleInboxMessage>().SingleAsync();
+        stored.Envelope = ReformatJsonb(stored.Envelope);
+        if (changed == "extraField")
+        {
+            var json = JsonNode.Parse(stored.Envelope)!.AsObject();
+            json["futureContext"] = "must remain immutable";
+            stored.Envelope = json.ToJsonString();
+        }
+        var originalEnvelope = stored.Envelope;
+        var processedAt = stored.ProcessedAt;
+        await fixture.Db.SaveChangesAsync();
+        fixture.Db.ChangeTracker.Clear();
+        var version = (await fixture.Db.WorkAreas.SingleAsync()).Version;
+        var outboxCount = await fixture.Db.PlanningEventOutbox.CountAsync();
+        var altered = changed switch
+        {
+            "status" => message with { Status = "COMPLETED" },
+            "capturedAt" => message with { CapturedAt = message.CapturedAt.AddSeconds(1) },
+            "parent" => message with { WorkArea = message.WorkArea with { Name = "Changed parent" } },
+            "assignees" => message with { AssigneeUserIds = [Guid.NewGuid()] },
+            "assigneeOrder" => message with { AssigneeUserIds = message.AssigneeUserIds.Reverse().ToArray() },
+            "materials" => message with { Materials = [] }, // Missing and empty are different contracts.
+            _ => message
+        };
+
+        var consume = () => fixture.Processor.ReceiveAsync(altered, default);
+
+        await consume.Should().ThrowAsync<FormatException>().WithMessage("An event ID was reused for a different lifecycle message.");
+        var inbox = await fixture.Db.Set<LifecycleInboxMessage>().SingleAsync();
+        inbox.Envelope.Should().Be(originalEnvelope);
+        inbox.ProcessedAt.Should().Be(processedAt);
+        (await fixture.Db.Set<LifecycleTaskProjection>().SingleAsync()).Status.Should().Be("IN_PROGRESS");
+        (await fixture.Db.WorkAreas.SingleAsync()).Version.Should().Be(version);
+        (await fixture.Db.PlanningEventOutbox.CountAsync()).Should().Be(outboxCount);
+    }
+
+    // Simulate jsonb's formatting/key-order rewrite at every object depth; preserve values and array order.
+    private static string ReformatJsonb(string envelope)
+    {
+        static JsonNode? Reorder(JsonNode? node) => node switch
+        {
+            JsonObject obj => new JsonObject(obj.OrderBy(pair => pair.Key.Length).ThenBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => new KeyValuePair<string, JsonNode?>(pair.Key, Reorder(pair.Value)))),
+            JsonArray array => new JsonArray(array.Select(Reorder).ToArray()),
+            _ => node?.DeepClone()
+        };
+        return Reorder(JsonNode.Parse(envelope))!.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+    }
+
     [Fact]
     public async Task Duplicate_and_stale_snapshots_do_not_regress_state_or_add_outbox_versions()
     {

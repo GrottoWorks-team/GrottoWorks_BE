@@ -5,7 +5,9 @@ public enum FilePurpose
     ProgressEvidence,
     ReadinessEvidence,
     PurchaseReceipt,
-    Other
+    Other,
+    SystemExport,
+    DatabaseBackup
 }
 
 public enum FileObjectStatus
@@ -127,6 +129,23 @@ public sealed class FileObject
         Checksum = checksum;
         Status = FileObjectStatus.Uploaded;
         CompletedAt = completedAt;
+    }
+
+    public static FileObject CreateSystemArtifact(Guid owner, Guid jobId, string key, string name,
+        string contentType, long size, string checksum, bool isBackup, DateTimeOffset now) => new()
+    {
+        Id = Guid.NewGuid(), UploadedByUserId = owner, ObjectKey = key, OriginalFileName = name,
+        ContentType = contentType, SizeBytes = size, Checksum = checksum,
+        Purpose = isBackup ? FilePurpose.DatabaseBackup : FilePurpose.SystemExport,
+        Status = FileObjectStatus.Attached, ReferenceType = "SYSTEM_JOB", ReferenceId = jobId,
+        CreatedAt = now, CompletedAt = now
+    };
+
+    public void ExpireSystemArtifact()
+    {
+        if (Purpose is not (FilePurpose.SystemExport or FilePurpose.DatabaseBackup) || ReferenceType != "SYSTEM_JOB")
+            throw new InvalidOperationException("Only a system artifact may expire through job retention.");
+        Status = FileObjectStatus.Deleted;
     }
 
     public void MarkDeleted()

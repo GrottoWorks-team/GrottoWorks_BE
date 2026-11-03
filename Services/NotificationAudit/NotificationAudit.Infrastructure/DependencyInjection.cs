@@ -40,7 +40,7 @@ public static class DependencyInjection
         services.AddOptions<NotificationContextReplayOptions>()
             .Bind(configuration.GetSection(NotificationContextReplayOptions.SectionName))
             .Validate(value => value.PollSeconds is >= 5 and <= 300 && value.BatchSize is >= 1 and <= 1000,
-                "Notification replay requires a poll interval of 5–300 seconds and batch size of 1–1000.")
+                "Notification replay requires a poll interval of 5â€“300 seconds and batch size of 1â€“1000.")
             .ValidateOnStart();
         if (configuration.GetValue("NotificationContextReplay:Enabled", true))
             services.AddHostedService<NotificationContextReplayWorker>();
@@ -48,6 +48,8 @@ public static class DependencyInjection
         {
             services.AddMessageBroker(configuration, typeof(TaskIntegrationEventConsumer).Assembly);
         }
+        SystemJobs.SystemJobRegistration.AddSystemJobs(services, configuration);
         return services;
     }
 }
+

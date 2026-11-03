@@ -65,7 +65,9 @@ public sealed class GetFileDownloadHandler(
     ICurrentUser currentUser,
     IFileObjectRepository repository,
     IFileObjectStorage storage,
-    Microsoft.Extensions.Options.IOptions<FileUploadOptions> options)
+    Microsoft.Extensions.Options.IOptions<FileUploadOptions> options,
+    NotificationAudit.Application.SystemJobs.ISystemArtifactAccess? artifactAccess = null,
+    TimeProvider? clock = null)
 {
     public async Task<FileDownloadDto> HandleAsync(Guid fileId, CancellationToken cancellationToken)
     {
@@ -73,6 +75,16 @@ public sealed class GetFileDownloadHandler(
         if (file is null || file.UploadedByUserId != currentUser.UserId)
         {
             throw new DomainException("FILE_NOT_FOUND", "The file does not exist.", 404);
+        }
+
+        DateTimeOffset? artifactExpiry = null;
+        if (file.Purpose is FilePurpose.SystemExport or FilePurpose.DatabaseBackup)
+        {
+            if (artifactAccess is not null)
+                artifactExpiry = await artifactAccess.GetExpiryAsync(file.Id, currentUser.UserId, cancellationToken);
+            if (!currentUser.IsAuthenticated || currentUser.Role != GrottoWorksRoles.Admin || artifactExpiry is null ||
+                artifactExpiry <= (clock ?? TimeProvider.System).GetUtcNow().AddSeconds(60))
+                throw new DomainException("FILE_NOT_FOUND", "The file does not exist or has expired.", 404);
         }
 
         if (file.Status is not (FileObjectStatus.Uploaded or FileObjectStatus.Attached))
@@ -83,6 +95,11 @@ public sealed class GetFileDownloadHandler(
         try
         {
             var lifetime = TimeSpan.FromMinutes(Math.Clamp(options.Value.DownloadUrlMinutes, 1, 60));
+            if (artifactExpiry.HasValue)
+            {
+                var remaining = artifactExpiry.Value - (clock ?? TimeProvider.System).GetUtcNow();
+                if (remaining < lifetime) lifetime = remaining;
+            }
             var request = await storage.CreateDownloadRequestAsync(file.ObjectKey, lifetime, cancellationToken);
             return new FileDownloadDto(request.Url, request.ExpiresAt);
         }

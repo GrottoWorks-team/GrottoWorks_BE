@@ -19,6 +19,7 @@ public partial class NotificationAuditDbContextModelSnapshot : ModelSnapshot
         modelBuilder.HasAnnotation("ProductVersion", "10.0.4")
             .HasAnnotation("Relational:MaxIdentifierLength", 63);
         NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+        new NotificationAudit.Infrastructure.SystemJobs.SystemJobConfiguration().Configure(modelBuilder.Entity<NotificationAudit.Domain.SystemJobs.SystemJob>());
         new FileObjectConfiguration().Configure(modelBuilder.Entity<NotificationAudit.Domain.Files.FileObject>());
         new NotificationConfiguration().Configure(modelBuilder.Entity<NotificationAudit.Domain.Notifications.Notification>());
         new NotificationPreferenceConfiguration().Configure(modelBuilder.Entity<NotificationAudit.Domain.Notifications.NotificationPreference>());
@@ -27,3 +28,4 @@ public partial class NotificationAuditDbContextModelSnapshot : ModelSnapshot
         new NotificationEventInboxConfiguration().Configure(modelBuilder.Entity<NotificationEventInbox>());
     }
 }
+

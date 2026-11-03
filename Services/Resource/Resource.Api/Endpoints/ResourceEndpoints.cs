@@ -8,6 +8,7 @@ public static class ResourceEndpoints
         app.MapCatalogEndpoints();
         app.MapInternalScopeEndpoints();
         app.MapInternalMaterialEndpoints();
+        app.MapInternalSupportReconciliationEndpoints();
         app.MapRequirementEndpoints();
         app.MapInventoryEndpoints();
         app.MapShortageEndpoints();

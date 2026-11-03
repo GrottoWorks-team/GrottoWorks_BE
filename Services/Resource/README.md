@@ -1,5 +1,7 @@
 # Resource Service
 
+Internal Support reconciliation uses `GET /internal/support-transfers?ids=...` and `GET /internal/work-areas/{id}/available-materials?materialIds=...` (1–100 UUIDs, API-key protected, not routed through Gateway/OpenAPI). Transfers include immutable identity/approval and receipt facts plus local tenant/season scope; unknown IDs are omitted. Availability subtracts allocations from confirmed ledger stock in one database query and clamps to zero. It is advisory: the existing transfer command rechecks under its stock lock. Neither query mutates stock or reads TaskExecution's database.
+
 Purchase-request submit/approve/reject now wrap business saves, state history and integration-outbox writes in the same PostgreSQL transaction. The existing publisher writes through the same scoped ResourceDbContext; failure before commit rolls back all three. This does not claim that every other Resource producer has already been audited for atomicity.
 
 Vật tư, tồn kho, mua sắm, quyên góp, đồ mượn (owner: Vũ — spec §5.2, tag `Materials`, `Purchases`, `Contributions`).

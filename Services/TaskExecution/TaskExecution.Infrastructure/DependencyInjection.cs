@@ -65,11 +65,15 @@ public static class DependencyInjection
         services.AddSingleton(new TaskExecution.Application.Attendance.LongOpenAttendanceOptions(longOpenHours*60));
         services.AddHostedService<TaskExecution.Infrastructure.Attendance.AttendanceAlertWorker>();
         services.AddScoped<TaskExecution.Application.Assignments.IAssignmentStore, TaskExecution.Infrastructure.Assignments.AssignmentStore>();
-        services.AddHttpClient<TaskExecution.Application.Users.IIdentityUserLookup, TaskExecution.Infrastructure.Identity.IdentityUserLookup>(client =>
+        services.AddHttpClient<TaskExecution.Infrastructure.Identity.IdentityUserLookup>(client =>
         {
             client.BaseAddress = new Uri(configuration["IdentityClient:BaseAddress"] ?? "http://localhost:6100/");
             client.Timeout = Timeout.InfiniteTimeSpan;
         }).AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
+        services.AddTransient<TaskExecution.Application.Users.IIdentityUserLookup>(provider=>
+            provider.GetRequiredService<TaskExecution.Infrastructure.Identity.IdentityUserLookup>());
+        services.AddTransient<TaskExecution.Application.Users.IIdentityUserBatchLookup>(provider=>
+            provider.GetRequiredService<TaskExecution.Infrastructure.Identity.IdentityUserLookup>());
         services.AddScoped<TaskExecution.Application.Events.ITaskEventOutbox, TaskExecution.Infrastructure.Events.TaskEventOutbox>();
         services.AddScoped<IScopeEventInbox, ScopeEventInbox>();
         services.AddScoped<IUserStatusProjectionStore, UserStatusProjectionStore>();

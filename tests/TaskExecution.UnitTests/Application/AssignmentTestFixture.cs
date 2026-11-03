@@ -83,11 +83,13 @@ internal sealed class AssignmentTestFixture
         public void Add(TaskAssignment row) => Items.Add(row);
         public Task SaveAsync(CancellationToken ct) { Saves++; return System.Threading.Tasks.Task.CompletedTask; }
     }
-    internal sealed class TestUsers : IIdentityUserLookup
+    internal sealed class TestUsers : IIdentityUserLookup, IIdentityUserBatchLookup
     {
         public Dictionary<Guid,IdentityUser> Items { get; } = [];
         public Task<IdentityUser?> FindAsync(Guid id,CancellationToken ct=default) =>
             System.Threading.Tasks.Task.FromResult(Items.GetValueOrDefault(id));
+        public Task<IReadOnlyDictionary<Guid,IdentityUser>> FindManyAsync(IReadOnlyCollection<Guid> ids,CancellationToken ct=default)=>
+            System.Threading.Tasks.Task.FromResult<IReadOnlyDictionary<Guid,IdentityUser>>(Items.Where(item=>ids.Contains(item.Key)).ToDictionary());
     }
     internal sealed class TestEvents : ITaskEventOutbox
     {

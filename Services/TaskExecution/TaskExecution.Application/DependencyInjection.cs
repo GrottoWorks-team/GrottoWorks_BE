@@ -26,6 +26,8 @@ public static class DependencyInjection
         services.AddScoped<TaskExecution.Application.Attendance.AttendanceAlertProcessor>();
         services.AddScoped<TaskExecution.Application.Support.SupportRequestService>();
         services.AddScoped<TaskExecution.Application.Support.PublishSupportRequestHandler>();
+        services.AddScoped<TaskExecution.Application.Support.StaffingSupportResponseHandler>();
+        services.AddScoped<TaskExecution.Application.Support.ListSupportResponsesHandler>();
         services.AddScoped<GetTaskQueryHandler>();
         services.AddScoped<CreateTaskCommandHandler>();
         services.AddScoped<UpdateTaskCommandHandler>();

@@ -37,6 +37,8 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
         new TaskExecution.Infrastructure.Support.SupportPositionConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Support.SupportPosition>());
         new TaskExecution.Infrastructure.Support.SupportSkillConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Support.SupportPositionSkill>());
         new TaskExecution.Infrastructure.Support.SupportMaterialConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Support.SupportMaterial>());
+        new TaskExecution.Infrastructure.Support.SupportResponseConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Support.SupportResponse>());
+        new TaskExecution.Infrastructure.Support.SupportResponseMemberConfiguration().Configure(modelBuilder.Entity<TaskExecution.Domain.Support.SupportResponseMember>());
         new TaskExecution.Infrastructure.Attendance.AttendanceReplayConfiguration().Configure(modelBuilder.Entity<TaskExecution.Application.Attendance.AttendanceReplay>());
         new TaskExecution.Infrastructure.Events.TaskEventOutboxConfiguration()
             .Configure(modelBuilder.Entity<TaskExecution.Infrastructure.Events.TaskEventOutboxMessage>());

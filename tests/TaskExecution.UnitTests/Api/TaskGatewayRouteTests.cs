@@ -6,6 +6,14 @@ namespace TaskExecution.UnitTests.Api;
 public sealed class TaskGatewayRouteTests
 {
     [Fact]
+    public void Support_response_route_keeps_resource_material_receipt_route_separate()
+    {
+        using var document=JsonDocument.Parse(File.ReadAllText(GetGatewaySettingsPath()));
+        var routes=document.RootElement.GetProperty("ReverseProxy").GetProperty("Routes");
+        routes.GetProperty("task-support-responses-route").GetProperty("ClusterId").GetString().Should().Be("task");
+        routes.GetProperty("resource-support-material-receipt-route").GetProperty("ClusterId").GetString().Should().Be("resource");
+    }
+    [Fact]
     public void Support_publication_routes_only_post_to_task_with_authentication()
     {
         using var document = JsonDocument.Parse(File.ReadAllText(GetGatewaySettingsPath()));

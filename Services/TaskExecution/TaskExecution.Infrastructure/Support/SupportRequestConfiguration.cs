@@ -22,6 +22,8 @@ public sealed class SupportRequestConfiguration : IEntityTypeConfiguration<Suppo
         b.HasMany(r=>r.Materials).WithOne().HasForeignKey(m=>m.RequestId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(r=>r.Positions).HasField("positions").UsePropertyAccessMode(PropertyAccessMode.Field);
         b.Navigation(r=>r.Materials).HasField("materials").UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasMany(r=>r.Responses).WithOne().HasForeignKey(r=>r.RequestId).OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_support_response_request");
+        b.Navigation(r=>r.Responses).HasField("responses").UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }
 
@@ -31,6 +33,7 @@ public sealed class SupportPositionConfiguration : IEntityTypeConfiguration<Supp
     {
         b.ToTable("support_request_position",t=>t.HasCheckConstraint("support_position_positive_count","required_volunteer_count>0"));b.HasKey(r=>r.Id);
         b.Property(r=>r.Id).HasColumnName("support_request_position_id").ValueGeneratedNever();b.Property(r=>r.RequestId).HasColumnName("support_request_id");
+        b.HasAlternateKey(r=>new {r.RequestId,r.Id}).HasName("ak_support_position_request_id");
         b.Property(r=>r.Name).HasColumnName("position_name").HasMaxLength(150);b.Property(r=>r.RequiredVolunteerCount).HasColumnName("required_volunteer_count");
         b.Property(r=>r.Note).HasColumnName("position_note").HasMaxLength(2000);
         b.Property(r=>r.TaskId).HasColumnName("task_id");

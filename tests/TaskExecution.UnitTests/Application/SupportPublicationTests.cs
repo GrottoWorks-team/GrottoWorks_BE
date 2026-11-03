@@ -116,7 +116,7 @@ public sealed class SupportPublicationTests
         await publish.Should().ThrowAsync<DomainRuleException>().Where(error => error.Code == "SEASON_READ_ONLY");
     }
 
-    private sealed class Fixture
+    internal sealed class Fixture
     {
         public AssignmentTestFixture Source { get; } = new();
         public Store Store { get; } = new();
@@ -133,7 +133,7 @@ public sealed class SupportPublicationTests
         }
     }
 
-    private sealed class Store : ISupportRequestRepository
+    internal sealed class Store : ISupportRequestRepository
     {
         public List<SupportRequest> Rows { get; } = [];
         public List<SupportPositionTask> Tasks { get; } = [];

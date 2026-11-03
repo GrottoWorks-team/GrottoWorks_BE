@@ -2,6 +2,10 @@
 
 ## Support publication
 
+`POST /api/v1/support-requests/{requestId}/responses` currently accepts staffing offers: `{ respondingCommunityId?, members: [{ positionId, volunteerId }], note? }`. Individual Volunteers can name only themselves. A community response verifies the current caller and every named Volunteer against Identity's authoritative community/parish/status and all position skill minima. Identity IDs are fetched in batches of 100 rather than one HTTP call per member. No skill override is accepted. Material offers are added in the separately planned Resource transfer integration.
+
+Pending members do not create assignments or consume Task slots. A request lock and a partial unique index enforce one active position per person across responses. Composite foreign keys ensure each response/position belongs to the same request. `GET .../responses` is restricted to the assigned Leader; Support Request detail also returns its persisted responses. Member approval/capacity/assignment creation remain the next small feature.
+
 `POST /api/v1/support-requests/{requestId}/publish` is restricted to the assigned Leader and validates the current caller through Identity. It accepts optional body version / `If-Match`, returns the standard Support Request envelope and a new ETag. STAFFING requires positions, MATERIAL requires material lines, MIXED requires both. Positions accept nullable `taskId` during planning (including legacy data), but publication requires every position's Task to exist in the same Work Area and not be completed/cancelled. Task rows are checked in a single batch under share locks until publication commits.
 
 Publication locks the Support Request, updates its state/version and records `support.request.published` in the same local transaction. The event includes skill/level, position/Task and material requirements without copying private notes. Delivery uses the existing outbox; candidate notification fan-out and staffing/material response workflows are separate integrations. Migration adds nullable Task references without guessing links for existing positions.

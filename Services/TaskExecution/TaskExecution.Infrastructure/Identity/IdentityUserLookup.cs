@@ -8,24 +8,37 @@ using TaskExecution.Domain;
 namespace TaskExecution.Infrastructure.Identity;
 
 public sealed class IdentityUserLookup(HttpClient client, IConfiguration configuration, ITaskCorrelationContext correlation)
-    : IIdentityUserLookup
+    : IIdentityUserLookup, IIdentityUserBatchLookup
 {
-    public async Task<IdentityUser?> FindAsync(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<IdentityUser?> FindAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        (await FindManyAsync([userId],cancellationToken)).GetValueOrDefault(userId);
+
+    public async Task<IReadOnlyDictionary<Guid,IdentityUser>> FindManyAsync(IReadOnlyCollection<Guid> userIds,CancellationToken cancellationToken=default)
+    {
+        var result=new Dictionary<Guid,IdentityUser>();
+        foreach(var batch in userIds.Distinct().Chunk(100))
+            foreach(var user in await GetBatchAsync(batch,cancellationToken)) result.Add(user.UserId,user);
+        return result;
+    }
+
+    private async Task<IReadOnlyList<IdentityUser>> GetBatchAsync(Guid[] userIds,CancellationToken cancellationToken)
     {
         var key = configuration["InternalApi:ApiKey"];
         if (string.IsNullOrWhiteSpace(key) || key.Length < 32) throw Unavailable();
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"internal/users?ids={userId:D}");
+            var query=string.Join("&",userIds.Select(id=>$"ids={id:D}"));
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"internal/users?{query}");
             request.Headers.Add("X-Internal-Api-Key", key);
             request.Headers.Add("X-Correlation-Id", correlation.CorrelationId);
             using var response = await client.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode) throw Unavailable();
             var envelope = await response.Content.ReadFromJsonAsync<UserEnvelope>(cancellationToken);
-            if (envelope?.Data == null || envelope.Data.Count > 1 || envelope.Data.Any(row => row is null || row.UserId != userId ||
+            if (envelope?.Data == null || envelope.Data.Count > userIds.Length || envelope.Data.Any(row => row is null || !userIds.Contains(row.UserId) ||
                 string.IsNullOrWhiteSpace(row.Role) || string.IsNullOrWhiteSpace(row.Status) || !ValidSkills(row)))
                 throw Unavailable();
-            return envelope.Data.SingleOrDefault();
+            if (envelope.Data.Select(row=>row.UserId).Distinct().Count()!=envelope.Data.Count) throw Unavailable();
+            return envelope.Data;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception exception) when (exception is HttpRequestException or JsonException or OperationCanceledException or

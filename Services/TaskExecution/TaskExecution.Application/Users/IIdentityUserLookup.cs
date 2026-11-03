@@ -26,6 +26,11 @@ public interface IIdentityUserLookup
     Task<IdentityUser?> FindAsync(Guid userId, CancellationToken cancellationToken = default);
 }
 
+public interface IIdentityUserBatchLookup
+{
+    Task<IReadOnlyDictionary<Guid,IdentityUser>> FindManyAsync(IReadOnlyCollection<Guid> userIds,CancellationToken cancellationToken=default);
+}
+
 public sealed class ActiveUserAccess(IIdentityUserLookup users, ICurrentUser currentUser)
 {
     public async Task<IdentityUser> EnsureActiveAsync(Guid userId, Guid parishId, string role,

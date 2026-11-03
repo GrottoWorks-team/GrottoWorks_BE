@@ -3,6 +3,7 @@ using TaskExecution.Application.Support;
 using TaskExecution.Domain;
 using TaskExecution.Domain.Support;
 using TaskExecution.Infrastructure.Data;
+using Npgsql;
 
 namespace TaskExecution.Infrastructure.Support;
 
@@ -31,7 +32,7 @@ public sealed partial class SupportRequestRepository(TaskExecutionDbContext db) 
         SupportType? type,SupportRequestStatus? status,int page,int size,bool descending,CancellationToken ct)
     {
         var query=db.SupportRequests.AsNoTracking()
-            .Include(r=>r.Positions).ThenInclude(p=>p.Skills).Include(r=>r.Materials).AsSplitQuery()
+            .Include(r=>r.Positions).ThenInclude(p=>p.Skills).Include(r=>r.Materials).Include(r=>r.Responses).ThenInclude(r=>r.Members).AsSplitQuery()
             .Where(request=>db.WorkAreaScopes.Any(area=>area.WorkAreaId==request.WorkAreaId &&
                 (!parishId.HasValue || area.ParishId==parishId.Value)));
         if (seasonId.HasValue) query=query.Where(r=>r.SeasonId==seasonId.Value);
@@ -45,7 +46,8 @@ public sealed partial class SupportRequestRepository(TaskExecutionDbContext db) 
 
     public Task<SupportRequest?> GetAsync(Guid id,bool tracked,CancellationToken ct)
     {
-        var query=db.SupportRequests.Include(r=>r.Positions).ThenInclude(p=>p.Skills).Include(r=>r.Materials).AsSplitQuery();
+        var query=db.SupportRequests.Include(r=>r.Positions).ThenInclude(p=>p.Skills).Include(r=>r.Materials)
+            .Include(r=>r.Responses).ThenInclude(r=>r.Members).AsSplitQuery();
         return (tracked ? query : query.AsNoTracking()).SingleOrDefaultAsync(r=>r.Id==id,ct);
     }
     public void Add(SupportRequest request)=>db.SupportRequests.Add(request);
@@ -53,5 +55,7 @@ public sealed partial class SupportRequestRepository(TaskExecutionDbContext db) 
     {
         try {await db.SaveChangesAsync(ct);}
         catch(DbUpdateConcurrencyException) {throw new DomainRuleException("SUPPORT_REQUEST_VERSION_MISMATCH","The request changed concurrently.",DomainErrorKind.PreconditionFailed);}
+        catch(DbUpdateException exception) when(exception.InnerException is PostgresException {SqlState:PostgresErrorCodes.UniqueViolation,ConstraintName:SupportResponseMemberConfiguration.ActiveVolunteerIndex})
+        {throw new DomainRuleException("SUPPORT_MEMBER_DUPLICATE","The volunteer already has an active position in this request.");}
     }
 }

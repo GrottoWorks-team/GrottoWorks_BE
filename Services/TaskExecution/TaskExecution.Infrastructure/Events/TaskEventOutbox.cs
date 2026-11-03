@@ -21,6 +21,19 @@ public sealed class TaskEventOutboxMessage
     public DateTimeOffset NextAttemptAt { get; private set; }
     public string? LastError { get; private set; }
 
+    public bool IsScopeSnapshot => EventType == "scope.snapshot";
+
+    public TaskScopeSnapshot ToScopeSnapshot() => JsonSerializer.Deserialize<TaskScopeSnapshot>(
+        Envelope, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+        ?? throw new InvalidOperationException("The task snapshot envelope is empty.");
+
+    public static TaskEventOutboxMessage Create(TaskScopeSnapshot snapshot) => new()
+    {
+        Id = snapshot.EventId, EventType = "scope.snapshot", CreatedAt = snapshot.CapturedAt,
+        AggregateId = snapshot.TaskId, NextAttemptAt = snapshot.CapturedAt,
+        Envelope = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+    };
+
     public TaskIntegrationEvent ToMessage() => JsonSerializer.Deserialize<TaskIntegrationEvent>(
         Envelope, new JsonSerializerOptions(JsonSerializerDefaults.Web))
         ?? throw new InvalidOperationException("The task event envelope is empty.");
@@ -57,6 +70,7 @@ public sealed class TaskEventOutboxConfiguration : IEntityTypeConfiguration<Task
     public void Configure(EntityTypeBuilder<TaskEventOutboxMessage> builder)
     {
         builder.ToTable("task_event_outbox");
+        builder.Ignore(row => row.IsScopeSnapshot);
         builder.HasKey(row => row.Id);
         builder.Property(row => row.Id).HasColumnName("event_id").ValueGeneratedNever();
         builder.Property(row => row.EventType).HasColumnName("event_type").HasMaxLength(100).IsRequired();

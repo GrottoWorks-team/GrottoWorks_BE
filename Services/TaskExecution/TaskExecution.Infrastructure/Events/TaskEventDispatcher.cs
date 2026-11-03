@@ -69,8 +69,10 @@ public sealed class TaskEventDispatcher(IServiceScopeFactory scopes, ILogger<Tas
             {
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 timeout.CancelAfter(TimeSpan.FromSeconds(10));
-                var message = row.ToMessage();
-                await publisher.Publish(message, context => context.MessageId = row.Id, timeout.Token);
+                if (row.IsScopeSnapshot)
+                    await publisher.Publish(row.ToScopeSnapshot(), context => context.MessageId = row.Id, timeout.Token);
+                else
+                    await publisher.Publish(row.ToMessage(), context => context.MessageId = row.Id, timeout.Token);
                 row.MarkPublished(DateTimeOffset.UtcNow);
                 delivered++;
             }

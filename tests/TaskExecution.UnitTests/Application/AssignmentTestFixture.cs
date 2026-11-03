@@ -63,16 +63,22 @@ internal sealed class AssignmentTestFixture
         public List<TaskAssignment> Items { get; } = [];
         public bool ScheduleConflict { get; set; }
         public int Saves { get; private set; }
+        public int FreshReads {get;private set;}
+        public bool FreshReadInsideTransaction {get;private set;}
+        private bool inTransaction;
         public async Task<T> InTaskTransactionAsync<T>(Guid id,Func<Task<T>> action,CancellationToken ct)
         {
             await _gate.WaitAsync(ct);
+            inTransaction=true;
             try { return await action(); }
-            finally { _gate.Release(); }
+            finally { inTransaction=false;_gate.Release(); }
         }
         public Task<IReadOnlyList<TaskAssignment>> ListAsync(Guid id,CancellationToken ct) =>
             System.Threading.Tasks.Task.FromResult<IReadOnlyList<TaskAssignment>>(Items.Where(row=>row.TaskId==id).ToList());
         public Task<TaskAssignment?> GetAsync(Guid id,CancellationToken ct) =>
             System.Threading.Tasks.Task.FromResult(Items.SingleOrDefault(row=>row.Id==id));
+        public Task<TaskAssignment?> GetForUpdateAsync(Guid id,CancellationToken ct)
+        {FreshReads++;FreshReadInsideTransaction=inTransaction;return GetAsync(id,ct);}
         public Task<(IReadOnlyList<TaskAssignment> Items,long Total)> ApplicationsPageAsync(Guid id,int page,int size,bool descending,CancellationToken ct)
         {
             var rows = Items.Where(row => row.TaskId == id && row.Type == AssignmentType.Application).OrderBy(row=>row.RequestedAt).ThenBy(row=>row.Id).ToList();

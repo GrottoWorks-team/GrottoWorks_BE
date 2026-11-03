@@ -12,6 +12,8 @@ Pending members do not create assignments or consume Task slots. A request lock 
 
 Nomination consent follows Lâm's reviewed BA decision. Migration preserves already recorded legacy assignment states without inventing a Volunteer consent timestamp or rewriting attendance/history; the new confirmation rule applies to new community nominations. Pending Support assignments appear in My Tasks/Leader assignment lists and schedule warnings. Acceptance/decline updates membership and fulfillment in the same Task transaction. Cancellation includes unconfirmed nominations.
 
+Assignment responses and application reviews reload the tracked assignment after acquiring the Task lock. A request that waited for another decision must validate the current version/state rather than an EF identity-map copy read before the lock; Volunteer consent and fulfillment still commit together.
+
 Task cancellation also cancels its approved Support Members and recalculates response/staffing fulfillment in the Task's transaction. Assignment/member IDs and original review metadata remain available; completed members and terminal request states are preserved. Aggregate concurrency prevents cancellation and review from silently overwriting each other. Receipt/material fulfillment remains owned by the separate Resource synchronization flow.
 
 Support review outbox facts include the original PENDING state, resulting APPROVED/REJECTED state and rejection reason, so NotificationAudit can preserve an immutable decision trail with its existing allowlist/redaction. NotificationAudit handles these decisions once per event and retains published matching requirements pending candidate fan-out. This does not enable the producer dispatcher or claim broker runtime verification.

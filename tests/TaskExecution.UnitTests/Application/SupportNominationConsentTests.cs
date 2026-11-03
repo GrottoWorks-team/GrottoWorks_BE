@@ -37,6 +37,7 @@ public sealed class SupportNominationConsentTests
         f.Base.Request.Status.Should().Be(accept ? SupportRequestStatus.Fulfilled : SupportRequestStatus.Published);
         if(!accept) {saved.ParticipationReason.Should().Be("Unavailable");f.Base.Source.Store.Items.Single().ReservesCapacity.Should().BeFalse();}
         f.Base.Source.Events.Items.Last().Payload.GetProperty("assignmentType").GetString().Should().Be("SUPPORT");
+        f.Base.Source.Store.FreshReads.Should().Be(1);f.Base.Source.Store.FreshReadInsideTransaction.Should().BeTrue();
     }
 
     [Fact]

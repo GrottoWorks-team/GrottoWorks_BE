@@ -30,12 +30,14 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
     public async Task<AssignmentDto> RespondAsync(Guid assignmentId, bool accept, string? reason, int? expectedVersion,
         CancellationToken cancellationToken = default)
     {
-        var assignment = await assignments.GetAsync(assignmentId, cancellationToken)
+        var assignmentInfo = await assignments.GetAsync(assignmentId, cancellationToken)
             ?? throw DomainRuleException.NotFound("TASK_ASSIGNMENT_NOT_FOUND", "The assignment does not exist.");
-        if (user.Role != GrottoWorksRoles.Volunteer || assignment.VolunteerId != user.UserId)
+        if (user.Role != GrottoWorksRoles.Volunteer || assignmentInfo.VolunteerId != user.UserId)
             throw DomainRuleException.Forbidden("TASK_ASSIGNMENT_ACCESS_DENIED", "Only the assigned volunteer can respond.");
-        return await assignments.InTaskTransactionAsync(assignment.TaskId, async () =>
+        return await assignments.InTaskTransactionAsync(assignmentInfo.TaskId, async () =>
         {
+            var assignment=await assignments.GetForUpdateAsync(assignmentId,cancellationToken)
+                ?? throw DomainRuleException.NotFound("TASK_ASSIGNMENT_NOT_FOUND","The assignment does not exist.");
             var task = await tasks.GetByIdForUpdateAsync(assignment.TaskId, cancellationToken)
                 ?? throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
             var (area, _) = await scopeAccess.GetWorkAreaForVolunteerWriteAsync(task.WorkAreaId, cancellationToken);

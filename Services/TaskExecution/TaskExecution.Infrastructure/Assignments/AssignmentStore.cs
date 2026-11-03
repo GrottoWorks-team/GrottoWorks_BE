@@ -49,6 +49,14 @@ public sealed class AssignmentStore(TaskExecutionDbContext db) : IAssignmentStor
     public Task<TaskAssignment?> GetAsync(Guid assignmentId, CancellationToken cancellationToken) =>
         db.Assignments.SingleOrDefaultAsync(row => row.Id == assignmentId, cancellationToken);
 
+    public async Task<TaskAssignment?> GetForUpdateAsync(Guid assignmentId,CancellationToken cancellationToken)
+    {
+        var tracked=db.Assignments.Local.SingleOrDefault(row=>row.Id==assignmentId);
+        if(tracked is null) return await GetAsync(assignmentId,cancellationToken);
+        await db.Entry(tracked).ReloadAsync(cancellationToken);
+        return db.Entry(tracked).State==EntityState.Detached ? null : tracked;
+    }
+
     public async Task<(IReadOnlyList<TaskAssignment> Items, long Total)> ApplicationsPageAsync(Guid taskId, int page, int size,
         bool descending, CancellationToken cancellationToken)
     {

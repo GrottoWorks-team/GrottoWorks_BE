@@ -26,11 +26,13 @@ public sealed partial class AssignmentService
 
     private async Task<TaskAssignment> ReviewApplicationAsync(Guid id, bool approve, string? reason, int? version, CancellationToken cancellationToken)
     {
-        var row = await assignments.GetAsync(id, cancellationToken);
-        if (row is null || row.Type != AssignmentType.Application)
+        var applicationInfo = await assignments.GetAsync(id, cancellationToken);
+        if (applicationInfo is null || applicationInfo.Type != AssignmentType.Application)
             throw DomainRuleException.NotFound("TASK_APPLICATION_NOT_FOUND", "The application does not exist.");
-        return await assignments.InTaskTransactionAsync(row.TaskId, async () =>
+        return await assignments.InTaskTransactionAsync(applicationInfo.TaskId, async () =>
         {
+            var row=await assignments.GetForUpdateAsync(id,cancellationToken)
+                ?? throw DomainRuleException.NotFound("TASK_APPLICATION_NOT_FOUND","The application does not exist.");
             var task = await tasks.GetByIdForUpdateAsync(row.TaskId, cancellationToken)
                 ?? throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
             var (area, _) = await scopeAccess.GetWorkAreaForLeaderWriteAsync(task.WorkAreaId, cancellationToken);

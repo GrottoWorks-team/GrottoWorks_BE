@@ -8,7 +8,8 @@ public sealed class TaskSkillConfiguration : IEntityTypeConfiguration<TaskSkill>
 {
     public void Configure(EntityTypeBuilder<TaskSkill> builder)
     {
-        builder.ToTable("task_skill");
+        builder.ToTable("task_skill", table => table.HasCheckConstraint("task_skill_level_valid",
+            "required_skill_level IS NULL OR required_skill_level IN ('BASIC','INTERMEDIATE','ADVANCED','EXPERT')"));
         builder.HasKey(skill => skill.Id);
         builder.Property(skill => skill.Id).HasColumnName("task_skill_id").ValueGeneratedNever();
         builder.Property(skill => skill.TaskId).HasColumnName("task_id").IsRequired();

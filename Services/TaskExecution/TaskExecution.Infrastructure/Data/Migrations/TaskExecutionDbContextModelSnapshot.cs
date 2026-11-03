@@ -162,7 +162,8 @@ public partial class TaskExecutionDbContextModelSnapshot : ModelSnapshot
             builder.HasKey("Id");
             builder.HasIndex("TaskId", "SkillId").IsUnique()
                 .HasDatabaseName("ux_task_skill_task_id_skill_id");
-            builder.ToTable("task_skill", (string)null);
+            builder.ToTable("task_skill", null, table => table.HasCheckConstraint("task_skill_level_valid",
+                "required_skill_level IS NULL OR required_skill_level IN ('BASIC','INTERMEDIATE','ADVANCED','EXPERT')"));
         });
 
         modelBuilder.Entity("TaskExecution.Domain.Tasks.TaskSkill", builder =>

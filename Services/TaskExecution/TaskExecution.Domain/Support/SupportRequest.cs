@@ -161,9 +161,9 @@ public sealed class SupportPosition
         var ids=new HashSet<Guid>();
         foreach(var input in inputs)
         {
-            var level=string.IsNullOrWhiteSpace(input.RequiredSkillLevel) ? null : input.RequiredSkillLevel.Trim();
-            if (input.SkillId==Guid.Empty || level?.Length>30)
-                throw DomainRuleException.Validation("SUPPORT_SKILL_INVALID","Skill ID is required; skill level must not exceed 30 characters.");
+            var level = SkillLevels.Normalize(input.RequiredSkillLevel, "SUPPORT_SKILL_INVALID");
+            if (input.SkillId == Guid.Empty)
+                throw DomainRuleException.Validation("SUPPORT_SKILL_INVALID", "Skill ID is required.");
             if (!ids.Add(input.SkillId)) throw DomainRuleException.Validation("SUPPORT_SKILL_DUPLICATE","A skill can only appear once per position.");
             row.skills.Add(SupportPositionSkill.Create(id,input.SkillId,level));
         }

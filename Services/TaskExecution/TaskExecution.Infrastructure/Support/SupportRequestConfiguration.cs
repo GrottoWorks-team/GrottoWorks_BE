@@ -42,7 +42,9 @@ public sealed class SupportSkillConfiguration : IEntityTypeConfiguration<Support
 {
     public void Configure(EntityTypeBuilder<SupportPositionSkill> b)
     {
-        b.ToTable("support_position_skill");b.HasKey(r=>new {r.PositionId,r.SkillId});
+        b.ToTable("support_position_skill", table => table.HasCheckConstraint("support_skill_level_valid",
+            "required_skill_level IS NULL OR required_skill_level IN ('BASIC','INTERMEDIATE','ADVANCED','EXPERT')"));
+        b.HasKey(r=>new {r.PositionId,r.SkillId});
         b.Property(r=>r.PositionId).HasColumnName("support_request_position_id");b.Property(r=>r.SkillId).HasColumnName("skill_id");
         b.Property(r=>r.RequiredSkillLevel).HasColumnName("required_skill_level").HasMaxLength(30);
     }

@@ -14,14 +14,20 @@ public sealed class AssignmentStore(TaskExecutionDbContext db) : IAssignmentStor
 {
     public async Task<T> InTaskTransactionAsync<T>(Guid taskId, Func<Task<T>> action, CancellationToken cancellationToken)
     {
+        if(db.Database.CurrentTransaction is not null) return await WithTaskLockAsync(taskId,action,cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var result=await WithTaskLockAsync(taskId,action,cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
+    private async Task<T> WithTaskLockAsync<T>(Guid taskId,Func<Task<T>> action,CancellationToken cancellationToken)
+    {
         var key = $"task-mutation:{taskId:D}";
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({key},0))", cancellationToken);
         try
         {
-            var result = await action();
-            await transaction.CommitAsync(cancellationToken);
-            return result;
+            return await action();
         }
         catch (DbUpdateConcurrencyException exception)
         {
@@ -29,7 +35,8 @@ public sealed class AssignmentStore(TaskExecutionDbContext db) : IAssignmentStor
                 ? "TASK_ASSIGNMENT_VERSION_MISMATCH" : "TASK_VERSION_MISMATCH";
             throw new DomainRuleException(code, "The task or assignment changed concurrently.", DomainErrorKind.PreconditionFailed);
         }
-        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+            {SqlState:PostgresErrorCodes.UniqueViolation,ConstraintName:"ux_task_assignment_active_volunteer"})
         {
             throw new DomainRuleException("TASK_ASSIGNMENT_DUPLICATE", "The volunteer already has an active assignment or application.");
         }
@@ -41,6 +48,14 @@ public sealed class AssignmentStore(TaskExecutionDbContext db) : IAssignmentStor
 
     public Task<TaskAssignment?> GetAsync(Guid assignmentId, CancellationToken cancellationToken) =>
         db.Assignments.SingleOrDefaultAsync(row => row.Id == assignmentId, cancellationToken);
+
+    public async Task<TaskAssignment?> GetForUpdateAsync(Guid assignmentId,CancellationToken cancellationToken)
+    {
+        var tracked=db.Assignments.Local.SingleOrDefault(row=>row.Id==assignmentId);
+        if(tracked is null) return await GetAsync(assignmentId,cancellationToken);
+        await db.Entry(tracked).ReloadAsync(cancellationToken);
+        return db.Entry(tracked).State==EntityState.Detached ? null : tracked;
+    }
 
     public async Task<(IReadOnlyList<TaskAssignment> Items, long Total)> ApplicationsPageAsync(Guid taskId, int page, int size,
         bool descending, CancellationToken cancellationToken)
@@ -60,7 +75,7 @@ public sealed class AssignmentStore(TaskExecutionDbContext db) : IAssignmentStor
                       join task in db.Tasks on assignment.TaskId equals task.Id
                       where assignment.VolunteerId == volunteerId && assignment.TaskId != taskId &&
                             (assignment.Status == AssignmentStatus.Accepted || assignment.Status == AssignmentStatus.InProgress ||
-                             (assignment.Status == AssignmentStatus.Pending && assignment.Type == AssignmentType.Direct)) &&
+                             (assignment.Status == AssignmentStatus.Pending && (assignment.Type == AssignmentType.Direct || assignment.Type==AssignmentType.Support))) &&
                             task.StartAt.HasValue && task.StartAt < deadline && task.Deadline > startAt.Value
                       select assignment.Id).AnyAsync(cancellationToken);
     }

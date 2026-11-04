@@ -259,7 +259,9 @@ public static class WorkAreaEndpoints
                 request.CategoryId,
                 request.CommunityId,
                 request.StartDate,
-                request.Deadline),
+                request.Deadline,
+                request.Latitude,
+                request.Longitude),
             cancellationToken);
 
         if (result.Outcome == CreateWorkAreaOutcome.SeasonNotFound)
@@ -346,7 +348,11 @@ public static class WorkAreaEndpoints
             request.CategoryId,
             request.StartDate,
             request.Deadline,
-            expectedVersion);
+            expectedVersion,
+            request.HasLatitude,
+            request.Latitude,
+            request.HasLongitude,
+            request.Longitude);
 
         var result = await commandHandler.HandleAsync(command, cancellationToken);
 

@@ -9,4 +9,14 @@
     <ProjectReference Include="..\..\Services\NotificationAudit\NotificationAudit.Api\NotificationAudit.Api.csproj" /><ProjectReference Include="..\..\Services\NotificationAudit\NotificationAudit.Application\NotificationAudit.Application.csproj" />
     <ProjectReference Include="..\..\Services\NotificationAudit\NotificationAudit.Domain\NotificationAudit.Domain.csproj" /><ProjectReference Include="..\..\Services\NotificationAudit\NotificationAudit.Infrastructure\NotificationAudit.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Services/NotificationAudit/NotificationAudit.BackupWorker/NotificationAudit.BackupWorker.csproj" />
+    <EmbeddedResource Include="../../Services/Identity/Identity.Infrastructure/SystemExport/SystemExportSource.cs" LogicalName="SystemExportSources.Identity.cs" />
+    <EmbeddedResource Include="../../Services/ParishCoordination/ParishCoordination.Infrastructure/SystemExport/SystemExportSource.cs" LogicalName="SystemExportSources.ParishCoordination.cs" />
+    <EmbeddedResource Include="../../Services/TaskExecution/TaskExecution.Infrastructure/SystemExport/SystemExportSource.cs" LogicalName="SystemExportSources.TaskExecution.cs" />
+    <EmbeddedResource Include="../../Services/Resource/Resource.Infrastructure/SystemExport/SystemExportSource.cs" LogicalName="SystemExportSources.Resource.cs" />
+    <EmbeddedResource Include="../../Services/Readiness/Readiness.Infrastructure/SystemExport/SystemExportSource.cs" LogicalName="SystemExportSources.Readiness.cs" />
+    <EmbeddedResource Include="../../Services/Reporting/Reporting.Infrastructure/SystemExport/SystemExportSource.cs" LogicalName="SystemExportSources.Reporting.cs" />
+    <EmbeddedResource Include="../../Services/NotificationAudit/NotificationAudit.Infrastructure/SystemExport/SystemExportSource.cs" LogicalName="SystemExportSources.NotificationAudit.cs" />
+  </ItemGroup>
 </Project>

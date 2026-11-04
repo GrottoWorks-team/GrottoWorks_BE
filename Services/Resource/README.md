@@ -1,9 +1,25 @@
 # Resource Service
 
+Internal Support reconciliation uses `GET /internal/support-transfers?ids=...` and `GET /internal/work-areas/{id}/available-materials?materialIds=...` (1–100 UUIDs, API-key protected, not routed through Gateway/OpenAPI). Transfers include immutable identity/approval and receipt facts plus local tenant/season scope; unknown IDs are omitted. Availability subtracts allocations from confirmed ledger stock in one database query and clamps to zero. It is advisory: the existing transfer command rechecks under its stock lock. Neither query mutates stock or reads TaskExecution's database.
+
+Support receipt confirmation now commits the receipt state, TRANSFER_IN ledger and outbox/shortage facts in one local transaction. Transfer-out shortage facts are also staged before the stock lease commits. Both source and target must be writable. A dependency failure cannot leave a committed receipt without its corresponding event intent; actual publisher delivery remains asynchronous.
+
+Purchase-request submit/approve/reject now wrap business saves, state history and integration-outbox writes in the same PostgreSQL transaction. The existing publisher writes through the same scoped ResourceDbContext; failure before commit rolls back all three. This does not claim that every other Resource producer has already been audited for atomicity.
+
 Vật tư, tồn kho, mua sắm, quyên góp, đồ mượn (owner: Vũ — spec §5.2, tag `Materials`, `Purchases`, `Contributions`).
 Trạng thái: F-RES-01 (một phần), 02, 03, 04, 05 — S2/S3; F-RES-06, 07 — S4; F-RES-09, 10, 11 — S5/S6; F-RES-12, 13 — S5; F-RES-13b, 13c, 15, 16 — S6; F-RES-17, 18, 20 — S7; F-RES-14 — S8.
 
 ## Kiến trúc
+
+`GET /internal/materials?ids={id}&ids={id}` supplies catalog references to TaskExecution. The API requires the internal API key, is hidden from OpenAPI and has no Gateway route. It accepts 1–100 non-empty IDs, deduplicates them and omits unknown IDs; inactive entries are returned with `INACTIVE` so callers can reject new usage. It does not expose stock or accept catalog writes.
+
+### Scope replication qua RabbitMQ
+
+Khi `TaskEvents:Enabled=true`, Resource nhận `PlanningScopeSnapshot` tại queue `resource-planning-scopes` và `TaskScopeSnapshot` tại queue `resource-task-snapshots`. Task snapshot chứa scope cha nên có thể tạo projection còn thiếu. Inbox và các thay đổi projection được commit cùng transaction; advisory lock theo Season phối hợp hai queue. Snapshot cũ không ghi đè source version mới. Không lấy trạng thái Season từ snapshot con để ghi đè projection Season hiện tại.
+
+Các producer mới vẫn chưa được bật tự động. Backfill/reconciliation và cutover HTTP sẽ được thực hiện sau khi các phía nhận đã sẵn sàng. Consumer business event cũ tiếp tục tồn tại; snapshot kỹ thuật không thay thế integration event nghiệp vụ.
+
+`resource-task-materials` consumes `task.materials.changed` into `task_material_plan`/`task_material_plan_item`. Complete Task snapshots also restore this replica in the same inbox transaction as parent/task projections. Legacy snapshots with no material field preserve the current plan; an explicit empty array clears it at the new source version. Replay/stale messages cannot restore an older plan. These tables are Resource-owned projections; TaskExecution still owns `task_material`. Consumption does not rewrite the Leader's manual `material_requirement`, inventory ledger or allocation history.
 
 ```
 Services/Resource/

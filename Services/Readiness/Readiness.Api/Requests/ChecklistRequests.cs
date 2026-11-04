@@ -50,6 +50,8 @@ public sealed class CorrectiveTaskLinkRequest
     public long? Version { get; init; }
 
     public Guid? TaskId { get; init; }
+
+    public Readiness.Application.Checklists.CorrectiveTaskDefinition? Create { get; init; }
 }
 
 /// <summary><c>FileReference</c> (only the id is needed to attach an uploaded file).</summary>

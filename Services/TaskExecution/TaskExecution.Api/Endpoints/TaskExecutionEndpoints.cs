@@ -4,9 +4,12 @@ public static class TaskExecutionEndpoints
 {
     public static void MapTaskExecutionEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapInternalScopeEndpoints();
         app.MapInternalTaskCountEndpoints();
         app.MapTaskEndpoints();
+        app.MapTaskReviewEndpoints();
+        app.MapSpecialTaskEndpoints();
+        app.MapTaskMaterialEndpoints();
+        app.MapVolunteerMatchEndpoints();
         app.MapAssignmentEndpoints();
         app.MapApplicationEndpoints();
         app.MapMyTasksEndpoints();
@@ -19,5 +22,10 @@ public static class TaskExecutionEndpoints
         app.MapAttendanceCorrectionReviewEndpoints();
         app.MapLongOpenAttendanceEndpoints();
         app.MapSupportRequestEndpoints();
+        app.MapSupportResponseEndpoints();
+        app.MapSupportMemberReviewEndpoints();
+        app.MapSupportMaterialReviewEndpoints();
+        app.MapSupportClosureEndpoints();
+        app.MapSupportSummaryEndpoints();
     }
 }

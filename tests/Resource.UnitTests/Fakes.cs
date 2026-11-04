@@ -83,6 +83,7 @@ public sealed class FakeCatalogStore : IMaterialCatalogStore
 
 public sealed class FakeIntegrationEventPublisher : IIntegrationEventPublisher
 {
+    public Action? BeforePublish { get; set; }
     public sealed record Published(string EventType, int Version, object Payload, string AggregateType, Guid AggregateId);
 
     public List<Published> Events { get; } = [];
@@ -90,6 +91,7 @@ public sealed class FakeIntegrationEventPublisher : IIntegrationEventPublisher
     public Task PublishAsync<TPayload>(string eventType, int version, TPayload payload, string aggregateType, Guid aggregateId, CancellationToken cancellationToken = default)
         where TPayload : class
     {
+        BeforePublish?.Invoke();
         Events.Add(new Published(eventType, version, payload, aggregateType, aggregateId));
         return Task.CompletedTask;
     }
@@ -243,6 +245,24 @@ public sealed class FakeInventoryStore(FakeRequirementStore requirements) : Reso
 
 public sealed class FakePurchaseRequestStore : Resource.Application.Purchases.IPurchaseRequestStore
 {
+    public bool IsInTransaction { get; private set; }
+    public int TransactionCommits { get; private set; }
+    public int TransactionFailures { get; private set; }
+
+    public async Task<T> InTransactionAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        IsInTransaction = true;
+        try
+        {
+            var result = await operation();
+            TransactionCommits++;
+            return result;
+        }
+        catch { TransactionFailures++; throw; }
+        finally { IsInTransaction = false; }
+    }
+
     public List<Resource.Domain.Purchases.PurchaseRequest> Requests { get; } = [];
 
     public List<Resource.Domain.Purchases.PurchaseRequestStateChange> History { get; } = [];
@@ -502,6 +522,16 @@ public sealed class FakeTaskMaterialReportStore : Resource.Application.Inventory
 
 public sealed class FakeSupportTransferStore : Resource.Application.Inventory.ISupportTransferStore
 {
+    public bool InTransaction {get;private set;}
+    public int Commits {get;private set;}
+    public int Failures {get;private set;}
+    public async Task<T> InTransactionAsync<T>(Func<Task<T>> operation,CancellationToken cancellationToken=default)
+    {
+        InTransaction=true;
+        try {var result=await operation();Commits++;return result;}
+        catch {Failures++;throw;}
+        finally {InTransaction=false;}
+    }
     public List<Resource.Domain.Inventory.SupportTransfer> Transfers { get; } = [];
 
     public Task<Resource.Domain.Inventory.SupportTransfer?> GetAsync(Guid supportResponseMaterialId, CancellationToken cancellationToken = default) =>
@@ -560,6 +590,13 @@ public sealed class FakePurchaseStore : Resource.Application.Purchases.IPurchase
 /// <summary>Accepts every file unless <see cref="Reject"/> is set (then throws it, like the NotificationAudit check).</summary>
 public sealed class FakeFileVerifier : Resource.Application.Files.IFileVerifier
 {
+    public async Task<IAsyncDisposable> ReserveAsync(IReadOnlyCollection<Guid> ids, string purpose, Guid userId, Guid referenceId, CancellationToken ct = default)
+    {
+        await EnsureAttachableAsync(ids, purpose, userId, ct);
+        return new TestReservation();
+    }
+    private sealed class TestReservation : IAsyncDisposable { public ValueTask DisposeAsync() => ValueTask.CompletedTask; }
+
     public List<(IReadOnlyCollection<Guid> Ids, string Purpose, Guid Uploader)> Calls { get; } = [];
 
     public Resource.Domain.DomainRuleException? Reject { get; set; }

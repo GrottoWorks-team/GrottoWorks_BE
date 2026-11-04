@@ -40,7 +40,7 @@ public sealed class VolunteerSkill
             Guid.NewGuid(),
             volunteerUserId,
             skillId,
-            string.IsNullOrWhiteSpace(skillLevel) ? null : skillLevel.Trim(),
+            SkillLevels.Normalize(skillLevel),
             string.IsNullOrWhiteSpace(skillNote) ? null : skillNote.Trim());
     }
 
@@ -53,6 +53,8 @@ public sealed class VolunteerSkill
     public Skill? Skill { get; private set; }
 
     public string? SkillLevel { get; private set; }
+
+    public void UpdateLevel(string? level) => SkillLevel = SkillLevels.Normalize(level);
 
     public string? SkillNote { get; private set; }
 }

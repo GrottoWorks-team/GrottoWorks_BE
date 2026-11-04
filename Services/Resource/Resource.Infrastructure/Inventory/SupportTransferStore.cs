@@ -9,6 +9,14 @@ namespace Resource.Infrastructure.Inventory;
 
 public sealed class SupportTransferStore(ResourceDbContext dbContext) : ISupportTransferStore
 {
+    public async Task<T> InTransactionAsync<T>(Func<Task<T>> operation,CancellationToken cancellationToken=default)
+    {
+        if(dbContext.Database.CurrentTransaction is not null) return await operation();
+        await using var transaction=await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var result=await operation();
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
     public Task<SupportTransfer?> GetAsync(Guid supportResponseMaterialId, CancellationToken cancellationToken = default) =>
         dbContext.SupportTransfers.FirstOrDefaultAsync(transfer => transfer.SupportResponseMaterialId == supportResponseMaterialId, cancellationToken);
 

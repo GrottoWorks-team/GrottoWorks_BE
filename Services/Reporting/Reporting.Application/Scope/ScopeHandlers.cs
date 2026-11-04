@@ -36,15 +36,13 @@ public sealed class ApplyWorkAreaSnapshotHandler(IWorkAreaScopeStore store)
     {
         var now = DateTimeOffset.UtcNow;
         var existing = await store.GetAsync(snapshot.WorkAreaId, cancellationToken);
-        if (snapshot.SeasonStatus is null)
+        // Parent and child versions advance independently. A known season always owns its status,
+        // even when a newer area snapshot embeds an older parent status.
+        var season = await store.GetSeasonAsync(snapshot.SeasonId, cancellationToken);
+        snapshot = snapshot with
         {
-            // Parish's work-area snapshot carries no season state: take the projected season, else keep what is stored.
-            var season = await store.GetSeasonAsync(snapshot.SeasonId, cancellationToken);
-            snapshot = snapshot with
-            {
-                SeasonStatus = season?.Status ?? existing?.SeasonStatus ?? SeasonStatus.Planning
-            };
-        }
+            SeasonStatus = season?.Status ?? snapshot.SeasonStatus ?? existing?.SeasonStatus ?? SeasonStatus.Planning
+        };
 
         if (existing is null)
         {

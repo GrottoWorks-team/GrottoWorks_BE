@@ -17,7 +17,7 @@ public sealed class CorrelationIdMiddleware(RequestDelegate next)
     {
         var correlationId = context.Request.Headers[HeaderName].FirstOrDefault();
 
-        if (string.IsNullOrWhiteSpace(correlationId) || correlationId.Length > 200)
+        if (string.IsNullOrWhiteSpace(correlationId) || correlationId.Length > 200 || correlationId.Any(char.IsControl))
         {
             correlationId = Guid.NewGuid().ToString();
         }

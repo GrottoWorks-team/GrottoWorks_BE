@@ -1,10 +1,21 @@
 namespace TaskExecution.Domain.Assignments;
 
-public enum AssignmentType { Direct, Application }
+public enum AssignmentType { Direct, Application, Support }
 public enum AssignmentStatus { Pending, Accepted, Declined, InProgress, Completed, Cancelled }
 
 public sealed class TaskAssignment
 {
+    public static TaskAssignment FromSupportResponse(Guid taskId,Guid volunteerId,Guid leaderId,DateTimeOffset requestedAt,DateTimeOffset now,bool requiresConfirmation)
+    {
+        if(taskId==Guid.Empty || volunteerId==Guid.Empty || leaderId==Guid.Empty)
+            throw DomainRuleException.Validation("ASSIGNMENT_IDENTITY_INVALID","Task, volunteer and leader are required.");
+        return new TaskAssignment
+        {
+            Id=Guid.NewGuid(),TaskId=taskId,VolunteerId=volunteerId,AssignedBy=leaderId,Type=AssignmentType.Support,
+            Status=requiresConfirmation ? AssignmentStatus.Pending : AssignmentStatus.Accepted,RequestedAt=requestedAt.ToUniversalTime(),
+            AssignedAt=now.ToUniversalTime(),ApprovedAt=requiresConfirmation ? null : now.ToUniversalTime()
+        };
+    }
     private TaskAssignment() { }
     public Guid Id { get; private set; }
     public Guid TaskId { get; private set; }
@@ -24,7 +35,7 @@ public sealed class TaskAssignment
     public int Version { get; private set; } = 1;
 
     public bool ReservesCapacity => Status is AssignmentStatus.Accepted or AssignmentStatus.InProgress or AssignmentStatus.Completed ||
-        (Status == AssignmentStatus.Pending && Type == AssignmentType.Direct);
+        (Status == AssignmentStatus.Pending && Type is AssignmentType.Direct or AssignmentType.Support);
 
     public static TaskAssignment Assign(Guid taskId, Guid volunteerId, Guid leaderId, string? note,
         bool overrideCapacity, bool overrideSkills, string? overrideReason, DateTimeOffset now)
@@ -70,7 +81,7 @@ public sealed class TaskAssignment
     public void Accept(int? expectedVersion, DateTimeOffset now)
     {
         EnsureVersion(expectedVersion);
-        if (Type != AssignmentType.Direct || Status != AssignmentStatus.Pending)
+        if (Type is not (AssignmentType.Direct or AssignmentType.Support) || Status != AssignmentStatus.Pending)
             throw new DomainRuleException("TASK_ASSIGNMENT_INVALID_STATE", "Only a pending direct assignment can be accepted.");
         Status = AssignmentStatus.Accepted;
         ApprovedAt = now.ToUniversalTime();
@@ -96,7 +107,7 @@ public sealed class TaskAssignment
     public void Decline(string reason, int? expectedVersion, DateTimeOffset now)
     {
         EnsureVersion(expectedVersion);
-        if (Type != AssignmentType.Direct || Status != AssignmentStatus.Pending)
+        if (Type is not (AssignmentType.Direct or AssignmentType.Support) || Status != AssignmentStatus.Pending)
             throw new DomainRuleException("TASK_ASSIGNMENT_INVALID_STATE", "Only a pending direct assignment can be declined.");
         var normalized = reason?.Trim();
         if (string.IsNullOrWhiteSpace(normalized) || normalized.Length > 500)
@@ -105,6 +116,12 @@ public sealed class TaskAssignment
         ResponseReason = normalized;
         RejectedAt = now.ToUniversalTime();
         Version++;
+    }
+
+    public void CompleteForTask()
+    {
+        if (Status is not (AssignmentStatus.Accepted or AssignmentStatus.InProgress)) return;
+        Status=AssignmentStatus.Completed; Version++;
     }
 
     public void CancelForTask(string reason)

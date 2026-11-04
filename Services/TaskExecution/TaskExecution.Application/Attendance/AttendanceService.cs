@@ -51,7 +51,11 @@ public sealed partial class AttendanceService(IAttendanceStore store, IAssignmen
             var row = AttendanceRequest.CheckIn(assignmentId,user.UserId,note,DateTimeOffset.UtcNow);
             store.Add(row);
             task.RegisterAssignmentChange(DateTimeOffset.UtcNow);
-            events.Record(TaskEventTypes.AttendanceRequested,task,area,new { requestId=row.Id,assignmentId,volunteerUserId=user.UserId,row.RequestedAt });
+            events.Record(TaskEventTypes.AttendanceRequested, task, area, new
+            {
+                requestId = row.Id, taskId = task.Id, workAreaId = area.WorkAreaId, assignmentId,
+                volunteerUserId = user.UserId, leaderUserId = area.LeaderUserId, row.RequestedAt
+            });
             var result = AttendanceRequestDto.From(row);
             store.Add(AttendanceReplay.Create(user.UserId,key,fingerprint,JsonSerializer.Serialize(result)));
             await store.SaveAsync(cancellationToken);
@@ -71,7 +75,11 @@ public sealed partial class AttendanceService(IAttendanceStore store, IAssignmen
             var (_,task,area) = await VolunteerAssignmentAsync(request.AssignmentId,cancellationToken);
             request.Cancel(version);
             task.RegisterAssignmentChange(DateTimeOffset.UtcNow);
-            events.Record(TaskEventTypes.AttendanceReviewed,task,area,new { requestId,decision="CANCELLED",volunteerUserId=user.UserId });
+            events.Record(TaskEventTypes.AttendanceReviewed, task, area, new
+            {
+                requestId, taskId = task.Id, workAreaId = area.WorkAreaId,
+                decision = "CANCELLED", reviewType = "CHECK_IN", volunteerUserId = user.UserId
+            });
             await store.SaveAsync(cancellationToken);
             return AttendanceRequestDto.From(request);
         },cancellationToken);

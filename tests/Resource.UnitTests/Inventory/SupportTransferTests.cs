@@ -13,6 +13,25 @@ namespace Resource.UnitTests.Inventory;
 /// <summary>F-RES-20: support material transfers — TRANSFER_OUT on approval (BR-63), one-officer receipt (BR-64).</summary>
 public sealed class SupportTransferTests
 {
+    [Fact]
+    public async Task Receipt_fact_and_ledger_are_committed_inside_the_same_transaction()
+    {
+        var transfer=await Start().HandleAsync(Transfer());
+        _events.BeforePublish=()=>_store.InTransaction.Should().BeTrue();
+        await Confirm().HandleAsync(new(transfer.Transfer.SupportResponseMaterialId,null,20,5,null));
+        _store.Commits.Should().Be(1);
+        _events.Events.Should().Contain(row=>row.EventType==SupportTransferConfirmed.EventType);
+    }
+
+    [Fact]
+    public async Task Receipt_outbox_failure_prevents_transaction_commit()
+    {
+        var transfer=await Start().HandleAsync(Transfer());
+        _events.BeforePublish=()=>throw new TimeoutException("Simulated outbox storage failure");
+        Func<Task> confirm=()=>Confirm().HandleAsync(new(transfer.Transfer.SupportResponseMaterialId,null,20,5,null));
+        await confirm.Should().ThrowAsync<TimeoutException>();
+        _store.Commits.Should().Be(0);_store.Failures.Should().Be(1);
+    }
     private static readonly Guid Parish = Guid.NewGuid();
     private readonly Guid _sourceOfficer = Guid.NewGuid();
     private readonly Guid _targetOfficer = Guid.NewGuid();

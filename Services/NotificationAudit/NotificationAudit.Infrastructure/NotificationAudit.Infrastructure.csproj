@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="..\..\Identity\Identity.Contracts\Identity.Contracts.csproj" />
+    <ProjectReference Include="..\..\ParishCoordination\ParishCoordination.Contracts\ParishCoordination.Contracts.csproj" />
+    <ProjectReference Include="..\..\Resource\Resource.Contracts\Resource.Contracts.csproj" />
+    <ProjectReference Include="..\..\Readiness\Readiness.Contracts\Readiness.Contracts.csproj" />
+    <ProjectReference Include="..\..\Reporting\Reporting.Contracts\Reporting.Contracts.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\BuildingBlocks.Messaging\BuildingBlocks.Messaging.csproj" />
     <ProjectReference Include="..\..\TaskExecution\TaskExecution.Contracts\TaskExecution.Contracts.csproj" />
     <ProjectReference Include="..\NotificationAudit.Application\NotificationAudit.Application.csproj" />
@@ -8,6 +13,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.1.0" />
     <PackageReference Include="Minio" Version="6.0.3" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
   </ItemGroup>

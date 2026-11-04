@@ -70,12 +70,16 @@ public sealed class DirectAssignmentTests
     }
 
     [Fact]
-    public async Task Missing_skill_level_dependency_is_not_silently_bypassed()
+    public async Task Unknown_skill_level_requires_an_explicit_audited_override()
     {
         var f = new AssignmentTestFixture();
         f.Task.ReplaceSkills([new TaskSkillRequirement(Guid.NewGuid(),"ADVANCED",null)],null,DateTimeOffset.UtcNow);
-        var act = () => f.Service.AssignAsync(f.Command() with { OverrideSkillMismatch=true,OverrideReason="Approved exception" });
-        (await act.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("SKILL_LEVEL_VALIDATION_UNAVAILABLE");
+        var act = () => f.Service.AssignAsync(f.Command());
+        (await act.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("TASK_SKILL_MISMATCH");
+        var assigned = await f.Service.AssignAsync(f.Command() with { OverrideSkillMismatch=true,OverrideReason="Approved exception" });
+        f.Store.Items.Single().OverrideSkillMismatch.Should().BeTrue();
+        f.Store.Items.Single().OverrideReason.Should().Be("Approved exception");
+        assigned.VolunteerId.Should().Be(f.VolunteerId);
     }
 
     [Fact]

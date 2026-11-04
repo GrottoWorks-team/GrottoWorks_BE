@@ -11,6 +11,15 @@ namespace Resource.Infrastructure.Purchases;
 
 public sealed class PurchaseRequestStore(ResourceDbContext dbContext) : IPurchaseRequestStore
 {
+    public async Task<T> InTransactionAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken = default)
+    {
+        if (dbContext.Database.CurrentTransaction is not null) return await operation();
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var result = await operation();
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
     public Task<PurchaseRequest?> GetAsync(Guid purchaseRequestId, CancellationToken cancellationToken = default) =>
         dbContext.PurchaseRequests.Include(request => request.Items)
             .FirstOrDefaultAsync(request => request.PurchaseRequestId == purchaseRequestId, cancellationToken);

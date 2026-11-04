@@ -20,7 +20,8 @@ public interface IActivityLogRepository
 {
     Task<(IReadOnlyList<ActivityLog> Items, long Total)> GetPageAsync(ActivityLogFilter filter, CancellationToken cancellationToken);
     Task<ActivityLog?> GetAsync(Guid id, CancellationToken cancellationToken);
-    Task<IReadOnlyList<ActivityLog>> GetHistoryAsync(string entityType, Guid entityId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ActivityLog>> GetHistoryAsync(string entityType, Guid entityId,
+        DateTimeOffset? from, DateTimeOffset? to, CancellationToken cancellationToken);
 }
 
 public sealed class ListActivityLogsHandler(IActivityLogRepository repository)
@@ -30,6 +31,7 @@ public sealed class ListActivityLogsHandler(IActivityLogRepository repository)
         CancellationToken cancellationToken)
     {
         ValidateRange(filter.From, filter.To);
+        filter = filter with { From = filter.From?.ToUniversalTime(), To = filter.To?.ToUniversalTime() };
         var result = await repository.GetPageAsync(filter, cancellationToken);
         return (result.Items.Select(Map).ToList(), result.Total);
     }
@@ -72,9 +74,15 @@ public sealed class GetResourceHistoryHandler(IActivityLogRepository repository)
     public async Task<IReadOnlyList<StateChangeDto>> HandleAsync(
         string resourceType,
         Guid resourceId,
+        DateTimeOffset? from,
+        DateTimeOffset? to,
         CancellationToken cancellationToken)
     {
-        var logs = await repository.GetHistoryAsync(resourceType.Trim(), resourceId, cancellationToken);
+        ListActivityLogsHandler.ValidateRange(from, to);
+        if (string.IsNullOrWhiteSpace(resourceType) || resourceType.Trim().Length > 50 || resourceId == Guid.Empty)
+            throw new DomainException("INVALID_RESOURCE_REFERENCE", "Resource type and a non-empty ID are required.", 400);
+        var logs = await repository.GetHistoryAsync(resourceType.Trim(), resourceId,
+            from?.ToUniversalTime(), to?.ToUniversalTime(), cancellationToken);
         return logs.Select(log => new StateChangeDto(
             log.Id,
             log.Action,

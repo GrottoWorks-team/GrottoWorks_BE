@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
 using TaskExecution.Application.Scopes;
 using TaskExecution.Application.Tasks;
 using TaskExecution.Infrastructure.Data;
@@ -25,9 +26,77 @@ public static class DependencyInjection
         services.AddScoped<IScopeProjectionStore, ScopeProjectionStore>();
         services.AddScoped<IScopeSnapshotTransaction, ScopeSnapshotTransaction>();
         services.AddScoped<ITaskRepository, TaskRepository>();
+        services.AddScoped<ITaskReviewStore, TaskReviewStore>();
+        services.AddScoped<ISpecialTaskStore, SpecialTaskStore>();
+        services.AddScoped<FileAttachmentRecovery>();
+        services.AddHostedService<FileAttachmentRecoveryWorker>();
+        services.AddScoped<PurchaseTaskEventHandler>();
+        services.AddHostedService<PurchaseTaskRecoveryWorker>();
+        services.AddHttpClient<ITaskFileGateway,TaskFileGateway>(client=>
+        {
+            client.BaseAddress=new Uri(configuration["NotificationAuditClient:BaseAddress"] ?? "http://localhost:6107/");
+            client.Timeout=Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options=> { options.TotalRequestTimeout.Timeout=TimeSpan.FromSeconds(10);options.Retry.DisableForUnsafeHttpMethods(); });
+        services.AddHttpClient<ITaskResourceGateway,TaskExecution.Infrastructure.Resource.TaskResourceGateway>(client=>
+        {
+            client.BaseAddress=new Uri(configuration["ResourceClient:BaseAddress"] ?? "http://localhost:6103/");
+            client.Timeout=Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options=>options.TotalRequestTimeout.Timeout=TimeSpan.FromSeconds(10));
         services.AddScoped<IWorkAreaTaskCountReader, WorkAreaTaskCountReader>();
         services.AddScoped<IMyTasksStore, MyTasksStore>();
+        services.AddHttpClient<TaskExecution.Application.Support.ISupportMaterialAvailability,TaskExecution.Infrastructure.Resource.SupportMaterialAvailabilityClient>(client=>
+        {
+            client.BaseAddress=new Uri(configuration["ResourceClient:BaseAddress"] ?? "http://localhost:6103/");
+            client.Timeout=Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options=>options.TotalRequestTimeout.Timeout=TimeSpan.FromSeconds(10));
+        services.AddHttpClient<IMaterialCatalogLookup, TaskExecution.Infrastructure.Resource.MaterialCatalogLookup>(client =>
+        {
+            client.BaseAddress = new Uri(configuration["ResourceClient:BaseAddress"] ?? "http://localhost:6103/");
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
+        services.AddScoped<IVolunteerScheduleReader, TaskExecution.Infrastructure.Assignments.VolunteerScheduleReader>();
+        var redis = configuration.GetConnectionString("Redis");
+        var cacheSeconds = configuration.GetValue("Matching:CacheSeconds", 60);
+        if (cacheSeconds is < 1 or > 300)
+            throw new InvalidOperationException("Matching:CacheSeconds must be between 1 and 300.");
+        services.AddSingleton(new TaskExecution.Infrastructure.Identity.VolunteerDirectoryCacheOptions(cacheSeconds));
+        if (string.IsNullOrWhiteSpace(redis)) services.AddDistributedMemoryCache(options => options.SizeLimit = 16 * 1024 * 1024);
+        else services.AddStackExchangeRedisCache(options =>
+        {
+            var connection = StackExchange.Redis.ConfigurationOptions.Parse(redis);
+            connection.AbortOnConnectFail = false;
+            connection.ConnectTimeout = 500;
+            connection.AsyncTimeout = 500;
+            connection.ConnectRetry = 0;
+            options.ConfigurationOptions = connection;
+            options.InstanceName = "grottoworks:task:";
+        });
+        services.AddSingleton<TaskExecution.Infrastructure.Identity.VolunteerDirectoryCacheGate>();
+        services.AddScoped<IVolunteerDirectory, TaskExecution.Infrastructure.Identity.CachedVolunteerDirectory>();
+        services.AddHttpClient<TaskExecution.Infrastructure.Identity.IdentityVolunteerDirectory>(client =>
+        {
+            client.BaseAddress = new Uri(configuration["IdentityClient:BaseAddress"] ?? "http://localhost:6100/");
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<TaskExecution.Application.Support.ISupportRequestRepository, TaskExecution.Infrastructure.Support.SupportRequestRepository>();
+        services.AddScoped<TaskExecution.Application.Support.ISupportMaterialSyncStore, TaskExecution.Infrastructure.Support.SupportMaterialSyncStore>();
+        services.AddScoped<TaskExecution.Application.Support.ISupportSummaryStore, TaskExecution.Infrastructure.Support.SupportSummaryStore>();
+        services.AddHostedService<TaskExecution.Infrastructure.Support.SupportMaterialApprovalWorker>();
+        services.AddHttpClient<TaskExecution.Application.Support.ISupportTransferReceiptLookup,TaskExecution.Infrastructure.Resource.SupportTransferReceiptLookup>(client=>
+        {
+            client.BaseAddress=new Uri(configuration["ResourceClient:BaseAddress"] ?? "http://localhost:6103/");
+            client.Timeout=Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options=>options.TotalRequestTimeout.Timeout=TimeSpan.FromSeconds(10));
+        services.AddHttpClient<TaskExecution.Application.Support.ISupportTransferGateway,TaskExecution.Infrastructure.Resource.SupportTransferGateway>(client=>
+        {
+            client.BaseAddress=new Uri(configuration["ResourceClient:BaseAddress"] ?? "http://localhost:6103/");
+            client.Timeout=Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options=>
+        {
+            options.TotalRequestTimeout.Timeout=TimeSpan.FromSeconds(10);
+            options.Retry.DisableForUnsafeHttpMethods();
+        });
+        services.AddScoped<TaskExecution.Application.Support.ISupportAssignmentLifecycle,TaskExecution.Infrastructure.Support.SupportAssignmentLifecycle>();
         services.AddScoped<TaskExecution.Application.Attendance.IAttendanceStore, TaskExecution.Infrastructure.Attendance.AttendanceStore>();
         services.AddScoped<TaskExecution.Application.Attendance.IAttendanceReadStore, TaskExecution.Infrastructure.Attendance.AttendanceReadStore>();
         services.AddScoped<TaskExecution.Application.Attendance.ILongOpenAttendanceStore, TaskExecution.Infrastructure.Attendance.LongOpenAttendanceStore>();
@@ -36,12 +105,33 @@ public static class DependencyInjection
         services.AddSingleton(new TaskExecution.Application.Attendance.LongOpenAttendanceOptions(longOpenHours*60));
         services.AddHostedService<TaskExecution.Infrastructure.Attendance.AttendanceAlertWorker>();
         services.AddScoped<TaskExecution.Application.Assignments.IAssignmentStore, TaskExecution.Infrastructure.Assignments.AssignmentStore>();
-        services.AddHttpClient<TaskExecution.Application.Users.IIdentityUserLookup, TaskExecution.Infrastructure.Identity.IdentityUserLookup>(client =>
+        services.AddHttpClient<TaskExecution.Infrastructure.Identity.IdentityUserLookup>(client =>
         {
             client.BaseAddress = new Uri(configuration["IdentityClient:BaseAddress"] ?? "http://localhost:6100/");
             client.Timeout = Timeout.InfiniteTimeSpan;
         }).AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
+        services.AddTransient<TaskExecution.Application.Users.IIdentityUserLookup>(provider=>
+            provider.GetRequiredService<TaskExecution.Infrastructure.Identity.IdentityUserLookup>());
+        services.AddTransient<TaskExecution.Application.Users.IIdentityUserBatchLookup>(provider=>
+            provider.GetRequiredService<TaskExecution.Infrastructure.Identity.IdentityUserLookup>());
         services.AddScoped<TaskExecution.Application.Events.ITaskEventOutbox, TaskExecution.Infrastructure.Events.TaskEventOutbox>();
+        services.AddScoped<IScopeEventInbox, ScopeEventInbox>();
+        services.AddScoped<IUserStatusProjectionStore, UserStatusProjectionStore>();
+        services.AddScoped<PlanningScopeIngestionHandler>();
+        services.AddScoped<IdentityStatusIngestionHandler>();
+        var dispatch = configuration.GetValue("Outbox:DispatchEnabled", false);
+        var consume = configuration.GetValue("PlanningEvents:ConsumeEnabled", false) || configuration.GetValue("SupportTransfers:ConsumeEnabled",false) || configuration.GetValue("PurchaseEvents:ConsumeEnabled",false);
+        if (dispatch || consume)
+        {
+            BuildingBlocks.Messaging.MassTransit.Extensions.AddMessageBroker(services, configuration,
+                consume ? typeof(PlanningScopeConsumer).Assembly : null);
+        }
+        if (dispatch)
+        {
+            services.AddScoped<TaskExecution.Infrastructure.Events.TaskSnapshotReconciliation>();
+            services.AddHostedService<TaskExecution.Infrastructure.Events.TaskSnapshotReconciliationWorker>();
+            services.AddHostedService<TaskExecution.Infrastructure.Events.TaskEventDispatcher>();
+        }
         return services;
     }
 }

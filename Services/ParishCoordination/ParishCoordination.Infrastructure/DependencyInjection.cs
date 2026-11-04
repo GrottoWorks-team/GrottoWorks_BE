@@ -10,9 +10,10 @@ using ParishCoordination.Infrastructure.Data;
 using ParishCoordination.Infrastructure.Identity;
 using ParishCoordination.Infrastructure.Repositories;
 using ParishCoordination.Application.Users;
-using ParishCoordination.Infrastructure.TaskScopeSync;
 using Microsoft.Extensions.Http.Resilience;
 using ParishCoordination.Infrastructure.TaskExecution;
+using ParishCoordination.Infrastructure.Events;
+using ParishCoordination.Infrastructure.Lifecycle;
 
 namespace ParishCoordination.Infrastructure;
 
@@ -32,33 +33,31 @@ public static class DependencyInjection
 
         services.AddDbContext<ParishCoordinationDbContext>(options =>
             options.UseNpgsql(connectionString));
+        services.AddSingleton(TimeProvider.System);
+        var planningDispatch = configuration.GetValue("PlanningEvents:DispatchEnabled", false);
+        var lifecycleEnabled = configuration.GetValue("LifecycleEvents:Enabled", false);
+        if (planningDispatch || lifecycleEnabled)
+            BuildingBlocks.Messaging.MassTransit.Extensions.AddMessageBroker(services, configuration,
+                lifecycleEnabled ? typeof(LifecycleTaskSnapshotConsumer).Assembly : null);
+        if (lifecycleEnabled)
+        {
+            services.AddScoped<LifecycleEventProcessor>();
+            services.AddHostedService<LifecycleRecoveryWorker>();
+        }
+        if (planningDispatch)
+        {
+            services.AddScoped<ParishCoordination.Infrastructure.Events.PlanningSnapshotReconciliation>();
+            services.AddHostedService<ParishCoordination.Infrastructure.Events.PlanningSnapshotReconciliationWorker>();
+            services.AddHostedService<ParishCoordination.Infrastructure.Events.PlanningEventDispatcher>();
+        }
 
         services.AddScoped<IParishRepository, ParishRepository>();
         services.AddScoped<ICommunityRepository, CommunityRepository>();
         services.AddScoped<ISeasonRepository, SeasonRepository>();
         services.AddScoped<IWorkAreaRepository, WorkAreaRepository>();
+        services.AddScoped<INotificationAudienceQuery, NotificationAudienceQuery>();
         services.AddScoped<IWorkAreaCategoryRepository, WorkAreaCategoryRepository>();
         services.AddScoped<IParishCoordinationDataSeeder, ParishCoordinationDataSeeder>();
-
-        var syncOptions = TaskScopeSyncOptions.FromConfiguration(configuration);
-        services.AddSingleton(syncOptions);
-        if (syncOptions.Enabled)
-        {
-            services.AddScoped<TaskScopeBackfill>();
-            services.AddHttpClient<ITaskScopeDelivery, HttpTaskScopeDelivery>(client =>
-            {
-                client.BaseAddress = syncOptions.BaseAddress;
-                client.Timeout = Timeout.InfiniteTimeSpan;
-            }).AddStandardResilienceHandler(options =>
-            {
-                options.TotalRequestTimeout.Timeout = syncOptions.RequestTimeout;
-                options.AttemptTimeout.Timeout = syncOptions.RequestTimeout;
-                options.CircuitBreaker.SamplingDuration = syncOptions.RequestTimeout * 3;
-                // PUT retries belong to the durable outbox, not this HTTP pipeline.
-                options.Retry.DisableForUnsafeHttpMethods();
-            });
-            services.AddHostedService<TaskScopeSyncWorker>();
-        }
 
         var identityClientOptions = IdentityClientOptions.FromConfiguration(configuration);
         services.AddSingleton(identityClientOptions);

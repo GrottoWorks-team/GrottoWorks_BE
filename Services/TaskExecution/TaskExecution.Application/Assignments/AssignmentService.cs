@@ -24,17 +24,20 @@ public sealed record AssignmentDto(Guid Id, Guid TaskId, Guid VolunteerId, Assig
 }
 
 public sealed partial class AssignmentService(IAssignmentStore assignments, ITaskRepository tasks,
-    TaskScopeAccess scopeAccess, ActiveUserAccess users, ICurrentUser user, TaskEventRecorder events)
+    TaskScopeAccess scopeAccess, ActiveUserAccess users, ICurrentUser user, TaskEventRecorder events,
+    TaskExecution.Application.Support.ISupportAssignmentLifecycle support)
 {
     public async Task<AssignmentDto> RespondAsync(Guid assignmentId, bool accept, string? reason, int? expectedVersion,
         CancellationToken cancellationToken = default)
     {
-        var assignment = await assignments.GetAsync(assignmentId, cancellationToken)
+        var assignmentInfo = await assignments.GetAsync(assignmentId, cancellationToken)
             ?? throw DomainRuleException.NotFound("TASK_ASSIGNMENT_NOT_FOUND", "The assignment does not exist.");
-        if (user.Role != GrottoWorksRoles.Volunteer || assignment.VolunteerId != user.UserId)
+        if (user.Role != GrottoWorksRoles.Volunteer || assignmentInfo.VolunteerId != user.UserId)
             throw DomainRuleException.Forbidden("TASK_ASSIGNMENT_ACCESS_DENIED", "Only the assigned volunteer can respond.");
-        return await assignments.InTaskTransactionAsync(assignment.TaskId, async () =>
+        return await assignments.InTaskTransactionAsync(assignmentInfo.TaskId, async () =>
         {
+            var assignment=await assignments.GetForUpdateAsync(assignmentId,cancellationToken)
+                ?? throw DomainRuleException.NotFound("TASK_ASSIGNMENT_NOT_FOUND","The assignment does not exist.");
             var task = await tasks.GetByIdForUpdateAsync(assignment.TaskId, cancellationToken)
                 ?? throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
             var (area, _) = await scopeAccess.GetWorkAreaForVolunteerWriteAsync(task.WorkAreaId, cancellationToken);
@@ -43,12 +46,18 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
                 throw new DomainRuleException("TASK_INVALID_STATE", "The task no longer accepts assignment responses.");
             if (accept) assignment.Accept(expectedVersion, DateTimeOffset.UtcNow);
             else assignment.Decline(reason!, expectedVersion, DateTimeOffset.UtcNow);
+            if(assignment.Type==AssignmentType.Support)
+                await support.RespondAsync(assignment.Id,accept,assignment.ResponseReason,DateTimeOffset.UtcNow,cancellationToken);
             task.RegisterAssignmentChange(DateTimeOffset.UtcNow);
             events.Record(TaskEventTypes.AssignmentResponded, task, area, new
             {
                 assignmentId = assignment.Id, taskId = task.Id, workAreaId = area.WorkAreaId,
-                volunteerUserId = user.UserId, decision = accept ? "ACCEPTED" : "DECLINED", reason = assignment.ResponseReason
+                volunteerUserId = user.UserId, leaderUserId = area.LeaderUserId, assignmentType = assignment.Type==AssignmentType.Support ? "SUPPORT" : "DIRECT",
+                decision = accept ? "ACCEPTED" : "DECLINED", reason = assignment.ResponseReason
             });
+            if(accept && task.Type==TaskType.Purchase)
+                events.Record("task.purchase-task.assigned",task,area,new {taskId=task.Id,purchaseRequestId=task.PurchaseRequestId,
+                    workAreaId=area.WorkAreaId,buyerUserId=assignment.VolunteerId,assignmentId=assignment.Id,leaderUserId=area.LeaderUserId});
             await assignments.SaveAsync(cancellationToken);
             return AssignmentDto.From(assignment);
         }, cancellationToken);
@@ -68,7 +77,7 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
 
             var existing = await assignments.ListAsync(task.Id, cancellationToken);
             EnsureNoDuplicate(existing, command.VolunteerId);
-            EnsureCapacity(existing, task.RequiredVolunteerCount, command.OverrideCapacity);
+            EnsureCapacity(existing, task.RequiredVolunteerCount, task.Type!=TaskType.Purchase && command.OverrideCapacity);
             EnsureSkills(task, volunteer, command.OverrideSkillMismatch);
 
             var assignment = TaskAssignment.Assign(task.Id, volunteer.UserId, user.UserId, command.Note,
@@ -81,7 +90,8 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
             events.Record(TaskEventTypes.AssignmentCreated, task, area, new
             {
                 assignmentId = assignment.Id, taskId = task.Id, workAreaId = area.WorkAreaId,
-                volunteerUserId = volunteer.UserId, status = "PENDING", assignmentType = "DIRECT"
+                volunteerUserId = volunteer.UserId, leaderUserId = area.LeaderUserId,
+                status = "PENDING", assignmentType = "DIRECT"
             });
             await assignments.SaveAsync(cancellationToken);
             return AssignmentDto.From(assignment, warnings);
@@ -94,7 +104,7 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
             ?? throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
         await scopeAccess.GetWorkAreaForLeaderReadAsync(task.WorkAreaId, cancellationToken);
         return (await assignments.ListAsync(taskId, cancellationToken))
-            .Where(row => row.Type == AssignmentType.Direct || row.Status != AssignmentStatus.Pending)
+            .Where(row => row.Type is AssignmentType.Direct or AssignmentType.Support || row.Status != AssignmentStatus.Pending)
             .Select(row => AssignmentDto.From(row)).ToList();
     }
 
@@ -113,9 +123,11 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
 
     public static void EnsureSkills(WorkTask task, IdentityUser volunteer, bool allowOverride)
     {
-        if (task.Skills.Any(skill => skill.RequiredSkillLevel != null))
-            throw new DomainRuleException("SKILL_LEVEL_VALIDATION_UNAVAILABLE", "Identity does not expose skill levels yet.");
-        if (!allowOverride && task.Skills.Any(skill => !volunteer.SkillIds.Contains(skill.SkillId)))
-            throw new DomainRuleException("TASK_SKILL_MISMATCH", "The volunteer does not match all required skills.");
+        if (allowOverride) return;
+        foreach (var requirement in task.Skills)
+        {
+            if (!VolunteerSkills.Meets(volunteer, requirement.SkillId, requirement.RequiredSkillLevel))
+                throw new DomainRuleException("TASK_SKILL_MISMATCH", "The volunteer does not meet all required skills and minimum levels.");
+        }
     }
 }

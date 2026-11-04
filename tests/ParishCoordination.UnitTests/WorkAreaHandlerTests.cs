@@ -130,13 +130,14 @@ public sealed class WorkAreaHandlerTests
     public async Task Admin_and_same_parish_user_can_get_work_area_detail()
     {
         var workAreaId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
+        var workAreas = WorkAreas();
 
         var adminHandler = new GetWorkAreaQueryHandler(
-            WorkAreas(),
+            workAreas,
             Seasons(),
             User(GrottoWorksRoles.Admin));
         var parishHandler = new GetWorkAreaQueryHandler(
-            WorkAreas(),
+            workAreas,
             Seasons(),
             User(GrottoWorksRoles.Parish, ParishNorth));
 
@@ -209,7 +210,9 @@ public sealed class WorkAreaHandlerTests
             nameof(WorkAreaDto.StartDate),
             nameof(WorkAreaDto.Deadline),
             nameof(WorkAreaDto.Status),
-            nameof(WorkAreaDto.Version));
+            nameof(WorkAreaDto.Version),
+            nameof(WorkAreaDto.Latitude),
+            nameof(WorkAreaDto.Longitude));
         dtoProperties.Should().NotContain("WorkAreaCategoryId");
     }
 

@@ -12,10 +12,10 @@ public sealed class TaskEventIngestionTests
     {
         var volunteerId = Guid.NewGuid();
         var taskId = Guid.NewGuid();
-        using var payload = JsonDocument.Parse($$"""{"volunteerUserId":"{{volunteerId}}","taskId":"{{taskId}}"}""");
+        using var payload = JsonDocument.Parse($$"""{"volunteerUserId":"{{volunteerId}}","taskId":"{{taskId}}","assignmentType":"DIRECT"}""");
         var message = Create("task.assignment.created", payload.RootElement);
 
-        var notifications = TaskEventIngestionHandler.MapNotifications(message, out var requiresContext);
+        var notifications = IntegrationEventIngestionHandler.MapNotifications(message, out var requiresContext);
 
         requiresContext.Should().BeFalse();
         notifications.Should().ContainSingle().Which.RecipientUserId.Should().Be(volunteerId);
@@ -26,7 +26,7 @@ public sealed class TaskEventIngestionTests
     public void Missing_recipient_is_marked_as_requiring_context()
     {
         using var payload = JsonDocument.Parse("{}");
-        var notifications = TaskEventIngestionHandler.MapNotifications(
+        var notifications = IntegrationEventIngestionHandler.MapNotifications(
             Create("attendance.session.open-too-long", payload.RootElement),
             out var requiresContext);
         requiresContext.Should().BeTrue();
@@ -39,14 +39,14 @@ public sealed class TaskEventIngestionTests
         var volunteerId = Guid.NewGuid();
         var leaderId = Guid.NewGuid();
         using var payload = JsonDocument.Parse($$"""{"volunteerUserId":"{{volunteerId}}","leaderUserId":"{{leaderId}}"}""");
-        var notifications = TaskEventIngestionHandler.MapNotifications(
+        var notifications = IntegrationEventIngestionHandler.MapNotifications(
             Create("attendance.session.open-too-long", payload.RootElement),
             out var requiresContext);
         requiresContext.Should().BeFalse();
         notifications.Select(item => item.RecipientUserId).Should().BeEquivalentTo(new[] { volunteerId, leaderId });
     }
 
-    private static IncomingTaskEvent Create(string eventType, JsonElement payload) => new(
+    private static IncomingIntegrationEvent Create(string eventType, JsonElement payload) => new(
         Guid.NewGuid(), eventType, DateTimeOffset.UtcNow, Guid.NewGuid().ToString(),
         Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "TASK", Guid.NewGuid(), payload.Clone());
 }

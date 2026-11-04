@@ -12,21 +12,26 @@ public sealed record UpdateSupportCommand(Guid Id,SupportType? SupportType,bool 
     bool ChangeDeadline,DateOnly? Deadline,bool ChangePositions,IReadOnlyList<SupportPositionInput>? Positions,
     bool ChangeMaterials,IReadOnlyList<SupportMaterialInput>? Materials,int? ExpectedVersion);
 public sealed record SupportSkillDto(Guid SkillId,string? RequiredSkillLevel);
-public sealed record SupportPositionDto(Guid Id,string Name,int RequiredVolunteerCount,string? Note,IReadOnlyList<SupportSkillDto> Skills);
+public sealed record SupportPositionDto(Guid Id,string Name,int RequiredVolunteerCount,string? Note,IReadOnlyList<SupportSkillDto> Skills,Guid? TaskId=null);
 public sealed record SupportMaterialDto(Guid Id,Guid MaterialId,decimal RequiredQuantity,string? Note);
 public sealed record SupportRequestDto(Guid Id,Guid SeasonId,Guid WorkAreaId,Guid RequestedBy,SupportType SupportType,string? Description,
     DateOnly? Deadline,SupportRequestStatus Status,DateTimeOffset CreatedAt,DateTimeOffset? UpdatedAt,int Version,
-    IReadOnlyList<SupportPositionDto> Positions,IReadOnlyList<SupportMaterialDto> Materials,IReadOnlyList<object> Responses)
+    IReadOnlyList<SupportPositionDto> Positions,IReadOnlyList<SupportMaterialDto> Materials,IReadOnlyList<SupportResponseDto> Responses,
+    Guid? ClosedBy=null,DateTimeOffset? ClosedAt=null,string? CloseReason=null)
 {
     public static SupportRequestDto From(SupportRequest row)=>new(row.Id,row.SeasonId,row.WorkAreaId,row.RequestedBy,row.SupportType,
         row.Description,row.Deadline,row.Status,row.CreatedAt,row.UpdatedAt,row.Version,
         row.Positions.OrderBy(p=>p.Name).ThenBy(p=>p.Id).Select(p=>new SupportPositionDto(p.Id,p.Name,p.RequiredVolunteerCount,p.Note,
-            p.Skills.OrderBy(s=>s.SkillId).Select(s=>new SupportSkillDto(s.SkillId,s.RequiredSkillLevel)).ToList())).ToList(),
-        row.Materials.OrderBy(m=>m.MaterialId).Select(m=>new SupportMaterialDto(m.Id,m.MaterialId,m.RequiredQuantity,m.Note)).ToList(),[]);
+            p.Skills.OrderBy(s=>s.SkillId).Select(s=>new SupportSkillDto(s.SkillId,s.RequiredSkillLevel)).ToList(),p.TaskId)).ToList(),
+        row.Materials.OrderBy(m=>m.MaterialId).Select(m=>new SupportMaterialDto(m.Id,m.MaterialId,m.RequiredQuantity,m.Note)).ToList(),
+        row.Responses.OrderBy(response=>response.CreatedAt).ThenBy(response=>response.Id).Select(SupportResponseDto.From).ToList(),row.ClosedBy,row.ClosedAt,row.CloseReason);
 }
 
 public interface ISupportRequestRepository
 {
+    Task<Guid?> FindRequestIdByMemberAsync(Guid memberId,CancellationToken cancellationToken);
+    Task<T> InRequestTransactionAsync<T>(Guid requestId,Func<Task<T>> operation,CancellationToken cancellationToken);
+    Task<IReadOnlyList<SupportPositionTask>> GetPositionTasksAsync(IReadOnlyCollection<Guid> taskIds,CancellationToken cancellationToken);
     Task<SupportRequest?> GetAsync(Guid id,bool tracked,CancellationToken cancellationToken);
     Task<(IReadOnlyList<SupportRequest> Items,long Total)> GetPageAsync(Guid? parishId,Guid? seasonId,Guid? workAreaId,
         SupportType? type,SupportRequestStatus? status,int page,int size,bool descending,CancellationToken cancellationToken);

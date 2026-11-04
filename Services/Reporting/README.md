@@ -5,6 +5,12 @@ Trạng thái: F-RPT-01 — S6; F-RPT-02, 03 — S7; F-RPT-04, 05 — S8; F-RPT-
 
 ## Kiến trúc
 
+### Scope replication qua RabbitMQ
+
+Khi `IntegrationEvents:ConsumeEnabled` (hoặc `TaskEvents:Enabled`) bật, Reporting nhận `PlanningScopeSnapshot` tại `reporting-planning-scopes` và `TaskScopeSnapshot` tại `reporting-task-snapshots`. Consumer áp dụng parent trước child; inbox và các projection/read-model effect dùng cùng transaction. Advisory lock theo Season phối hợp hai queue. Task đến muộn tiếp tục gắn các dòng attendance chưa có Work Area qua handler hiện có, không cộng lại giờ công.
+
+Producer mới chưa được bật tự động; backfill/reconciliation và cutover HTTP vẫn cần hoàn tất riêng. Snapshot kỹ thuật không thay thế event đóng góp/ghi nhận nghiệp vụ.
+
 ```
 Services/Reporting/
 ├── Reporting.Domain/          # Recognition, Inbox, ReadModels (rm_*), Scope (work_area_scope, task_projection)

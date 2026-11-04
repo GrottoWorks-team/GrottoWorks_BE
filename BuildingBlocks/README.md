@@ -191,3 +191,9 @@ Resource, Readiness, Reporting dùng thẳng `TaskExecution.Contracts.Events.Tas
 - **MassTransit hạ về 8.5.12 (Apache 2.0):** bản 9.x đòi license thương mại — không có license thì bus không khởi động và service
   crash ngay lúc start (NotificationAudit bật `NotificationEvents__Enabled=true` trong compose cũng bị). API dùng ở dự án không đổi.
 
+# Integration diagnostics
+
+`AddGrottoWorksObservability(configuration, serviceName)` enables OTLP traces/metrics/logs when `Observability:Enabled=true`; the default is off. HTTP and MassTransit instrumentation share the standard trace context. Broker filters preserve opaque `X-Correlation-Id`, set native correlation UUID when possible, and count publish/consume outcomes with bounded message-type labels. RabbitMQ publisher confirmation is explicitly enabled. Application outboxes still own transactional persistence and retry; these helpers do not replace an inbox/outbox.
+
+`IIntegrationQueueProbe` reads only the owning service's DbConnection. It feeds pending/retry gauges and an availability gauge; failed probes never report an invented zero backlog. See the root `INTEGRATION.md` for rollout, security and runtime acceptance.
+

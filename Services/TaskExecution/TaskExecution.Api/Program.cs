@@ -1,3 +1,4 @@
+using TaskExecution.Api.SystemExport;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BuildingBlocks.Security;
@@ -18,6 +19,7 @@ builder.Services.AddGrottoWorksCurrentUser();
 builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationMiddlewareResultHandler,
     ProblemDetailsAuthorizationMiddlewareResultHandler>();
 builder.Services.AddGrottoWorksWeb();
+builder.Services.AddGrottoWorksObservability(builder.Configuration, "TaskExecution");
 builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails += context =>
@@ -38,6 +40,8 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(
         new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseUpper, allowIntegerValues: false));
 });
+
+builder.Services.AddScoped<BuildingBlocks.Web.IIntegrationQueueProbe, TaskExecution.Api.Diagnostics.ServiceQueueProbe>();
 
 var app = builder.Build();
 
@@ -74,6 +78,8 @@ if (app.Configuration.GetValue("Database:MigrateOnStartup", true))
             "Database migration failed. The service stays up; /health/ready reports Unhealthy.");
     }
 }
+
+app.MapSystemExportEndpoints();
 
 app.Run();
 

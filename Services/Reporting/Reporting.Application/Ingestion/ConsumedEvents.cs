@@ -1,8 +1,8 @@
 namespace Reporting.Application.Ingestion;
 
 // Consumer-side payloads of the TaskExecution events (Lâm). attendance.hours.approved follows what Task publishes
-// (TaskExecution.Contracts TaskIntegrationEvent); task.completion.reviewed and support.member.completed are not published
-// yet — their shapes are the proposal in BuildingBlocks README §5.5.
+// (TaskExecution.Contracts TaskIntegrationEvent). Older task.completion.reviewed payloads omit recognition context;
+// ingestion resolves that context from the envelope and Reporting's own task projection.
 
 /// <summary><c>task.completion.reviewed</c>: <see cref="Decision"/> APPROVED counts once per volunteer (BR-54).</summary>
 public sealed record TaskCompletionReviewed(
@@ -13,7 +13,7 @@ public sealed record TaskCompletionReviewed(
     string? TaskName,
     string? TaskType,
     string Decision,
-    IReadOnlyList<Guid> VolunteerUserIds,
+    IReadOnlyList<Guid>? VolunteerUserIds,
     Guid ReviewedByUserId,
     DateTimeOffset ReviewedAt)
 {

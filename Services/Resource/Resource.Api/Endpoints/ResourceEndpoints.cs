@@ -7,6 +7,9 @@ public static class ResourceEndpoints
     {
         app.MapCatalogEndpoints();
         app.MapInternalScopeEndpoints();
+        app.MapInternalMaterialEndpoints();
+        app.MapInternalPurchaseEndpoints();
+        app.MapInternalSupportReconciliationEndpoints();
         app.MapRequirementEndpoints();
         app.MapInventoryEndpoints();
         app.MapShortageEndpoints();
@@ -16,6 +19,7 @@ public static class ResourceEndpoints
         app.MapDonationEndpoints();
         app.MapMaterialReportEndpoints();
         app.MapBorrowedItemEndpoints();
+        app.MapRecordFileEndpoints();
         return app;
     }
 }

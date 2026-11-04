@@ -13,6 +13,9 @@ public sealed record PurchaseRequestSearch(
 /// <summary>Store of the <c>purchase_request</c> aggregate (F-RES-06/07).</summary>
 public interface IPurchaseRequestStore
 {
+    /// <summary>Business state, state history and the integration outbox share this local transaction.</summary>
+    Task<T> InTransactionAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken = default);
+
     /// <summary>Tracked, with its items (not its history).</summary>
     Task<PurchaseRequest?> GetAsync(Guid purchaseRequestId, CancellationToken cancellationToken = default);
 

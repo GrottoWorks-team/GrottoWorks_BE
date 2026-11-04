@@ -16,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<GetFileDownloadHandler>();
         services.AddScoped<DeleteUnattachedFileHandler>();
         services.AddScoped<GetInternalFileHandler>();
+        services.AddScoped<FileAttachmentHandler>();
         services.AddScoped<ListNotificationsHandler>();
         services.AddScoped<MarkNotificationReadHandler>();
         services.AddScoped<MarkAllNotificationsReadHandler>();
@@ -25,7 +26,8 @@ public static class DependencyInjection
         services.AddScoped<ListActivityLogsHandler>();
         services.AddScoped<GetActivityLogHandler>();
         services.AddScoped<GetResourceHistoryHandler>();
-        services.AddScoped<TaskEventIngestionHandler>();
+        services.AddScoped<IntegrationEventIngestionHandler>();
+        services.AddScoped<ReplayNotificationContextHandler>();
         return services;
     }
 }

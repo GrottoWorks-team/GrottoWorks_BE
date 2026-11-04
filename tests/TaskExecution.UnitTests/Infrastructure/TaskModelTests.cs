@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using TaskExecution.Domain.Tasks;
 using TaskExecution.Infrastructure.Data;
 
@@ -16,7 +17,7 @@ public sealed class TaskModelTests
             .Options;
         using var dbContext = new TaskExecutionDbContext(options);
 
-        var entity = dbContext.Model.FindEntityType(typeof(WorkTask))!;
+        var entity = dbContext.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(WorkTask))!;
         var table = StoreObjectIdentifier.Table("task", null);
 
         entity.GetTableName().Should().Be("task");

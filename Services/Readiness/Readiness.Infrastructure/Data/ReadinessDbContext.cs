@@ -15,16 +15,31 @@ public sealed class ReadinessDbContext(DbContextOptions<ReadinessDbContext> opti
 
     public DbSet<ReadinessChecklist> Checklists => Set<ReadinessChecklist>();
 
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        TouchChangedChecklists();
+        ChangeTracker.DetectChanges();
+        var references = ChangeTracker.Entries<Readiness.Domain.Files.AttachmentIntent>()
+            .Where(x => x.State == EntityState.Modified && x.Entity.State == "FINALIZE")
+            .Select(x => x.Entity.ReferenceId).Distinct().Order().ToArray();
+        if (references.Length == 0) return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        var ownsTransaction = Database.CurrentTransaction is null;
+        var transaction = ownsTransaction ? await Database.BeginTransactionAsync(cancellationToken) : Database.CurrentTransaction!;
+        try
+        {
+            foreach (var reference in references)
+                await Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock_shared(hashtextextended({reference.ToString()}, 712));", cancellationToken);
+            var count = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+            if (ownsTransaction) await transaction.CommitAsync(cancellationToken);
+            return count;
+        }
+        finally { if (ownsTransaction) await transaction.DisposeAsync(); }
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // integration_event_outbox is configured by Outbox/OutboxMessageConfiguration (same assembly).
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ReadinessDbContext).Assembly);
-    }
-
-    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
-    {
-        TouchChangedChecklists();
-        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
     /// <summary>

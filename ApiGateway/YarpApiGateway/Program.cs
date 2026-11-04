@@ -7,6 +7,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // JWT validation (F-PLT-06) — same claim contract as Identity issues: sub/role/parishId/communityId.
 builder.Services.AddGrottoWorksSecurity(builder.Configuration);
+builder.Services.AddGrottoWorksWeb();
+builder.Services.AddGrottoWorksObservability(builder.Configuration,"ApiGateway");
 
 // Route-level authorization in appsettings.json references this policy.
 builder.Services.AddAuthorization(options =>
@@ -19,6 +21,19 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddRateLimiter(rateLimiterOptions =>
 {
     rateLimiterOptions.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    rateLimiterOptions.OnRejected=async (context,ct)=>
+    {
+        context.HttpContext.Response.Headers.RetryAfter="60";
+        await Results.Problem(statusCode:429,title:"Too many requests",extensions:new Dictionary<string,object?>
+        {
+            ["code"]="RATE_LIMIT_EXCEEDED",["correlationId"]=CorrelationIdMiddlewareExtensions.GetCorrelationId(context.HttpContext),
+            ["traceId"]=System.Diagnostics.Activity.Current?.Id ?? context.HttpContext.TraceIdentifier
+        }).ExecuteAsync(context.HttpContext);
+    };
+    foreach(var policy in new[] { (Name:"upload",Limit:20),(Name:"system-jobs",Limit:3) })
+        rateLimiterOptions.AddPolicy(policy.Name,http=>RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey:$"{http.User.FindFirst("sub")?.Value ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown"}:{policy.Name}",
+            factory:_=>new FixedWindowRateLimiterOptions {Window=TimeSpan.FromMinutes(1),PermitLimit=policy.Limit,QueueLimit=0}));
     rateLimiterOptions.AddPolicy("fixed", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -41,7 +56,7 @@ builder.Services.AddCors(options =>
         .AllowAnyHeader()
         .AllowAnyMethod()
         // Let the browser read the correlation id returned by every service (README §3).
-        .WithExposedHeaders("X-Correlation-Id"));
+        .WithExposedHeaders("X-Correlation-Id","ETag","Retry-After","Location"));
 });
 
 // Routes/clusters are defined under "ReverseProxy" in appsettings.json.
@@ -51,13 +66,24 @@ builder.Services.AddReverseProxy()
 var app = builder.Build();
 
 // Generate/propagate X-Correlation-Id before proxying so every service sees the same id (README §3).
-app.UseCorrelationId();
+app.UseGrottoWorksDefaults();
 // Before authentication so CORS preflight (OPTIONS, no token) is answered instead of returning 401.
 app.UseCors(CorsPolicyName);
 // Explicit so the bearer token is parsed before YARP evaluates per-route AuthorizationPolicy.
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
+
+// Internal service endpoints are deliberately absent from proxy routes, including any future catch-all route.
+app.Use(async (context,next)=>
+{
+    if(context.Request.Path.StartsWithSegments("/internal"))
+    {
+        context.Response.StatusCode=StatusCodes.Status404NotFound;
+        return;
+    }
+    await next();
+});
 
 app.MapReverseProxy();
 

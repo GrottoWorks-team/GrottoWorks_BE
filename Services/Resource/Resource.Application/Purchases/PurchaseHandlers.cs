@@ -164,7 +164,6 @@ public sealed class RecordPurchaseCommandHandler(
             .FirstOrDefault(candidate => candidate.Status != ProjectedTaskStatus.Cancelled && candidate.AssigneeUserIds.Contains(currentUser.UserId))
             ?? throw DomainRuleException.Forbidden("PURCHASE_NOT_BUYER", "Only the volunteer who accepted the purchase task can record the purchase (BR-30).");
         WorkAreaAccess.EnsureWritable(scope);
-        await files.EnsureAttachableAsync(command.ReceiptFileIds, FilePurposes.PurchaseReceipt, currentUser.UserId, cancellationToken);
 
         var now = DateTimeOffset.UtcNow;
         var today = ParishClock.Today(now);
@@ -173,6 +172,7 @@ public sealed class RecordPurchaseCommandHandler(
             command.Items, command.SupplierName, command.PurchaseDate ?? today, command.ReceiptFileIds, today, now);
         request.MarkPurchased(currentUser.UserId, now);
 
+        await using var reservation = await files.ReserveAsync(command.ReceiptFileIds, FilePurposes.PurchaseReceipt, currentUser.UserId, purchase.PurchaseId, cancellationToken);
         store.Add(purchase);
         await store.SaveChangesAsync(cancellationToken);
         return await context.ToDtoAsync(purchase, request, cancellationToken);
@@ -190,8 +190,8 @@ public sealed class AttachPurchaseReceiptsCommandHandler(PurchaseContext context
             throw PurchaseContext.NotFound();
         }
 
-        await files.EnsureAttachableAsync(command.FileIds, FilePurposes.PurchaseReceipt, currentUser.UserId, cancellationToken);
         purchase.AttachReceipts(command.FileIds);
+        await using var reservation = await files.ReserveAsync(command.FileIds, FilePurposes.PurchaseReceipt, currentUser.UserId, purchase.PurchaseId, cancellationToken);
         await store.SaveChangesAsync(cancellationToken);
         return await context.ToDtoAsync(purchase, request, cancellationToken);
     }

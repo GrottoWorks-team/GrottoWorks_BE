@@ -26,11 +26,13 @@ public sealed partial class AssignmentService
 
     private async Task<TaskAssignment> ReviewApplicationAsync(Guid id, bool approve, string? reason, int? version, CancellationToken cancellationToken)
     {
-        var row = await assignments.GetAsync(id, cancellationToken);
-        if (row is null || row.Type != AssignmentType.Application)
+        var applicationInfo = await assignments.GetAsync(id, cancellationToken);
+        if (applicationInfo is null || applicationInfo.Type != AssignmentType.Application)
             throw DomainRuleException.NotFound("TASK_APPLICATION_NOT_FOUND", "The application does not exist.");
-        return await assignments.InTaskTransactionAsync(row.TaskId, async () =>
+        return await assignments.InTaskTransactionAsync(applicationInfo.TaskId, async () =>
         {
+            var row=await assignments.GetForUpdateAsync(id,cancellationToken)
+                ?? throw DomainRuleException.NotFound("TASK_APPLICATION_NOT_FOUND","The application does not exist.");
             var task = await tasks.GetByIdForUpdateAsync(row.TaskId, cancellationToken)
                 ?? throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
             var (area, _) = await scopeAccess.GetWorkAreaForLeaderWriteAsync(task.WorkAreaId, cancellationToken);
@@ -49,7 +51,8 @@ public sealed partial class AssignmentService
             events.Record(TaskEventTypes.AssignmentResponded, task, area, new
             {
                 assignmentId = row.Id, taskId = task.Id, workAreaId = area.WorkAreaId,
-                volunteerUserId = row.VolunteerId, decision = approve ? "ACCEPTED" : "REJECTED", reason = row.ResponseReason
+                volunteerUserId = row.VolunteerId, leaderUserId = area.LeaderUserId, assignmentType = "APPLICATION",
+                decision = approve ? "ACCEPTED" : "REJECTED", reason = row.ResponseReason
             });
             await assignments.SaveAsync(cancellationToken);
             return row;
@@ -75,7 +78,8 @@ public sealed partial class AssignmentService
             events.Record(TaskEventTypes.AssignmentCreated, task, area, new
             {
                 assignmentId = application.Id, taskId, workAreaId = area.WorkAreaId,
-                volunteerUserId = user.UserId, status = "PENDING", assignmentType = "APPLICATION"
+                volunteerUserId = user.UserId, leaderUserId = area.LeaderUserId,
+                status = "PENDING", assignmentType = "APPLICATION"
             });
             await assignments.SaveAsync(cancellationToken);
             return TaskApplicationDto.From(application);

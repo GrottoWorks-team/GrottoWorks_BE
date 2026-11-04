@@ -14,8 +14,18 @@ public sealed class SupportRequestModelTests
             .UseNpgsql("Host=localhost;Database=model_only;Username=test;Password=test").Options);
         var request=db.Model.FindEntityType(typeof(SupportRequest))!;
         request.FindProperty(nameof(SupportRequest.Version))!.IsConcurrencyToken.Should().BeTrue();
+        var position=db.Model.FindEntityType(typeof(SupportPosition))!;
+        position.FindProperty(nameof(SupportPosition.TaskId))!.IsNullable.Should().BeTrue();
+        position.GetForeignKeys().Should().Contain(key=>key.PrincipalEntityType.ClrType==typeof(TaskExecution.Domain.Tasks.WorkTask)
+            && key.DeleteBehavior==DeleteBehavior.Restrict);
         db.Model.FindEntityType(typeof(SupportPositionSkill))!.FindPrimaryKey()!.Properties.Should().HaveCount(2);
         db.Model.FindEntityType(typeof(SupportMaterial))!.GetIndexes().Should().Contain(i=>i.IsUnique);
+        var member=db.Model.FindEntityType(typeof(SupportResponseMember))!;
+        member.GetIndexes().Should().Contain(index=>index.IsUnique && index.GetFilter()!=null && index.Properties.Any(property=>property.Name==nameof(SupportResponseMember.RequestId)));
+        member.GetForeignKeys().Should().Contain(key=>key.PrincipalEntityType.ClrType==typeof(SupportPosition) && key.Properties.Count==2);
+        var offer=db.Model.FindEntityType(typeof(SupportResponseMaterial))!;
+        offer.FindProperty(nameof(SupportResponseMaterial.OfferedQuantity))!.GetPrecision().Should().Be(12);
+        offer.GetForeignKeys().Should().Contain(key=>key.PrincipalEntityType.ClrType==typeof(SupportMaterial) && key.Properties.Count==2);
         db.Database.HasPendingModelChanges().Should().BeFalse();
     }
 }

@@ -5,6 +5,7 @@ using Resource.Application.Files;
 using Resource.Infrastructure.Files;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
 using Resource.Application.Abstractions;
 using Resource.Application.Catalog;
 using Resource.Infrastructure.Catalog;
@@ -41,15 +42,20 @@ public static class DependencyInjection
         services.AddScoped<IIntegrationEventPublisher, OutboxIntegrationEventPublisher>();
         services.AddScoped<IMaterialCatalogStore, MaterialCatalogStore>();
         services.AddScoped<IWorkAreaScopeStore, WorkAreaScopeStore>();
+        services.AddScoped<IScopeReplicationInbox, ScopeReplicationInbox>();
+        services.AddScoped<ITaskMaterialPlanStore, TaskMaterialPlanStore>();
         services.AddScoped<ITaskProjectionStore, TaskProjectionStore>();
         services.AddScoped<IMaterialRequirementStore, MaterialRequirementStore>();
         services.AddScoped<IInventoryStore, InventoryStore>();
         services.AddScoped<IAllocationStore, AllocationStore>();
         services.AddScoped<ITaskMaterialReportStore, TaskMaterialReportStore>();
         services.AddScoped<ISupportTransferStore, SupportTransferStore>();
+        services.AddScoped<ISupportTransferOperationStore, SupportTransferOperationStore>();
+        services.AddScoped<ISupportReconciliationReadStore,SupportReconciliationReadStore>();
         services.AddScoped<IWorkAreaStockLock, PostgresWorkAreaStockLock>();
         services.AddScoped<IPurchaseRequestStore, PurchaseRequestStore>();
         services.AddScoped<IPurchaseStore, PurchaseStore>();
+        services.AddScoped<IInternalPurchaseReadStore, InternalPurchaseReadStore>();
         services.AddScoped<IDonorStore, DonorStore>();
         services.AddScoped<IDonationStore, DonationStore>();
         services.AddScoped<IBorrowedItemStore, BorrowedItemStore>();
@@ -80,23 +86,24 @@ public static class DependencyInjection
             services.AddHostedService<OutboxDispatcher>();
         }
 
-        // F-NTF-01 file checks (evidence, receipts); skipped when NotificationAudit is not configured.
-        if (Uri.TryCreate(configuration[NotificationAuditClientOptions.BaseAddressConfigurationKey], UriKind.Absolute, out var files) &&
-            (files.Scheme == Uri.UriSchemeHttp || files.Scheme == Uri.UriSchemeHttps))
+        var fileAddress = configuration[NotificationAuditClientOptions.BaseAddressConfigurationKey];
+        var validFiles = Uri.TryCreate(fileAddress, UriKind.Absolute, out var files) &&
+            (files.Scheme == Uri.UriSchemeHttp || files.Scheme == Uri.UriSchemeHttps);
+        services.AddSingleton(new NotificationAuditClientOptions(validFiles ? files! : new Uri("http://unconfigured.invalid/"),
+            validFiles ? configuration["InternalApi:ApiKey"] ?? string.Empty : string.Empty));
+        services.AddHttpClient<FileAttachmentClient>(client =>
         {
-            services.AddSingleton(new NotificationAuditClientOptions(files, configuration["InternalApi:ApiKey"] ?? string.Empty));
-            services.AddHttpContextAccessor();
-            services.AddHttpClient<IFileVerifier, NotificationAuditFileVerifier>(client =>
-                {
-                    client.BaseAddress = files;
-                    client.Timeout = Timeout.InfiniteTimeSpan;
-                })
-                .AddStandardResilienceHandler(options => options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10));
-        }
-        else
+            client.BaseAddress = validFiles ? files : new Uri("http://unconfigured.invalid/");
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options=>
         {
-            services.AddSingleton<IFileVerifier, NoFileVerifier>();
-        }
+            options.TotalRequestTimeout.Timeout=TimeSpan.FromSeconds(10);
+            options.Retry.DisableForUnsafeHttpMethods();
+        });
+        services.AddScoped<AttachmentCoordinator>();
+        services.AddScoped<IFileVerifier>(provider => provider.GetRequiredService<AttachmentCoordinator>());
+        services.AddScoped<IRecordFileDownload>(provider => provider.GetRequiredService<AttachmentCoordinator>());
+        services.AddHostedService<AttachmentReconciliationWorker>();
 
         return services;
     }

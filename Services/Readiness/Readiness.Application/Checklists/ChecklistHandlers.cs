@@ -71,7 +71,7 @@ public sealed record ReplaceItemsCommand(Guid CheckId, long? Version, IReadOnlyL
 
 public sealed record ItemResultCommand(Guid CheckId, Guid ItemId, long? Version, InspectionResult Result, string? Note, IReadOnlyList<Guid> EvidenceFileIds);
 
-public sealed record LinkCorrectiveTaskCommand(Guid CheckId, Guid ItemId, long? Version, Guid? TaskId);
+public sealed record LinkCorrectiveTaskCommand(Guid CheckId, Guid ItemId, long? Version, Guid? TaskId, CorrectiveTaskDefinition? Create = null);
 
 public sealed record AttachEvidenceCommand(Guid CheckId, Guid ItemId, IReadOnlyList<Guid> FileIds);
 
@@ -169,7 +169,8 @@ public sealed class InspectionCommandHandler(
     ITaskProjectionStore tasks,
     IIntegrationEventPublisher publisher,
     ICurrentUser currentUser,
-    IFileVerifier files)
+    IFileVerifier files,
+    ICorrectiveTaskCreator correctiveTasks)
 {
     public Task<ReadinessItemDto> RecordResultAsync(ItemResultCommand command, CancellationToken cancellationToken = default) =>
         InspectAsync(command, recheck: false, cancellationToken);
@@ -177,17 +178,27 @@ public sealed class InspectionCommandHandler(
     public Task<ReadinessItemDto> RecheckAsync(ItemResultCommand command, CancellationToken cancellationToken = default) =>
         InspectAsync(command, recheck: true, cancellationToken);
 
-    /// <summary>
-    /// Links an existing CORRECTIVE task of the same work area. Creating one needs TaskExecution <c>POST /internal/tasks</c>
-    /// (not available yet — plan §5 fallback "link task có sẵn").
-    /// </summary>
+    /// <summary>Creates a corrective task through the durable caller, or links an existing task of this work area.</summary>
     public async Task<ReadinessItemDto> LinkCorrectiveTaskAsync(LinkCorrectiveTaskCommand command, CancellationToken cancellationToken = default)
     {
         var (checklist, scope) = await loader.ForLeaderAsync(command.CheckId, command.Version, cancellationToken);
-        var taskId = command.TaskId
-            ?? throw new DomainRuleException(
-                "CORRECTIVE_TASK_CREATE_UNAVAILABLE",
-                "Creating the corrective task from here needs TaskExecution POST /internal/tasks; create it in Tasks and link its id.");
+        var target = checklist.Item(command.ItemId);
+        if (command.TaskId is null)
+        {
+            var definition = command.Create ?? throw DomainRuleException.Validation("CORRECTIVE_TASK_DEFINITION_REQUIRED", "Provide a task ID or the corrective task definition.");
+            definition.Validate();
+            if (checklist.Status == ChecklistStatus.Ready || target.Status is not (ItemStatus.Failed or ItemStatus.CorrectiveAction))
+                throw new DomainRuleException("READINESS_ITEM_INVALID_STATE", "Only a failed item gets a corrective task.");
+            var created = await correctiveTasks.CreateAsync(new(checklist.ReadinessChecklistId, target.ReadinessItemId, scope.WorkAreaId,
+                currentUser.UserId, target.CheckedAt, target.CorrectiveTaskId, definition), cancellationToken);
+            var projected = await tasks.GetAsync(created.Id, cancellationToken);
+            var linkedItem = checklist.LinkCorrectiveTask(target.ReadinessItemId, created.Id,
+                created.Status == "COMPLETED" || projected?.Status == ProjectedTaskStatus.Completed);
+            await store.SaveChangesAsync(cancellationToken);
+            return ReadinessItemDto.From(linkedItem, checklist.Version);
+        }
+        if (command.Create is not null) throw DomainRuleException.Validation("CORRECTIVE_TASK_INVALID", "Provide either an existing task ID or a creation definition.");
+        var taskId = command.TaskId.Value;
         var task = await tasks.GetAsync(taskId, cancellationToken);
         if (task is null || task.WorkAreaId != scope.WorkAreaId || task.Type != ProjectedTaskType.Corrective || task.Status == ProjectedTaskStatus.Cancelled)
         {
@@ -202,7 +213,8 @@ public sealed class InspectionCommandHandler(
     private async Task<ReadinessItemDto> InspectAsync(ItemResultCommand command, bool recheck, CancellationToken cancellationToken)
     {
         var (checklist, scope) = await loader.ForLeaderAsync(command.CheckId, command.Version, cancellationToken);
-        await files.EnsureAttachableAsync(command.EvidenceFileIds, FilePurposes.ReadinessEvidence, currentUser.UserId, cancellationToken);
+        var target = checklist.Item(command.ItemId);
+        await using var reservation = await files.ReserveAsync(command.EvidenceFileIds, FilePurposes.ReadinessEvidence, currentUser.UserId, target.ReadinessItemId, cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var item = recheck
             ? checklist.Recheck(command.ItemId, command.Result, command.Note, currentUser.UserId, now)
@@ -253,8 +265,8 @@ public sealed class AttachEvidenceCommandHandler(
         }
 
         WorkAreaAccess.EnsureWritable(scope);
-        await files.EnsureAttachableAsync(command.FileIds, FilePurposes.ReadinessEvidence, currentUser.UserId, cancellationToken);
         item.AttachEvidence(command.FileIds);
+        await using var reservation = await files.ReserveAsync(command.FileIds, FilePurposes.ReadinessEvidence, currentUser.UserId, item.ReadinessItemId, cancellationToken);
         await store.SaveChangesAsync(cancellationToken);
         return ReadinessItemDto.From(item, checklist.Version);
     }

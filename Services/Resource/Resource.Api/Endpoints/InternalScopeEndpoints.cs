@@ -77,8 +77,16 @@ public static class InternalScopeEndpoints
         StartSupportTransferRequest request,
         HttpContext httpContext,
         Application.Inventory.StartSupportTransferCommandHandler handler,
+        Application.Inventory.SupportTransferOperationHandler operations,
         CancellationToken cancellationToken)
     {
+        if (request.ApprovalOperationId is { } operationId)
+        {
+            var outcome = await operations.HandleAsync(operationId,
+                new Application.Inventory.StartSupportTransferCommand(request.SupportResponseMaterialId!.Value, request.SourceWorkAreaId!.Value,
+                    request.TargetWorkAreaId!.Value, request.MaterialId!.Value, request.Quantity!.Value, request.ApprovedByUserId!.Value), cancellationToken);
+            return Results.Ok(ApiResults.Ok(outcome, httpContext));
+        }
         var (transfer, created) = await handler.HandleAsync(
             new Application.Inventory.StartSupportTransferCommand(request.SupportResponseMaterialId!.Value, request.SourceWorkAreaId!.Value,
                 request.TargetWorkAreaId!.Value, request.MaterialId!.Value, request.Quantity!.Value, request.ApprovedByUserId!.Value),

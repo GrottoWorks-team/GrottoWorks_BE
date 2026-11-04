@@ -67,6 +67,8 @@ public sealed class TaskSnapshotRequest
 /// <summary>Body of <c>POST /internal/support-transfers</c> (TaskExecution, F-TSK-15b → F-RES-20).</summary>
 public sealed class StartSupportTransferRequest
 {
+    /// <summary>Stable attempt identity: terminal rejection and success are replayable, even after an HTTP timeout.</summary>
+    public Guid? ApprovalOperationId { get; init; }
     [Required] public Guid? SupportResponseMaterialId { get; init; }
 
     [Required] public Guid? SourceWorkAreaId { get; init; }

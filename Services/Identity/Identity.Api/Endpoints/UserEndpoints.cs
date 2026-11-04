@@ -75,6 +75,12 @@ public static class UserEndpoints
             .AllowAnonymous()
             .AddEndpointFilter<InternalApiKeyFilter>()
             .ExcludeFromDescription();
+
+        app.MapGet("/internal/volunteers", GetInternalVolunteersAsync)
+            .WithName("internalGetVolunteers")
+            .AllowAnonymous()
+            .AddEndpointFilter<InternalApiKeyFilter>()
+            .ExcludeFromDescription();
     }
 
     private static async Task<IResult> ReplaceMySkillsAsync(
@@ -84,10 +90,23 @@ public static class UserEndpoints
         CancellationToken cancellationToken)
     {
         var profile = await handler.HandleAsync(
-            new ReplaceMySkillsCommand(request.SkillIds!),
+            new ReplaceMySkillsCommand(
+                request.SkillIds ?? request.Skills!.Select(skill => skill.SkillId).ToList(),
+                request.Skills?.Select(skill => new VolunteerSkillInput(skill.SkillId, skill.SkillLevel)).ToList()),
             cancellationToken);
 
         return Results.Ok(ApiResults.Ok(profile, httpContext));
+    }
+
+    private static async Task<IResult> GetInternalVolunteersAsync(
+        Guid parishId, Guid? communityId, Guid? skillId, int? page, int? size,
+        GetInternalVolunteersQueryHandler handler, HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var pageNumber = page ?? 1;
+        var pageSize = size ?? 100;
+        var result = await handler.HandleAsync(parishId, communityId, skillId, pageNumber, pageSize, cancellationToken);
+        return Results.Ok(ApiResults.Page(result.Items, result.TotalItems, pageNumber, pageSize, httpContext));
     }
 
     private static async Task<IResult> ReplaceMyAvailabilityAsync(

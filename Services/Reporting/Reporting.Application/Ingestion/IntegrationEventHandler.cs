@@ -68,7 +68,7 @@ public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecor
         var hours = incoming.EventType == TaskHoursApproved.EventType ? await HoursAsync(incoming, readModels, cancellationToken) : null;
         var drafts = incoming.EventType switch
         {
-            TaskCompletionReviewed.EventType => FromTaskReview(Read<TaskCompletionReviewed>(incoming)),
+            TaskCompletionReviewed.EventType => await FromTaskReviewAsync(incoming, cancellationToken),
             TaskHoursApproved.EventType => FromAttendance(hours!),
             PurchaseDeliveryConfirmed.EventType => FromPurchase(Read<PurchaseDeliveryConfirmed>(incoming)),
             ContributionReceiptConfirmed.EventType => FromReceipt(Read<ContributionReceiptConfirmed>(incoming)),
@@ -140,18 +140,62 @@ public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecor
         }
     }
 
-    private static List<ContributionDraft> FromTaskReview(TaskCompletionReviewed review)
+    private async Task<List<ContributionDraft>> FromTaskReviewAsync(IncomingEvent incoming, CancellationToken cancellationToken)
     {
-        // PURCHASE tasks are counted from purchase.delivery.confirmed; only an approval counts (BR-54).
-        if (!string.Equals(review.Decision, TaskCompletionReviewed.Approved, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(review.TaskType, "PURCHASE", StringComparison.OrdinalIgnoreCase))
+        var review = Read<TaskCompletionReviewed>(incoming);
+        if (review.TaskId == Guid.Empty || review.WorkAreaId == Guid.Empty || string.IsNullOrWhiteSpace(review.Decision))
+        {
+            throw DomainRuleException.Validation("EVENT_PAYLOAD_INVALID", "task.completion.reviewed needs taskId, workAreaId and decision.");
+        }
+
+        // Preserve the review decision vocabulary: only APPROVED earns credit (BR-54).
+        if (!string.Equals(review.Decision, TaskCompletionReviewed.Approved, StringComparison.OrdinalIgnoreCase))
         {
             return [];
         }
 
-        return review.VolunteerUserIds.Distinct()
-            .Select(userId => ContributionDraft.ForUser(ContributionType.TaskCompletion, userId, review.SeasonId, review.ParishId, review.WorkAreaId,
-                "TASK", review.TaskId, $"Hoàn thành task {review.TaskName}".Trim(), review.ReviewedAt))
+        var taskType = review.TaskType;
+        var taskName = review.TaskName;
+        var volunteers = review.VolunteerUserIds;
+        if (string.IsNullOrWhiteSpace(taskType) || string.IsNullOrWhiteSpace(taskName) || volunteers is null)
+        {
+            // Legacy recipients include the leader; only Reporting's accepted task assignees are participants.
+            var task = await readModels.GetTaskAsync(review.TaskId, cancellationToken)
+                ?? throw new DomainRuleException("EVENT_CONTEXT_UNAVAILABLE",
+                    $"task.completion.reviewed needs Reporting task projection {review.TaskId}; retry after replication.",
+                    DomainErrorKind.ServiceUnavailable);
+            if (task.WorkAreaId != review.WorkAreaId)
+            {
+                throw DomainRuleException.Validation("EVENT_PAYLOAD_INVALID", "Review workAreaId does not match the task projection.");
+            }
+
+            taskType = string.IsNullOrWhiteSpace(taskType) ? task.Type.ToString().ToUpperInvariant() : taskType;
+            taskName = string.IsNullOrWhiteSpace(taskName) ? task.Name : taskName;
+            volunteers ??= task.AssigneeUserIds;
+        }
+
+        var parishId = review.ParishId != Guid.Empty ? review.ParishId : incoming.ParishId.GetValueOrDefault();
+        var seasonId = review.SeasonId != Guid.Empty ? review.SeasonId : incoming.SeasonId.GetValueOrDefault();
+        var reviewedAt = review.ReviewedAt != default ? review.ReviewedAt : incoming.OccurredAt.GetValueOrDefault();
+        if (parishId == Guid.Empty || seasonId == Guid.Empty || reviewedAt == default ||
+            string.IsNullOrWhiteSpace(taskName) || volunteers.Any(id => id == Guid.Empty) ||
+            !(string.Equals(taskType, "WORK", StringComparison.OrdinalIgnoreCase) ||
+              string.Equals(taskType, "CORRECTIVE", StringComparison.OrdinalIgnoreCase) ||
+              string.Equals(taskType, "PURCHASE", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw DomainRuleException.Validation("EVENT_PAYLOAD_INVALID",
+                "Approved task review needs parishId, seasonId, reviewedAt, task name, a known task type and valid volunteer ids.");
+        }
+
+        // PURCHASE tasks are counted exclusively from purchase.delivery.confirmed.
+        if (string.Equals(taskType, "PURCHASE", StringComparison.OrdinalIgnoreCase))
+        {
+            return [];
+        }
+
+        return volunteers.Distinct()
+            .Select(userId => ContributionDraft.ForUser(ContributionType.TaskCompletion, userId, seasonId, parishId, review.WorkAreaId,
+                "TASK", review.TaskId, $"Hoàn thành task {taskName}".Trim(), reviewedAt))
             .ToList();
     }
 

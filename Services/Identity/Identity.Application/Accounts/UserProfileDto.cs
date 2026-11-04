@@ -3,6 +3,8 @@ using Identity.Domain.Enums;
 
 namespace Identity.Application.Accounts;
 
+public sealed record DeclaredSkillDto(Guid SkillId, string? SkillLevel);
+
 public sealed record AvailabilitySlotDto(
     DateTimeOffset AvailableFrom,
     DateTimeOffset AvailableTo,
@@ -29,7 +31,8 @@ public sealed record UserProfileDto(
     Guid? CommunityId,
     string? Introduction,
     IReadOnlyList<Guid> SkillIds,
-    IReadOnlyList<AvailabilitySlotDto> Availability)
+    IReadOnlyList<AvailabilitySlotDto> Availability,
+    IReadOnlyList<DeclaredSkillDto>? Skills = null)
 {
     public static UserProfileDto From(AppUser user)
     {
@@ -52,6 +55,8 @@ public sealed record UserProfileDto(
             user.VolunteerAvailabilities
                 .OrderBy(slot => slot.AvailableFrom)
                 .Select(AvailabilitySlotDto.From)
-                .ToList());
+                .ToList(),
+            user.VolunteerSkills.OrderBy(skill => skill.SkillId)
+                .Select(skill => new DeclaredSkillDto(skill.SkillId, skill.SkillLevel)).ToList());
     }
 }

@@ -278,13 +278,7 @@ public sealed partial class WorkTask
                     "A skill can only appear once in a task requirement.");
             }
 
-            var level = NormalizeOptional(requirement.RequiredSkillLevel);
-            if (level?.Length > 30)
-            {
-                throw DomainRuleException.Validation(
-                    "TASK_SKILL_LEVEL_INVALID",
-                    "Required skill level must not exceed 30 characters.");
-            }
+            var level = SkillLevels.Normalize(requirement.RequiredSkillLevel, "TASK_SKILL_LEVEL_INVALID");
 
             if (requirement.RequiredVolunteerCount is <= 0)
             {

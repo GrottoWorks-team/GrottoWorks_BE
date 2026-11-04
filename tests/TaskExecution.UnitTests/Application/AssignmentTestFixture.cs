@@ -22,6 +22,7 @@ internal sealed class AssignmentTestFixture
     public TestAssignments Store { get; } = new();
     public TestUsers Identity { get; } = new();
     public TestEvents Events { get; } = new();
+    public TestSupportLifecycle Support {get;}=new();
     public AssignmentService Service { get; }
 
     public AssignmentTestFixture()
@@ -35,7 +36,7 @@ internal sealed class AssignmentTestFixture
         Identity.Items[User.UserId] = new(User.UserId,"Leader","ACTIVE","LEADER",User.ParishId,null,[]);
         Identity.Items[VolunteerId] = new(VolunteerId,"Volunteer","ACTIVE","VOLUNTEER",User.ParishId,null,[]);
         Service = new AssignmentService(Store,new TestTasks(Task),new TaskScopeAccess(new TestScopes(Season,Area),User),
-            new ActiveUserAccess(Identity,User),User,new TaskEventRecorder(Events,User,new TestCorrelation()));
+            new ActiveUserAccess(Identity,User),User,new TaskEventRecorder(Events,User,new TestCorrelation()),Support);
     }
 
     public AssignVolunteerCommand Command() => new(Task.Id,VolunteerId,null,false,false,null);
@@ -62,16 +63,22 @@ internal sealed class AssignmentTestFixture
         public List<TaskAssignment> Items { get; } = [];
         public bool ScheduleConflict { get; set; }
         public int Saves { get; private set; }
+        public int FreshReads {get;private set;}
+        public bool FreshReadInsideTransaction {get;private set;}
+        private bool inTransaction;
         public async Task<T> InTaskTransactionAsync<T>(Guid id,Func<Task<T>> action,CancellationToken ct)
         {
             await _gate.WaitAsync(ct);
+            inTransaction=true;
             try { return await action(); }
-            finally { _gate.Release(); }
+            finally { inTransaction=false;_gate.Release(); }
         }
         public Task<IReadOnlyList<TaskAssignment>> ListAsync(Guid id,CancellationToken ct) =>
             System.Threading.Tasks.Task.FromResult<IReadOnlyList<TaskAssignment>>(Items.Where(row=>row.TaskId==id).ToList());
         public Task<TaskAssignment?> GetAsync(Guid id,CancellationToken ct) =>
             System.Threading.Tasks.Task.FromResult(Items.SingleOrDefault(row=>row.Id==id));
+        public Task<TaskAssignment?> GetForUpdateAsync(Guid id,CancellationToken ct)
+        {FreshReads++;FreshReadInsideTransaction=inTransaction;return GetAsync(id,ct);}
         public Task<(IReadOnlyList<TaskAssignment> Items,long Total)> ApplicationsPageAsync(Guid id,int page,int size,bool descending,CancellationToken ct)
         {
             var rows = Items.Where(row => row.TaskId == id && row.Type == AssignmentType.Application).OrderBy(row=>row.RequestedAt).ThenBy(row=>row.Id).ToList();
@@ -83,27 +90,39 @@ internal sealed class AssignmentTestFixture
         public void Add(TaskAssignment row) => Items.Add(row);
         public Task SaveAsync(CancellationToken ct) { Saves++; return System.Threading.Tasks.Task.CompletedTask; }
     }
-    internal sealed class TestUsers : IIdentityUserLookup
+    internal sealed class TestUsers : IIdentityUserLookup, IIdentityUserBatchLookup
     {
         public Dictionary<Guid,IdentityUser> Items { get; } = [];
         public Task<IdentityUser?> FindAsync(Guid id,CancellationToken ct=default) =>
             System.Threading.Tasks.Task.FromResult(Items.GetValueOrDefault(id));
+        public Task<IReadOnlyDictionary<Guid,IdentityUser>> FindManyAsync(IReadOnlyCollection<Guid> ids,CancellationToken ct=default)=>
+            System.Threading.Tasks.Task.FromResult<IReadOnlyDictionary<Guid,IdentityUser>>(Items.Where(item=>ids.Contains(item.Key)).ToDictionary());
     }
     internal sealed class TestEvents : ITaskEventOutbox
     {
         public List<TaskIntegrationEvent> Items { get; } = [];
         public void Add(TaskIntegrationEvent message) => Items.Add(message);
     }
-    private sealed class TestCorrelation : ITaskCorrelationContext { public string CorrelationId => "assignment-test"; }
-    private sealed class TestScopes(SeasonScope season,WorkAreaScope area) : IScopeProjectionStore
+    internal sealed class TestSupportLifecycle : TaskExecution.Application.Support.ISupportAssignmentLifecycle
     {
-        public Task<SeasonScope?> GetSeasonAsync(Guid id,CancellationToken ct=default) => System.Threading.Tasks.Task.FromResult<SeasonScope?>(season);
-        public Task<WorkAreaScope?> GetWorkAreaAsync(Guid id,CancellationToken ct=default) => System.Threading.Tasks.Task.FromResult<WorkAreaScope?>(area);
+        public List<TaskExecution.Domain.Support.SupportRequest> Rows {get;}=[];
+        public Task CompleteAssignmentsAsync(IReadOnlyCollection<Guid> ids,DateTimeOffset now,CancellationToken ct)
+        { foreach(var request in Rows) request.CompleteAssignments(ids,now);return System.Threading.Tasks.Task.CompletedTask; }
+        public Task CancelAssignmentsAsync(IReadOnlyCollection<Guid> ids,DateTimeOffset now,CancellationToken ct)
+        { foreach(var request in Rows) request.CancelAssignments(ids,now);return System.Threading.Tasks.Task.CompletedTask; }
+        public Task RespondAsync(Guid id,bool accept,string? reason,DateTimeOffset now,CancellationToken ct)
+        {Rows.Single(row=>row.Responses.Any(response=>response.Members.Any(member=>member.AssignmentId==id))).RespondToNomination(id,accept,reason,now);return System.Threading.Tasks.Task.CompletedTask;}
+    }
+    internal sealed class TestCorrelation : ITaskCorrelationContext { public string CorrelationId => "assignment-test"; }
+    internal sealed class TestScopes(SeasonScope season,WorkAreaScope area) : IScopeProjectionStore
+    {
+        public Task<SeasonScope?> GetSeasonAsync(Guid id,CancellationToken ct=default) => System.Threading.Tasks.Task.FromResult<SeasonScope?>(id == season.SeasonId ? season : null);
+        public Task<WorkAreaScope?> GetWorkAreaAsync(Guid id,CancellationToken ct=default) => System.Threading.Tasks.Task.FromResult<WorkAreaScope?>(id == area.WorkAreaId ? area : null);
         public void Add(SeasonScope row) => throw new NotSupportedException();
         public void Add(WorkAreaScope row) => throw new NotSupportedException();
         public Task SaveChangesAsync(CancellationToken ct=default) => throw new NotSupportedException();
     }
-    private sealed class TestTasks(WorkTask task) : ITaskRepository
+    internal sealed class TestTasks(WorkTask task) : ITaskRepository
     {
         public Task<WorkTask?> GetByIdAsync(Guid id,CancellationToken ct=default) => System.Threading.Tasks.Task.FromResult(id==task.Id?task:null);
         public Task<WorkTask?> GetByIdForUpdateAsync(Guid id,CancellationToken ct=default) => GetByIdAsync(id,ct);

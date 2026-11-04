@@ -22,6 +22,10 @@ internal sealed class FileObjectConfiguration : IEntityTypeConfiguration<FileObj
         builder.Property(file => file.Status).HasColumnName("status").HasMaxLength(30).HasConversion<string>();
         builder.Property(file => file.ReferenceType).HasColumnName("reference_type").HasMaxLength(50);
         builder.Property(file => file.ReferenceId).HasColumnName("reference_id");
+        builder.Property(file => file.AttachmentReservationId).HasColumnName("attachment_reservation_id");
+        builder.Property(file => file.AttachmentService).HasColumnName("attachment_service").HasMaxLength(50);
+        builder.Property(file => file.ReservedReferenceType).HasColumnName("reserved_reference_type").HasMaxLength(50);
+        builder.Property(file => file.ReservedReferenceId).HasColumnName("reserved_reference_id");
         builder.Property(file => file.CreatedAt).HasColumnName("created_at");
         builder.Property(file => file.CompletedAt).HasColumnName("completed_at");
         builder.HasIndex(file => new { file.UploadedByUserId, file.Status })

@@ -4,14 +4,14 @@ using TaskExecution.Contracts.Events;
 
 namespace NotificationAudit.Infrastructure.Events;
 
-public sealed class TaskIntegrationEventConsumer(TaskEventIngestionHandler handler)
+public sealed class TaskIntegrationEventConsumer(IntegrationEventIngestionHandler handler)
     : IConsumer<TaskIntegrationEvent>
 {
     public Task Consume(ConsumeContext<TaskIntegrationEvent> context)
     {
         var message = context.Message;
         return handler.HandleAsync(
-            new IncomingTaskEvent(
+            new IncomingIntegrationEvent(
                 message.EventId,
                 message.EventType,
                 message.OccurredAt,
@@ -21,7 +21,9 @@ public sealed class TaskIntegrationEventConsumer(TaskEventIngestionHandler handl
                 message.SeasonId,
                 message.AggregateType,
                 message.AggregateId,
-                message.Payload),
+                message.Payload,
+                message.Version,
+                message.AggregateVersion),
             context.CancellationToken);
     }
 }
@@ -40,9 +42,10 @@ public sealed class TaskIntegrationEventConsumerDefinition
         IConsumerConfigurator<TaskIntegrationEventConsumer> consumerConfigurator,
         IRegistrationContext context)
     {
-        endpointConfigurator.UseMessageRetry(retry => retry.Intervals(
-            TimeSpan.FromSeconds(1),
-            TimeSpan.FromSeconds(5),
-            TimeSpan.FromSeconds(15)));
+        endpointConfigurator.UseMessageRetry(retry =>
+        {
+            retry.Ignore<InvalidNotificationEventException>();
+            retry.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15));
+        });
     }
 }

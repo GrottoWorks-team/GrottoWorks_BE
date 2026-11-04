@@ -3,10 +3,12 @@ using Identity.Application.Accounts;
 using Identity.Application.Skills;
 using Identity.Domain;
 using Identity.Domain.Enums;
+using Identity.Domain.Entities;
 
 namespace Identity.Application.Users.ReplaceMySkills;
 
-public sealed record ReplaceMySkillsCommand(IReadOnlyList<Guid> SkillIds);
+public sealed record ReplaceMySkillsCommand(IReadOnlyList<Guid> SkillIds,
+    IReadOnlyList<VolunteerSkillInput>? Skills = null);
 
 /// <summary>
 /// F-IDN-07 <c>replaceMySkills</c> (VOLUNTEER): the caller's declared skills become exactly the given set.
@@ -43,7 +45,16 @@ public sealed class ReplaceMySkillsCommandHandler(
         }
 
         // Duplicates in the request are reported by the domain rather than silently merged.
-        user.ReplaceSkills(command.SkillIds, DateTimeOffset.UtcNow);
+        if (command.Skills is not null)
+        {
+            if (!command.Skills.Select(skill => skill.SkillId).SequenceEqual(command.SkillIds))
+                throw new DomainException("VOLUNTEER_SKILL_INVALID", "Skill identities must match the requested skill list.");
+            user.ReplaceSkillLevels(command.Skills, DateTimeOffset.UtcNow);
+        }
+        else
+        {
+            user.ReplaceSkills(command.SkillIds, DateTimeOffset.UtcNow);
+        }
 
         await userAccountStore.SaveChangesAsync(cancellationToken);
 

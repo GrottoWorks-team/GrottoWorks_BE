@@ -32,6 +32,8 @@ public sealed class ExceptionHandlingMiddleware(
             ["INVALID_IF_MATCH"] = (400, "Invalid If-Match header"),
             ["INTERNAL_USERS_IDS_REQUIRED"] = (400, "User ids required"),
             ["INTERNAL_USERS_TOO_MANY_IDS"] = (400, "Too many user ids"),
+            ["INTERNAL_VOLUNTEER_FILTER_INVALID"] = (400, "Invalid volunteer filter"),
+            ["INTERNAL_VOLUNTEER_PAGE_INVALID"] = (400, "Invalid volunteer pagination"),
             // 403 — outside data scope
             ["USER_PARISH_SCOPE_REQUIRED"] = (403, "Parish scope required"),
             // 404 — not found
@@ -67,6 +69,7 @@ public sealed class ExceptionHandlingMiddleware(
             ["AVAILABILITY_INVALID_RANGE"] = (422, "Invalid availability range"),
             ["AVAILABILITY_USER_REQUIRED"] = (422, "Invalid availability slot"),
             ["VOLUNTEER_SKILL_INVALID"] = (422, "Invalid volunteer skill"),
+            ["VOLUNTEER_SKILL_LEVEL_INVALID"] = (422, "Invalid volunteer skill level"),
             ["REFRESH_TOKEN_USER_REQUIRED"] = (422, "Invalid refresh token"),
             ["REFRESH_TOKEN_HASH_REQUIRED"] = (422, "Invalid refresh token"),
             ["REFRESH_TOKEN_INVALID_TTL"] = (422, "Invalid refresh token lifetime"),

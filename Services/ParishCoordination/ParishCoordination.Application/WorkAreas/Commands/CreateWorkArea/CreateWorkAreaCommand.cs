@@ -7,4 +7,6 @@ public sealed record CreateWorkAreaCommand(
     Guid? CategoryId,
     Guid? CommunityId,
     DateOnly? StartDate,
-    DateOnly? Deadline);
+    DateOnly? Deadline,
+    decimal? Latitude = null,
+    decimal? Longitude = null);

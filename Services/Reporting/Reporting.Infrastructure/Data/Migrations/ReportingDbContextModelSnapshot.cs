@@ -1092,6 +1092,7 @@ namespace Reporting.Infrastructure.Data.Migrations
                         .IsRequired();
                 });
 #pragma warning restore 612, 618
+            modelBuilder.ApplyConfiguration(new Reporting.Infrastructure.Messaging.ScopeReplicationReceiptConfiguration());
         }
     }
 }

@@ -5,6 +5,7 @@ using BuildingBlocks.Web;
 using Microsoft.EntityFrameworkCore;
 using NotificationAudit.Api.Common;
 using NotificationAudit.Api.Endpoints;
+using NotificationAudit.Api.SystemExport;
 using NotificationAudit.Application;
 using NotificationAudit.Infrastructure;
 using NotificationAudit.Infrastructure.Data;
@@ -17,6 +18,7 @@ builder.Services.AddGrottoWorksCurrentUser();
 builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationMiddlewareResultHandler,
     ProblemDetailsAuthorizationMiddlewareResultHandler>();
 builder.Services.AddGrottoWorksWeb();
+builder.Services.AddGrottoWorksObservability(builder.Configuration, "NotificationAudit");
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails += context =>
 {
     if (context.ProblemDetails is HttpValidationProblemDetails)
@@ -29,6 +31,8 @@ builder.Services.AddScoped<IReadinessProbe, DatabaseReadinessProbe>();
 builder.Services.AddScoped<InternalApiKeyFilter>();
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(
     new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseUpper, allowIntegerValues: false)));
+
+builder.Services.AddScoped<BuildingBlocks.Web.IIntegrationQueueProbe, NotificationAudit.Api.Diagnostics.ServiceQueueProbe>();
 
 var app = builder.Build();
 if (app.Environment.IsDevelopment())
@@ -46,6 +50,9 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapNotificationAuditEndpoints();
+app.MapSystemJobEndpoints();
+app.MapSystemExportEndpoints();
+app.MapInternalFileAttachmentEndpoints();
 app.MapGrottoWorksHealthEndpoints();
 
 if (app.Configuration.GetValue("Database:MigrateOnStartup", true))

@@ -16,11 +16,14 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        services.AddSingleton(TimeProvider.System);
+        services.AddScoped<SupportReconciliationQueries>();
         // F-RES-02 material catalog
         services.AddScoped<ListMaterialCategoriesQueryHandler>();
         services.AddScoped<CreateMaterialCategoryCommandHandler>();
         services.AddScoped<UpdateMaterialCategoryCommandHandler>();
         services.AddScoped<ListMaterialsQueryHandler>();
+        services.AddScoped<GetInternalMaterialsHandler>();
         services.AddScoped<CreateMaterialCommandHandler>();
         services.AddScoped<UpdateMaterialCommandHandler>();
 
@@ -28,6 +31,9 @@ public static class DependencyInjection
         services.AddScoped<ApplyWorkAreaSnapshotHandler>();
         services.AddScoped<ApplySeasonStatusHandler>();
         services.AddScoped<ApplyTaskSnapshotHandler>();
+        services.AddScoped<ScopeReplicationHandler>();
+        services.AddScoped<TaskMaterialPlanProjector>();
+        services.AddScoped<TaskMaterialEventIngestion>();
         services.AddScoped<ApplyTaskEventHandler>();
         services.AddScoped<WorkAreaAccess>();
 
@@ -59,6 +65,8 @@ public static class DependencyInjection
 
         // F-RES-20 support transfers
         services.AddScoped<StartSupportTransferCommandHandler>();
+        services.AddScoped<ISupportTransferStarter>(provider => provider.GetRequiredService<StartSupportTransferCommandHandler>());
+        services.AddScoped<SupportTransferOperationHandler>();
         services.AddScoped<ConfirmTransferReceiptCommandHandler>();
 
         // F-RES-05 shortages
@@ -122,6 +130,8 @@ public static class DependencyInjection
         // F-RES-13c receipts of pledges
         services.AddScoped<RecordDonationReceiptCommandHandler>();
 
+        services.AddScoped<Resource.Application.Files.PurchaseReceiptDownload>();
+        services.AddScoped<InternalPurchaseQueries>();
         return services;
     }
 }

@@ -61,6 +61,17 @@ public class ExceptionHandlingMiddlewareTests
         body.GetProperty("detail").GetString().Should().Contain("already registered");
     }
 
+    [Theory]
+    [InlineData("INTERNAL_VOLUNTEER_FILTER_INVALID", 400)]
+    [InlineData("INTERNAL_VOLUNTEER_PAGE_INVALID", 400)]
+    [InlineData("VOLUNTEER_SKILL_LEVEL_INVALID", 422)]
+    public async Task Volunteer_directory_and_level_errors_keep_the_http_contract(string code, int status)
+    {
+        var body = await InvokeAndReadBodyAsync(_ => throw new DomainException(code, "Invalid input."));
+        body.GetProperty("status").GetInt32().Should().Be(status);
+        body.GetProperty("code").GetString().Should().Be(code);
+    }
+
     [Fact]
     public async Task UnmappedDomainException_FallsBackTo409()
     {

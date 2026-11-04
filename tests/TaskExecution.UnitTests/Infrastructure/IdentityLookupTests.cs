@@ -13,7 +13,7 @@ public sealed class IdentityLookupTests
     public async Task Lookup_forwards_internal_key_correlation_and_reads_only_requested_user()
     {
         var user = Guid.NewGuid();
-        var handler = new StubHandler($$"""{"data":[{"userId":"{{user}}","displayName":"Volunteer","status":"ACTIVE","role":"VOLUNTEER","parishId":null,"communityId":null,"skillIds":[]}]}""");
+        var handler = new StubHandler($$"""{"data":[{"userId":"{{user}}","displayName":"Volunteer","status":"ACTIVE","role":"VOLUNTEER","parishId":null,"communityId":null,"skillIds":[],"skills":[]}]}""");
         var lookup = Create(handler);
         var result = await lookup.FindAsync(user);
         result!.UserId.Should().Be(user);
@@ -29,6 +29,21 @@ public sealed class IdentityLookupTests
     {
         var act = () => Create(new StubHandler(body)).FindAsync(Guid.NewGuid());
         (await act.Should().ThrowAsync<DomainRuleException>()).Which.Kind.Should().Be(DomainErrorKind.ServiceUnavailable);
+    }
+
+    [Fact]
+    public async Task Lookup_reads_declared_levels_and_rejects_inconsistent_skill_catalogs()
+    {
+        var user = Guid.NewGuid();
+        var skill = Guid.NewGuid();
+        var body = $$"""{"data":[{"userId":"{{user}}","displayName":"Volunteer","status":"ACTIVE","role":"VOLUNTEER","skillIds":["{{skill}}"],"skills":[{"skillId":"{{skill}}","skillLevel":"EXPERT"}]}]}""";
+        var found = await Create(new StubHandler(body)).FindAsync(user);
+        found!.Skills!.Single().SkillLevel.Should().Be("EXPERT");
+
+        Func<Task> invalid = () => Create(new StubHandler(body.Replace("EXPERT", "UNKNOWN"))).FindAsync(user);
+        (await invalid.Should().ThrowAsync<DomainRuleException>()).Which.Kind.Should().Be(DomainErrorKind.ServiceUnavailable);
+        Func<Task> missing = () => Create(new StubHandler(body.Replace($"\"skillIds\":[\"{skill}\"]", "\"skillIds\":[]"))).FindAsync(user);
+        (await missing.Should().ThrowAsync<DomainRuleException>()).Which.Kind.Should().Be(DomainErrorKind.ServiceUnavailable);
     }
 
     private static IdentityUserLookup Create(StubHandler handler) => new(

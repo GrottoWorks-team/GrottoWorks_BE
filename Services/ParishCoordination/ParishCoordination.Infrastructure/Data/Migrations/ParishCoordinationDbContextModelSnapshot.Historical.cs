@@ -32,8 +32,64 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
             new ParishCoordination.Infrastructure.Events.PlanningEventOutboxConfiguration()
                 .Configure(modelBuilder.Entity<ParishCoordination.Infrastructure.Events.PlanningEventOutboxMessage>());
 
-            new ParishCoordination.Infrastructure.TaskScopeSync.TaskScopeOutboxConfiguration()
-                .Configure(modelBuilder.Entity<ParishCoordination.Infrastructure.TaskScopeSync.TaskScopeOutbox>());
+            modelBuilder.Entity("ParishCoordination.Infrastructure.TaskScopeSync.TaskScopeOutbox", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AggregateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("aggregate_id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("delivered_at");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<string>("ScopeType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("scope_type");
+
+                    b.Property<long>("SourceVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NextAttemptAt")
+                        .HasDatabaseName("ix_task_scope_outbox_pending")
+                        .HasFilter("delivered_at IS NULL");
+
+                    b.HasIndex("ScopeType", "AggregateId", "SourceVersion")
+                        .IsUnique()
+                        .HasDatabaseName("ux_task_scope_outbox_version");
+
+                    b.ToTable("task_scope_outbox", (string)null);
+                });
 
             modelBuilder.Entity("ParishCoordination.Domain.Entities.Community", b =>
                 {

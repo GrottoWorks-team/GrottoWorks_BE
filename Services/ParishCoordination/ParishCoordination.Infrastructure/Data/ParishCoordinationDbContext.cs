@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using ParishCoordination.Domain.Entities;
-using ParishCoordination.Infrastructure.TaskScopeSync;
 using ParishCoordination.Infrastructure.Events;
 using ParishCoordination.Contracts.Events;
 using Microsoft.AspNetCore.Http;
@@ -22,7 +21,6 @@ public sealed class ParishCoordinationDbContext(DbContextOptions<ParishCoordinat
 
     public DbSet<WorkAreaCategory> WorkAreaCategories => Set<WorkAreaCategory>();
 
-    public DbSet<TaskScopeOutbox> TaskScopeOutbox => Set<TaskScopeOutbox>();
     public DbSet<PlanningEventOutboxMessage> PlanningEventOutbox => Set<PlanningEventOutboxMessage>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess) =>
@@ -61,7 +59,6 @@ public sealed class ParishCoordinationDbContext(DbContextOptions<ParishCoordinat
 
         foreach (var season in seasons)
         {
-            await EnqueueAsync(TaskScopeSync.TaskScopeOutbox.ForSeason(season), cancellationToken);
             var snapshot = PlanningSnapshotMapper.Scope(season);
             await StageAsync(PlanningEventOutboxMessage.Create(snapshot), cancellationToken);
             var entry = Entry(season);
@@ -88,7 +85,6 @@ public sealed class ParishCoordinationDbContext(DbContextOptions<ParishCoordinat
         {
             var season = Seasons.Local.SingleOrDefault(item => item.Id == area.SeasonId)
                 ?? await Seasons.AsNoTracking().SingleAsync(item => item.Id == area.SeasonId, cancellationToken);
-            await EnqueueAsync(TaskScopeSync.TaskScopeOutbox.ForWorkArea(area, season), cancellationToken);
             var snapshot = PlanningSnapshotMapper.Scope(season, area);
             await StageAsync(PlanningEventOutboxMessage.Create(snapshot), cancellationToken);
             var entry = Entry(area);
@@ -163,17 +159,6 @@ public sealed class ParishCoordinationDbContext(DbContextOptions<ParishCoordinat
         if (await PlanningEventOutbox.AnyAsync(row => row.AggregateId == message.AggregateId &&
             row.SourceVersion == message.SourceVersion && row.EventType == message.EventType, cancellationToken)) return;
         PlanningEventOutbox.Add(message);
-    }
-
-    private async Task EnqueueAsync(TaskScopeOutbox message, CancellationToken cancellationToken)
-    {
-        var tracked = TaskScopeOutbox.Local.Any(row => row.ScopeType == message.ScopeType &&
-            row.AggregateId == message.AggregateId && row.SourceVersion == message.SourceVersion);
-        if (!tracked && !await TaskScopeOutbox.AnyAsync(row => row.ScopeType == message.ScopeType &&
-                row.AggregateId == message.AggregateId && row.SourceVersion == message.SourceVersion, cancellationToken))
-        {
-            TaskScopeOutbox.Add(message);
-        }
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

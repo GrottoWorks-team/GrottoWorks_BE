@@ -42,7 +42,7 @@ When enabled, configure `MessageBroker:Host`, `MessageBroker:UserName`, and `Mes
 
 A PostgreSQL transaction advisory lock coordinates dispatchers. A pending earlier event blocks only later events for the same task. Failed deliveries retry after 2, 5, 15, 60 and then 300 seconds. Published rows are retained for seven days; pending rows are never removed by cleanup. Logs contain event IDs and error types rather than payloads or credentials.
 
-The existing HTTP scope synchronization continues until the separately planned broker cutover.
+Planning scopes arrive permanently through the RabbitMQ planning-scope consumer (`PlanningEvents:ConsumeEnabled`). The legacy `PUT /internal/season-scopes/{seasonId}` and `PUT /internal/work-area-scopes/{workAreaId}` routes and request DTOs are removed. Scope application handlers, inbox/version checks, and transaction advisory locks remain; `GET /internal/work-area-task-counts` remains available for lifecycle verification.
 
 ## Required skill levels
 
@@ -68,7 +68,7 @@ Task rows and `task.materials.changed` are saved in the same transaction. No-op 
 
 Every saved Task change also stages a `TaskScopeSnapshot` in the same unit of work. This technical message includes parent Season/Work Area scopes and effective assignees (accepted, in progress, completed), allowing receivers to bootstrap a missing Task projection. Pending applications and unconfirmed direct assignments are excluded. Snapshot IDs are stable per Task/version; business event envelopes and IDs remain independent.
 
-The dispatcher publishes snapshots using their own strongly typed message contract. When `Outbox:DispatchEnabled=true`, a reconciliation worker scans existing Tasks at startup and every 30 minutes (`Outbox:ReconcileIntervalMinutes`, 1–1440). Keyset batches of 100 use repeatable-read transactions, so Task/assignment/material/parent state is coherent. Missing parent scopes are reported and retried on later scans. Broker cutover remains disabled by default.
+The dispatcher publishes snapshots using their own strongly typed message contract. When `Outbox:DispatchEnabled=true`, a reconciliation worker scans existing Tasks at startup and every 30 minutes (`Outbox:ReconcileIntervalMinutes`, 1–1440). Keyset batches of 100 use repeatable-read transactions, so Task/assignment/material/parent state is coherent. Missing parent scopes are reported and retried on later scans. Configure the broker explicitly for this permanent delivery path.
 
 Existing pending rows keep their retry backoff. Published technical snapshots are requeued without changing their event ID or stored envelope; business events are never replayed by reconciliation. Receivers must keep inbox/version checks. The worker shares the dispatch advisory lock and retries failed scans without affecting business HTTP requests.
 
@@ -78,7 +78,7 @@ Snapshots now include a complete `materials` array, including an empty array aft
 ## Progress, review, special tasks, and durable evidence
 
 Task progress is append-only: `GET/POST /api/v1/tasks/{taskId}/progress`. POST takes
-`percentComplete` (integer 0�100), `note`, `evidence: [{fileId, caption}]`, and optional
+`percentComplete` (integer 0–100), `note`, `evidence: [{fileId, caption}]`, and optional
 `version`/`If-Match`. Up to ten distinct completed PROGRESS_EVIDENCE files owned by
 the submitting volunteer may be attached. Only an active volunteer with an accepted
 or in-progress assignment may submit. Progress at 100 does not automatically complete a Task.
@@ -127,18 +127,15 @@ It creates OPEN CORRECTIVE Tasks with normal schedule validation. Both readiness
 item and idempotency key are locked; identical retries return the saved response,
 while changed input conflicts. Readiness callers must use this exact contract.
 
-Migrations (authored only, not executed):
+Progress and special-task migrations:
 - `20261103220000_AddTaskProgressReview`
 - `20261103220001_AddTaskFileAttachmentIntents`
 - `20261103220002_AddSpecialTaskSynchronization`
 
-Targeted Domain, Contracts, Application, Infrastructure, API and unit-test project
-compilation succeeded with project references disabled. No unit tests or runtime
-integration checks were executed. Gateway route registration, deployment settings,
-and Readiness client integration remain owned by the parent/coordinating agents.
-
-Latest checkpoint: after the initial successful unit-test project compilation,
-additional HTTP-contract and Support completion tests were written. A subsequent
-compile was blocked by shared Messaging/Security NU1301 dependency assets errors
-(NuGet socket access denied); the parent must compile the latest additions.
-See TASKEXECUTION_HANDOFF.md for exact changed paths and integration details.
+Deployment verification on 2026-11-04 ran the solution tests and applied migrations
+to restored database copies before the original Docker databases. Isolated HTTP
+checks covered progress/review/evidence, Readiness corrective linkage, purchase
+completion, material transfer reconciliation and explicit community nomination
+consent. Broker checks covered duplicate/stale/equal-version snapshots and recovery
+after Task/RabbitMQ outages. See the root `INTEGRATION.md` and
+`tools/Verification/README.md` for configuration and repeatable verification.

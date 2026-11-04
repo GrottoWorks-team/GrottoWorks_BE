@@ -1,13 +1,12 @@
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using ParishCoordination.Infrastructure.Data;
-using ParishCoordination.Infrastructure.TaskScopeSync;
+using ParishCoordination.Infrastructure.Events;
 
 namespace ParishCoordination.UnitTests;
 
-public sealed class TaskScopeOutboxTests
+public sealed class PlanningScopeOutboxTests
 {
     [Fact]
     public async Task Seeder_captures_season_and_area_once_and_includes_parent_snapshot()
@@ -16,14 +15,14 @@ public sealed class TaskScopeOutboxTests
         var seeder = new ParishCoordinationDataSeeder(db, NullLogger<ParishCoordinationDataSeeder>.Instance);
         await seeder.SeedAsync();
         await seeder.SeedAsync();
-        var messages = await db.TaskScopeOutbox.ToListAsync();
+        var messages = await db.PlanningEventOutbox.Where(row => row.EventType == "scope.snapshot").ToListAsync();
         messages.Should().HaveCount(2);
-        var area = messages.Single(row => row.ScopeType == "work-area");
-        var payload = JsonSerializer.Deserialize<WorkAreaDelivery>(area.Payload, ScopeJson.Options)!;
-        payload.WorkArea.SeasonId.Should().Be(ParishCoordinationDataSeeder.DemoSeasonId);
+        var area = messages.Single(row => row.AggregateId == ParishCoordinationDataSeeder.DemoWorkAreaId);
+        var payload = area.ToScopeSnapshot();
+        payload.WorkArea!.SeasonId.Should().Be(ParishCoordinationDataSeeder.DemoSeasonId);
         payload.Season.Status.Should().Be("PLANNING");
-        payload.WorkArea.Status.Should().Be("PLANNED");
-        payload.WorkArea.Version.Should().Be(1);
+        payload.WorkArea!.Status.Should().Be("PLANNED");
+        payload.WorkArea!.Version.Should().Be(1);
     }
 
     [Fact]
@@ -37,10 +36,9 @@ public sealed class TaskScopeOutboxTests
         await db.SaveChangesAsync();
         area.AssignLeader(leaderId, DateTimeOffset.UtcNow);
         await db.SaveChangesAsync();
-        var messages = await db.TaskScopeOutbox.Where(row => row.ScopeType == "work-area").ToListAsync();
+        var messages = await db.PlanningEventOutbox.Where(row => row.EventType == "scope.snapshot" && row.AggregateId == area.Id).ToListAsync();
         messages.Select(row => row.SourceVersion).Should().BeEquivalentTo(new long[] { 1, 2 });
-        JsonSerializer.Deserialize<WorkAreaDelivery>(messages.Single(row => row.SourceVersion == 2).Payload,
-            ScopeJson.Options)!.WorkArea.LeaderUserId.Should().Be(leaderId);
+        messages.Single(row => row.SourceVersion == 2).ToScopeSnapshot().WorkArea!.LeaderUserId.Should().Be(leaderId);
     }
 
     [Fact]
@@ -49,10 +47,11 @@ public sealed class TaskScopeOutboxTests
         using var db = new ParishCoordinationDbContext(
             new DbContextOptionsBuilder<ParishCoordinationDbContext>()
                 .UseNpgsql("Host=localhost;Database=metadata_only").Options);
-        var entity = db.Model.FindEntityType(typeof(TaskScopeOutbox))!;
-        entity.GetTableName().Should().Be("task_scope_outbox");
+        var entity = db.Model.FindEntityType(typeof(PlanningEventOutboxMessage))!;
+        entity.GetTableName().Should().Be("planning_event_outbox");
         entity.GetIndexes().Should().Contain(index => index.IsUnique && index.Properties.Count == 3);
-        entity.FindProperty(nameof(TaskScopeOutbox.Payload))!.GetColumnType().Should().Be("jsonb");
+        entity.GetIndexes().Should().Contain(index => index.GetFilter() == "published_at IS NULL");
+        entity.FindProperty(nameof(PlanningEventOutboxMessage.Envelope))!.GetColumnType().Should().Be("jsonb");
     }
 
     private static ParishCoordinationDbContext CreateDatabase() => new(

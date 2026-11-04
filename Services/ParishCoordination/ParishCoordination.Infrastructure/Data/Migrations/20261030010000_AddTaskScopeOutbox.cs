@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
-using ParishCoordination.Infrastructure.TaskScopeSync;
 
 #nullable disable
 namespace ParishCoordination.Infrastructure.Data.Migrations;

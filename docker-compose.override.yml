@@ -10,7 +10,7 @@ services:
       - POSTGRES_DB=postgres
     restart: always
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-15432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # Creates one database per service on first start (F-PLT-02).
@@ -93,12 +93,6 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - PlanningEvents__DispatchEnabled=true
       - LifecycleEvents__Enabled=true
-      - ScopeDelivery__BrokerPrimaryEnabled=${BROKER_SCOPE_PRIMARY:-false}
-      - ScopeDelivery__HttpRollbackEnabled=${HTTP_SCOPE_ROLLBACK:-false}
-      - TaskScopeSync__Enabled=true
-      - TaskScopeSync__BaseAddress=http://taskexecution.api:8080/
-      - TaskScopeSync__PollIntervalSeconds=2
-      - TaskScopeSync__RequestTimeoutSeconds=10
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__ParishCoordinationDatabase=Host=postgres;Port=5432;Database=parish_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
@@ -202,6 +196,9 @@ services:
       - Outbox__DispatchEnabled=true
       - PlanningEvents__ConsumeEnabled=true
       - PurchaseEvents__ConsumeEnabled=true
+      - MessageBroker__Host=amqp://rabbitmq:5672
+      - MessageBroker__UserName=${RABBITMQ_DEFAULT_USER:-grottoworks}
+      - MessageBroker__Password=${RABBITMQ_DEFAULT_PASS:-grottoworks}
       - NotificationAuditClient__BaseAddress=http://notificationaudit.api:8080/
       - ResourceClient__BaseAddress=http://resource.api:8080/
       - ConnectionStrings__Redis=redis:6379
@@ -214,6 +211,8 @@ services:
       - Database__MigrateOnStartup=true
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     ports:
       - "6104:8080"

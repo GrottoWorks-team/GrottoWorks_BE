@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Services/Identity/Identity.Infrastructure/Identity.Infrastructure.csproj" />
+    <ProjectReference Include="../../Services/ParishCoordination/ParishCoordination.Infrastructure/ParishCoordination.Infrastructure.csproj" />
+    <ProjectReference Include="../../Services/TaskExecution/TaskExecution.Infrastructure/TaskExecution.Infrastructure.csproj" />
+    <ProjectReference Include="../../Services/Resource/Resource.Infrastructure/Resource.Infrastructure.csproj" />
+    <ProjectReference Include="../../Services/Readiness/Readiness.Infrastructure/Readiness.Infrastructure.csproj" />
+    <ProjectReference Include="../../Services/Reporting/Reporting.Infrastructure/Reporting.Infrastructure.csproj" />
+    <ProjectReference Include="../../Services/NotificationAudit/NotificationAudit.Infrastructure/NotificationAudit.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

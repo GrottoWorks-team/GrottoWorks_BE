@@ -122,7 +122,7 @@ Khi khởi động, các service tự chạy EF Core migration. Identity và Par
 | ParishCoordination API | `http://localhost:6101` | Swagger, health check, debug |
 | Resource API | `http://localhost:6103` | Swagger, health check, debug |
 | TaskExecution API | `http://localhost:6104` | Swagger, health check, debug |
-| PostgreSQL | `localhost:5432` | Database local |
+| PostgreSQL | `localhost:15432` | Database Docker; đổi bằng `POSTGRES_HOST_PORT` |
 | RabbitMQ AMQP | `localhost:5672` | Message broker |
 | RabbitMQ Management | `http://localhost:15672` | Giao diện quản trị RabbitMQ |
 | Redis | `localhost:6379` | Cache local |
@@ -391,7 +391,7 @@ Chỉ dùng khi chắc chắn không cần dữ liệu local. PostgreSQL init sc
 ## 13. Trạng thái tích hợp hiện tại
 
 - Frontend không được gọi `/internal/**`. Các endpoint này dùng `X-Internal-Api-Key`, không đi qua Gateway và không xuất hiện trong Swagger.
-- TaskExecution và Resource đang giữ local scope projection. Một số flow liên service chưa tự đồng bộ vì consumer/outbox messaging chưa hoàn tất.
+- TaskExecution, Resource, Readiness và Reporting giữ local scope projection, tự đồng bộ qua RabbitMQ bằng transactional outbox/inbox. Sau khi tạo hoặc sửa Work Area, chờ đồng bộ trong thời gian ngắn trước khi thao tác ở service khác.
 - Dữ liệu demo của ParishCoordination không tự động trở thành projection trong TaskExecution hoặc Resource. Vì vậy một số API Task/Resource có thể trả `WORK_AREA_NOT_FOUND` hoặc `SEASON_NOT_FOUND` cho tới khi projection tương ứng được cấp qua internal feed hoặc messaging được hoàn thiện.
 - Không dùng trực tiếp database của service khác để workaround projection.
 
@@ -411,7 +411,7 @@ Không đăng output lệnh này lên chat công khai vì có thể chứa secre
 
 ### Port đã được sử dụng
 
-Các port thường xung đột: `5432`, `5672`, `6379`, `9000`, `9001`, `6100` đến `6104` và `15672`.
+Các port thường xung đột: `15432`, `5672`, `6379`, `9000`, `9001`, `6100` đến `6107` và `15672`. PostgreSQL trong container vẫn dùng `5432`; port host mặc định là `15432` để tránh nhầm với PostgreSQL cài trực tiếp trên máy.
 
 Tắt ứng dụng/container đang dùng port hoặc đổi host port ở `docker-compose.override.yml`. Nếu đổi port `6102`, frontend phải cập nhật API base URL.
 
@@ -463,4 +463,4 @@ Route có thể chưa được khai báo trong YARP Gateway. Frontend không nê
 
 # Implementation and integration
 
-See [INTEGRATION.md](INTEGRATION.md) for the completed PLAN feature flows, Docker configuration, broker cutover/rollback, isolated encrypted backup worker and runtime acceptance checklist. Unit tests were written without being executed; deployment verification remains separate from compilation.
+See [INTEGRATION.md](INTEGRATION.md) for service flows, RabbitMQ recovery, the isolated encrypted backup worker and deployment verification. Repeatable acceptance tools are documented in [tools/Verification/README.md](tools/Verification/README.md).

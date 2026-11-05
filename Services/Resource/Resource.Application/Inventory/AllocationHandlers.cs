@@ -104,6 +104,7 @@ public sealed class AllocateMaterialCommandHandler(
     IAllocationStore store,
     IWorkAreaStockLock stockLock,
     AllocationProjector projector,
+    ITaskMaterialPlanStore materialPlans,
     ICurrentUser currentUser)
 {
     public async Task<MaterialAllocationDto> HandleAsync(AllocateMaterialCommand command, CancellationToken cancellationToken = default)
@@ -137,12 +138,44 @@ public sealed class AllocateMaterialCommandHandler(
         {
             await StockGuard.EnsureUnallocatedAsync(reader, scope, materials,
                 allocation.Items.Select(item => (item.MaterialId, item.AllocatedQuantity)), cancellationToken);
+            if (command.TaskId is { } targetTaskId)
+            {
+                await EnsureWithinTaskPlanAsync(targetTaskId, allocation.Items, cancellationToken);
+            }
             store.Add(allocation);
             await store.SaveChangesAsync(cancellationToken);
             await lease.CommitAsync(cancellationToken);
         }
 
         return (await projector.ToDtosAsync([allocation], cancellationToken))[0];
+    }
+
+    /// <summary>
+    /// BR: không cấp vượt nhu cầu của việc. Với vật tư có trong kế hoạch của task
+    /// (`task_material_plan` — replicate từ TaskExecution) thì tổng đã cấp + lần này
+    /// không được vượt `required_quantity`, nếu không → 409
+    /// <c>ALLOCATION_EXCEEDS_TASK_REQUIREMENT</c>.
+    /// </summary>
+    private async Task EnsureWithinTaskPlanAsync(Guid taskId, IReadOnlyCollection<MaterialAllocationItem> items,
+        CancellationToken cancellationToken)
+    {
+        var plan = await materialPlans.GetAsync(taskId, cancellationToken);
+        if (plan is null || plan.Items.Count == 0) return;
+
+        var required = plan.Items.ToDictionary(item => item.MaterialId, item => item.RequiredQuantity);
+        var allocated = (await store.ListItemsOfTaskAsync(taskId, cancellationToken))
+            .GroupBy(item => item.MaterialId)
+            .ToDictionary(group => group.Key, group => group.Sum(item => item.AllocatedQuantity));
+
+        foreach (var item in items)
+        {
+            if (!required.TryGetValue(item.MaterialId, out var cap)) continue;
+            var already = allocated.GetValueOrDefault(item.MaterialId);
+            if (already + item.AllocatedQuantity <= cap) continue;
+            throw new DomainRuleException(
+                "ALLOCATION_EXCEEDS_TASK_REQUIREMENT",
+                $"Material {item.MaterialId} needs at most {cap} for this task; {already} already allocated, {item.AllocatedQuantity} requested.");
+        }
     }
 }
 

@@ -108,6 +108,14 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
             .Select(row => AssignmentDto.From(row)).ToList();
     }
 
+    /// <summary>
+    /// Phân công + đơn đăng ký của chính người gọi (TNV). App mobile cần `id`/`version`
+    /// của assignment để gọi accept/decline — trước đây không có đường đọc nào.
+    /// </summary>
+    public async Task<IReadOnlyList<AssignmentDto>> MyAssignmentsAsync(CancellationToken cancellationToken = default) =>
+        (await assignments.ListForVolunteerAsync(user.UserId, cancellationToken))
+        .Select(row => AssignmentDto.From(row)).ToList();
+
     public static void EnsureNoDuplicate(IReadOnlyList<TaskAssignment> existing, Guid volunteerId)
     {
         if (existing.Any(row => row.VolunteerId == volunteerId &&

@@ -75,6 +75,8 @@ internal sealed class AssignmentTestFixture
         }
         public Task<IReadOnlyList<TaskAssignment>> ListAsync(Guid id,CancellationToken ct) =>
             System.Threading.Tasks.Task.FromResult<IReadOnlyList<TaskAssignment>>(Items.Where(row=>row.TaskId==id).ToList());
+        public Task<IReadOnlyList<TaskAssignment>> ListForVolunteerAsync(Guid volunteerId,CancellationToken ct) =>
+            System.Threading.Tasks.Task.FromResult<IReadOnlyList<TaskAssignment>>(Items.Where(row=>row.VolunteerId==volunteerId).ToList());
         public Task<TaskAssignment?> GetAsync(Guid id,CancellationToken ct) =>
             System.Threading.Tasks.Task.FromResult(Items.SingleOrDefault(row=>row.Id==id));
         public Task<TaskAssignment?> GetForUpdateAsync(Guid id,CancellationToken ct)

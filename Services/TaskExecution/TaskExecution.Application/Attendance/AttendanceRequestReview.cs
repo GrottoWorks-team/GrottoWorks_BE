@@ -16,6 +16,14 @@ public sealed partial class AttendanceService
         return (result.Items.Select(AttendanceRequestDto.From).ToList(),result.Total);
     }
 
+    /// <summary>Đơn vào ca của chính TNV — để app hiển thị "chờ duyệt" thay vì "chưa bắt đầu".</summary>
+    public async Task<(IReadOnlyList<AttendanceRequestDto> Items,long Total)> MyRequestsAsync(AttendanceRequestStatus status,
+        int page,int size,bool descending,CancellationToken cancellationToken=default)
+    {
+        var result=await store.MyRequestsPageAsync(user.UserId,status,page,size,descending,cancellationToken);
+        return (result.Items.Select(AttendanceRequestDto.From).ToList(),result.Total);
+    }
+
     public async Task<AttendanceRequestDto> ReviewRequestAsync(Guid requestId,bool approve,string? note,int? version,CancellationToken cancellationToken=default)
     {
         var request=await store.RequestAsync(requestId,cancellationToken)

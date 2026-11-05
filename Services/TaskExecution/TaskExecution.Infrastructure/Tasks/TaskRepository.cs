@@ -9,7 +9,9 @@ namespace TaskExecution.Infrastructure.Tasks;
 public sealed class TaskRepository(TaskExecutionDbContext dbContext) : ITaskRepository
 {
     public Task<WorkTask?> GetByIdAsync(Guid taskId, CancellationToken cancellationToken = default) =>
-        dbContext.Tasks.AsNoTracking().Include(task => task.Skills)
+        dbContext.Tasks.AsNoTracking()
+            .Include(task => task.Skills)
+            .Include(task => task.Materials)
             .SingleOrDefaultAsync(task => task.Id == taskId, cancellationToken);
 
     public Task<WorkTask?> GetByIdForUpdateAsync(Guid taskId, CancellationToken cancellationToken = default) =>
@@ -41,6 +43,9 @@ public sealed class TaskRepository(TaskExecutionDbContext dbContext) : ITaskRepo
         query = ApplySorting(query, sort);
         var totalItems = await query.LongCountAsync(cancellationToken);
         var items = await query
+            .Include(task => task.Skills)
+            .Include(task => task.Materials)
+            .AsSplitQuery()
             .Skip((page - 1) * size)
             .Take(size)
             .ToListAsync(cancellationToken);

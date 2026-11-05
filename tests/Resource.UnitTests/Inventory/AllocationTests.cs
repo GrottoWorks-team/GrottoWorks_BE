@@ -5,6 +5,7 @@ using Resource.Domain;
 using Resource.Domain.Catalog;
 using Resource.Domain.Inventory;
 using Resource.Domain.Scope;
+using Resource.UnitTests.Scope;
 
 namespace Resource.UnitTests.Inventory;
 
@@ -18,6 +19,7 @@ public sealed class AllocationTests
     private readonly FakeRequirementStore _requirements = new();
     private readonly FakeInventoryStore _inventory;
     private readonly FakeTaskProjectionStore _tasks = new();
+    private readonly FakeTaskMaterialPlanStore _plans = new();
     private readonly FakeStockLock _lock = new();
     private readonly WorkAreaScope _area;
     private readonly Material _cable;
@@ -42,11 +44,17 @@ public sealed class AllocationTests
     private AllocateMaterialCommandHandler Allocate(FakeCurrentUser? user = null)
     {
         var current = user ?? Officer();
-        return new(new WorkAreaAccess(_scopes, current), _tasks, _catalog, Reader(), new FakeAllocationStore(_inventory), _lock, Projector(), current);
+        return new(new WorkAreaAccess(_scopes, current), _tasks, _catalog, Reader(), new FakeAllocationStore(_inventory),
+            _lock, Projector(), _plans, current);
     }
 
     private AllocateMaterialCommand Cable(decimal quantity, Guid? taskId = null) =>
         new(_area.WorkAreaId, taskId, [new AllocationLineInput(_cable.MaterialId, quantity)], null, "Cho hang đá");
+
+    private void SeedPlan(Guid taskId, params (Guid MaterialId, decimal Quantity)[] lines) =>
+        _plans.Add(TaskMaterialPlan.Create(taskId, _area.WorkAreaId, Parish, _area.SeasonId, 1,
+            lines.Select(line => new TaskMaterialPlanInput(line.MaterialId, line.Quantity, null)).ToArray(),
+            DateTimeOffset.UtcNow));
 
     private static async Task<DomainRuleException> Fails(Func<Task> act) =>
         (await act.Should().ThrowAsync<DomainRuleException>()).Which;
@@ -143,5 +151,45 @@ public sealed class AllocationTests
         var outsider = new FakeCurrentUser(Guid.NewGuid(), GrottoWorksRoles.Parish, Guid.NewGuid());
         (await new ListMaterialAllocationsQueryHandler(new WorkAreaAccess(_scopes, outsider), _scopes, new FakeAllocationStore(_inventory), Projector())
             .HandleAsync(new AllocationFilter(1, 20, null, null, null, null))).TotalItems.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Allocation_above_the_task_plan_is_rejected()
+    {
+        var task = _tasks.Seed(_area.WorkAreaId);
+        SeedPlan(task.TaskId, (_cable.MaterialId, 20m));
+
+        var error = await Fails(() => Allocate().HandleAsync(Cable(21, task.TaskId)));
+
+        error.Code.Should().Be("ALLOCATION_EXCEEDS_TASK_REQUIREMENT");
+        (await Reader().ReadAsync([_area], _cable.MaterialId)).Single().Allocated.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Allocations_accumulate_against_the_task_plan()
+    {
+        var task = _tasks.Seed(_area.WorkAreaId);
+        SeedPlan(task.TaskId, (_cable.MaterialId, 20m));
+
+        await Allocate().HandleAsync(Cable(15, task.TaskId));
+        var error = await Fails(() => Allocate().HandleAsync(Cable(6, task.TaskId)));
+        error.Code.Should().Be("ALLOCATION_EXCEEDS_TASK_REQUIREMENT");
+
+        var dto = await Allocate().HandleAsync(Cable(5, task.TaskId));
+        dto.Items.Single().AllocatedQuantity.Should().Be(5);
+        (await Reader().ReadAsync([_area], _cable.MaterialId)).Single().Allocated.Should().Be(20);
+    }
+
+    [Fact]
+    public async Task Material_outside_the_task_plan_is_not_capped()
+    {
+        _inventory.Append(MaterialTransaction.Post(_area.WorkAreaId, _paint.MaterialId, TransactionType.OpeningStock, 50, DateTimeOffset.UtcNow, _officer, null));
+        var task = _tasks.Seed(_area.WorkAreaId);
+        SeedPlan(task.TaskId, (_cable.MaterialId, 5m));
+
+        var dto = await Allocate().HandleAsync(
+            new AllocateMaterialCommand(_area.WorkAreaId, task.TaskId, [new AllocationLineInput(_paint.MaterialId, 10)], null, null));
+
+        dto.Items.Single().AllocatedQuantity.Should().Be(10);
     }
 }

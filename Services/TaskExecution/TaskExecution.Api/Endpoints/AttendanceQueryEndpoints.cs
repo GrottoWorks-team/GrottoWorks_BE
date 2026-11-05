@@ -16,6 +16,10 @@ public static class AttendanceQueryEndpoints
         group.MapGet("/users/me/attendance",PersonalAsync).WithName("listMyAttendance")
             .RequireAuthorization(p=>p.RequireRole(GrottoWorksRoles.Volunteer))
             .Produces<PagedResponse<AttendanceDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401).Produces<ProblemDetails>(403);
+        // Đơn vào ca của chính TNV (mặc định PENDING) — app dùng để hiện "chờ trưởng khu duyệt".
+        group.MapGet("/users/me/attendance-requests",MyRequestsAsync).WithName("listMyAttendanceRequests")
+            .RequireAuthorization(p=>p.RequireRole(GrottoWorksRoles.Volunteer))
+            .Produces<PagedResponse<AttendanceRequestDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401).Produces<ProblemDetails>(403);
         group.MapGet("/work-areas/{workAreaId:guid}/working-hours",HoursAsync).WithName("getWorkingHours")
             .RequireAuthorization(p=>p.RequireRole(GrottoWorksRoles.Parish,GrottoWorksRoles.Leader))
             .Produces<ApiResponse<IReadOnlyList<WorkingHourSummary>>>().Produces<ProblemDetails>(400)
@@ -32,4 +36,13 @@ public static class AttendanceQueryEndpoints
     }
     private static async Task<IResult> HoursAsync(Guid workAreaId,DateTimeOffset? from,DateTimeOffset? to,AttendanceQueries queries,HttpContext context,CancellationToken ct) =>
         Results.Ok(ApiResults.Ok(await queries.HoursAsync(workAreaId,from,to,ct),context));
+
+    /// <summary>Đơn vào ca của chính TNV (mặc định chỉ lấy PENDING).</summary>
+    private static async Task<IResult> MyRequestsAsync(string? status,AttendanceService service,HttpContext context,CancellationToken ct)
+    {
+        var page=PaginationRequest.FromQuery(context.Request.Query,"requestedAt");
+        var parsed=QueryEnum.Parse<AttendanceRequestStatus>(status,"status") ?? AttendanceRequestStatus.Pending;
+        var result=await service.MyRequestsAsync(parsed,page.Page,page.Size,page.Sort is null || page.Sort.EndsWith(",desc"),ct);
+        return Results.Ok(ApiResults.Page(result.Items,result.Total,page.Page,page.Size,context));
+    }
 }

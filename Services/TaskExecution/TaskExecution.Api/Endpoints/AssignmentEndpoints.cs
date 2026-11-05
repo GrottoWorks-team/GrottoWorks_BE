@@ -37,6 +37,9 @@ public static class AssignmentEndpoints
             .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
             .Produces<ApiResponse<IReadOnlyList<AssignmentDto>>>().Produces<ProblemDetails>(400)
             .Produces<ProblemDetails>(401).Produces<ProblemDetails>(403).Produces<ProblemDetails>(404);
+        group.MapGet("/users/me/assignments", MyAssignmentsAsync).WithName("listMyAssignments")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Volunteer))
+            .Produces<ApiResponse<IReadOnlyList<AssignmentDto>>>().Produces<ProblemDetails>(401);
         group.MapPost("/task-assignments/{assignmentId:guid}/accept", AcceptAsync).WithName("acceptTaskAssignment")
             .RequireAuthorization(policy=>policy.RequireRole(GrottoWorksRoles.Volunteer))
             .Produces<ApiResponse<AssignmentDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401)
@@ -61,6 +64,11 @@ public static class AssignmentEndpoints
     private static async Task<IResult> ListAsync(Guid taskId, AssignmentService service,
         HttpContext context, CancellationToken cancellationToken) =>
         Results.Ok(ApiResults.Ok(await service.ListAsync(taskId, cancellationToken), context));
+
+    /// <summary>TNV xem phân công/đơn đăng ký của chính mình — kèm `id` + `version` để accept/decline.</summary>
+    private static async Task<IResult> MyAssignmentsAsync(AssignmentService service,
+        HttpContext context, CancellationToken cancellationToken) =>
+        Results.Ok(ApiResults.Ok(await service.MyAssignmentsAsync(cancellationToken), context));
 
     private static async Task<IResult> AcceptAsync(Guid assignmentId,
         [FromBody(EmptyBodyBehavior=Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] VersionedCommandRequest? request,

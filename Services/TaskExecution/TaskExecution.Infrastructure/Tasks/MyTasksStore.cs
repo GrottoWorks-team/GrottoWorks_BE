@@ -27,6 +27,12 @@ public sealed class MyTasksStore(TaskExecutionDbContext db) : IMyTasksStore
             "deadline" => descending ? query.OrderByDescending(t=>t.Deadline).ThenBy(t=>t.Id) : query.OrderBy(t=>t.Deadline).ThenBy(t=>t.Id),
             _ => descending ? query.OrderByDescending(t=>t.CreatedAt).ThenBy(t=>t.Id) : query.OrderBy(t=>t.CreatedAt).ThenBy(t=>t.Id)
         };
-        return (await sorted.Skip((filter.Page-1)*filter.Size).Take(filter.Size).ToListAsync(cancellationToken), total);
+        return (await sorted
+            .Include(task => task.Skills)
+            .Include(task => task.Materials)
+            .AsSplitQuery()
+            .Skip((filter.Page-1)*filter.Size)
+            .Take(filter.Size)
+            .ToListAsync(cancellationToken), total);
     }
 }

@@ -116,6 +116,38 @@ public sealed class MaterialReportTests
     }
 
     [Fact]
+    public async Task Officer_recovers_materials_of_a_cancelled_task_through_the_report()
+    {
+        // V-04: the materials of a cancelled task were stuck as allocated; the verified remainder now returns to stock.
+        _task.ApplyStatus(ProjectedTaskStatus.Cancelled, _task.SourceVersion + 1, DateTimeOffset.UtcNow);
+        var officerReport = await Submit(Officer()).HandleAsync(Report(cableRemaining: 30, cableDamaged: 0, bulbRemaining: 9));
+
+        officerReport.ReportedBy.Should().Be(_officer);
+        await Verify().HandleAsync(new VerifyMaterialReportCommand(officerReport.Id, officerReport.Version,
+            [new VerifiedLineInput(officerReport.Items.Single(i => i.MaterialId == _cable.MaterialId).Id, 30, 0, 0),
+             new VerifiedLineInput(officerReport.Items.Single(i => i.MaterialId == _bulb.MaterialId).Id, 9, 1, 0)]));
+
+        var cable = (await new InventoryReader(_inventory, _catalog).ReadAsync([_area], _cable.MaterialId)).Single();
+        cable.Unallocated.Should().Be(100); // all 30 m came back
+        cable.Shortage.Should().Be(0);
+        _inventory.Ledger.Where(t => t.Type == TransactionType.TaskReturn).Sum(t => t.Quantity).Should().Be(39);
+    }
+
+    [Fact]
+    public async Task Cancelled_task_is_reported_by_an_assignee_or_its_own_officer_only()
+    {
+        _task.ApplyStatus(ProjectedTaskStatus.Cancelled, _task.SourceVersion + 1, DateTimeOffset.UtcNow);
+
+        (await Fails(() => Submit(Officer(Guid.NewGuid())).HandleAsync(Report()))).Code.Should().Be("MATERIAL_REPORT_NOT_ASSIGNEE");
+        (await Fails(() => Submit(Volunteer(Guid.NewGuid())).HandleAsync(Report()))).Code.Should().Be("MATERIAL_REPORT_NOT_ASSIGNEE");
+        (await Submit().HandleAsync(Report())).ReportedBy.Should().Be(_volunteer);
+
+        // A completed task stays the assignees' report (BR-44): the officer only verifies it.
+        var completed = _tasks.Seed(_area.WorkAreaId, ProjectedTaskStatus.Completed, _volunteer);
+        (await Fails(() => Submit(Officer()).HandleAsync(Report() with { TaskId = completed.TaskId }))).Code.Should().Be("MATERIAL_REPORT_NOT_ASSIGNEE");
+    }
+
+    [Fact]
     public async Task Lines_cover_exactly_the_allocation_items_and_never_exceed_allocated()
     {
         (await Fails(() => Submit().HandleAsync(new SubmitMaterialReportCommand(_task.TaskId, [new ReportedLineInput(ItemOf(_cable), 1, 0, 0, null)], null))))

@@ -159,6 +159,21 @@ public sealed class MaterialReportTests
     }
 
     [Fact]
+    public async Task Verified_remainder_does_not_lower_the_shortage()
+    {
+        // 120 m required, 100 m received: 20 m are still missing whatever the task hands back.
+        _requirements.Requirements.Single(r => r.MaterialId == _cable.MaterialId).Update(120, null, null, null, DateTimeOffset.UtcNow);
+        var submitted = await Submit().HandleAsync(Report());
+
+        await Verify().HandleAsync(Verified(submitted));
+
+        var row = (await new InventoryReader(_inventory, _catalog).ReadAsync([_area], _cable.MaterialId)).Single();
+        row.Shortage.Should().Be(20);
+        row.Unallocated.Should().Be(77);
+        _events.Events.Should().NotContain(e => e.EventType == MaterialShortageChanged.EventType);
+    }
+
+    [Fact]
     public async Task Verified_values_are_checked_and_only_the_officer_of_the_area_verifies()
     {
         var submitted = await Submit().HandleAsync(Report());

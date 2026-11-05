@@ -24,6 +24,12 @@ public interface IInventoryStore
         Guid? materialId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>SUM of <c>TASK_RETURN</c> postings per (work area, material) — remainders of verified material reports.</summary>
+    Task<IReadOnlyList<QuantityByMaterial>> GetTaskReturnTotalsAsync(
+        IReadOnlyCollection<Guid> workAreaIds,
+        Guid? materialId,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Required quantity of ACTIVE requirements per (work area, material).</summary>
     Task<IReadOnlyList<QuantityByMaterial>> GetRequiredTotalsAsync(
         IReadOnlyCollection<Guid> workAreaIds,

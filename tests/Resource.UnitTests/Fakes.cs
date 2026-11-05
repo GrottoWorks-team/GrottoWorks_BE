@@ -209,6 +209,15 @@ public sealed class FakeInventoryStore(FakeRequirementStore requirements) : Reso
             .Select(g => new Resource.Application.Inventory.QuantityByMaterial(g.Key.WorkAreaId, g.Key.MaterialId, g.Sum(t => t.Quantity)))
             .ToList());
 
+    public Task<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>> GetTaskReturnTotalsAsync(
+        IReadOnlyCollection<Guid> workAreaIds, Guid? materialId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>>(Ledger
+            .Where(t => workAreaIds.Contains(t.WorkAreaId) && (materialId is null || t.MaterialId == materialId) &&
+                        t.Type == Resource.Domain.Inventory.TransactionType.TaskReturn)
+            .GroupBy(t => (t.WorkAreaId, t.MaterialId))
+            .Select(g => new Resource.Application.Inventory.QuantityByMaterial(g.Key.WorkAreaId, g.Key.MaterialId, g.Sum(t => t.Quantity)))
+            .ToList());
+
     public Task<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>> GetRequiredTotalsAsync(
         IReadOnlyCollection<Guid> workAreaIds, Guid? materialId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>>(requirements.Requirements

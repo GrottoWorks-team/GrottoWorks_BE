@@ -29,6 +29,8 @@ public sealed class InventoryReader(IInventoryStore inventory, IMaterialCatalogS
 
         var allocated = (await inventory.GetAllocatedTotalsAsync(workAreaIds, materialId, cancellationToken))
             .ToDictionary(row => (row.WorkAreaId, row.MaterialId), row => row.Quantity);
+        var returned = (await inventory.GetTaskReturnTotalsAsync(workAreaIds, materialId, cancellationToken))
+            .ToDictionary(row => (row.WorkAreaId, row.MaterialId), row => row.Quantity);
 
         var keys = ledger.Keys.Union(required.Keys).Union(allocated.Keys).ToList();
         var materials = (await catalog.GetMaterialsAsync(keys.Select(key => key.MaterialId).Distinct().ToList(), cancellationToken))
@@ -39,7 +41,8 @@ public sealed class InventoryReader(IInventoryStore inventory, IMaterialCatalogS
             .Select(key => InventoryBalanceDto.From(
                 scopeById[key.WorkAreaId],
                 materials[key.MaterialId],
-                InventoryCalculator.Calculate(required.GetValueOrDefault(key), ledger.GetValueOrDefault(key), allocated.GetValueOrDefault(key))))
+                InventoryCalculator.Calculate(required.GetValueOrDefault(key), ledger.GetValueOrDefault(key), allocated.GetValueOrDefault(key),
+                    returned.GetValueOrDefault(key))))
             .OrderBy(row => row.WorkAreaName, StringComparer.CurrentCulture)
             .ThenBy(row => row.MaterialName, StringComparer.CurrentCulture)
             .ThenBy(row => row.MaterialId)

@@ -209,6 +209,15 @@ public sealed class FakeInventoryStore(FakeRequirementStore requirements) : Reso
             .Select(g => new Resource.Application.Inventory.QuantityByMaterial(g.Key.WorkAreaId, g.Key.MaterialId, g.Sum(t => t.Quantity)))
             .ToList());
 
+    public Task<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>> GetTaskReturnTotalsAsync(
+        IReadOnlyCollection<Guid> workAreaIds, Guid? materialId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>>(Ledger
+            .Where(t => workAreaIds.Contains(t.WorkAreaId) && (materialId is null || t.MaterialId == materialId) &&
+                        t.Type == Resource.Domain.Inventory.TransactionType.TaskReturn)
+            .GroupBy(t => (t.WorkAreaId, t.MaterialId))
+            .Select(g => new Resource.Application.Inventory.QuantityByMaterial(g.Key.WorkAreaId, g.Key.MaterialId, g.Sum(t => t.Quantity)))
+            .ToList());
+
     public Task<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>> GetRequiredTotalsAsync(
         IReadOnlyCollection<Guid> workAreaIds, Guid? materialId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>>(requirements.Requirements
@@ -608,3 +617,32 @@ public sealed class FakeFileVerifier : Resource.Application.Files.IFileVerifier
     }
 }
 
+
+/// <summary>Runs the operation inline and records whether a caller is inside the unit of work (outbox atomicity checks).</summary>
+public sealed class FakeUnitOfWork : Resource.Application.Abstractions.IUnitOfWork
+{
+    public int Depth { get; private set; }
+
+    public bool IsActive => Depth > 0;
+
+    public int Committed { get; private set; }
+
+    public async Task<T> ExecuteAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken = default)
+    {
+        Depth++;
+        try
+        {
+            var result = await operation();
+            if (Depth == 1)
+            {
+                Committed++;
+            }
+
+            return result;
+        }
+        finally
+        {
+            Depth--;
+        }
+    }
+}

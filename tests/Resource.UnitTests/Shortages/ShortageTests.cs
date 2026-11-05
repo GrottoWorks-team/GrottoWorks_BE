@@ -45,12 +45,12 @@ public sealed class ShortageTests
     private ShortageTracker Tracker() => new(Reader(), _events);
 
     private Task<MaterialRequirementDto> Require(WorkAreaScope area, Material material, decimal quantity) =>
-        new CreateMaterialRequirementCommandHandler(Access(), _requirements, _catalog, Tracker())
+        new CreateMaterialRequirementCommandHandler(Access(), _requirements, _catalog, Tracker(), new FakeUnitOfWork())
             .HandleAsync(new CreateMaterialRequirementCommand(area.WorkAreaId, material.MaterialId, quantity, null, null));
 
     private Task Open(WorkAreaScope area, Material material, decimal quantity) =>
         new RecordOpeningStockCommandHandler(Access(), new FakeCurrentUser(_officer, GrottoWorksRoles.MaterialOfficer, Parish),
-                _inventory, _catalog, Tracker())
+                _inventory, _catalog, Tracker(), new FakeUnitOfWork())
             .HandleAsync(new RecordOpeningStockCommand(area.WorkAreaId, material.MaterialId, quantity, null, null));
 
     [Fact]
@@ -101,9 +101,9 @@ public sealed class ShortageTests
     {
         var requirement = await Require(_grotto, _cable, 100);
         await Open(_grotto, _cable, 40);
-        await new UpdateMaterialRequirementCommandHandler(Access(), _requirements, _catalog, Tracker())
+        await new UpdateMaterialRequirementCommandHandler(Access(), _requirements, _catalog, Tracker(), new FakeUnitOfWork())
             .HandleAsync(new UpdateMaterialRequirementCommand(requirement.Id, null, null, null, "chỉ sửa ghi chú", null));
-        await new UpdateMaterialRequirementCommandHandler(Access(), _requirements, _catalog, Tracker())
+        await new UpdateMaterialRequirementCommandHandler(Access(), _requirements, _catalog, Tracker(), new FakeUnitOfWork())
             .HandleAsync(new UpdateMaterialRequirementCommand(requirement.Id, null, null, null, null, RequirementStatus.Cancelled));
 
         var payloads = _events.Events.Select(e => (MaterialShortageChanged)e.Payload).ToList();

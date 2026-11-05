@@ -11,11 +11,14 @@ public sealed class FakeIntegrationEventPublisher : IIntegrationEventPublisher
 {
     public sealed record Published(string EventType, int Version, object Payload, string AggregateType, Guid AggregateId);
 
+    public Action? BeforePublish { get; set; }
+
     public List<Published> Events { get; } = [];
 
     public Task PublishAsync<TPayload>(string eventType, int version, TPayload payload, string aggregateType, Guid aggregateId, CancellationToken cancellationToken = default)
         where TPayload : class
     {
+        BeforePublish?.Invoke();
         Events.Add(new Published(eventType, version, payload, aggregateType, aggregateId));
         return Task.CompletedTask;
     }
@@ -161,5 +164,34 @@ public sealed class FakeCorrectiveTaskCreator : Readiness.Application.Checklists
     {
         Requests.Add(request);
         return Task.FromResult(new Readiness.Application.Checklists.CreatedCorrectiveTask(TaskId, request.WorkAreaId, "CORRECTIVE", "OPEN"));
+    }
+}
+
+/// <summary>Runs the operation inline and records whether a caller is inside the unit of work (outbox atomicity checks).</summary>
+public sealed class FakeUnitOfWork : Readiness.Application.Abstractions.IUnitOfWork
+{
+    public int Depth { get; private set; }
+
+    public bool IsActive => Depth > 0;
+
+    public int Committed { get; private set; }
+
+    public async Task<T> ExecuteAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken = default)
+    {
+        Depth++;
+        try
+        {
+            var result = await operation();
+            if (Depth == 1)
+            {
+                Committed++;
+            }
+
+            return result;
+        }
+        finally
+        {
+            Depth--;
+        }
     }
 }

@@ -33,9 +33,9 @@ public sealed class RequirementTests
     private Resource.Application.Shortages.ShortageTracker Tracker() =>
         new(new Resource.Application.Inventory.InventoryReader(new FakeInventoryStore(_requirements), _catalog), _events);
 
-    private CreateMaterialRequirementCommandHandler Create(WorkAreaAccess? access = null) => new(access ?? Access(), _requirements, _catalog, Tracker());
+    private CreateMaterialRequirementCommandHandler Create(WorkAreaAccess? access = null) => new(access ?? Access(), _requirements, _catalog, Tracker(), new FakeUnitOfWork());
 
-    private UpdateMaterialRequirementCommandHandler Update(WorkAreaAccess? access = null) => new(access ?? Access(), _requirements, _catalog, Tracker());
+    private UpdateMaterialRequirementCommandHandler Update(WorkAreaAccess? access = null) => new(access ?? Access(), _requirements, _catalog, Tracker(), new FakeUnitOfWork());
 
     private static async Task<DomainRuleException> Fails(Func<Task> act) =>
         (await act.Should().ThrowAsync<DomainRuleException>()).Which;

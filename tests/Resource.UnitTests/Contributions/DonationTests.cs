@@ -54,7 +54,7 @@ public sealed class DonationTests
         var current = user ?? Officer();
         return new(new MaterialOfficerScope(new WorkAreaAccess(_scopes, current), _scopes, current), _donors, _store, _catalog,
             new DonationReceiptPoster(_inventory, new ShortageTracker(new InventoryReader(_inventory, _catalog), _events), _events, current),
-            Projector(), current);
+            Projector(), current, new FakeUnitOfWork());
     }
 
     private GetDonationQueryHandler Get(FakeCurrentUser user) =>

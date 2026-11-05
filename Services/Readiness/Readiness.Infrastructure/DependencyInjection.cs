@@ -30,6 +30,7 @@ public static class DependencyInjection
         // Integration events go through the transactional outbox (integration_event_outbox).
         services.AddHttpContextAccessor();
         services.AddScoped<IIntegrationEventPublisher, OutboxIntegrationEventPublisher>();
+        services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IWorkAreaScopeStore, WorkAreaScopeStore>();
         services.AddScoped<IScopeReplicationInbox, ScopeReplicationInbox>();
         services.AddScoped<ITaskProjectionStore, TaskProjectionStore>();

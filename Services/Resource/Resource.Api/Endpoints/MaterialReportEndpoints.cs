@@ -17,7 +17,7 @@ public static class MaterialReportEndpoints
         app.MapPost("/api/v1/tasks/{taskId:guid}/material-reports", SubmitAsync)
             .WithName("submitTaskMaterialReport")
             .WithTags("Materials")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Volunteer))
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Volunteer, GrottoWorksRoles.MaterialOfficer))
             .Accepts<TaskMaterialReportRequest>("application/json")
             .Produces<ApiResponse<TaskMaterialReportDto>>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status403Forbidden)

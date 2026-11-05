@@ -24,7 +24,7 @@ public sealed class ChecklistHandlerTests
     private FakeCurrentUser LeaderUser() => new(_leaderId, GrottoWorksRoles.Leader, _parishId);
 
     private InspectionCommandHandler Inspection(ICurrentUser user) =>
-        new(new ChecklistLoader(_store, Access(user)), _store, _tasks, _publisher, user, _files, new FakeCorrectiveTaskCreator());
+        new(new ChecklistLoader(_store, Access(user)), _store, _tasks, _publisher, user, _files, new FakeCorrectiveTaskCreator(), new FakeUnitOfWork());
 
     private async Task<(WorkAreaScope Scope, ReadinessCheckDto Check)> CreateAsync(
         SeasonStatus seasonStatus = SeasonStatus.Active,
@@ -189,13 +189,13 @@ public sealed class ChecklistHandlerTests
         var (_, check) = await CreateAsync();
         await Inspection(LeaderUser()).RecordResultAsync(new ItemResultCommand(check.Id, check.Items[0].Id, null, InspectionResult.Passed, null, []));
 
-        var leaderDecision = new ReadinessDecisionHandler(new ChecklistLoader(_store, Access(LeaderUser())), _store, _publisher, LeaderUser());
+        var leaderDecision = new ReadinessDecisionHandler(new ChecklistLoader(_store, Access(LeaderUser())), _store, _publisher, LeaderUser(), new FakeUnitOfWork());
         var ready = await leaderDecision.ConfirmAsync(new CheckCommand(check.Id, null));
         ready.Status.Should().Be(ChecklistStatus.Ready);
         _publisher.Events.Should().ContainSingle(e => e.EventType == ReadinessAreaReady.EventType);
 
         var parish = new FakeCurrentUser(Guid.NewGuid(), GrottoWorksRoles.Parish, _parishId);
-        var parishDecision = new ReadinessDecisionHandler(new ChecklistLoader(_store, Access(parish)), _store, _publisher, parish);
+        var parishDecision = new ReadinessDecisionHandler(new ChecklistLoader(_store, Access(parish)), _store, _publisher, parish, new FakeUnitOfWork());
         var reopened = await parishDecision.ReopenAsync(new CheckCommand(check.Id, null, "Mưa làm hỏng đèn"));
 
         reopened.Status.Should().Be(ChecklistStatus.Reopened);
@@ -204,12 +204,33 @@ public sealed class ChecklistHandlerTests
     }
 
     [Fact]
+    public async Task Failed_result_confirm_and_reopen_write_state_and_event_in_one_unit_of_work()
+    {
+        // readiness.area.ready lost after the READY commit used to leave the Parish work area in READINESS_REVIEW.
+        var (_, check) = await CreateAsync();
+        var unitOfWork = new FakeUnitOfWork();
+        var publishedOutside = new List<int>();
+        _publisher.BeforePublish = () => { if (!unitOfWork.IsActive) publishedOutside.Add(_publisher.Events.Count); };
+        var inspection = new InspectionCommandHandler(new ChecklistLoader(_store, Access(LeaderUser())), _store, _tasks, _publisher, LeaderUser(),
+            _files, new FakeCorrectiveTaskCreator(), unitOfWork);
+        var decision = new ReadinessDecisionHandler(new ChecklistLoader(_store, Access(LeaderUser())), _store, _publisher, LeaderUser(), unitOfWork);
+
+        await inspection.RecordResultAsync(new ItemResultCommand(check.Id, check.Items[1].Id, null, InspectionResult.Failed, null, []));
+        await inspection.RecordResultAsync(new ItemResultCommand(check.Id, check.Items[0].Id, null, InspectionResult.Passed, null, []));
+        await decision.ConfirmAsync(new CheckCommand(check.Id, null));
+        await decision.ReopenAsync(new CheckCommand(check.Id, null, "Mưa làm hỏng đèn"));
+
+        _publisher.Events.Select(e => e.EventType).Should().Contain([ReadinessItemFailed.EventType, ReadinessAreaReady.EventType, ReadinessAreaReopened.EventType]);
+        publishedOutside.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Confirm_is_blocked_while_a_mandatory_item_is_not_passed()
     {
         var (_, check) = await CreateAsync();
         await Inspection(LeaderUser()).RecordResultAsync(new ItemResultCommand(check.Id, check.Items[1].Id, null, InspectionResult.Passed, null, []));
 
-        var confirm = () => new ReadinessDecisionHandler(new ChecklistLoader(_store, Access(LeaderUser())), _store, _publisher, LeaderUser())
+        var confirm = () => new ReadinessDecisionHandler(new ChecklistLoader(_store, Access(LeaderUser())), _store, _publisher, LeaderUser(), new FakeUnitOfWork())
             .ConfirmAsync(new CheckCommand(check.Id, null));
 
         (await confirm.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("READINESS_MANDATORY_NOT_PASSED");
@@ -245,7 +266,7 @@ public sealed class ChecklistHandlerTests
         var (_, check) = await CreateAsync(status: WorkAreaStatus.InProgress);
         await Inspection(LeaderUser()).RecordResultAsync(new ItemResultCommand(check.Id, check.Items[0].Id, null, InspectionResult.Passed, null, []));
 
-        var confirm = () => new ReadinessDecisionHandler(new ChecklistLoader(_store, Access(LeaderUser())), _store, _publisher, LeaderUser())
+        var confirm = () => new ReadinessDecisionHandler(new ChecklistLoader(_store, Access(LeaderUser())), _store, _publisher, LeaderUser(), new FakeUnitOfWork())
             .ConfirmAsync(new CheckCommand(check.Id, null));
 
         (await confirm.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("WORK_AREA_NOT_IN_READINESS_REVIEW");

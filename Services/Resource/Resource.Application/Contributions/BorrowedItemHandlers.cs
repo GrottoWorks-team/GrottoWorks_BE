@@ -142,9 +142,13 @@ public sealed class OfferItemForLoanCommandHandler(
     IWorkAreaScopeStore scopes,
     IBorrowedItemStore store,
     IIntegrationEventPublisher publisher,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork)
 {
-    public async Task<BorrowedItemDto> HandleAsync(OfferItemForLoanCommand command, CancellationToken cancellationToken = default)
+    public Task<BorrowedItemDto> HandleAsync(OfferItemForLoanCommand command, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteAsync(() => HandleInTransactionAsync(command, cancellationToken), cancellationToken);
+
+    private async Task<BorrowedItemDto> HandleInTransactionAsync(OfferItemForLoanCommand command, CancellationToken cancellationToken)
     {
         var offer = command.Offer;
         var areas = await scopes.ListByParishAsync(access.RequireParish(), offer.SeasonId, cancellationToken);
@@ -322,9 +326,13 @@ public sealed class BorrowedItemCommandHandler(
 /// <c>borrowed-item.return-due</c>; past due → <c>borrowed-item.overdue</c>. <c>last_reminded_on</c> keeps it to one
 /// reminder per item per day, whichever instance runs the job.
 /// </summary>
-public sealed class BorrowedItemReminderJob(IBorrowedItemStore store, IWorkAreaScopeStore scopes, IIntegrationEventPublisher publisher)
+public sealed class BorrowedItemReminderJob(IBorrowedItemStore store, IWorkAreaScopeStore scopes, IIntegrationEventPublisher publisher,
+    IUnitOfWork unitOfWork)
 {
-    public async Task<int> RunAsync(DateTimeOffset now, CancellationToken cancellationToken = default)
+    public Task<int> RunAsync(DateTimeOffset now, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteAsync(() => RunInTransactionAsync(now, cancellationToken), cancellationToken);
+
+    private async Task<int> RunInTransactionAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
         var today = ParishClock.Today(now);
         var items = await store.ListToRemindAsync(today.AddDays(1), today, cancellationToken);

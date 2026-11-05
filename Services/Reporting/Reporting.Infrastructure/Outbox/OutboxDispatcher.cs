@@ -76,11 +76,14 @@ public sealed class OutboxDispatcher(IServiceScopeFactory scopes, ILogger<Outbox
         var dbContext = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
         var publisher = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        // Only compile-time constants are concatenated (table name, batch size); nothing comes from input.
+#pragma warning disable EF1003
         var rows = await dbContext.Set<OutboxMessage>()
             .FromSqlRaw(
                 $"SELECT * FROM {OutboxMessageConfiguration.TableName} WHERE published_at IS NULL AND next_attempt_at <= now() " +
                 $"ORDER BY created_at LIMIT {BatchSize} FOR UPDATE SKIP LOCKED")
             .ToListAsync(cancellationToken);
+#pragma warning restore EF1003
         var published = 0;
         foreach (var row in rows)
         {

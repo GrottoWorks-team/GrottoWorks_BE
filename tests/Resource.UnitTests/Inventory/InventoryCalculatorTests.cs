@@ -29,6 +29,21 @@ public sealed class InventoryCalculatorTests
         figures.Allocated.Should().Be(allocated);
     }
 
+    [Theory]
+    //          required  ledger  allocated returned | available unallocated shortage
+    [InlineData(120,       110,    30,       10,        110,      80,         20)]  // 100 received, 30 allocated, 10 returned
+    [InlineData(100,       107,    30,       7,         107,      77,         0)]   // requirement already covered before the task
+    public void Task_returns_free_stock_but_never_cover_the_requirement_twice(
+        decimal required, decimal ledger, decimal allocated, decimal returned,
+        decimal expectedAvailable, decimal expectedUnallocated, decimal expectedShortage)
+    {
+        var figures = InventoryCalculator.Calculate(required, ledger, allocated, returned);
+
+        figures.ConfirmedAvailable.Should().Be(expectedAvailable);
+        figures.Unallocated.Should().Be(expectedUnallocated);
+        figures.Shortage.Should().Be(expectedShortage);
+    }
+
     [Fact]
     public void Donation_scenario_from_BA_edge_case_17_counts_only_usable()
     {

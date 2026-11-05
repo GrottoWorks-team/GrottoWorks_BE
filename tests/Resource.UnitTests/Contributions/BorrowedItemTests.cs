@@ -33,7 +33,7 @@ public sealed class BorrowedItemTests
     private OfferItemForLoanCommandHandler Offer(FakeCurrentUser? user = null)
     {
         var current = user ?? Volunteer();
-        return new(new WorkAreaAccess(_scopes, current), _scopes, _store, _events, current);
+        return new(new WorkAreaAccess(_scopes, current), _scopes, _store, _events, current, new FakeUnitOfWork());
     }
 
     private BorrowedItemCommandHandler Commands(FakeCurrentUser? user = null)
@@ -153,7 +153,7 @@ public sealed class BorrowedItemTests
         await IssuedItem(daysUntilReturn: 10);
         _events.Events.Clear();
 
-        var job = new BorrowedItemReminderJob(_store, _scopes, _events);
+        var job = new BorrowedItemReminderJob(_store, _scopes, _events, new FakeUnitOfWork());
         var tomorrow = DateTimeOffset.UtcNow.AddDays(1);
         (await job.RunAsync(tomorrow)).Should().Be(2);
         (await job.RunAsync(tomorrow)).Should().Be(0);

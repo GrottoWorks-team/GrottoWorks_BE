@@ -170,7 +170,8 @@ public sealed class InspectionCommandHandler(
     IIntegrationEventPublisher publisher,
     ICurrentUser currentUser,
     IFileVerifier files,
-    ICorrectiveTaskCreator correctiveTasks)
+    ICorrectiveTaskCreator correctiveTasks,
+    IUnitOfWork unitOfWork)
 {
     public Task<ReadinessItemDto> RecordResultAsync(ItemResultCommand command, CancellationToken cancellationToken = default) =>
         InspectAsync(command, recheck: false, cancellationToken);
@@ -224,18 +225,22 @@ public sealed class InspectionCommandHandler(
             item.AttachEvidence(command.EvidenceFileIds);
         }
 
-        await store.SaveChangesAsync(cancellationToken);
-        if (command.Result == InspectionResult.Failed)
+        // The failed result and readiness.item.failed commit together (Parish moves the area to NEEDS_CORRECTION on it).
+        await unitOfWork.ExecuteAsync(async () =>
         {
-            await publisher.PublishAsync(
-                ReadinessItemFailed.EventType,
-                ReadinessItemFailed.Version,
-                new ReadinessItemFailed(checklist.ReadinessChecklistId, item.ReadinessItemId, scope.WorkAreaId, scope.SeasonId, scope.ParishId,
-                    scope.LeaderUserId, item.Name, item.Mandatory, item.Note, currentUser.UserId, now),
-                "readiness_checklist",
-                checklist.ReadinessChecklistId,
-                cancellationToken);
-        }
+            await store.SaveChangesAsync(cancellationToken);
+            if (command.Result == InspectionResult.Failed)
+            {
+                await publisher.PublishAsync(
+                    ReadinessItemFailed.EventType,
+                    ReadinessItemFailed.Version,
+                    new ReadinessItemFailed(checklist.ReadinessChecklistId, item.ReadinessItemId, scope.WorkAreaId, scope.SeasonId, scope.ParishId,
+                        scope.LeaderUserId, item.Name, item.Mandatory, item.Note, currentUser.UserId, now),
+                    "readiness_checklist",
+                    checklist.ReadinessChecklistId,
+                    cancellationToken);
+            }
+        }, cancellationToken);
 
         return ReadinessItemDto.From(item, checklist.Version);
     }
@@ -281,9 +286,13 @@ public sealed class ReadinessDecisionHandler(
     ChecklistLoader loader,
     IReadinessCheckStore store,
     IIntegrationEventPublisher publisher,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork)
 {
-    public async Task<ReadinessCheckDto> ConfirmAsync(CheckCommand command, CancellationToken cancellationToken = default)
+    public Task<ReadinessCheckDto> ConfirmAsync(CheckCommand command, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteAsync(() => ConfirmInTransactionAsync(command, cancellationToken), cancellationToken);
+
+    private async Task<ReadinessCheckDto> ConfirmInTransactionAsync(CheckCommand command, CancellationToken cancellationToken)
     {
         var (checklist, scope) = await loader.ForLeaderAsync(command.CheckId, command.Version, cancellationToken);
         // BA 9.2 / BR-73: a work area reaches READY from READINESS_REVIEW, i.e. once every non-cancelled task is COMPLETED.
@@ -307,7 +316,10 @@ public sealed class ReadinessDecisionHandler(
         return ReadinessCheckDto.From(checklist, scope);
     }
 
-    public async Task<ReadinessCheckDto> ReopenAsync(CheckCommand command, CancellationToken cancellationToken = default)
+    public Task<ReadinessCheckDto> ReopenAsync(CheckCommand command, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteAsync(() => ReopenInTransactionAsync(command, cancellationToken), cancellationToken);
+
+    private async Task<ReadinessCheckDto> ReopenInTransactionAsync(CheckCommand command, CancellationToken cancellationToken)
     {
         var (checklist, scope) = currentUser.Role == GrottoWorksRoles.Parish
             ? await loader.ForReadAsync(command.CheckId, cancellationToken)

@@ -36,11 +36,15 @@ public sealed class CreateInventoryAdjustmentCommandHandler(
     IInventoryStore inventory,
     IWorkAreaStockLock stockLock,
     ShortageTracker shortages,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork)
 {
     public const int MaxReasonLength = 500;
 
-    public async Task<InventoryTransactionDto> HandleAsync(CreateInventoryAdjustmentCommand command, CancellationToken cancellationToken = default)
+    public Task<InventoryTransactionDto> HandleAsync(CreateInventoryAdjustmentCommand command, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteAsync(() => HandleInTransactionAsync(command, cancellationToken), cancellationToken);
+
+    private async Task<InventoryTransactionDto> HandleInTransactionAsync(CreateInventoryAdjustmentCommand command, CancellationToken cancellationToken)
     {
         var scope = await access.ForMaterialOfficerWriteAsync(command.WorkAreaId, cancellationToken);
         var material = await catalog.GetMaterialAsync(command.MaterialId, cancellationToken)

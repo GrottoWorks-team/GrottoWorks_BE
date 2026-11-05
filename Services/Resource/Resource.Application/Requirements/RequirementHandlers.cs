@@ -1,3 +1,4 @@
+using Resource.Application.Abstractions;
 using Resource.Application.Catalog;
 using Resource.Application.Scope;
 using Resource.Application.Shortages;
@@ -84,7 +85,8 @@ public sealed class CreateMaterialRequirementCommandHandler(
     WorkAreaAccess access,
     IMaterialRequirementStore store,
     IMaterialCatalogStore catalog,
-    ShortageTracker shortages)
+    ShortageTracker shortages,
+    IUnitOfWork unitOfWork)
 {
     public async Task<MaterialRequirementDto> HandleAsync(
         CreateMaterialRequirementCommand command,
@@ -117,8 +119,11 @@ public sealed class CreateMaterialRequirementCommandHandler(
 
         var before = await shortages.CaptureAsync(scope, command.MaterialId, cancellationToken);
         store.Add(requirement);
-        await store.SaveChangesAsync(cancellationToken);
-        await shortages.PublishIfChangedAsync(before, cancellationToken);
+        await unitOfWork.ExecuteAsync(async () =>
+        {
+            await store.SaveChangesAsync(cancellationToken);
+            await shortages.PublishIfChangedAsync(before, cancellationToken);
+        }, cancellationToken);
         return MaterialRequirementDto.From(requirement, material);
     }
 }
@@ -128,7 +133,8 @@ public sealed class UpdateMaterialRequirementCommandHandler(
     WorkAreaAccess access,
     IMaterialRequirementStore store,
     IMaterialCatalogStore catalog,
-    ShortageTracker shortages)
+    ShortageTracker shortages,
+    IUnitOfWork unitOfWork)
 {
     public async Task<MaterialRequirementDto> HandleAsync(
         UpdateMaterialRequirementCommand command,
@@ -153,8 +159,11 @@ public sealed class UpdateMaterialRequirementCommandHandler(
 
         var before = await shortages.CaptureAsync(scope, requirement.MaterialId, cancellationToken);
         requirement.Update(command.RequiredQuantity, command.ExistingQuantity, command.Note, command.Status, DateTimeOffset.UtcNow);
-        await store.SaveChangesAsync(cancellationToken);
-        await shortages.PublishIfChangedAsync(before, cancellationToken);
+        await unitOfWork.ExecuteAsync(async () =>
+        {
+            await store.SaveChangesAsync(cancellationToken);
+            await shortages.PublishIfChangedAsync(before, cancellationToken);
+        }, cancellationToken);
         return MaterialRequirementDto.From(requirement, material);
     }
 }

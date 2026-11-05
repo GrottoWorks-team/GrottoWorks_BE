@@ -16,4 +16,14 @@ public sealed partial class AttendanceStore
         var sorted=descending ? query.OrderByDescending(r=>r.RequestedAt).ThenBy(r=>r.Id) : query.OrderBy(r=>r.RequestedAt).ThenBy(r=>r.Id);
         return (await sorted.Skip((page-1)*size).Take(size).ToListAsync(ct),total);
     }
+
+    public async Task<(IReadOnlyList<AttendanceRequest> Items,long Total)> MyRequestsPageAsync(Guid volunteerId,AttendanceRequestStatus status,
+        int page,int size,bool descending,CancellationToken ct)
+    {
+        var query=db.AttendanceRequests.AsNoTracking()
+            .Where(request => request.VolunteerId==volunteerId && request.Status==status);
+        var total=await query.LongCountAsync(ct);
+        var sorted=descending ? query.OrderByDescending(r=>r.RequestedAt).ThenBy(r=>r.Id) : query.OrderBy(r=>r.RequestedAt).ThenBy(r=>r.Id);
+        return (await sorted.Skip((page-1)*size).Take(size).ToListAsync(ct),total);
+    }
 }

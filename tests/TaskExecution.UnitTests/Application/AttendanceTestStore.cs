@@ -20,6 +20,12 @@ internal sealed partial class AttendanceTestStore(AssignmentTestFixture fixture)
         if (descending) query.Reverse();
         return Task.FromResult<(IReadOnlyList<AttendanceRequest>,long)>((query.Skip((page-1)*size).Take(size).ToList(),query.Count));
     }
+    public Task<(IReadOnlyList<AttendanceRequest> Items,long Total)> MyRequestsPageAsync(Guid volunteerId,AttendanceRequestStatus status,int page,int size,bool descending,CancellationToken ct)
+    {
+        var query=Requests.Where(r=>r.VolunteerId==volunteerId && r.Status==status).OrderBy(r=>r.RequestedAt).ThenBy(r=>r.Id).ToList();
+        if (descending) query.Reverse();
+        return Task.FromResult<(IReadOnlyList<AttendanceRequest>,long)>((query.Skip((page-1)*size).Take(size).ToList(),query.Count));
+    }
     public Task<AttendanceSession?> SessionAsync(Guid id,CancellationToken ct)=>Task.FromResult(Sessions.SingleOrDefault(r=>r.Id==id));
     public Task<AttendanceSession?> OpenSessionAsync(Guid id,CancellationToken ct)=>Task.FromResult(Sessions.SingleOrDefault(r=>r.AssignmentId==id && !r.CheckOutAt.HasValue));
     public Task<bool> HasPendingOrOpenAsync(Guid id,CancellationToken ct)=>Task.FromResult(

@@ -46,6 +46,11 @@ public sealed class AssignmentStore(TaskExecutionDbContext db) : IAssignmentStor
         await db.Assignments.Where(row => row.TaskId == taskId)
             .OrderBy(row => row.AssignedAt ?? row.RequestedAt).ThenBy(row => row.Id).ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<TaskAssignment>> ListForVolunteerAsync(Guid volunteerId, CancellationToken cancellationToken) =>
+        await db.Assignments.AsNoTracking().Where(row => row.VolunteerId == volunteerId)
+            .OrderByDescending(row => row.AssignedAt ?? row.RequestedAt).ThenBy(row => row.Id)
+            .ToListAsync(cancellationToken);
+
     public Task<TaskAssignment?> GetAsync(Guid assignmentId, CancellationToken cancellationToken) =>
         db.Assignments.SingleOrDefaultAsync(row => row.Id == assignmentId, cancellationToken);
 

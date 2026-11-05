@@ -55,7 +55,7 @@ services:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-grottoworks}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-grottoworks_minio_1234}
       - MINIO_CONSOLE_PORT_NUMBER=9001
-      - MINIO_API_CORS_ALLOW_ORIGIN=${FRONTEND_ORIGIN:-http://localhost:5173}
+      - MINIO_API_CORS_ALLOW_ORIGIN=${FRONTEND_ORIGIN:-http://localhost:5173},http://localhost:5174,http://localhost:5175,http://localhost:8081,http://localhost:8082
     restart: always
     ports:
       - "9000:9000"

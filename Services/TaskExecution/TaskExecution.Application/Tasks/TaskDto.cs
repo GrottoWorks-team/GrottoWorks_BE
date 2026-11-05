@@ -3,6 +3,12 @@ using TaskState = TaskExecution.Domain.Tasks.TaskStatus;
 
 namespace TaskExecution.Application.Tasks;
 
+/// <summary>Yêu cầu kỹ năng của task (`PUT /tasks/{id}/skills`).</summary>
+public sealed record TaskSkillDto(Guid SkillId, string? RequiredSkillLevel, int? RequiredVolunteerCount);
+
+/// <summary>Nhu cầu vật tư của task (`PUT /tasks/{id}/materials`).</summary>
+public sealed record TaskMaterialDto(Guid MaterialId, decimal RequiredQuantity, string? Note);
+
 public sealed record TaskDto(
     Guid Id,
     Guid WorkAreaId,
@@ -19,7 +25,9 @@ public sealed record TaskDto(
     TaskState Status,
     int Version,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? UpdatedAt)
+    DateTimeOffset? UpdatedAt,
+    IReadOnlyList<TaskSkillDto> Skills,
+    IReadOnlyList<TaskMaterialDto> Materials)
 {
     public static TaskDto From(WorkTask task) =>
         new(
@@ -38,5 +46,19 @@ public sealed record TaskDto(
             task.Status,
             task.Version,
             task.CreatedAt,
-            task.UpdatedAt);
+            task.UpdatedAt,
+            task.Skills
+                .OrderBy(skill => skill.SkillId)
+                .Select(skill => new TaskSkillDto(
+                    skill.SkillId,
+                    skill.RequiredSkillLevel,
+                    skill.RequiredVolunteerCount))
+                .ToArray(),
+            task.Materials
+                .OrderBy(material => material.MaterialId)
+                .Select(material => new TaskMaterialDto(
+                    material.MaterialId,
+                    material.RequiredQuantity,
+                    material.Note))
+                .ToArray());
 }

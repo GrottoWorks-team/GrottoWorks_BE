@@ -19,6 +19,8 @@ public interface IAttendanceStore
     Task<T> ForVolunteerAsync<T>(Guid volunteerId, Func<Task<T>> action, CancellationToken cancellationToken);
     Task<AttendanceRequest?> RequestAsync(Guid id, CancellationToken cancellationToken);
     Task<(IReadOnlyList<AttendanceRequest> Items,long Total)> RequestsPageAsync(Guid areaId,AttendanceRequestStatus status,int page,int size,bool descending,CancellationToken cancellationToken);
+    /// <summary>Đơn chấm công của chính TNV (app mobile cần biết đơn đang chờ duyệt).</summary>
+    Task<(IReadOnlyList<AttendanceRequest> Items,long Total)> MyRequestsPageAsync(Guid volunteerId,AttendanceRequestStatus status,int page,int size,bool descending,CancellationToken cancellationToken);
     Task<AttendanceSession?> SessionAsync(Guid id, CancellationToken cancellationToken);
     Task<AttendanceSession?> OpenSessionAsync(Guid assignmentId,CancellationToken cancellationToken);
     Task<bool> HasPendingOrOpenAsync(Guid volunteerId, CancellationToken cancellationToken);

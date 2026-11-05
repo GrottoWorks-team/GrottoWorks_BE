@@ -6,6 +6,8 @@ public interface IAssignmentStore
 {
     Task<T> InTaskTransactionAsync<T>(Guid taskId, Func<Task<T>> action, CancellationToken cancellationToken);
     Task<IReadOnlyList<TaskAssignment>> ListAsync(Guid taskId, CancellationToken cancellationToken);
+    /// <summary>Phân công/đơn đăng ký của một TNV (dùng cho app mobile: cần `assignmentId` để phản hồi).</summary>
+    Task<IReadOnlyList<TaskAssignment>> ListForVolunteerAsync(Guid volunteerId, CancellationToken cancellationToken);
     Task<TaskAssignment?> GetAsync(Guid assignmentId, CancellationToken cancellationToken);
     /// <summary>Reload the current assignment after acquiring its Task transaction lock.</summary>
     Task<TaskAssignment?> GetForUpdateAsync(Guid assignmentId,CancellationToken cancellationToken);

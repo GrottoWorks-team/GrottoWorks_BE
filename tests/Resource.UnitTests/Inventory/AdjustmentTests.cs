@@ -38,7 +38,7 @@ public sealed class AdjustmentTests
     private CreateInventoryAdjustmentCommandHandler Adjust(Guid? officer = null)
     {
         var user = new FakeCurrentUser(officer ?? _officer, GrottoWorksRoles.MaterialOfficer, Parish);
-        return new(new WorkAreaAccess(_scopes, user), _catalog, Reader(), _inventory, _lock, new ShortageTracker(Reader(), _events), user);
+        return new(new WorkAreaAccess(_scopes, user), _catalog, Reader(), _inventory, _lock, new ShortageTracker(Reader(), _events), user, new FakeUnitOfWork());
     }
 
     private CreateInventoryAdjustmentCommand Command(AdjustmentKind kind, decimal quantity, string? reason = "Mưa làm hỏng") =>

@@ -89,6 +89,8 @@ public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecor
 
         var (contributions, points) = await recorder.RecordAsync(drafts ?? [], now, cancellationToken);
         inbox.Add(ProcessedEvent.Record(incoming.EventId, incoming.EventType, nameof(IngestionOutcome.Applied), now));
+        // Staged on the same unit of work: points, inbox row and recognition.entry.created commit in one SaveChanges.
+        await recorder.PublishAsync(points, cancellationToken);
         try
         {
             if (!await SaveAsync(cancellationToken))
@@ -107,7 +109,6 @@ public sealed class IntegrationEventHandler(IInboxStore inbox, ContributionRecor
             throw;
         }
 
-        await recorder.PublishAsync(points, cancellationToken);
         return new IngestionResult(incoming.EventId, incoming.EventType, IngestionOutcome.Applied, contributions, points.Count);
     }
 

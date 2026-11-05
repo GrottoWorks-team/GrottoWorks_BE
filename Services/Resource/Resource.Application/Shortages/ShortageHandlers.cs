@@ -94,7 +94,7 @@ public sealed class ListMaterialNeedsQueryHandler(WorkAreaAccess access, IWorkAr
 
 /// <summary>
 /// Publishes <c>material.shortage.changed</c> when a write changed the shortage of a (work area, material).
-/// Usage: <c>var before = await tracker.CaptureAsync(...)</c> → write + save → <c>await tracker.PublishIfChangedAsync(before)</c>.
+/// Usage: <c>var before = await tracker.CaptureAsync(...)</c> → inside <c>IUnitOfWork</c>: write + save → <c>await tracker.PublishIfChangedAsync(before)</c>.
 /// </summary>
 public sealed class ShortageTracker(InventoryReader reader, IIntegrationEventPublisher publisher)
 {

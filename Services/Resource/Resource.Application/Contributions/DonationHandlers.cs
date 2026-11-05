@@ -211,9 +211,13 @@ public sealed class RecordDirectDonationCommandHandler(
     IMaterialCatalogStore catalog,
     DonationReceiptPoster poster,
     DonationProjector projector,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork)
 {
-    public async Task<DonationDto> HandleAsync(RecordDirectDonationCommand command, CancellationToken cancellationToken = default)
+    public Task<DonationDto> HandleAsync(RecordDirectDonationCommand command, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteAsync(() => HandleInTransactionAsync(command, cancellationToken), cancellationToken);
+
+    private async Task<DonationDto> HandleInTransactionAsync(RecordDirectDonationCommand command, CancellationToken cancellationToken)
     {
         var (scope, seasonId, parishId) = await officers.ResolveAsync(command.Type, command.WorkAreaId, command.SeasonId, cancellationToken);
 
@@ -363,9 +367,13 @@ public sealed class RecordDonationReceiptCommandHandler(
     IDonationStore store,
     IDonorStore donors,
     DonationReceiptPoster poster,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork)
 {
-    public async Task<RecordedReceiptDto> HandleAsync(RecordDonationReceiptCommand command, CancellationToken cancellationToken = default)
+    public Task<RecordedReceiptDto> HandleAsync(RecordDonationReceiptCommand command, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteAsync(() => HandleInTransactionAsync(command, cancellationToken), cancellationToken);
+
+    private async Task<RecordedReceiptDto> HandleInTransactionAsync(RecordDonationReceiptCommand command, CancellationToken cancellationToken)
     {
         var donation = await store.GetAsync(command.DonationId, cancellationToken)
             ?? throw DomainRuleException.NotFound("DONATION_NOT_FOUND", "The donation does not exist.");

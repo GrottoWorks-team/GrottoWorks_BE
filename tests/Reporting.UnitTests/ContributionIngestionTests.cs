@@ -187,6 +187,20 @@ public sealed class ContributionIngestionTests
     }
 
     [Fact]
+    public async Task Recognition_events_are_staged_before_the_points_commit()
+    {
+        // Published after the commit, a crash in between kept the points but lost recognition.entry.created.
+        Rule(ContributionType.TaskCompletion, 10);
+        var committedWhenPublished = new List<int>();
+        _publisher.BeforePublish = () => committedWhenPublished.Add(_store.Points.Count);
+
+        await Handler.HandleAsync(Event(TaskCompletionReviewed.EventType, Review("APPROVED", Guid.NewGuid(), Guid.NewGuid())));
+
+        committedWhenPublished.Should().HaveCount(2).And.OnlyContain(count => count == 0);
+        _store.Points.Should().HaveCount(2);
+    }
+
+    [Fact]
     public async Task Redelivered_or_repeated_events_are_never_counted_twice()
     {
         Rule(ContributionType.TaskCompletion, 10);

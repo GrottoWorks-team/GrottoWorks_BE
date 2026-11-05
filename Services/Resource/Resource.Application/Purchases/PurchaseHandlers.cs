@@ -243,9 +243,14 @@ public sealed class ConfirmPurchaseDeliveryCommandHandler(
     IInventoryStore inventory,
     ShortageTracker shortages,
     IIntegrationEventPublisher publisher,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork)
 {
-    public async Task<PurchaseDto> HandleAsync(ConfirmDeliveryCommand command, CancellationToken cancellationToken = default)
+    // Ledger, request status and purchase.delivery.confirmed commit together: TaskExecution closes the PURCHASE task on it.
+    public Task<PurchaseDto> HandleAsync(ConfirmDeliveryCommand command, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteAsync(() => ConfirmInTransactionAsync(command, cancellationToken), cancellationToken);
+
+    private async Task<PurchaseDto> ConfirmInTransactionAsync(ConfirmDeliveryCommand command, CancellationToken cancellationToken)
     {
         var (purchase, request, _) = await context.LoadAsync(command.PurchaseId, cancellationToken);
         var scope = await access.ForMaterialOfficerWriteAsync(request.WorkAreaId, cancellationToken);

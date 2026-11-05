@@ -9,13 +9,13 @@ namespace Reporting.Infrastructure.Outbox;
 
 /// <summary>
 /// Writes integration events to <c>integration_event_outbox</c> (F-PLT-05 pattern, per service); <see cref="OutboxDispatcher"/>
-/// publishes them. The row is saved through the handler's DbContext: inside a command that already runs in a database
-/// transaction (stock lock) it commits with the business change, otherwise right after it.
+/// publishes them. The row is only staged on the handler's DbContext and commits with the handler's next SaveChanges, so the
+/// event and the business change it describes are written atomically (a recognition point never exists without its event).
 /// </summary>
 public sealed class OutboxIntegrationEventPublisher(ReportingDbContext dbContext, ICurrentUser currentUser, IHttpContextAccessor httpContextAccessor)
     : IIntegrationEventPublisher
 {
-    public async Task PublishAsync<TPayload>(
+    public Task PublishAsync<TPayload>(
         string eventType,
         int version,
         TPayload payload,
@@ -40,7 +40,7 @@ public sealed class OutboxIntegrationEventPublisher(ReportingDbContext dbContext
             aggregateId,
             body);
         dbContext.Add(OutboxMessage.Create(message));
-        await dbContext.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 
     private static Guid? ReadGuid(JsonElement body, string property) =>

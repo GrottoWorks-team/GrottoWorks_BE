@@ -85,7 +85,7 @@ Mẫu request: `Resource.Api.http`.
 | `POST /api/v1/material-allocations` | `allocateMaterial` | MO của work area — từ phần chưa phân bổ, tùy chọn gắn task đang mở | F-RES-15 |
 | `GET /api/v1/material-allocations` | `listMaterialAllocations` | PARISH, LEADER, MO — `seasonId,workAreaId,taskId,materialId` | F-RES-15 |
 | `POST /api/v1/inventory-adjustments` | `createInventoryAdjustment` | MO của work area — `DAMAGED|LOST|DISPOSED`, lý do bắt buộc, ≤ phần chưa phân bổ | F-RES-16 |
-| `POST /api/v1/tasks/{id}/material-reports` | `submitTaskMaterialReport` | VOLUNTEER được giao task (assignee ACCEPTED), task COMPLETED | F-RES-17 |
+| `POST /api/v1/tasks/{id}/material-reports` | `submitTaskMaterialReport` | Task COMPLETED: VOLUNTEER được giao task (assignee ACCEPTED). Task CANCELLED còn allocation: assignee hoặc MO của work area | F-RES-17 |
 | `GET /api/v1/tasks/{id}/material-reports` | `listTaskMaterialReports` | LEADER, MO cùng parish; VOLUNTEER được giao task | F-RES-17 |
 | `POST /api/v1/task-material-reports/{id}/verify` | `verifyTaskMaterialReport` | MO của work area — trả phần remaining về kho | F-RES-17 |
 | `POST /api/v1/task-material-reports/{id}/request-revision` | `requestMaterialReportRevision` | MO của work area — lý do bắt buộc | F-RES-17 |
@@ -114,7 +114,11 @@ Mẫu request: `Resource.Api.http`.
   unique `(reference_type, reference_id, transaction_type)` → mỗi chứng từ chỉ post một lần.
 - `InventoryCalculator`: `confirmedAvailable = SUM(ledger)`, `unallocated = available − allocated` (allocated = tổng
   `material_allocation_item`, Contract 7.1; phần dư sau task quay lại qua `TASK_RETURN` khi MO verify — F-RES-17),
-  `shortage = max(0, required − available)` (BR-25). `existing_quantity` của requirement chỉ để hiển thị.
+  `shortage = max(0, required − (available − TASK_RETURN))` (BR-25). Phần trả về từ task là hàng đã nhận một lần: nó
+  tăng `unallocated` nhưng không đáp ứng requirement lần nữa (allocation không bao giờ giảm — BR-51). `existing_quantity`
+  của requirement chỉ để hiển thị.
+- Command nào lưu thay đổi rồi publish event phải chạy trong `IUnitOfWork` (một transaction, dùng chung transaction đang
+  mở) để thay đổi và dòng outbox commit cùng nhau.
 - `material.shortage.changed` (v1) chỉ phát khi shortage của (work area, material) thực sự đổi.
 
 ## Purchase request (F-RES-06/07, BA 8.6 + 9.5, D-01)
@@ -199,13 +203,20 @@ Mẫu request: `Resource.Api.http`.
 
 ## Task material report (F-RES-17, BR-44..51)
 
-- Chỉ khi task `COMPLETED` (BR-44), chỉ volunteer có assignee ACCEPTED (`task_projection.assignee_user_ids`). Mỗi
+- Task `COMPLETED` (BR-44): chỉ volunteer có assignee ACCEPTED (`task_projection.assignee_user_ids`).
+- Task `CANCELLED` còn vật tư đã cấp (V-04): assignee **hoặc MO của work area** nộp report (task hủy trước khi có người
+  nhận thì không có assignee); MO verify như thường và phần remaining đã verify quay về kho. Khi `task.status.changed`
+  chuyển task sang CANCELLED mà task còn allocation, Resource phát một lần `material.allocation.recall-required`
+  (taskId, work area, MO, các dòng allocation) để NotificationAudit nhắc MO thu hồi.
+- Allocation cấp cho work area (không gắn task) được xem là **đã tiêu thụ** khi cấp, không có đường trả về kho (V-05);
+  muốn thu hồi phần dư thì cấp theo task.
+- Mỗi
   allocation item của task đúng **một** dòng, không thêm material khác (BR-45); `remaining + damaged + lost ≤ allocated`.
 - Một report/task (unique `task_id`); `REVISION_REQUIRED` → volunteer gửi lại vào chính report đó (thay dòng).
 - Verify (MO của work area, BR-47): nhập `verified_*` cho mọi dòng; `verifiedRemaining > 0` → `TASK_RETURN` vào **đúng**
   work area, `reference = (TASK_MATERIAL_REPORT_ITEM, id dòng)` → post một lần (BR-49). Damaged/lost không vào kho (BR-50).
   Allocation giữ nguyên (BR-51); `usedQuantity = allocated − remaining − damaged − lost`. Một transaction.
-- Event `material-report.submitted` (kèm MO cần verify), `material-report.verified`.
+- Event `material-report.submitted` (kèm MO cần verify), `material-report.verified`, `material.allocation.recall-required`.
 - **Bổ sung so với ERD**: cột `task_material_report.revision_reason` (lý do trả về cho volunteer xem).
 
 ## Chuyển kho hỗ trợ vật tư (F-RES-20, D-03, BR-63/64, R-08/22/23)

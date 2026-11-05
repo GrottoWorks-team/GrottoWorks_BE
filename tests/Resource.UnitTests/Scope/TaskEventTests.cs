@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Resource.Application.Purchases;
 using Resource.Application.Scope;
+using Resource.Contracts.Events;
 using Resource.Domain;
 using Resource.Domain.Purchases;
 using Resource.Domain.Scope;
@@ -28,7 +29,12 @@ public sealed class TaskEventTests
         _tasks.Add(_task);
     }
 
-    private ApplyTaskEventHandler Handler() => new(_tasks, new PurchaseBuyerSync(_requests));
+    private readonly FakeInventoryStore _inventory = new(new FakeRequirementStore());
+    private readonly FakeScopeStore _scopes = new();
+    private readonly FakeIntegrationEventPublisher _events = new();
+
+    private ApplyTaskEventHandler Handler() =>
+        new(_tasks, new PurchaseBuyerSync(_requests), new FakeAllocationStore(_inventory), _scopes, _events, new FakeUnitOfWork());
 
     private TaskIntegrationEvent Event(string type, object payload, long version, Guid? taskId = null) =>
         new(Guid.NewGuid(), type, 1, DateTimeOffset.UtcNow, "c", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "task", taskId ?? _task.TaskId,
@@ -44,6 +50,32 @@ public sealed class TaskEventTests
 
         _task.AssigneeUserIds.Should().Equal(buyer);
         _request.Status.Should().Be(PurchaseRequestStatus.BuyerAssigned);
+    }
+
+    [Fact]
+    public async Task Cancelling_a_task_that_holds_materials_asks_the_officer_to_recall_them_once()
+    {
+        var officer = Guid.NewGuid();
+        var area = _scopes.Seed(Guid.NewGuid(), officer);
+        var task = TaskProjection.FromSnapshot(new TaskSnapshot(Guid.NewGuid(), area.WorkAreaId, "Dựng hang", ProjectedTaskType.Work,
+            ProjectedTaskStatus.InProgress, null, [], 1), DateTimeOffset.UtcNow);
+        _tasks.Add(task);
+        var materialId = Guid.NewGuid();
+        var allocation = Resource.Domain.Inventory.MaterialAllocation.Create(area.WorkAreaId, task.TaskId,
+            [new Resource.Domain.Inventory.AllocationLineInput(materialId, 12)], DateTimeOffset.UtcNow, null, officer, DateTimeOffset.UtcNow);
+        _inventory.Allocations.Add(allocation);
+
+        (await Handler().HandleAsync(Event(TaskEventTypes.StatusChanged, new { status = "CANCELLED" }, 2, task.TaskId))).Should().BeTrue();
+        (await Handler().HandleAsync(Event(TaskEventTypes.StatusChanged, new { status = "CANCELLED" }, 3, task.TaskId))).Should().BeTrue();
+
+        var recall = _events.Events.Should().ContainSingle(e => e.EventType == MaterialAllocationRecallRequired.EventType).Which.Payload
+            .Should().BeOfType<MaterialAllocationRecallRequired>().Which;
+        recall.MaterialOfficerUserId.Should().Be(officer);
+        recall.Items.Should().ContainSingle(line => line.MaterialId == materialId && line.AllocatedQuantity == 12);
+
+        // A cancelled task without allocated materials needs no recall.
+        (await Handler().HandleAsync(Event(TaskEventTypes.StatusChanged, new { status = "CANCELLED" }, 4))).Should().BeTrue();
+        _events.Events.Should().ContainSingle();
     }
 
     [Fact]

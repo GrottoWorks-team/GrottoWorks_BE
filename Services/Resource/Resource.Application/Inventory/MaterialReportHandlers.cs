@@ -130,9 +130,14 @@ public sealed class MaterialReportContext(
 }
 
 /// <summary>
-/// F-RES-17 <c>submitTaskMaterialReport</c> (VOLUNTEER with an ACCEPTED assignment on the task): only after the leader
-/// completed the task (BR-44), one line per allocation item of the task (BR-45). A report sent back for revision is
-/// resubmitted in place; otherwise one report per task.
+/// F-RES-17 <c>submitTaskMaterialReport</c>: one line per allocation item of the task (BR-45). A report sent back for
+/// revision is resubmitted in place; otherwise one report per task.
+/// <list type="bullet">
+/// <item>COMPLETED task (BR-44): a VOLUNTEER with an ACCEPTED assignment on the task.</item>
+/// <item>CANCELLED task holding allocated materials (V-04): an assignee, or the MATERIAL OFFICER of the work area —
+/// a task cancelled before anyone accepted it has no assignee to report.</item>
+/// </list>
+/// Either way the officer verifies, and only the verified remainder goes back to stock (BR-49).
 /// </summary>
 public sealed class SubmitMaterialReportCommandHandler(
     MaterialReportContext context,
@@ -147,14 +152,18 @@ public sealed class SubmitMaterialReportCommandHandler(
     private async Task<TaskMaterialReportDto> HandleInTransactionAsync(SubmitMaterialReportCommand command, CancellationToken cancellationToken)
     {
         var (task, scope) = await context.TaskAsync(command.TaskId, cancellationToken);
-        if (!task.AssigneeUserIds.Contains(currentUser.UserId))
+        var isAssignee = currentUser.Role == GrottoWorksRoles.Volunteer && task.AssigneeUserIds.Contains(currentUser.UserId);
+        var isOfficer = currentUser.Role == GrottoWorksRoles.MaterialOfficer && scope.MaterialOfficerUserId == currentUser.UserId;
+        var cancelled = task.Status == ProjectedTaskStatus.Cancelled;
+        if (!isAssignee && !(cancelled && isOfficer))
         {
-            throw DomainRuleException.Forbidden("MATERIAL_REPORT_NOT_ASSIGNEE", "Only a volunteer assigned to the task can report its materials.");
+            throw DomainRuleException.Forbidden("MATERIAL_REPORT_NOT_ASSIGNEE",
+                "Only a volunteer assigned to the task, or the material officer of a cancelled task, can report its materials.");
         }
 
-        if (task.Status != ProjectedTaskStatus.Completed)
+        if (task.Status != ProjectedTaskStatus.Completed && !cancelled)
         {
-            throw new DomainRuleException("TASK_NOT_COMPLETED", "The leader must complete the task before its material report (BR-44).");
+            throw new DomainRuleException("TASK_NOT_COMPLETED", "The leader must complete or cancel the task before its material report (BR-44).");
         }
 
         WorkAreaAccess.EnsureWritable(scope);

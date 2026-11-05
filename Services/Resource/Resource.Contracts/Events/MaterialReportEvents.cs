@@ -48,3 +48,26 @@ public sealed record MaterialReportVerified(
 
     public const int Version = 1;
 }
+
+/// <summary>One allocation item still out with a cancelled task.</summary>
+public sealed record AllocationRecallLine(Guid MaterialAllocationItemId, Guid MaterialId, decimal AllocatedQuantity);
+
+/// <summary>
+/// <c>material.allocation.recall-required</c> — publisher Resource (Vũ), consumer NotificationAudit (tell
+/// <see cref="MaterialOfficerUserId"/> to collect the materials). Raised once when a task that holds allocated materials is
+/// cancelled: the officer (or an assignee) files the material report of the cancelled task so the verified remainder
+/// goes back to the work area's stock (BR-44 as extended for cancelled tasks).
+/// </summary>
+public sealed record MaterialAllocationRecallRequired(
+    Guid TaskId,
+    Guid WorkAreaId,
+    Guid SeasonId,
+    Guid ParishId,
+    Guid? MaterialOfficerUserId,
+    IReadOnlyList<AllocationRecallLine> Items,
+    DateTimeOffset CancelledAt)
+{
+    public const string EventType = "material.allocation.recall-required";
+
+    public const int Version = 1;
+}

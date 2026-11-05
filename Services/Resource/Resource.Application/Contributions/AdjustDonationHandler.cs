@@ -37,11 +37,15 @@ public sealed class AdjustDonationCommandHandler(
     ShortageTracker shortages,
     DonationProjector projector,
     IIntegrationEventPublisher publisher,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork)
 {
     public const int MaxReasonLength = 500;
 
-    public async Task<DonationDto> HandleAsync(AdjustDonationCommand command, CancellationToken cancellationToken = default)
+    public Task<DonationDto> HandleAsync(AdjustDonationCommand command, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteAsync(() => HandleInTransactionAsync(command, cancellationToken), cancellationToken);
+
+    private async Task<DonationDto> HandleInTransactionAsync(AdjustDonationCommand command, CancellationToken cancellationToken)
     {
         var donation = await store.GetAsync(command.DonationId, cancellationToken) ?? throw NotFound();
         Domain.Scope.WorkAreaScope? scope;

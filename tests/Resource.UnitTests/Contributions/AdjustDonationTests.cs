@@ -46,7 +46,7 @@ public sealed class AdjustDonationTests
     {
         var current = user ?? Officer();
         return new(new MaterialOfficerScope(new WorkAreaAccess(_scopes, current), _scopes, current), _store, _donors, _catalog, Reader(),
-            _inventory, _lock, new ShortageTracker(Reader(), _events), new DonationProjector(_donors, _catalog), _events, current);
+            _inventory, _lock, new ShortageTracker(Reader(), _events), new DonationProjector(_donors, _catalog), _events, current, new FakeUnitOfWork());
     }
 
     /// <summary>Direct MATERIAL donation of 20 m with 2 unusable, already posted (+18).</summary>

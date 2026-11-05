@@ -54,14 +54,14 @@ public sealed class MaterialReportTests
     private SubmitMaterialReportCommandHandler Submit(FakeCurrentUser? user = null)
     {
         var current = user ?? Volunteer();
-        return new(Context(current), _reports, _events, current);
+        return new(Context(current), _reports, _events, current, new FakeUnitOfWork());
     }
 
     private VerifyMaterialReportCommandHandler Verify(FakeCurrentUser? user = null)
     {
         var current = user ?? Officer();
         var reader = new InventoryReader(_inventory, _catalog);
-        return new(Context(current), _reports, _inventory, new ShortageTracker(reader, _events), new WorkAreaAccess(_scopes, current), _events, current);
+        return new(Context(current), _reports, _inventory, new ShortageTracker(reader, _events), new WorkAreaAccess(_scopes, current), _events, current, new FakeUnitOfWork());
     }
 
     private RequestReportRevisionCommandHandler Revise(FakeCurrentUser? user = null)

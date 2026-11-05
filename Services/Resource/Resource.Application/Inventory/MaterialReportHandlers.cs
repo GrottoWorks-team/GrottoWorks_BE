@@ -138,9 +138,13 @@ public sealed class SubmitMaterialReportCommandHandler(
     MaterialReportContext context,
     ITaskMaterialReportStore store,
     IIntegrationEventPublisher publisher,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork)
 {
-    public async Task<TaskMaterialReportDto> HandleAsync(SubmitMaterialReportCommand command, CancellationToken cancellationToken = default)
+    public Task<TaskMaterialReportDto> HandleAsync(SubmitMaterialReportCommand command, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteAsync(() => HandleInTransactionAsync(command, cancellationToken), cancellationToken);
+
+    private async Task<TaskMaterialReportDto> HandleInTransactionAsync(SubmitMaterialReportCommand command, CancellationToken cancellationToken)
     {
         var (task, scope) = await context.TaskAsync(command.TaskId, cancellationToken);
         if (!task.AssigneeUserIds.Contains(currentUser.UserId))
@@ -215,9 +219,13 @@ public sealed class VerifyMaterialReportCommandHandler(
     ShortageTracker shortages,
     WorkAreaAccess access,
     IIntegrationEventPublisher publisher,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork)
 {
-    public async Task<TaskMaterialReportDto> HandleAsync(VerifyMaterialReportCommand command, CancellationToken cancellationToken = default)
+    public Task<TaskMaterialReportDto> HandleAsync(VerifyMaterialReportCommand command, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteAsync(() => HandleInTransactionAsync(command, cancellationToken), cancellationToken);
+
+    private async Task<TaskMaterialReportDto> HandleInTransactionAsync(VerifyMaterialReportCommand command, CancellationToken cancellationToken)
     {
         var report = await store.GetAsync(command.ReportId, cancellationToken) ?? throw NotFound();
         var (task, _) = await context.TaskAsync(report.TaskId, cancellationToken);

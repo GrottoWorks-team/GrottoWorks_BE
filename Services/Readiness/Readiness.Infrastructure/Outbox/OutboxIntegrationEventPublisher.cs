@@ -9,8 +9,8 @@ namespace Readiness.Infrastructure.Outbox;
 
 /// <summary>
 /// Writes integration events to <c>integration_event_outbox</c> (F-PLT-05 pattern, per service); <see cref="OutboxDispatcher"/>
-/// publishes them. The row is saved through the handler's DbContext: inside a command that already runs in a database
-/// transaction (stock lock) it commits with the business change, otherwise right after it.
+/// publishes them. The row is saved through the handler's DbContext. A command that saves its change before publishing must
+/// run inside <c>IUnitOfWork</c> (or another open transaction) so the change and the row commit together.
 /// </summary>
 public sealed class OutboxIntegrationEventPublisher(ReadinessDbContext dbContext, ICurrentUser currentUser, IHttpContextAccessor httpContextAccessor)
     : IIntegrationEventPublisher

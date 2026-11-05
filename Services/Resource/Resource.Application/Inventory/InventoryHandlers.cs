@@ -1,3 +1,4 @@
+using Resource.Application.Abstractions;
 using BuildingBlocks.Security;
 using Resource.Application.Catalog;
 using Resource.Application.Scope;
@@ -35,7 +36,8 @@ public sealed class RecordOpeningStockCommandHandler(
     ICurrentUser currentUser,
     IInventoryStore inventory,
     IMaterialCatalogStore catalog,
-    ShortageTracker shortages)
+    ShortageTracker shortages,
+    IUnitOfWork unitOfWork)
 {
     public async Task<InventoryTransactionDto> HandleAsync(
         RecordOpeningStockCommand command,
@@ -75,8 +77,11 @@ public sealed class RecordOpeningStockCommandHandler(
 
         var before = await shortages.CaptureAsync(scope, command.MaterialId, cancellationToken);
         inventory.Append(transaction);
-        await inventory.SaveChangesAsync(cancellationToken);
-        await shortages.PublishIfChangedAsync(before, cancellationToken);
+        await unitOfWork.ExecuteAsync(async () =>
+        {
+            await inventory.SaveChangesAsync(cancellationToken);
+            await shortages.PublishIfChangedAsync(before, cancellationToken);
+        }, cancellationToken);
         return InventoryTransactionDto.From(transaction);
     }
 }

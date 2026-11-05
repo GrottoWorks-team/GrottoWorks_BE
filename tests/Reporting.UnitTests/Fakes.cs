@@ -9,11 +9,14 @@ public sealed class FakeIntegrationEventPublisher : IIntegrationEventPublisher
 {
     public sealed record Published(string EventType, int Version, object Payload, string AggregateType, Guid AggregateId);
 
+    public Action? BeforePublish { get; set; }
+
     public List<Published> Events { get; } = [];
 
     public Task PublishAsync<TPayload>(string eventType, int version, TPayload payload, string aggregateType, Guid aggregateId, CancellationToken cancellationToken = default)
         where TPayload : class
     {
+        BeforePublish?.Invoke();
         Events.Add(new Published(eventType, version, payload, aggregateType, aggregateId));
         return Task.CompletedTask;
     }

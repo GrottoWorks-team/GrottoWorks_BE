@@ -52,13 +52,13 @@ public sealed class PledgeTests
     {
         var current = user ?? Volunteer();
         return new(new WorkAreaAccess(_scopes, current), _requirements, _catalog, new VolunteerDonorResolver(_donors, _identity, current),
-            _store, Projector(), _events, current);
+            _store, Projector(), _events, current, new FakeUnitOfWork());
     }
 
     private PledgeMoneyCommandHandler PledgeMoney(FakeCurrentUser? user = null)
     {
         var current = user ?? Volunteer();
-        return new(new WorkAreaAccess(_scopes, current), _scopes, new VolunteerDonorResolver(_donors, _identity, current), _store, Projector(), _events, current);
+        return new(new WorkAreaAccess(_scopes, current), _scopes, new VolunteerDonorResolver(_donors, _identity, current), _store, Projector(), _events, current, new FakeUnitOfWork());
     }
 
     private CancelPledgeCommandHandler Cancel(FakeCurrentUser user) =>

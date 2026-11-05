@@ -27,6 +27,7 @@ public sealed class PurchaseTests
     private readonly FakeTaskProjectionStore _tasks = new();
     private readonly FakeIntegrationEventPublisher _events = new();
     private readonly FakeFileVerifier _files = new();
+    private readonly FakeUnitOfWork _unitOfWork = new();
     private readonly WorkAreaScope _area;
     private readonly Guid _leader;
     private readonly Material _cable;
@@ -71,7 +72,7 @@ public sealed class PurchaseTests
     {
         var user = User(officer ?? _officer, GrottoWorksRoles.MaterialOfficer);
         var reader = new InventoryReader(_inventory, _catalog);
-        return new(Context(user), _purchases, new WorkAreaAccess(_scopes, user), _inventory, new ShortageTracker(reader, _events), _events, user);
+        return new(Context(user), _purchases, new WorkAreaAccess(_scopes, user), _inventory, new ShortageTracker(reader, _events), _events, user, _unitOfWork);
     }
 
     private PurchaseReviewCommandHandler Review(Guid userId, string role)
@@ -139,6 +140,22 @@ public sealed class PurchaseTests
         await Confirm().HandleAsync(Delivered(second, 22));
         _request.Status.Should().Be(PurchaseRequestStatus.Completed);
         _inventory.Ledger.Sum(t => t.Quantity).Should().Be(50);
+    }
+
+    [Fact]
+    public async Task Delivery_stock_and_events_are_written_in_one_unit_of_work()
+    {
+        // A crash between the ledger commit and the outbox write used to lose purchase.delivery.confirmed,
+        // leaving TaskExecution's PURCHASE task open although the stock had arrived.
+        var purchase = await Record().HandleAsync(Bought(10));
+        var publishedOutside = new List<int>();
+        _events.BeforePublish = () => { if (!_unitOfWork.IsActive) publishedOutside.Add(_events.Events.Count); };
+
+        await Confirm().HandleAsync(Delivered(purchase, 10));
+
+        publishedOutside.Should().BeEmpty();
+        _unitOfWork.Committed.Should().Be(1);
+        _events.Events.Select(e => e.EventType).Should().Contain(PurchaseDeliveryConfirmed.EventType);
     }
 
     [Fact]

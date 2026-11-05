@@ -48,7 +48,7 @@ public sealed class DonationReceiptTests
     {
         var current = user ?? Officer();
         return new(new MaterialOfficerScope(new WorkAreaAccess(_scopes, current), _scopes, current), _store, _donors,
-            new DonationReceiptPoster(_inventory, new ShortageTracker(new InventoryReader(_inventory, _catalog), _events), _events, current), current);
+            new DonationReceiptPoster(_inventory, new ShortageTracker(new InventoryReader(_inventory, _catalog), _events), _events, current), current, new FakeUnitOfWork());
     }
 
     private Donation PledgeMaterial(decimal cable = 20, decimal bulb = 10)

@@ -38,7 +38,7 @@ public sealed class InventoryHandlerTests
 
     private RecordOpeningStockCommandHandler Opening() =>
         new(Access(), new FakeCurrentUser(_officer, GrottoWorksRoles.MaterialOfficer, Parish), _inventory, _catalog,
-            new Resource.Application.Shortages.ShortageTracker(new InventoryReader(_inventory, _catalog), _events));
+            new Resource.Application.Shortages.ShortageTracker(new InventoryReader(_inventory, _catalog), _events), new FakeUnitOfWork());
 
     private ListInventoryQueryHandler List(string role = GrottoWorksRoles.Parish) =>
         new(Access(Guid.NewGuid(), role), _scopes, new InventoryReader(_inventory, _catalog));

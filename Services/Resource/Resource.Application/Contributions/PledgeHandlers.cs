@@ -115,9 +115,13 @@ public sealed class PledgeMaterialCommandHandler(
     IDonationStore store,
     DonationProjector projector,
     IIntegrationEventPublisher publisher,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork)
 {
-    public async Task<DonationDto> HandleAsync(PledgeMaterialCommand command, CancellationToken cancellationToken = default)
+    public Task<DonationDto> HandleAsync(PledgeMaterialCommand command, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteAsync(() => HandleInTransactionAsync(command, cancellationToken), cancellationToken);
+
+    private async Task<DonationDto> HandleInTransactionAsync(PledgeMaterialCommand command, CancellationToken cancellationToken)
     {
         var scope = await access.ForReadAsync(command.WorkAreaId, cancellationToken);
         WorkAreaAccess.EnsureWritable(scope);
@@ -153,9 +157,13 @@ public sealed class PledgeMoneyCommandHandler(
     IDonationStore store,
     DonationProjector projector,
     IIntegrationEventPublisher publisher,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork)
 {
-    public async Task<DonationDto> HandleAsync(PledgeMoneyCommand command, CancellationToken cancellationToken = default)
+    public Task<DonationDto> HandleAsync(PledgeMoneyCommand command, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteAsync(() => HandleInTransactionAsync(command, cancellationToken), cancellationToken);
+
+    private async Task<DonationDto> HandleInTransactionAsync(PledgeMoneyCommand command, CancellationToken cancellationToken)
     {
         WorkAreaScope target;
         if (command.WorkAreaId is { } workAreaId)

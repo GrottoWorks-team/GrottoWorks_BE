@@ -1,8 +1,8 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
-using Minio;
-using Minio.DataModel.Args;
+using Amazon.S3.Model;
+using NotificationAudit.Infrastructure.Files;
 
 internal static class RecoveryObjects
 {
@@ -10,13 +10,31 @@ internal static class RecoveryObjects
     {
         if (!bucket.StartsWith("grottoworks-restore-", StringComparison.Ordinal))
             throw new ArgumentException("Restore is restricted to a new verification bucket.");
-        using var storage = new MinioClient().WithEndpoint("localhost", 9000)
-            .WithCredentials(Environment.GetEnvironmentVariable("VERIFY_MINIO_USER") ?? "grottoworks",
-                Environment.GetEnvironmentVariable("VERIFY_MINIO_PASSWORD")
-                    ?? throw new InvalidOperationException("VERIFY_MINIO_PASSWORD is required.")).Build();
-        if (await storage.BucketExistsAsync(new BucketExistsArgs().WithBucket(bucket)))
-            throw new InvalidOperationException("Restore bucket already exists; no objects were overwritten.");
-        await storage.MakeBucketAsync(new MakeBucketArgs().WithBucket(bucket));
+        var options = new ObjectStorageOptions
+        {
+            Provider = Enum.Parse<ObjectStorageProvider>(Environment.GetEnvironmentVariable("VERIFY_STORAGE_PROVIDER") ?? "MinIO", true),
+            InternalEndpoint = Environment.GetEnvironmentVariable("VERIFY_STORAGE_ENDPOINT") ?? "http://localhost:9000",
+            AccessKey = Environment.GetEnvironmentVariable("VERIFY_STORAGE_ACCESS_KEY")
+                ?? Environment.GetEnvironmentVariable("VERIFY_MINIO_USER") ?? "grottoworks",
+            SecretKey = Environment.GetEnvironmentVariable("VERIFY_STORAGE_SECRET_KEY")
+                ?? Environment.GetEnvironmentVariable("VERIFY_MINIO_PASSWORD")
+                ?? throw new InvalidOperationException("VERIFY_STORAGE_SECRET_KEY (or VERIFY_MINIO_PASSWORD) is required."),
+            Bucket = bucket
+        };
+        using var storage = ObjectStorageClientFactory.Create(options);
+        if (options.Provider == ObjectStorageProvider.MinIO)
+        {
+            if (await ObjectStorageProbe.BucketExistsAsync(storage, bucket, CancellationToken.None))
+                throw new InvalidOperationException("Restore bucket already exists; no objects were overwritten.");
+            await storage.PutBucketAsync(new PutBucketRequest { BucketName = bucket });
+        }
+        else
+        {
+            // R2 tokens are bucket-scoped: the restore bucket is created in the Cloudflare dashboard and must be empty.
+            var existing = await storage.ListObjectsV2Async(new ListObjectsV2Request { BucketName = bucket, MaxKeys = 1 });
+            if (existing.KeyCount > 0)
+                throw new InvalidOperationException("Restore bucket is not empty; no objects were overwritten.");
+        }
         using var archive = ZipFile.OpenRead(archivePath);
         using var manifest = JsonDocument.Parse(archive.GetEntry("manifest.json")!.Open());
         var count = 0;
@@ -28,13 +46,22 @@ internal static class RecoveryObjects
             var key = row.GetProperty("objectKey").GetString()!;
             var expected = row.GetProperty("sha256").GetString()!;
             var entry = archive.GetEntry(row.GetProperty("entry").GetString()!)!;
-            await using (var source = entry.Open())
-                await storage.PutObjectAsync(new PutObjectArgs().WithBucket(bucket).WithObject(key)
-                    .WithStreamData(source).WithObjectSize(row.GetProperty("bytes").GetInt64())
-                    .WithContentType(row.GetProperty("metadata").GetProperty("ContentType").GetString()!));
-            string? restoredHash = null;
-            await storage.GetObjectAsync(new GetObjectArgs().WithBucket(bucket).WithObject(key)
-                .WithCallbackStream(source => restoredHash = Convert.ToHexString(SHA256.HashData(source))));
+            // Zip entry streams are not seekable; buffer so the SDK can sign a known content length.
+            using var content = new MemoryStream();
+            await using (var source = entry.Open()) await source.CopyToAsync(content);
+            content.Position = 0;
+            await storage.PutObjectAsync(new PutObjectRequest
+            {
+                BucketName = bucket,
+                Key = key,
+                InputStream = content,
+                AutoCloseStream = false,
+                ContentType = row.GetProperty("metadata").GetProperty("ContentType").GetString()!,
+                DisablePayloadSigning = ObjectStorageClientFactory.ShouldDisablePayloadSigning(options)
+            });
+            string restoredHash;
+            using (var restored = await storage.GetObjectAsync(new GetObjectRequest { BucketName = bucket, Key = key }))
+                restoredHash = Convert.ToHexString(await SHA256.HashDataAsync(restored.ResponseStream));
             if (!expected.Equals(restoredHash, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("Restored object checksum mismatch.");
             count++;

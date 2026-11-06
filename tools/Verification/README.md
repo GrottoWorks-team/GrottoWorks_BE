@@ -60,9 +60,13 @@ does not prove those flows have passed.
 `GROTTOWORKS_BACKUP_KEY`; it refuses to overwrite an existing output. Restore
 database dumps into newly created databases, then use `schema` to validate them.
 `restore-objects <plaintext-archive> <new-bucket>` requires
-`VERIFY_MINIO_PASSWORD` (`VERIFY_MINIO_USER` defaults to `grottoworks`), permits
-only a new `grottoworks-restore-*` bucket on localhost:9000, and checks each restored
-object against its manifest SHA-256.
+`VERIFY_STORAGE_SECRET_KEY` (or legacy `VERIFY_MINIO_PASSWORD`; the access key
+`VERIFY_STORAGE_ACCESS_KEY`/`VERIFY_MINIO_USER` defaults to `grottoworks`), permits
+only a `grottoworks-restore-*` bucket, and checks each restored object against its
+manifest SHA-256. Default target is local MinIO (`VERIFY_STORAGE_ENDPOINT`, default
+`http://localhost:9000`), where the bucket must not exist yet. For Cloudflare R2 set
+`VERIFY_STORAGE_PROVIDER=R2` and the R2 endpoint; the bucket must be created empty in
+the dashboard first (see `docs/ops/cloudflare-r2.md`).
 
 `replay-reporting-errors` and `replay-lifecycle-errors` are deliberately restricted
 to the isolated vhost and two known queue pairs. They preserve original message

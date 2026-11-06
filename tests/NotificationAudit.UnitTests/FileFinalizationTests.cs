@@ -81,7 +81,7 @@ public sealed class FileFinalizationTests
     public void Inspection_reads_no_more_than_one_byte_beyond_its_limit()
     {
         using var stream = new MemoryStream(new byte[1024]);
-        Action read = () => MinioFileObjectStorage.ReadBounded(stream, 16, default);
+        Action read = () => S3FileObjectStorage.ReadBounded(stream, 16, default);
         read.Should().Throw<UploadedObjectTooLargeException>();
         stream.Position.Should().Be(17);
     }
@@ -90,10 +90,10 @@ public sealed class FileFinalizationTests
     public void Exact_limit_is_accepted_and_cancellation_is_honored()
     {
         using var stream = new MemoryStream([1, 2, 3]);
-        MinioFileObjectStorage.ReadBounded(stream, 3, default).Should().Equal(1, 2, 3);
+        S3FileObjectStorage.ReadBounded(stream, 3, default).Should().Equal(1, 2, 3);
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
-        Action read = () => MinioFileObjectStorage.ReadBounded(stream, 3, cancelled.Token);
+        Action read = () => S3FileObjectStorage.ReadBounded(stream, 3, cancelled.Token);
         read.Should().Throw<OperationCanceledException>();
     }
 

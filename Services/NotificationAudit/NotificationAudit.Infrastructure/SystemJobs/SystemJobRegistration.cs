@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NotificationAudit.Application.SystemJobs;
@@ -37,6 +38,7 @@ public static class SystemJobRegistration
                 options.MaximumSourceBytes > 0 && options.SourceTimeoutMinutes is >= 1 and <= 180,
                 "System job retry, retention, timeout or byte limits are invalid.").ValidateOnStart();
         services.AddScoped<ISystemJobExecutionStore, SystemJobExecutionStore>();
+        services.TryAddSingleton<NotificationAudit.Infrastructure.Files.ObjectStorageClients>();
         services.AddScoped<ISystemArtifactStorage, SystemArtifactStorage>();
         services.AddScoped<ExecuteSystemJob>();
         return services;

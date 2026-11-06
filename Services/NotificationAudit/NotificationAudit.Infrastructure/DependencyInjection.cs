@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,8 +29,9 @@ public static class DependencyInjection
         services.Configure<ObjectStorageOptions>(configuration.GetSection(ObjectStorageOptions.SectionName));
         services.Configure<FileUploadOptions>(configuration.GetSection(FileUploadOptions.SectionName));
         services.AddScoped<IFileObjectRepository, FileObjectRepository>();
-        services.AddScoped<IFileObjectStorage, MinioFileObjectStorage>();
-        services.AddHostedService<MinioBucketInitializer>();
+        services.TryAddSingleton<ObjectStorageClients>();
+        services.AddScoped<IFileObjectStorage, S3FileObjectStorage>();
+        services.AddHostedService<ObjectStorageInitializer>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<INotificationPreferenceRepository, NotificationPreferenceRepository>();
         services.AddScoped<INotificationRuleRepository, NotificationRuleRepository>();

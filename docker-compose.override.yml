@@ -243,11 +243,13 @@ services:
       - ConnectionStrings__NotificationAuditDatabase=Host=postgres;Port=5432;Database=notify_db;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Include Error Detail=true
       - Jwt__SigningKey=${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY (>= 32 chars) in .env}
       - InternalApi__ApiKey=${INTERNAL_API_KEY:-dev-internal-api-key-change-me-0123456789}
-      - ObjectStorage__InternalEndpoint=http://minio:9000
-      - ObjectStorage__PublicEndpoint=${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
-      - ObjectStorage__AccessKey=${MINIO_ROOT_USER:-grottoworks}
-      - ObjectStorage__SecretKey=${MINIO_ROOT_PASSWORD:-grottoworks_minio_1234}
-      - ObjectStorage__Bucket=grottoworks-files
+      # MinIO by default; set OBJECT_STORAGE_* in .env to use Cloudflare R2 (docs/ops/cloudflare-r2.md).
+      - ObjectStorage__Provider=${OBJECT_STORAGE_PROVIDER:-MinIO}
+      - ObjectStorage__InternalEndpoint=${OBJECT_STORAGE_ENDPOINT:-http://minio:9000}
+      - ObjectStorage__PublicEndpoint=${OBJECT_STORAGE_PUBLIC_ENDPOINT:-${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}}
+      - ObjectStorage__AccessKey=${OBJECT_STORAGE_ACCESS_KEY:-${MINIO_ROOT_USER:-grottoworks}}
+      - ObjectStorage__SecretKey=${OBJECT_STORAGE_SECRET_KEY:-${MINIO_ROOT_PASSWORD:-grottoworks_minio_1234}}
+      - ObjectStorage__Bucket=${OBJECT_STORAGE_BUCKET:-grottoworks-files}
       - FileUpload__AllowOtherPdf=${ALLOW_OTHER_PDF_UPLOADS:-false}
       - NotificationEvents__Enabled=true
       - MessageBroker__Host=amqp://rabbitmq:5672
@@ -303,11 +305,13 @@ services:
       - DatabaseBackup__Databases__NotificationAudit=Host=postgres;Database=notify_db;Username=${BACKUP_DB_USER:-grottoworks_backup};Password=${BACKUP_DB_PASSWORD:-}
       - DatabaseBackup__EncryptionKeyId=${BACKUP_KEY_ID:-local-v1}
       - GROTTOWORKS_BACKUP_KEY=${GROTTOWORKS_BACKUP_KEY:-}
-      - ObjectStorage__InternalEndpoint=http://minio:9000
-      - ObjectStorage__PublicEndpoint=http://localhost:9000
-      - ObjectStorage__AccessKey=${MINIO_ROOT_USER:-grottoworks}
-      - ObjectStorage__SecretKey=${MINIO_ROOT_PASSWORD:-grottoworks_minio_1234}
-      - ObjectStorage__Bucket=grottoworks-files
+      # MinIO by default; set OBJECT_STORAGE_* in .env to use Cloudflare R2 (docs/ops/cloudflare-r2.md).
+      - ObjectStorage__Provider=${OBJECT_STORAGE_PROVIDER:-MinIO}
+      - ObjectStorage__InternalEndpoint=${OBJECT_STORAGE_ENDPOINT:-http://minio:9000}
+      - ObjectStorage__PublicEndpoint=${OBJECT_STORAGE_PUBLIC_ENDPOINT:-${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}}
+      - ObjectStorage__AccessKey=${OBJECT_STORAGE_ACCESS_KEY:-${MINIO_ROOT_USER:-grottoworks}}
+      - ObjectStorage__SecretKey=${OBJECT_STORAGE_SECRET_KEY:-${MINIO_ROOT_PASSWORD:-grottoworks_minio_1234}}
+      - ObjectStorage__Bucket=${OBJECT_STORAGE_BUCKET:-grottoworks-files}
     depends_on:
       postgres:
         condition: service_healthy

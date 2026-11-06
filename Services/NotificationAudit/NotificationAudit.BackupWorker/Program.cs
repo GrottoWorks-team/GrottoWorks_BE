@@ -11,7 +11,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddDbContext<NotificationAuditDbContext>(options => options.UseNpgsql(
     builder.Configuration.GetConnectionString("NotificationAuditDatabase")
         ?? throw new InvalidOperationException("The job database connection is required.")));
-builder.Services.Configure<ObjectStorageOptions>(builder.Configuration.GetSection("ObjectStorage"));
+builder.Services.Configure<ObjectStorageOptions>(builder.Configuration.GetSection(ObjectStorageOptions.SectionName));
 builder.Services.AddSystemJobExecution(builder.Configuration);
 builder.Services.Configure<DatabaseBackupOptions>(builder.Configuration.GetSection("DatabaseBackup"));
 builder.Services.AddScoped<ISystemArtifactBuilder, DatabaseBackupArtifactBuilder>();

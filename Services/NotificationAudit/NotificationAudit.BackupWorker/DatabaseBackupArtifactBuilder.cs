@@ -4,8 +4,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Minio;
-using Minio.DataModel.Args;
+using Amazon.S3.Model;
 using Npgsql;
 using NotificationAudit.Application.SystemJobs;
 using NotificationAudit.Domain.Files;
@@ -17,7 +16,7 @@ using NotificationAudit.Infrastructure.SystemJobs;
 namespace NotificationAudit.BackupWorker;
 
 public sealed class DatabaseBackupArtifactBuilder(IOptions<DatabaseBackupOptions> backupOptions,
-    IOptions<SystemJobOptions> jobOptions, IOptions<ObjectStorageOptions> storageOptions,
+    IOptions<SystemJobOptions> jobOptions, ObjectStorageClients storage,
     NotificationAuditDbContext jobs, TimeProvider clock) : ISystemArtifactBuilder
 {
     private sealed record RecoveryFile(Guid FileId, string ObjectKey, long SizeBytes, string? Checksum,
@@ -93,9 +92,8 @@ public sealed class DatabaseBackupArtifactBuilder(IOptions<DatabaseBackupOptions
                     failed = true;
                     entries.Add(new { kind = "FILE_OBJECT", fileId = missing, status = "FAILED", errorCode = "REFERENCED_FILE_METADATA_MISSING" });
                 }
-                var objectOptions = storageOptions.Value;
-                using var client = new MinioClient().WithEndpoint(new Uri(objectOptions.InternalEndpoint).Host, new Uri(objectOptions.InternalEndpoint).Port)
-                    .WithCredentials(objectOptions.AccessKey, objectOptions.SecretKey).WithSSL(new Uri(objectOptions.InternalEndpoint).Scheme == "https").Build();
+                var objectOptions = storage.Options;
+                var client = storage.Internal;
                 foreach (var file in files.Values.OrderBy(file => file.FileId))
                 {
                     var startedAt = clock.GetUtcNow();
@@ -106,20 +104,18 @@ public sealed class DatabaseBackupArtifactBuilder(IOptions<DatabaseBackupOptions
                         long length = 0;
                         await using (var target = archive.CreateEntry(path, CompressionLevel.NoCompression).Open())
                         {
-                            await client.GetObjectAsync(new GetObjectArgs().WithBucket(objectOptions.Bucket).WithObject(file.ObjectKey)
-                                .WithCallbackStream(source =>
-                                {
-                                    var buffer = new byte[81920];
-                                    int read;
-                                    while ((read = source.Read(buffer)) > 0)
-                                    {
-                                        ct.ThrowIfCancellationRequested();
-                                        if (read > jobOptions.Value.MaximumSourceBytes - length) throw new IOException("Object exceeds backup size limit.");
-                                        length += read;
-                                        hash.AppendData(buffer.AsSpan(0, read));
-                                        target.Write(buffer, 0, read);
-                                    }
-                                }), ct);
+                            using var response = await client.GetObjectAsync(new GetObjectRequest
+                                { BucketName = objectOptions.Bucket, Key = file.ObjectKey }, ct);
+                            var source = response.ResponseStream;
+                            var buffer = new byte[81920];
+                            int read;
+                            while ((read = await source.ReadAsync(buffer, ct)) > 0)
+                            {
+                                if (read > jobOptions.Value.MaximumSourceBytes - length) throw new IOException("Object exceeds backup size limit.");
+                                length += read;
+                                hash.AppendData(buffer.AsSpan(0, read));
+                                await target.WriteAsync(buffer.AsMemory(0, read), ct);
+                            }
                         }
                         var checksum = Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
                         if (length != file.SizeBytes || string.IsNullOrEmpty(file.Checksum) || !checksum.Equals(file.Checksum, StringComparison.OrdinalIgnoreCase))

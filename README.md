@@ -133,6 +133,8 @@ RabbitMQ Management dùng `RABBITMQ_DEFAULT_USER` và `RABBITMQ_DEFAULT_PASS` tr
 
 MinIO Console dùng `MINIO_ROOT_USER` và `MINIO_ROOT_PASSWORD` trong `.env`.
 
+Staging/production lưu file trên **Cloudflare R2** thay cho MinIO: đặt các biến `OBJECT_STORAGE_*` trong `.env`, xem [docs/ops/cloudflare-r2.md](docs/ops/cloudflare-r2.md).
+
 Cấu hình base URL ở frontend, không thêm `/api/v1` vào biến môi trường để có thể dùng chung cho mọi route.
 
 Vite (`.env.local`):

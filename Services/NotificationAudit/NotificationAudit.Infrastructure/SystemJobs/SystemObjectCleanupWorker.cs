@@ -2,9 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Minio;
-using Minio.DataModel.Args;
+using Amazon.S3.Model;
 using NotificationAudit.Domain.Files;
 using NotificationAudit.Domain.SystemJobs;
 using NotificationAudit.Infrastructure.Data;
@@ -13,7 +11,7 @@ using NotificationAudit.Infrastructure.Files;
 namespace NotificationAudit.Infrastructure.SystemJobs;
 
 /// <summary>Delayed, reconciled deletion. Never infer an orphan from an upload/DB timeout alone.</summary>
-public sealed class SystemObjectCleanupWorker(IServiceScopeFactory scopes, IOptions<ObjectStorageOptions> configuredOptions,
+public sealed class SystemObjectCleanupWorker(IServiceScopeFactory scopes, ObjectStorageClients clients,
     TimeProvider clock, ILogger<SystemObjectCleanupWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -31,17 +29,18 @@ public sealed class SystemObjectCleanupWorker(IServiceScopeFactory scopes, IOpti
 
     public async Task SweepAsync(CancellationToken ct)
     {
-        var options = configuredOptions.Value;
-        using var client = MinioFileObjectStorage.CreateClient(options.InternalEndpoint, options.AccessKey, options.SecretKey);
+        var options = clients.Options;
+        var client = clients.Internal;
         foreach (var prefix in new[] { "system-jobs/", "completed/", "pending/" })
         {
-            await foreach (var item in client.ListObjectsEnumAsync(new ListObjectsArgs().WithBucket(options.Bucket).WithPrefix(prefix).WithRecursive(true), ct))
+            var objects = client.Paginators.ListObjectsV2(new ListObjectsV2Request { BucketName = options.Bucket, Prefix = prefix }).S3Objects;
+            await foreach (var item in objects.WithCancellation(ct))
             {
                 ct.ThrowIfCancellationRequested();
-                if (item.IsDir || !DateTimeOffset.TryParse(item.LastModified, System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.AssumeUniversal, out var modified) || modified > clock.GetUtcNow().AddDays(-1)) continue;
+                if (item.Key.EndsWith('/') || item.LastModified is not { } lastModified ||
+                    new DateTimeOffset(DateTime.SpecifyKind(lastModified.ToUniversalTime(), DateTimeKind.Utc)) > clock.GetUtcNow().AddDays(-1)) continue;
                 if (!await IsRemovableAsync(item.Key, ct)) continue;
-                await client.RemoveObjectAsync(new RemoveObjectArgs().WithBucket(options.Bucket).WithObject(item.Key), ct);
+                await client.DeleteObjectAsync(new DeleteObjectRequest { BucketName = options.Bucket, Key = item.Key }, ct);
             }
         }
     }

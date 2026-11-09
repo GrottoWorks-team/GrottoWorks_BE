@@ -40,14 +40,28 @@ public sealed class AdminUserTests
         new(_users, parishes ?? new FakeParishDirectory(), new FakePasswordHasher(), _events);
 
     private UpdateUserCommandHandler UpdateHandler(FakeParishDirectory? parishes = null) =>
-        new(Admin, _users, _refreshTokens, parishes ?? new FakeParishDirectory());
+        new(Admin, _users, _refreshTokens, parishes ?? new FakeParishDirectory(), _events);
 
     private LockUserCommandHandler LockHandler() => new(Admin, _users, _refreshTokens, _events);
 
     private UnlockUserCommandHandler UnlockHandler() => new(Admin, _users, _events);
 
     private AssignUserRoleCommandHandler RoleHandler(FakeParishDirectory? parishes = null) =>
-        new(Admin, _users, parishes ?? new FakeParishDirectory());
+        new(Admin, _users, parishes ?? new FakeParishDirectory(), _events);
+
+    [Fact]
+    public async Task Eligibility_events_cover_role_parish_and_activity_changes_but_skip_profile_edits()
+    {
+        var newParish = Guid.NewGuid();
+        await UpdateHandler().HandleAsync(new(_volunteer.UserId, null, null, "New name", null, null, null));
+        _events.Events.Should().BeEmpty();
+
+        await UpdateHandler().HandleAsync(new(_volunteer.UserId, null, null, null, null, newParish, UserStatus.Inactive));
+        await UpdateHandler().HandleAsync(new(_volunteer.UserId, null, null, null, null, null, UserStatus.Active));
+        await RoleHandler().HandleAsync(new(_volunteer.UserId, null, RoleCodes.Leader, null));
+        _events.Events.Should().HaveCount(3).And.OnlyContain(evt =>
+            evt.EventType == IdentityUserEligibilityChanged.EventType && evt.AggregateId == _volunteer.UserId);
+    }
 
     private static async Task<string> CodeOf(Func<Task> act) =>
         (await act.Should().ThrowAsync<DomainException>()).Which.Code;

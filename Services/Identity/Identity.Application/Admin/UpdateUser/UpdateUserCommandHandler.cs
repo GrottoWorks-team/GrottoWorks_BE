@@ -1,6 +1,7 @@
 using Identity.Application.Abstractions;
 using Identity.Application.Accounts;
 using Identity.Application.Auth;
+using Identity.Contracts.Events;
 using Identity.Domain;
 using Identity.Domain.Entities;
 using Identity.Domain.Enums;
@@ -26,7 +27,8 @@ public sealed class UpdateUserCommandHandler(
     ICurrentUser currentUser,
     IUserAccountStore userAccountStore,
     IRefreshTokenStore refreshTokenStore,
-    IParishDirectory parishDirectory)
+    IParishDirectory parishDirectory,
+    IIntegrationEventPublisher eventPublisher)
 {
     public async Task<AdminUserDto> HandleAsync(
         UpdateUserCommand command,
@@ -34,6 +36,8 @@ public sealed class UpdateUserCommandHandler(
     {
         var user = await AdminGuards.LoadUserAsync(userAccountStore, command.UserId, cancellationToken);
         user.EnsureVersion(command.Version);
+        var previousParish = user.ParishId;
+        var previousStatus = user.Status;
 
         var now = DateTimeOffset.UtcNow;
 
@@ -93,6 +97,13 @@ public sealed class UpdateUserCommandHandler(
                 RefreshToken.ReasonUserBlocked,
                 now,
                 cancellationToken);
+        }
+
+        if (previousParish != user.ParishId || previousStatus != user.Status)
+        {
+            await eventPublisher.PublishAsync(IdentityUserEligibilityChanged.EventType,
+                IdentityUserEligibilityChanged.Version, new IdentityUserEligibilityChanged(user.UserId),
+                "user", user.UserId, cancellationToken);
         }
 
         await userAccountStore.SaveChangesAsync(cancellationToken);

@@ -1,5 +1,6 @@
 using Identity.Application.Abstractions;
 using Identity.Application.Accounts;
+using Identity.Contracts.Events;
 
 namespace Identity.Application.Admin.AssignUserRole;
 
@@ -17,7 +18,8 @@ public sealed record AssignUserRoleCommand(Guid UserId, long? Version, string Ro
 public sealed class AssignUserRoleCommandHandler(
     ICurrentUser currentUser,
     IUserAccountStore userAccountStore,
-    IParishDirectory parishDirectory)
+    IParishDirectory parishDirectory,
+    IIntegrationEventPublisher eventPublisher)
 {
     public async Task<AdminUserDto> HandleAsync(
         AssignUserRoleCommand command,
@@ -47,7 +49,15 @@ public sealed class AssignUserRoleCommandHandler(
             }
         }
 
+        var previousRole = user.RoleId;
+        var previousParish = user.ParishId;
         user.AssignRole(role, command.ParishId, DateTimeOffset.UtcNow);
+        if (previousRole != user.RoleId || previousParish != user.ParishId)
+        {
+            await eventPublisher.PublishAsync(IdentityUserEligibilityChanged.EventType,
+                IdentityUserEligibilityChanged.Version, new IdentityUserEligibilityChanged(user.UserId),
+                "user", user.UserId, cancellationToken);
+        }
 
         await userAccountStore.SaveChangesAsync(cancellationToken);
 

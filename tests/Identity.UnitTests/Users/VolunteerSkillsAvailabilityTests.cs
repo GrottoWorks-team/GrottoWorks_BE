@@ -25,7 +25,7 @@ public sealed class VolunteerSkillsAvailabilityTests
     }
 
     private ReplaceMySkillsCommandHandler SkillsHandler() =>
-        new(new FakeCurrentUser(_volunteer.UserId), _users, _skills);
+        new(new FakeCurrentUser(_volunteer.UserId), _users, _skills, new FakeIntegrationEventPublisher());
 
     [Fact]
     public async Task ReplaceMySkills_replaces_the_set_and_returns_the_profile()

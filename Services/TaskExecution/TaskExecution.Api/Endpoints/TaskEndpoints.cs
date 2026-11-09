@@ -80,7 +80,8 @@ public static class TaskEndpoints
             .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
             .Produces<ProblemDetails>(StatusCodes.Status409Conflict)
             .Produces<ProblemDetails>(StatusCodes.Status412PreconditionFailed)
-            .Produces<ProblemDetails>(StatusCodes.Status422UnprocessableEntity);
+            .Produces<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)
+            .Produces<ProblemDetails>(StatusCodes.Status503ServiceUnavailable);
 
         group.MapPost("/tasks/{taskId:guid}/ready", ReadyTaskAsync)
             .WithName("markTaskReady")

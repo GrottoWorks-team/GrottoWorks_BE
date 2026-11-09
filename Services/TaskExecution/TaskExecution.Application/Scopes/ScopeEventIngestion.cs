@@ -1,5 +1,7 @@
 using Identity.Contracts.Events;
 using ParishCoordination.Contracts.Events;
+using TaskExecution.Application.Assignments;
+using System.Text.Json;
 using TaskExecution.Domain.Scopes;
 
 namespace TaskExecution.Application.Scopes;
@@ -64,7 +66,7 @@ public interface IUserStatusProjectionStore
 }
 
 public sealed class IdentityStatusIngestionHandler(IScopeEventInbox inbox, IScopeSnapshotTransaction transaction,
-    IUserStatusProjectionStore users)
+    IUserStatusProjectionStore users, TaskTeamLeaderService teamLeaders)
 {
     public Task HandleAsync(IdentityIntegrationEvent message, CancellationToken cancellationToken)
     {
@@ -76,19 +78,35 @@ public sealed class IdentityStatusIngestionHandler(IScopeEventInbox inbox, IScop
             "identity.user.unlocked" or "identity.user.registered" => "ACTIVE",
             _ => null
         };
-        if (status is null) return Task.CompletedTask;
+        var eligibilityChanged = message.EventType == IdentityUserEligibilityChanged.EventType;
+        if (status is null && !eligibilityChanged) return Task.CompletedTask;
+        if (eligibilityChanged &&
+            (message.AggregateType != "user" || message.Payload.ValueKind != JsonValueKind.Object ||
+             !message.Payload.TryGetProperty("userId", out var userId) || userId.ValueKind != JsonValueKind.String ||
+             !userId.TryGetGuid(out var payloadUserId) || payloadUserId != message.AggregateId))
+            throw new FormatException("The eligibility event must identify the same user as its envelope.");
+
         return inbox.ExecuteAsync("identity-status", message.EventId, async () =>
         {
             await transaction.ExecuteAsync("user", message.AggregateId, async () =>
             {
-                var projection = await users.GetAsync(message.AggregateId, cancellationToken);
-                if (projection is null)
+                if (status is not null)
                 {
-                    projection = UserStatusProjection.Create(message.AggregateId, message.ParishId, status, message.AggregateVersion);
-                    users.Add(projection);
+                    var projection = await users.GetAsync(message.AggregateId, cancellationToken);
+                    if (projection is null)
+                    {
+                        projection = UserStatusProjection.Create(message.AggregateId, message.ParishId, status, message.AggregateVersion);
+                        users.Add(projection);
+                    }
+                    else projection.Apply(message.ParishId, status, message.AggregateVersion);
+                    await users.SaveAsync(cancellationToken);
                 }
-                else projection.Apply(message.ParishId, status, message.AggregateVersion);
-                await users.SaveAsync(cancellationToken);
+
+                // Eligibility events are invalidation signals. StatusVersion only orders the
+                // status projection and cannot distinguish changes to the same user's skills.
+                if (eligibilityChanged || status == "LOCKED")
+                    await teamLeaders.ReconcileVolunteerAsync(message.AggregateId, cancellationToken);
+
                 return true;
             }, cancellationToken);
         }, cancellationToken);

@@ -126,10 +126,14 @@ internal sealed class AssignmentTestFixture
     }
     internal sealed class TestTasks(WorkTask task) : ITaskRepository
     {
-        public Task<WorkTask?> GetByIdAsync(Guid id,CancellationToken ct=default) => System.Threading.Tasks.Task.FromResult(id==task.Id?task:null);
+        public int Saves { get; private set; }
+        public List<WorkTask> Items { get; } = [task];
+        public Task<WorkTask?> GetByIdAsync(Guid id,CancellationToken ct=default) =>
+            System.Threading.Tasks.Task.FromResult(Items.SingleOrDefault(row => row.Id == id));
         public Task<WorkTask?> GetByIdForUpdateAsync(Guid id,CancellationToken ct=default) => GetByIdAsync(id,ct);
         public Task<(IReadOnlyList<WorkTask> Items,long TotalItems)> GetPagedByWorkAreaAsync(Guid area,TaskState? status,TaskType? type,int page,int size,string? sort,CancellationToken ct=default) => throw new NotSupportedException();
-        public void Add(WorkTask row) => throw new NotSupportedException();
-        public Task SaveChangesAsync(CancellationToken ct=default) => throw new NotSupportedException();
+        public void Add(WorkTask row) => Items.Add(row);
+        public Task SaveChangesAsync(CancellationToken ct=default)
+        { Saves++; return System.Threading.Tasks.Task.CompletedTask; }
     }
 }

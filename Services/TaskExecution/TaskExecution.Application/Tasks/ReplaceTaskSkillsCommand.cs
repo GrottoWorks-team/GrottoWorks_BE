@@ -1,4 +1,6 @@
+using TaskExecution.Application.Assignments;
 using TaskExecution.Application.Scopes;
+using TaskExecution.Application.Users;
 using TaskExecution.Domain;
 using TaskExecution.Domain.Tasks;
 
@@ -11,11 +13,18 @@ public sealed record ReplaceTaskSkillsCommand(
 
 public sealed class ReplaceTaskSkillsCommandHandler(
     ITaskRepository tasks,
-    TaskScopeAccess scopeAccess)
+    TaskScopeAccess scopeAccess,
+    IAssignmentStore assignments,
+    IIdentityUserLookup identity)
 {
-    public async Task<TaskDto> HandleAsync(
+    public Task<TaskDto> HandleAsync(
         ReplaceTaskSkillsCommand command,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        assignments.InTaskTransactionAsync(command.TaskId,
+            () => ReplaceUnderLockAsync(command, cancellationToken), cancellationToken);
+
+    private async Task<TaskDto> ReplaceUnderLockAsync(
+        ReplaceTaskSkillsCommand command, CancellationToken cancellationToken)
     {
         var task = await tasks.GetByIdForUpdateAsync(command.TaskId, cancellationToken);
         if (task is null)
@@ -23,7 +32,7 @@ public sealed class ReplaceTaskSkillsCommandHandler(
             throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
         }
 
-        await scopeAccess.GetWorkAreaForLeaderWriteAsync(task.WorkAreaId, cancellationToken);
+        var (area, _) = await scopeAccess.GetWorkAreaForLeaderWriteAsync(task.WorkAreaId, cancellationToken);
 
         var changed = task.ReplaceSkills(
             command.Requirements,
@@ -33,6 +42,15 @@ public sealed class ReplaceTaskSkillsCommandHandler(
         if (!changed)
         {
             return TaskDto.From(task);
+        }
+
+        if (task.TeamLeaderAssignmentId is { } assignmentId)
+        {
+            var assignment = await assignments.GetForUpdateAsync(assignmentId, cancellationToken);
+            var volunteer = assignment is null ? null :
+                await identity.FindAsync(assignment.VolunteerId, cancellationToken);
+            if (assignment is null || !TaskTeamLeaderEligibility.IsEligible(task, assignment, volunteer, area.ParishId))
+                task.ClearInvalidTeamLeaderForCurrentChange(assignmentId);
         }
 
         try

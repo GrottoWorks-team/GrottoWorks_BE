@@ -49,6 +49,8 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
             if(assignment.Type==AssignmentType.Support)
                 await support.RespondAsync(assignment.Id,accept,assignment.ResponseReason,DateTimeOffset.UtcNow,cancellationToken);
             task.RegisterAssignmentChange(DateTimeOffset.UtcNow);
+            if (!accept)
+                task.ClearInvalidTeamLeaderForCurrentChange(assignment.Id);
             events.Record(TaskEventTypes.AssignmentResponded, task, area, new
             {
                 assignmentId = assignment.Id, taskId = task.Id, workAreaId = area.WorkAreaId,

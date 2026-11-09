@@ -105,6 +105,7 @@ public static class DependencyInjection
         services.AddSingleton(new TaskExecution.Application.Attendance.LongOpenAttendanceOptions(longOpenHours*60));
         services.AddHostedService<TaskExecution.Infrastructure.Attendance.AttendanceAlertWorker>();
         services.AddScoped<TaskExecution.Application.Assignments.IAssignmentStore, TaskExecution.Infrastructure.Assignments.AssignmentStore>();
+        services.AddScoped<TaskExecution.Application.Assignments.ITaskTeamLeaderQuery, TaskExecution.Infrastructure.Assignments.TaskTeamLeaderQuery>();
         services.AddHttpClient<TaskExecution.Infrastructure.Identity.IdentityUserLookup>(client =>
         {
             client.BaseAddress = new Uri(configuration["IdentityClient:BaseAddress"] ?? "http://localhost:6100/");

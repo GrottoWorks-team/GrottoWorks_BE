@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using TaskExecution.Domain.Assignments;
 using TaskExecution.Domain.Tasks;
 
 namespace TaskExecution.Infrastructure.Data.Configurations;
@@ -24,6 +25,14 @@ public sealed class WorkTaskConfiguration : IEntityTypeConfiguration<WorkTask>
         builder.Property(task => task.Type).HasColumnName("task_type")
             .HasConversion(EnumText.Converter<TaskType>()).HasMaxLength(30).IsRequired();
         builder.Property(task => task.PurchaseRequestId).HasColumnName("purchase_request_id");
+        builder.Property(task => task.TeamLeaderAssignmentId).HasColumnName("team_leader_assignment_id");
+        builder.HasOne<TaskAssignment>().WithMany()
+            .HasForeignKey(task => new { task.Id, task.TeamLeaderAssignmentId })
+            .HasPrincipalKey(assignment => new { assignment.TaskId, assignment.Id })
+            .OnDelete(DeleteBehavior.NoAction)
+            .HasConstraintName("fk_task_team_leader_assignment");
+        builder.HasIndex(task => new { task.Id, task.TeamLeaderAssignmentId })
+            .HasDatabaseName("ix_task_team_leader_assignment");
         builder.Property(task => task.Name).HasColumnName("task_name").HasMaxLength(160).IsRequired();
         builder.Property(task => task.Description).HasColumnName("task_description").HasMaxLength(2000);
         builder.Property(task => task.CompletionCriteria).HasColumnName("completion_criteria").HasMaxLength(4000);

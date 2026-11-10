@@ -17,7 +17,7 @@ khi API có.
 | # | Nghiệp vụ chốt | Demo hiện tại (FE/mobile) | Thiếu ở BE |
 |---|---|---|---|
 | 1 | **ADMIN** là người tải ảnh sơ đồ giáo xứ và tạo/quản khu vực (ban hành giáo chỉ xem) | `ParishMapPage.canEdit = role === 'PARISH'`; ẩn nút Tạo/Sửa/Phân công khu vực với `COMMUNITY` | Không có entity/endpoint bản đồ; policy tạo khu vực còn cho `PARISH` |
-| 2 | TNV xem được **mô hình 3D gắn với nhiệm vụ đã nhận** | Mobile: thẻ "Mô hình 3D" ở `TaskDetailScreen` → mở web `/share/scene/:areaId?task=…` (scene demo nếu chưa có scene) | Không có API `design-scene` / token chia sẻ; scene chỉ nằm localStorage |
+| 2 | TNV xem được **mô hình 3D gắn với nhiệm vụ đã nhận** | Mobile: thẻ "Mô hình 3D" ở `TaskDetailScreen` → màn **`TaskModelScreen` trong app** (WebView + canvas 3D, scene mock `mockScene.ts`, tô sáng lớp chứa task) | Không có API `design-scene`; scene thật chỉ nằm localStorage của trình duyệt trưởng khu |
 | 3 | **Tạo khu vực + ghim vị trí trong cùng một lần lưu** | `AreaFormDialog` có khối "Vị trí trên sơ đồ" (bấm lên ảnh để ghim; tuỳ chọn) | Không có API lưu pin; pin đang ở localStorage key `grotto-parish-map-v1` |
 
 ---
@@ -141,28 +141,25 @@ Quyền đọc cho **VOLUNTEER**: chỉ khi TNV có `task_assignment` ở trạn
 lọc**: chỉ các lớp có `taskIds` giao với task của TNV, hoặc toàn bộ nếu nghiệp vụ
 cho xem cả công trình (cần chốt — hiện demo cho xem cả scene, tô sáng lớp của TNV).
 
-### 3.3. Token chia sẻ (để mobile mở bằng trình duyệt, không cần Bearer)
+### 3.3. Trang chia sẻ công khai — KHÔNG dùng trong demo
 
-Demo hiện mở `GET {WEB}/share/scene/{areaId}?task={taskId}` — trang công khai.
-Khi chạy thật, **không** để areaId trần (đoán được id là xem được). Chọn 1 trong 2:
-
-- **A. Mobile gọi API trực tiếp** (khuyến nghị): bỏ trang share công khai, mobile
-  gọi `GET /work-areas/{id}/design-scene` bằng Bearer rồi render 3D trong app
-  (cần `expo-gl` + `three`).
-- **B. Giữ trang share**: thêm `POST /api/v1/tasks/{taskId}/scene-share-link`
-  (VOLUNTEER đã nhận việc) → `{ token, expiresAt }`; trang công khai gọi
-  `GET /api/v1/share/scenes/{token}` (token có hạn, chỉ trả scene đã lọc).
+Yêu cầu nghiệp vụ 10/11/2026: TNV **không được rời app**, nên demo dùng màn
+`TaskModelScreen` + scene mock. Trang `/share/scene/:areaId` đã được **xoá** khỏi
+FE web. Chỉ khi nào cần chia sẻ mô hình cho người **ngoài hệ thống** mới bổ sung
+`POST /api/v1/tasks/{taskId}/scene-share-link` → `{ token, expiresAt }` +
+`GET /api/v1/share/scenes/{token}` (token có hạn, trả scene đã lọc).
 
 ### 3.4. FE/mobile sửa khi có API
 
 - `src/features/builder/repository.ts`: thêm `RemoteSceneRepository` (giữ
   `LocalSceneRepository` cho nháp); chọn implementation theo biến môi trường.
-- `src/features/builder/pages/SceneSharePage.tsx`: thay `sceneRepository.load` +
-  `buildDemoScene` bằng API/token.
-- `GrottoWokrs_Mobile/src/features/volunteer/TaskDetailScreen.tsx`: đổi
-  `Linking.openURL(...)` sang màn hình 3D native (nếu chọn phương án A) hoặc
-  truyền token (phương án B).
-- `GrottoWokrs_Mobile/src/api/client.ts`: giữ `WEB_BASE`/`webUrl` nếu chọn B.
+- `GrottoWokrs_Mobile/src/features/volunteer/mockScene.ts`: thay
+  `mockSceneFor(...)` bằng lời gọi `GET /work-areas/{id}/design-scene` (map
+  document JSON sang `SceneBox[]`).
+- `GrottoWokrs_Mobile/src/features/volunteer/sceneHtml.ts`: khi có model `.glb`
+  thật thì thay canvas 2D bằng WebView + GLTFLoader (hoặc renderer native
+  `expo-gl` + `three`).
+- Mobile đã thêm dependency `react-native-webview` (có sẵn trong Expo Go).
 
 ---
 

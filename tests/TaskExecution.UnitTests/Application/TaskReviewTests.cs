@@ -55,6 +55,32 @@ public sealed class TaskReviewTests
         await f.Service.DownloadAsync(f.F.Task.Id,progress.Id,progress.Evidence.Single().FileId,default);
         f.Files.Finalized.Should().ContainSingle();f.Files.Downloads.Should().Be(1);
     }
+    [Fact]
+    public async Task Progress_is_limited_to_the_designated_team_leader()
+    {
+        var f=new ReviewFixture();
+        var leaderAssignment=f.F.Store.Items.Single();
+        f.F.Task.SetTeamLeader(leaderAssignment.Id,f.F.Task.Version,DateTimeOffset.UtcNow);
+        var other=f.AddVolunteer(f.F.Task.Id);
+        f.F.User.UserId=other;
+        var action=()=>f.Service.AddAsync(f.F.Task.Id,new(50,"not leader",null),false,false,default);
+        (await action.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("TASK_TEAM_LEADER_ONLY");
+        f.Files.Reserved.Should().BeEmpty();
+        f.Store.Intents.Should().BeEmpty();
+        f.F.User.UserId=f.F.VolunteerId;
+        var progress=await f.Service.AddAsync(f.F.Task.Id,new(50,"leader",null),false,false,default);
+        progress.SubmittedByUserId.Should().Be(f.F.VolunteerId);
+    }
+    [Fact]
+    public async Task Progress_allows_any_active_assignment_when_no_team_leader_is_designated()
+    {
+        var f=new ReviewFixture();
+        f.F.Task.TeamLeaderAssignmentId.Should().BeNull();
+        var other=f.AddVolunteer(f.F.Task.Id);
+        f.F.User.UserId=other;
+        var progress=await f.Service.AddAsync(f.F.Task.Id,new(30,"member",null),false,false,default);
+        progress.SubmittedByUserId.Should().Be(other);
+    }
     private sealed class ReviewFixture
     {
         public AssignmentTestFixture F {get;}=new();public Store Store {get;}=new();public Files Files {get;}=new();public Resource Resource {get;}=new();
@@ -68,6 +94,16 @@ public sealed class TaskReviewTests
                 new ActiveUserAccess(F.Identity,F.User),F.User,new TaskEventRecorder(F.Events,F.User,new AssignmentTestFixture.TestCorrelation()),Files,Resource,F.Support);
         }
         public void AsLeader(){F.User.UserId=F.Area.LeaderUserId!.Value;F.User.Role="LEADER";}
+        /// <summary>Thêm một TNV khác đã ACCEPT assignment trên cùng task (trả về volunteerId).</summary>
+        public Guid AddVolunteer(Guid taskId)
+        {
+            var id=Guid.NewGuid();
+            F.Identity.Items[id]=new(id,"Volunteer 2","ACTIVE","VOLUNTEER",F.Area.ParishId,null,[]);
+            var row=TaskAssignment.Assign(taskId,id,F.Area.LeaderUserId!.Value,null,false,false,null,DateTimeOffset.UtcNow);
+            row.Accept(null,DateTimeOffset.UtcNow);
+            F.Store.Items.Add(row);
+            return id;
+        }
     }
     private sealed class Store : ITaskReviewStore
     {

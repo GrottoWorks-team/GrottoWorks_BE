@@ -110,8 +110,13 @@ public sealed class TaskReviewService(ITaskRepository tasks, IAssignmentStore as
         var (area,_)=await scope.GetWorkAreaForVolunteerWriteAsync(task.WorkAreaId,ct);
         await users.EnsureCallerAsync(area.ParishId,ct);
         var rows=await assignments.ListAsync(task.Id,ct);
-        if(!rows.Any(row=>row.VolunteerId==user.UserId && row.Status is AssignmentStatus.Accepted or AssignmentStatus.InProgress))
+        var mine=rows.SingleOrDefault(row=>row.VolunteerId==user.UserId && row.Status is AssignmentStatus.Accepted or AssignmentStatus.InProgress);
+        if(mine is null)
             throw DomainRuleException.Forbidden("TASK_ASSIGNMENT_REQUIRED","An accepted active assignment is required.");
+        // Task đã chỉ định trưởng nhóm → chỉ assignment đó được ghi tiến độ / nộp hoàn thành.
+        // Task chưa chỉ định (null) giữ hành vi cũ: mọi TNV đã nhận việc đều ghi được.
+        if(task.TeamLeaderAssignmentId is { } leaderAssignmentId && leaderAssignmentId != mine.Id)
+            throw DomainRuleException.Forbidden("TASK_TEAM_LEADER_ONLY","Only the designated task team leader can submit progress.");
         return area;
     }
     private async Task AuthorizeReadAsync(WorkTask task,CancellationToken ct)

@@ -35,7 +35,12 @@ public sealed class TaskModelTests
         entity.GetCheckConstraints().Select(constraint => constraint.Name).Should().Contain(
             "ck_task_positive_estimate",
             "ck_task_positive_volunteer_count");
-        entity.GetForeignKeys().Should().BeEmpty("TaskExecution stores external ownership as IDs only");
+        // TaskExecution chỉ lưu ID chủ sở hữu bên ngoài; FK duy nhất là liên kết nội bộ
+        // task ↔ assignment của trưởng nhóm (thêm 09/11 cùng tính năng team leader).
+        var foreignKeys = entity.GetForeignKeys().ToArray();
+        foreignKeys.Should().ContainSingle();
+        foreignKeys[0].Properties.Select(property => property.Name).Should().BeEquivalentTo(
+            nameof(WorkTask.Id), nameof(WorkTask.TeamLeaderAssignmentId));
     }
 
     [Fact]

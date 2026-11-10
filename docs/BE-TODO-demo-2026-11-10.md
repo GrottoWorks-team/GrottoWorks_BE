@@ -17,7 +17,7 @@ khi API có.
 | # | Nghiệp vụ chốt | Demo hiện tại (FE/mobile) | Thiếu ở BE |
 |---|---|---|---|
 | 1 | **ADMIN** là người tải ảnh sơ đồ giáo xứ và tạo/quản khu vực (ban hành giáo chỉ xem) | `ParishMapPage.canEdit = role === 'PARISH'`; ẩn nút Tạo/Sửa/Phân công khu vực với `COMMUNITY` | Không có entity/endpoint bản đồ; policy tạo khu vực còn cho `PARISH` |
-| 2 | TNV xem được **mô hình 3D gắn với nhiệm vụ đã nhận** | Mobile: thẻ "Mô hình 3D" ở `TaskDetailScreen` → màn **`TaskModelScreen` trong app** (WebView + canvas 3D, scene mock `mockScene.ts`, tô sáng lớp chứa task) | Không có API `design-scene`; scene thật chỉ nằm localStorage của trình duyệt trưởng khu |
+| 2 | TNV xem được **lớp 3D gắn với nhiệm vụ đã nhận** (không xem toàn bộ công trình) | Mobile: thẻ "Mô hình 3D" ở `TaskDetailScreen` → màn **`TaskModelScreen` trong app** (WebView + canvas 3D, scene mock `mockScene.ts`, **chỉ render (các) lớp có `taskIds` chứa task**) | Không có API `design-scene`; scene thật chỉ nằm localStorage của trình duyệt trưởng khu |
 | 3 | **Tạo khu vực + ghim vị trí trong cùng một lần lưu** | `AreaFormDialog` có khối "Vị trí trên sơ đồ" (bấm lên ảnh để ghim; tuỳ chọn) | Không có API lưu pin; pin đang ở localStorage key `grotto-parish-map-v1` |
 
 ---
@@ -155,7 +155,7 @@ FE web. Chỉ khi nào cần chia sẻ mô hình cho người **ngoài hệ th�
   `LocalSceneRepository` cho nháp); chọn implementation theo biến môi trường.
 - `GrottoWokrs_Mobile/src/features/volunteer/mockScene.ts`: thay
   `mockSceneFor(...)` bằng lời gọi `GET /work-areas/{id}/design-scene` (map
-  document JSON sang `SceneBox[]`).
+  document JSON sang `SceneBox[]`, **lọc theo `taskId`** trước khi trả về).
 - `GrottoWokrs_Mobile/src/features/volunteer/sceneHtml.ts`: khi có model `.glb`
   thật thì thay canvas 2D bằng WebView + GLTFLoader (hoặc renderer native
   `expo-gl` + `three`).

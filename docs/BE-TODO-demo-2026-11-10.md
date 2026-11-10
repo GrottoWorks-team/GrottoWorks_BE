@@ -16,9 +16,9 @@ khi API có.
 
 | # | Nghiệp vụ chốt | Demo hiện tại (FE/mobile) | Thiếu ở BE |
 |---|---|---|---|
-| 1 | **ADMIN** là người tải ảnh sơ đồ giáo xứ và tạo/quản khu vực (ban hành giáo chỉ xem) | `ParishMapPage.canEdit = role === 'PARISH'`; ẩn nút Tạo/Sửa/Phân công khu vực với `COMMUNITY` | Không có entity/endpoint bản đồ; policy tạo khu vực còn cho `PARISH` |
+| 1 | **ADMIN** là người tải ảnh sơ đồ giáo xứ; **khu vực công tác do PARISH (ban hành giáo) tạo/điều chỉnh/phân công**, ADMIN chỉ xem (chốt lại 11/11/2026) | `ParishMapPage.canEdit = role === 'PARISH'` (ảnh + ghim); `AreaListPage.canEdit = role === 'COMMUNITY'` (tạo/sửa/phân công); hub admin `AreasPanel` chỉ đọc | Không có entity/endpoint bản đồ; policy `POST/PATCH/PUT` khu vực **còn cho `Admin`** — cần bỏ để ADMIN chỉ đọc |
 | 2 | TNV xem được **lớp 3D gắn với nhiệm vụ đã nhận** (không xem toàn bộ công trình) | Mobile: thẻ "Mô hình 3D" ở `TaskDetailScreen` → màn **`TaskModelScreen` trong app** (WebView + canvas 3D, scene mock `mockScene.ts`, **chỉ render (các) lớp có `taskIds` chứa task**) | Không có API `design-scene`; scene thật chỉ nằm localStorage của trình duyệt trưởng khu |
-| 3 | **Tạo khu vực + ghim vị trí trong cùng một lần lưu** | `AreaFormDialog` có khối "Vị trí trên sơ đồ" (bấm lên ảnh để ghim; tuỳ chọn) | Không có API lưu pin; pin đang ở localStorage key `grotto-parish-map-v1` |
+| 3 | **Ghim vị trí khu trên sơ đồ** — đặt từ trang **Bản đồ giáo xứ** (ADMIN là chủ sơ đồ) | `ParishMapPage` (bấm lên ảnh để ghim/bỏ ghim); form khu vực của Ban hành giáo không còn khối ghim | Không có API lưu pin; pin đang ở localStorage key `grotto-parish-map-v1` (nay theo từng `parishId`) |
 
 ---
 
@@ -81,21 +81,24 @@ hành giáo của chính giáo xứ" — **phải sửa thành ADMIN-only** cho 
 
 ---
 
-## 2. Quyền tạo/quản khu vực về ADMIN
+## 2. Quyền tạo/quản khu vực: PARISH ghi, ADMIN chỉ đọc
 
-Hiện `WorkAreaEndpoints.cs` cho `Admin, Parish` ở `POST /seasons/{id}/work-areas`
-và các `PUT .../leader|material-officer|community`. FE đã ẩn nút với
-`COMMUNITY` (UI), nhưng BE vẫn cho gọi trực tiếp.
+Chốt lại 11/11/2026: **ADMIN không tạo/điều chỉnh/phân công khu vực** — chỉ xem để
+theo dõi giáo xứ. Quyền ghi thuộc **ban hành giáo (`Parish`)**. Hiện
+`WorkAreaEndpoints.cs` cho `Admin, Parish` nên ADMIN vẫn gọi trực tiếp được (UI đã
+ẩn hết nút tạo/sửa/phân công ở hub admin).
 
 | Endpoint | Policy hiện tại | Policy đích |
 |---|---|---|
-| `POST /seasons/{seasonId}/work-areas` | ADMIN, PARISH | **ADMIN** |
-| `PATCH /work-areas/{id}` | ADMIN, PARISH | **ADMIN** |
-| `PUT /work-areas/{id}/leader` \| `/material-officer` \| `/community` | ADMIN, PARISH | **ADMIN** |
-| `PUT /work-areas/{id}/season` | ADMIN, PARISH | **ADMIN** (nếu đang có) |
-| `GET /work-areas/**`, `/work-areas/{id}/progress` | giữ nguyên | giữ nguyên |
+| `POST /seasons/{seasonId}/work-areas` | ADMIN, PARISH | **PARISH** |
+| `PATCH /work-areas/{id}` | ADMIN, PARISH, LEADER | **PARISH, LEADER** |
+| `PUT /work-areas/{id}/leader` \| `/material-officer` \| `/community` | ADMIN, PARISH | **PARISH** |
+| `PUT /work-areas/{id}/season` | ADMIN, PARISH | **PARISH** (nếu đang có) |
+| `GET /work-areas/**`, `/work-areas/{id}/progress` | giữ nguyên | giữ nguyên (ADMIN đọc được) |
+| `GET /parishes/{id}/map`, `PUT`/`DELETE` map | chưa có | **GET**: ADMIN + PARISH + LEADER; **PUT/DELETE**: ADMIN |
 
-Ghi chú: LEADER vẫn cần `PUT .../leader`? Hiện LEADER không được phép — giữ nguyên.
+Ghi chú: LEADER giữ `PATCH /work-areas/{id}` (cập nhật tiến độ/trạng thái khu được
+phân công) — các `PUT .../leader|material-officer|community` thì chỉ PARISH.
 
 ---
 

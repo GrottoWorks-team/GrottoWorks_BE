@@ -16,9 +16,9 @@ khi API có.
 
 | # | Nghiệp vụ chốt | Demo hiện tại (FE/mobile) | Thiếu ở BE |
 |---|---|---|---|
-| 1 | **ADMIN** là người tải ảnh sơ đồ giáo xứ; **khu vực công tác do PARISH (ban hành giáo) tạo/điều chỉnh/phân công**, ADMIN chỉ xem (chốt lại 11/11/2026) | `ParishMapPage.canEdit = role === 'PARISH'` (ảnh + ghim); `AreaListPage.canEdit = role === 'COMMUNITY'` (tạo/sửa/phân công); hub admin `AreasPanel` chỉ đọc | Không có entity/endpoint bản đồ; policy `POST/PATCH/PUT` khu vực **còn cho `Admin`** — cần bỏ để ADMIN chỉ đọc |
+| 1 | **ADMIN** là người tải ảnh sơ đồ giáo xứ; **khu vực công tác do PARISH (ban hành giáo) tạo/điều chỉnh/phân công**, ADMIN chỉ xem (chốt lại 11/11/2026) | `ParishMapPage`: ảnh = `canUpload = role === 'PARISH'`, ghim = `canPin = role === 'COMMUNITY'`; `AreaListPage.canEdit = role === 'COMMUNITY'` (tạo/sửa/phân công); hub admin `AreasPanel` chỉ đọc | Không có entity/endpoint bản đồ; policy `POST/PATCH/PUT` khu vực **còn cho `Admin`** — cần bỏ để ADMIN chỉ đọc |
 | 2 | TNV xem được **lớp 3D gắn với nhiệm vụ đã nhận** (không xem toàn bộ công trình) | Mobile: thẻ "Mô hình 3D" ở `TaskDetailScreen` → màn **`TaskModelScreen` trong app** (WebView + canvas 3D, scene mock `mockScene.ts`, **chỉ render (các) lớp có `taskIds` chứa task**) | Không có API `design-scene`; scene thật chỉ nằm localStorage của trình duyệt trưởng khu |
-| 3 | **Ghim vị trí khu trên sơ đồ** — đặt từ trang **Bản đồ giáo xứ** (ADMIN là chủ sơ đồ) | `ParishMapPage` (bấm lên ảnh để ghim/bỏ ghim); form khu vực của Ban hành giáo không còn khối ghim | Không có API lưu pin; pin đang ở localStorage key `grotto-parish-map-v1` (nay theo từng `parishId`) |
+| 3 | **Ghim vị trí khu trên sơ đồ** — Ban hành giáo (role FE `COMMUNITY`) đặt từ trang **Bản đồ giáo xứ** hoặc ngay trong form khu vực; **ADMIN chỉ xem, không được ghim** (chốt 11/11/2026) | `ParishMapPage`: nút “Đặt vị trí/Xoá vị trí” chỉ hiện với `COMMUNITY`, ADMIN chỉ thấy marker + danh sách; `AreaFormDialog`: khối ghim chỉ hiện với `COMMUNITY` | Không có API lưu pin; pin đang ở localStorage key `grotto-parish-map-v1` (nay theo từng `parishId`) |
 
 ---
 
@@ -45,10 +45,11 @@ service (xem spec §2.3).
 ### 1.2. Endpoint
 
 ```http
-GET    /api/v1/parishes/{parishId}/map   → 200 { fileId, fileName, imageWidth, imageHeight,
-                                                 frameVersion, metersPerPixel, pins[], updatedAt } | 204
-PUT    /api/v1/parishes/{parishId}/map   → 200  (CHỈ ADMIN)
-DELETE /api/v1/parishes/{parishId}/map   → 204  (CHỈ ADMIN)
+GET    /api/v1/parishes/{parishId}/map       → 200 { fileId, fileName, imageWidth, imageHeight,
+                                                     frameVersion, metersPerPixel, pins[], updatedAt } | 204
+PUT    /api/v1/parishes/{parishId}/map       → 200  (ảnh + frame — CHỈ ADMIN)
+PUT    /api/v1/parishes/{parishId}/map/pins  → 200  (batch ghim/bỏ ghim — CHỈ PARISH, ADMIN chỉ đọc)
+DELETE /api/v1/parishes/{parishId}/map       → 204  (CHỈ ADMIN)
 ```
 
 - `PUT` nhận **nguyên trạng thái** (idempotent), không PATCH từng ghim.
@@ -62,12 +63,14 @@ DELETE /api/v1/parishes/{parishId}/map   → 204  (CHỈ ADMIN)
 
 | Hành động | Policy đích |
 |---|---|
-| `PUT`/`DELETE /parishes/{id}/map` | **ADMIN** (`GrottoWorksRoles.Admin`) |
+| `PUT`/`DELETE /parishes/{id}/map` (ảnh + frame) | **ADMIN** (`GrottoWorksRoles.Admin`) |
+| `PUT /parishes/{id}/map/pins` (ghim vị trí khu) | **PARISH** (`GrottoWorksRoles.Parish`) — ADMIN **403** `MAP_PIN_ADMIN_READONLY` |
 | `GET /parishes/{id}/map` | ADMIN + PARISH + LEADER (+ VOLUNTEER nếu cần xem sơ đồ khi làm việc) |
 
-⚠️ Spec `2026-11-03-clone-season-and-parish-map.md` §2.4 hiện ghi "ADMIN + ban
-hành giáo của chính giáo xứ" — **phải sửa thành ADMIN-only** cho khớp yêu cầu
-10/11/2026 (ban hành giáo chỉ xem).
+⚠️ Yêu cầu 11/11/2026 tách đôi quyền trên bản đồ: **ADMIN sở hữu ảnh sơ đồ**,
+**ban hành giáo sở hữu vị trí ghim** (ADMIN không được ghim). Vì vậy KHÔNG gộp
+pin vào `PUT /parishes/{id}/map` nữa — nếu gộp, ADMIN sẽ ghi được pin. Spec
+`2026-11-03-clone-season-and-parish-map.md` §2.4 cũng phải sửa theo hướng này.
 
 ### 1.4. FE sửa khi có API
 
@@ -76,8 +79,9 @@ hành giáo của chính giáo xứ" — **phải sửa thành ADMIN-only** cho 
 - `src/features/map/localStore.ts`: xoá sau khi chuyển xong.
 - `src/features/map/pages/ParishMapPage.tsx`: bỏ ghi chú "lưu trên máy này";
   upload ảnh đổi sang flow 3 request (presigned).
-- `src/features/areas/pages/AreaFormDialog.tsx`: khối ghim gọi cùng endpoint
-  `PUT /parishes/{id}/map` (batch) thay vì `useSetMapPin` cục bộ.
+- `src/features/areas/pages/AreaFormDialog.tsx`: khối ghim (chỉ hiện với
+  `COMMUNITY`) gọi `PUT /parishes/{id}/map/pins` (batch) thay vì `useSetMapPin`
+  cục bộ.
 
 ---
 
@@ -95,7 +99,8 @@ theo dõi giáo xứ. Quyền ghi thuộc **ban hành giáo (`Parish`)**. Hiện
 | `PUT /work-areas/{id}/leader` \| `/material-officer` \| `/community` | ADMIN, PARISH | **PARISH** |
 | `PUT /work-areas/{id}/season` | ADMIN, PARISH | **PARISH** (nếu đang có) |
 | `GET /work-areas/**`, `/work-areas/{id}/progress` | giữ nguyên | giữ nguyên (ADMIN đọc được) |
-| `GET /parishes/{id}/map`, `PUT`/`DELETE` map | chưa có | **GET**: ADMIN + PARISH + LEADER; **PUT/DELETE**: ADMIN |
+| `GET /parishes/{id}/map`, `PUT`/`DELETE` map (ảnh) | chưa có | **GET**: ADMIN + PARISH + LEADER; **PUT/DELETE**: ADMIN |
+| `PUT /parishes/{id}/map/pins` (ghim vị trí khu) | chưa có | **PARISH** — ADMIN chỉ đọc (403) |
 
 Ghi chú: LEADER giữ `PATCH /work-areas/{id}` (cập nhật tiến độ/trạng thái khu được
 phân công) — các `PUT .../leader|material-officer|community` thì chỉ PARISH.

@@ -10,6 +10,30 @@
 
 ---
 
+## 2026-11-11 (lần 3) · `phongnltse/task-team-leader-progress`
+
+### 6. Rule thông báo cho `attendance.session.closed-by-leader`
+
+- **Service**: `NotificationAudit`
+- **Files**
+  - `NotificationAudit.Application/Notifications/NotificationRuleCatalog.cs` — thêm rule
+    `71000000-0000-0000-0000-000000000034` = `attendance.session.closed-by-leader`
+    (ID mới, không sửa ID cũ — ID là contract của màn admin).
+  - `NotificationAudit.Application/Events/IntegrationEventIngestion.cs` — map event →
+    **1 notification cho TNV**: title “Attendance session closed”, body nêu số giờ
+    được ghi + lý do trưởng khu nhập, `referenceType = TASK`, `referenceId = taskId`.
+    Thiếu `volunteerUserId` → `REQUIRES_CONTEXT` (không tạo notification rác).
+- **Seeding**: `NotificationRuleSeeder` tự thêm rule mới khi service khởi động (đã xác nhận
+  `notification_rule` có row 34, `in_app_enabled = true`).
+- **Test**: `tests/NotificationAudit.UnitTests/TaskEventIngestionTests.cs` thêm
+  `Session_closed_by_leader_notifies_the_volunteer_with_hours_and_reason`.
+  Kết quả: 154 pass, **1 fail có sẵn từ trước** (`ObjectStorageTests.R2_upload_url_is_path_style_https_and_signs_the_content_type`
+  — test dùng mốc thời gian cứng `2026-11-06` trong khi presign dùng đồng hồ thật; không liên quan thay đổi này).
+- **Cần làm thêm**: chưa có push server (chưa lưu Expo push token) — client mobile hiện
+  tự poll `/notifications` và phát notification cục bộ ra khay hệ điều hành.
+
+---
+
 ## 2026-11-11 (lần 2) · `phongnltse/task-team-leader-progress`
 
 ### 4. LEADER đóng phiên điểm danh hộ TNV (mới)

@@ -46,6 +46,24 @@ public sealed class TaskEventIngestionTests
         notifications.Select(item => item.RecipientUserId).Should().BeEquivalentTo(new[] { volunteerId, leaderId });
     }
 
+    [Fact]
+    public void Session_closed_by_leader_notifies_the_volunteer_with_hours_and_reason()
+    {
+        var volunteerId = Guid.NewGuid();
+        var taskId = Guid.NewGuid();
+        using var payload = JsonDocument.Parse(
+            $$"""{"volunteerUserId":"{{volunteerId}}","taskId":"{{taskId}}","approvedMinutes":90,"reason":"Quen check-out"}""");
+        var notifications = IntegrationEventIngestionHandler.MapNotifications(
+            Create("attendance.session.closed-by-leader", payload.RootElement),
+            out var requiresContext);
+        requiresContext.Should().BeFalse();
+        var candidate = notifications.Should().ContainSingle().Which;
+        candidate.RecipientUserId.Should().Be(volunteerId);
+        candidate.Title.Should().Be("Attendance session closed");
+        candidate.Body.Should().Contain("1.5").And.Contain("Quen check-out");
+        candidate.ReferenceId.Should().Be(taskId);
+    }
+
     private static IncomingIntegrationEvent Create(string eventType, JsonElement payload) => new(
         Guid.NewGuid(), eventType, DateTimeOffset.UtcNow, Guid.NewGuid().ToString(),
         Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "TASK", Guid.NewGuid(), payload.Clone());

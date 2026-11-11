@@ -145,6 +145,23 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
                     taskId)).ToList();
         }
 
+        if (message.EventType == "attendance.session.closed-by-leader")
+        {
+            var volunteerId = GetGuid(payload, "volunteerUserId");
+            if (!volunteerId.HasValue)
+            {
+                requiresContext = true;
+                return [];
+            }
+            var minutes = payload.TryGetProperty("approvedMinutes", out var approved) && approved.TryGetInt32(out var value) ? value : 0;
+            var hours = (minutes / 60d).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            var reason = GetString(payload, "reason");
+            var body = string.IsNullOrWhiteSpace(reason)
+                ? $"The leader closed your open attendance session. Hours recorded: {hours}."
+                : $"The leader closed your open attendance session. Hours recorded: {hours}. Reason: {reason}";
+            return [new NotificationCandidate(volunteerId.Value, "Attendance session closed", body, "TASK", taskId)];
+        }
+
         // These are notification events; until their recipient mapping is resolved, retain the safe context.
         requiresContext = message.EventType is "support.request.published" or "planning.work-area.assigned" or "planning.season.activated" or
             "planning.season.completed" or "planning.season.archived" or "purchase.request.submitted" or

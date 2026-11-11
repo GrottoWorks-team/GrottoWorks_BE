@@ -10,7 +10,7 @@
 
 ---
 
-## 2026-11-11 · `phongnltse/task-team-leader-progress` · (commit của PR "thêm ngữ cảnh đơn chấm công")
+## 2026-11-11 · `phongnltse/task-team-leader-progress` · `4d8167c`
 
 ### 1. Đơn xin check-in trả kèm "đơn của ai, nhiệm vụ nào"
 

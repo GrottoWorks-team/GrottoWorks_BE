@@ -74,6 +74,14 @@ public static class InventoryEndpoints
             .ProducesProblem(StatusCodes.Status412PreconditionFailed)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
 
+        app.MapGet("/api/v1/support-response-materials/{itemId:guid}/support-transfer", GetSupportTransferAsync)
+            .WithName("getSupportMaterialTransfer")
+            .WithTags("Support")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer))
+            .Produces<ApiResponse<SupportTransferDto>>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         app.MapGet("/api/v1/materials/{materialId:guid}/allocation-history", GetHistoryAsync)
             .WithName("getAllocationHistory")
             .WithTags("Materials")
@@ -162,6 +170,16 @@ public static class InventoryEndpoints
             new ConfirmTransferReceiptCommand(itemId, VersionHeader.Resolve(request.Version, httpContext, "SUPPORT_TRANSFER_VERSION_MISMATCH"),
                 request.ReceivedUsableQuantity!.Value, request.ReceivedUnusableQuantity ?? 0, request.Note),
             cancellationToken);
+        return Results.Ok(ApiResults.Ok(transfer, httpContext));
+    }
+
+    private static async Task<IResult> GetSupportTransferAsync(
+        Guid itemId,
+        HttpContext httpContext,
+        GetSupportTransferQueryHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var transfer = await handler.HandleAsync(itemId, cancellationToken);
         return Results.Ok(ApiResults.Ok(transfer, httpContext));
     }
 

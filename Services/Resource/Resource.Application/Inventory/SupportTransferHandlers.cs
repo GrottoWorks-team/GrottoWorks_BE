@@ -126,6 +126,31 @@ public sealed class StartSupportTransferCommandHandler(
 }
 
 /// <summary>
+/// F-RES-20 read side <c>getSupportMaterialTransfer</c>: the transfer behind one support response material, so the
+/// receiving officer can see what is in transit and confirm the receipt with the current version. The version here is
+/// the <c>support_transfer</c> concurrency token, which differs from the TaskExecution item version.
+/// </summary>
+public sealed class GetSupportTransferQueryHandler(WorkAreaAccess access, ISupportTransferStore store)
+{
+    public async Task<SupportTransferDto> HandleAsync(Guid supportResponseMaterialId, CancellationToken cancellationToken = default)
+    {
+        var transfer = await store.GetAsync(supportResponseMaterialId, cancellationToken)
+            ?? throw DomainRuleException.NotFound("SUPPORT_TRANSFER_NOT_FOUND", "No approved transfer exists for this support material.");
+
+        try
+        {
+            await access.ForMaterialOfficerWriteAsync(transfer.TargetWorkAreaId, cancellationToken);
+        }
+        catch (DomainRuleException exception) when (exception.Kind == DomainErrorKind.NotFound)
+        {
+            throw DomainRuleException.NotFound("SUPPORT_TRANSFER_NOT_FOUND", "No approved transfer exists for this support material.");
+        }
+
+        return SupportTransferDto.From(transfer);
+    }
+}
+
+/// <summary>
 /// F-RES-20 <c>confirmSupportMaterialReceipt</c> (MO of the receiving work area, one confirmation — R-23): records usable
 /// and unusable quantities; only the usable part is posted as TRANSFER_IN (BR-64); then <c>support.transfer.confirmed</c>
 /// for TaskExecution.

@@ -67,6 +67,7 @@ public static class DependencyInjection
         services.AddScoped<StartSupportTransferCommandHandler>();
         services.AddScoped<ISupportTransferStarter>(provider => provider.GetRequiredService<StartSupportTransferCommandHandler>());
         services.AddScoped<SupportTransferOperationHandler>();
+        services.AddScoped<GetSupportTransferQueryHandler>();
         services.AddScoped<ConfirmTransferReceiptCommandHandler>();
 
         // F-RES-05 shortages

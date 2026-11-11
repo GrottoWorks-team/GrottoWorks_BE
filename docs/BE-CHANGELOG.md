@@ -10,6 +10,32 @@
 
 ---
 
+## 2026-11-11 (lần 5) · `phongnltse/task-team-leader-progress`
+
+### 8. Thêm `GET /api/v1/support-response-materials/{itemId}/support-transfer` — sửa lỗi 412 khi nhận vật tư hỗ trợ
+
+- **Vấn đề**: `POST /api/v1/support-response-materials/{itemId}/confirm-receipt` kiểm tra `Version` của
+  **`support_transfer`** (Resource, token `xmin` — ví dụ `2088`), nhưng FE chỉ có `version` của
+  `support_response_material` bên TaskExecution (ví dụ `3`). Kết quả: MO bấm "Xác nhận đã nhận" luôn nhận
+  `412 SUPPORT_TRANSFER_VERSION_MISMATCH`, luồng BR-64 không thể hoàn tất từ UI (đã kiểm chứng: gửi đúng
+  `xmin` → `200 RECEIVED`).
+- **Sửa** (additive, không đổi contract cũ):
+  - `Resource.Application/Inventory/SupportTransferHandlers.cs` — thêm `GetSupportTransferQueryHandler`
+    (đọc phiếu chuyển theo `support_response_material_id`, scope theo MO của work area **đích**;
+    không tồn tại → `404 SUPPORT_TRANSFER_NOT_FOUND`).
+  - `Resource.Application/DependencyInjection.cs` — đăng ký handler (**bắt buộc**, thiếu đăng ký thì
+    minimal API ném lỗi `RequestDelegateFactory` lúc build endpoint và service không khởi động).
+  - `Resource.Api/Endpoints/InventoryEndpoints.cs` — `GET /api/v1/support-response-materials/{itemId:guid}/support-transfer`
+    (`getSupportMaterialTransfer`, role `MATERIAL_OFFICER`, trả `SupportTransferDto` có `version`).
+  - `ApiGateway/YarpApiGateway/appsettings.json` — route `resource-support-material-transfer-route`
+    (Path `/api/v1/support-response-materials/{itemId}/support-transfer`, GET, Order -1) → cluster `resource`.
+- **Ảnh hưởng client**: FE `MaterialReceiptsPage` gọi endpoint này để lấy `version` thật rồi mới
+  `confirm-receipt`; `confirm-receipt` không đổi payload.
+- **Cần làm thêm**: nếu service khác cũng cần version phiếu chuyển, dùng `GET /internal/support-transfers?ids=`
+  (đã có sẵn, API-key) thay vì thêm endpoint public.
+
+---
+
 ## 2026-11-11 (lần 4) · `phongnltse/task-team-leader-progress`
 
 ### 7. Cho phép tạo task theo loại (`taskType`) để hoàn tất BR-66

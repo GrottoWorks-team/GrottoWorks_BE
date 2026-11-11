@@ -14,11 +14,16 @@ public sealed class AttendanceReplay
     { ActorId=actor, Key=key, Fingerprint=fingerprint, Result=result, CreatedAt=DateTimeOffset.UtcNow };
 }
 
+/// <summary>Nhiệm vụ mà một phân công (assignment) thuộc về — dùng để bổ sung ngữ cảnh cho đơn chấm công.</summary>
+public sealed record AttendanceRequestTarget(Guid TaskId, string TaskName);
+
 public interface IAttendanceStore
 {
     Task<T> ForVolunteerAsync<T>(Guid volunteerId, Func<Task<T>> action, CancellationToken cancellationToken);
     Task<AttendanceRequest?> RequestAsync(Guid id, CancellationToken cancellationToken);
     Task<(IReadOnlyList<AttendanceRequest> Items,long Total)> RequestsPageAsync(Guid areaId,AttendanceRequestStatus status,int page,int size,bool descending,CancellationToken cancellationToken);
+    /// <summary>Tra cứu batch `assignmentId → (taskId, taskName)` để danh sách đơn hiển thị "nhiệm vụ nào" (tránh N+1).</summary>
+    Task<IReadOnlyDictionary<Guid,AttendanceRequestTarget>> RequestTargetsAsync(IReadOnlyCollection<Guid> assignmentIds,CancellationToken cancellationToken);
     /// <summary>Đơn chấm công của chính TNV (app mobile cần biết đơn đang chờ duyệt).</summary>
     Task<(IReadOnlyList<AttendanceRequest> Items,long Total)> MyRequestsPageAsync(Guid volunteerId,AttendanceRequestStatus status,int page,int size,bool descending,CancellationToken cancellationToken);
     Task<AttendanceSession?> SessionAsync(Guid id, CancellationToken cancellationToken);

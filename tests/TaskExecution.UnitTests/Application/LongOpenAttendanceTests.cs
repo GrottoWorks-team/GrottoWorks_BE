@@ -28,11 +28,21 @@ public sealed class LongOpenAttendanceTests
         f.User.Role="ADMIN";await query.HandleAsync(null);store.Leader.Should().BeNull();store.Parish.Should().BeNull();
     }
 
+    [Fact]
+    public async Task Work_area_filter_is_forwarded_to_the_store()
+    {
+        var f=new AssignmentTestFixture();var session=AttendanceCheckOutTests.OpenSession(Guid.NewGuid(),f.VolunteerId,DateTimeOffset.UtcNow.AddHours(-13));
+        var store=new AlertStore(session,f.VolunteerId);var query=new LongOpenAttendanceQuery(store,new(),f.User);
+        var areaId=Guid.NewGuid();
+        await query.HandleAsync(null,areaId);
+        store.WorkArea.Should().Be(areaId);
+    }
+
     private sealed class AlertStore(AttendanceSession session,Guid volunteer) : ILongOpenAttendanceStore
     {
-        public List<AttendanceSessionAlert> Markers {get;}=[];public Guid? Leader,Parish;
-        public Task<IReadOnlyList<AttendanceSession>> ListAsync(DateTimeOffset cutoff,Guid? parish,Guid? leader,CancellationToken ct)
-        {Leader=leader;Parish=parish;return Task.FromResult<IReadOnlyList<AttendanceSession>>([session]);}
+        public List<AttendanceSessionAlert> Markers {get;}=[];public Guid? Leader,Parish,WorkArea;
+        public Task<IReadOnlyList<AttendanceSession>> ListAsync(DateTimeOffset cutoff,Guid? parish,Guid? leader,Guid? workArea,CancellationToken ct)
+        {Leader=leader;Parish=parish;WorkArea=workArea;return Task.FromResult<IReadOnlyList<AttendanceSession>>([session]);}
         public Task<IReadOnlyList<AttendanceAlertCandidate>> CandidatesAsync(DateTimeOffset cutoff,Guid? after,int size,CancellationToken ct)=>
             Task.FromResult<IReadOnlyList<AttendanceAlertCandidate>>(after.HasValue ? [] : [new(session.Id,volunteer)]);
         public Task<bool> HasAlertAsync(Guid id,int threshold,CancellationToken ct)=>Task.FromResult(Markers.Any(m=>m.AttendanceId==id && m.ThresholdMinutes==threshold));

@@ -20,6 +20,8 @@ internal sealed partial class AttendanceTestStore(AssignmentTestFixture fixture)
         if (descending) query.Reverse();
         return Task.FromResult<(IReadOnlyList<AttendanceRequest>,long)>((query.Skip((page-1)*size).Take(size).ToList(),query.Count));
     }
+    public Task<IReadOnlyDictionary<Guid,AttendanceRequestTarget>> RequestTargetsAsync(IReadOnlyCollection<Guid> ids,CancellationToken ct)=>
+        Task.FromResult<IReadOnlyDictionary<Guid,AttendanceRequestTarget>>(new Dictionary<Guid,AttendanceRequestTarget>());
     public Task<(IReadOnlyList<AttendanceRequest> Items,long Total)> MyRequestsPageAsync(Guid volunteerId,AttendanceRequestStatus status,int page,int size,bool descending,CancellationToken ct)
     {
         var query=Requests.Where(r=>r.VolunteerId==volunteerId && r.Status==status).OrderBy(r=>r.RequestedAt).ThenBy(r=>r.Id).ToList();

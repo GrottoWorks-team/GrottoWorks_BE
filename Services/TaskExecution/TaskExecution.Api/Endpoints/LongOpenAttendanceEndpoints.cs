@@ -14,6 +14,6 @@ public static class LongOpenAttendanceEndpoints
             .RequireAuthorization(p=>p.RequireRole(GrottoWorksRoles.Leader,GrottoWorksRoles.Admin))
             .Produces<ApiResponse<IReadOnlyList<AttendanceDto>>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401).Produces<ProblemDetails>(403);
     }
-    private static async Task<IResult> ListAsync(int? hours,LongOpenAttendanceQuery query,HttpContext context,CancellationToken ct)=>
-        Results.Ok(ApiResults.Ok(await query.HandleAsync(hours,ct),context));
+    private static async Task<IResult> ListAsync(int? hours,Guid? workAreaId,LongOpenAttendanceQuery query,HttpContext context,CancellationToken ct)=>
+        Results.Ok(ApiResults.Ok(await query.HandleAsync(hours,workAreaId,ct),context));
 }

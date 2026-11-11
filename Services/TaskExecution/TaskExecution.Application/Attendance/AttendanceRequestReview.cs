@@ -13,7 +13,7 @@ public sealed partial class AttendanceService
     {
         await scopes.GetWorkAreaForLeaderReadAsync(areaId,cancellationToken);
         var result=await store.RequestsPageAsync(areaId,status,page,size,descending,cancellationToken);
-        return (result.Items.Select(AttendanceRequestDto.From).ToList(),result.Total);
+        return (await WithContextAsync(result.Items,cancellationToken),result.Total);
     }
 
     /// <summary>Đơn vào ca của chính TNV — để app hiển thị "chờ duyệt" thay vì "chưa bắt đầu".</summary>
@@ -21,7 +21,22 @@ public sealed partial class AttendanceService
         int page,int size,bool descending,CancellationToken cancellationToken=default)
     {
         var result=await store.MyRequestsPageAsync(user.UserId,status,page,size,descending,cancellationToken);
-        return (result.Items.Select(AttendanceRequestDto.From).ToList(),result.Total);
+        return (await WithContextAsync(result.Items,cancellationToken),result.Total);
+    }
+
+    /// <summary>
+    /// Bổ sung "đơn của ai / cho nhiệm vụ nào" cho danh sách đơn: `volunteerId` đã có sẵn trên
+    /// `AttendanceRequest`; `taskId`/`taskName` tra một lượt theo `assignmentId` (tránh N+1).
+    /// </summary>
+    private async Task<IReadOnlyList<AttendanceRequestDto>> WithContextAsync(IReadOnlyList<AttendanceRequest> rows,
+        CancellationToken cancellationToken)
+    {
+        if (rows.Count==0) return Array.Empty<AttendanceRequestDto>();
+        var targets=await store.RequestTargetsAsync(rows.Select(r=>r.AssignmentId).Distinct().ToList(),cancellationToken);
+        return rows.Select(r=>{
+            var target=targets.TryGetValue(r.AssignmentId,out var found) ? found : null;
+            return AttendanceRequestDto.WithContext(r,target?.TaskId,target?.TaskName);
+        }).ToList();
     }
 
     public async Task<AttendanceRequestDto> ReviewRequestAsync(Guid requestId,bool approve,string? note,int? version,CancellationToken cancellationToken=default)

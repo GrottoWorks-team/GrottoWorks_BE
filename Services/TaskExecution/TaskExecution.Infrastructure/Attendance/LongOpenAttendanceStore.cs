@@ -8,13 +8,14 @@ namespace TaskExecution.Infrastructure.Attendance;
 
 public sealed class LongOpenAttendanceStore(TaskExecutionDbContext db) : ILongOpenAttendanceStore
 {
-    public async Task<IReadOnlyList<AttendanceSession>> ListAsync(DateTimeOffset cutoff,Guid? parishId,Guid? leaderId,CancellationToken ct)=>
+    public async Task<IReadOnlyList<AttendanceSession>> ListAsync(DateTimeOffset cutoff,Guid? parishId,Guid? leaderId,Guid? workAreaId,CancellationToken ct)=>
         await (from session in db.AttendanceSessions.AsNoTracking()
                join assignment in db.Assignments on session.AssignmentId equals assignment.Id
                join task in db.Tasks on assignment.TaskId equals task.Id
                join area in db.WorkAreaScopes on task.WorkAreaId equals area.WorkAreaId
                where !session.CheckOutAt.HasValue && session.CheckInAt<=cutoff &&
-                   (!parishId.HasValue || area.ParishId==parishId.Value) && (!leaderId.HasValue || area.LeaderUserId==leaderId.Value)
+                   (!parishId.HasValue || area.ParishId==parishId.Value) && (!leaderId.HasValue || area.LeaderUserId==leaderId.Value) &&
+                   (!workAreaId.HasValue || task.WorkAreaId==workAreaId.Value)
                orderby session.CheckInAt,session.Id select session).ToListAsync(ct);
 
     public async Task<IReadOnlyList<AttendanceAlertCandidate>> CandidatesAsync(DateTimeOffset cutoff,Guid? after,int size,CancellationToken ct)=>

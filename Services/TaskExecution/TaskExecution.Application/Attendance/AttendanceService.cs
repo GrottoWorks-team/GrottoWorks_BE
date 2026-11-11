@@ -18,16 +18,29 @@ using TaskState = TaskExecution.Domain.Tasks.TaskStatus;
 namespace TaskExecution.Application.Attendance;
 
 public sealed record AttendanceRequestDto(Guid Id, Guid AssignmentId, string Type, DateTimeOffset RequestedAt,
-    AttendanceRequestStatus Status, string? Note, Guid? AttendanceId, Guid? ReviewedBy, string? ReviewNote, DateTimeOffset? ReviewedAt, int Version)
+    AttendanceRequestStatus Status, string? Note, Guid? AttendanceId, Guid? ReviewedBy, string? ReviewNote, DateTimeOffset? ReviewedAt, int Version,
+    Guid? VolunteerId = null, Guid? TaskId = null, string? TaskName = null)
 {
     public static AttendanceRequestDto From(AttendanceRequest row) => new(row.Id,row.AssignmentId,row.Type,row.RequestedAt,
         row.Status,row.Note,row.AttendanceId,row.ReviewedBy,row.ReviewNote,row.ReviewedAt,row.Version);
+
+    /// <summary>
+    /// Kèm ngữ cảnh "đơn của ai, cho nhiệm vụ nào" cho màn duyệt của trưởng khu.
+    /// `VolunteerName` không nằm ở đây — web tự đổi `volunteerId` sang tên bằng `GET /users`.
+    /// </summary>
+    public static AttendanceRequestDto WithContext(AttendanceRequest row, Guid? taskId, string? taskName) =>
+        From(row) with { VolunteerId = row.VolunteerId, TaskId = taskId, TaskName = taskName };
 }
 
 public sealed record AttendanceDto(Guid Id, Guid AssignmentId, DateTimeOffset CheckInAt, DateTimeOffset? CheckOutAt,
-    int ApprovedMinutes, AttendanceStatus Status, int Version)
+    int ApprovedMinutes, AttendanceStatus Status, int Version,
+    Guid? VolunteerId = null, Guid? TaskId = null, string? TaskName = null)
 {
     public static AttendanceDto From(AttendanceSession row) => new(row.Id,row.AssignmentId,row.CheckInAt,row.CheckOutAt,row.ApprovedMinutes,row.Status,row.Version);
+
+    /// <summary>Cùng ngữ cảnh như đơn check-in — dùng cho cảnh báo "phiên mở quá lâu".</summary>
+    public AttendanceDto WithContext(Guid? volunteerId, Guid? taskId, string? taskName) =>
+        this with { VolunteerId = volunteerId, TaskId = taskId, TaskName = taskName };
 }
 
 public sealed partial class AttendanceService(IAttendanceStore store, IAssignmentStore assignments, ITaskRepository tasks,

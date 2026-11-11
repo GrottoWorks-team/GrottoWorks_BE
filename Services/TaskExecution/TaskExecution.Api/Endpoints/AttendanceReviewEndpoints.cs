@@ -15,6 +15,13 @@ public sealed class ReviewAttendanceRequest
     [StringLength(2000)] public string? ReviewNote {get;init;}
 }
 
+/// <summary>Đóng phiên điểm danh hộ TNV — trưởng khu phải nêu lý do.</summary>
+public sealed class CloseAttendanceSessionRequest
+{
+    [Range(1,int.MaxValue)] public int? Version {get;init;}
+    [Required,StringLength(500)] public string? Reason {get;init;}
+}
+
 public static class AttendanceReviewEndpoints
 {
     public static void MapAttendanceReviewEndpoints(this IEndpointRouteBuilder app)
@@ -31,6 +38,11 @@ public static class AttendanceReviewEndpoints
             .Produces<ApiResponse<AttendanceRequestDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401)
             .Produces<ProblemDetails>(403).Produces<ProblemDetails>(404).Produces<ProblemDetails>(409)
             .Produces<ProblemDetails>(412).Produces<ProblemDetails>(422).Produces<ProblemDetails>(503);
+        group.MapPost("/attendance/{attendanceId:guid}/close",CloseSessionAsync).WithName("closeAttendanceSession")
+            .WithSummary("Leader closes an open session on behalf of a volunteer (reason required).")
+            .Produces<ApiResponse<AttendanceDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401)
+            .Produces<ProblemDetails>(403).Produces<ProblemDetails>(404).Produces<ProblemDetails>(409)
+            .Produces<ProblemDetails>(412).Produces<ProblemDetails>(422).Produces<ProblemDetails>(503);
     }
     private static async Task<IResult> ListAsync(Guid workAreaId,string? status,AttendanceService service,HttpContext context,CancellationToken ct)
     {
@@ -43,6 +55,14 @@ public static class AttendanceReviewEndpoints
         AttendanceService service,HttpContext context,CancellationToken ct)=>ReviewAsync(requestId,true,request,ifMatch,service,context,ct);
     private static Task<IResult> RejectAsync(Guid requestId,ReviewAttendanceRequest request,[FromHeader(Name="If-Match")] string? ifMatch,
         AttendanceService service,HttpContext context,CancellationToken ct)=>ReviewAsync(requestId,false,request,ifMatch,service,context,ct);
+    private static async Task<IResult> CloseSessionAsync(Guid attendanceId,CloseAttendanceSessionRequest request,
+        [FromHeader(Name="If-Match")] string? ifMatch,AttendanceService service,HttpContext context,CancellationToken ct)
+    {
+        var result=await service.CloseSessionAsync(attendanceId,request.Reason ?? string.Empty,
+            TaskVersionPrecondition.Resolve(request.Version,ifMatch,"ATTENDANCE_VERSION_MISMATCH"),ct);
+        context.Response.Headers.ETag=$"\"{result.Version}\"";
+        return Results.Ok(ApiResults.Ok(result,context));
+    }
     private static async Task<IResult> ReviewAsync(Guid id,bool approve,ReviewAttendanceRequest request,string? header,
         AttendanceService service,HttpContext context,CancellationToken ct)
     {

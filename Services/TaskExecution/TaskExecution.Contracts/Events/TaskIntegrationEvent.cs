@@ -21,4 +21,6 @@ public static class TaskEventTypes
     public const string AttendanceReviewed = "attendance.request.reviewed";
     public const string HoursApproved = "attendance.hours.approved";
     public const string SessionOpenTooLong = "attendance.session.open-too-long";
+    /// <summary>Trưởng khu đóng phiên hộ khi TNV quên check-out (có lý do, ghi audit).</summary>
+    public const string SessionClosedByLeader = "attendance.session.closed-by-leader";
 }

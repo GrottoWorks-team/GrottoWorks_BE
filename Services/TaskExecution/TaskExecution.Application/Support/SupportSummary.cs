@@ -23,8 +23,12 @@ public sealed class GetSupportSummaryHandler(IScopeProjectionStore scopes, ISupp
 {
     public async Task<SupportSummaryDto> HandleAsync(Guid seasonId, CancellationToken ct = default)
     {
-        if (!user.IsAuthenticated || user.Role != GrottoWorksRoles.Parish)
-            throw DomainRuleException.Forbidden("PARISH_ACCESS_DENIED", "Only a parish coordinator can read its support summary.");
+        // BR-57/§11: báo cáo là số liệu của giáo xứ — ban hành giáo (PARISH) và
+        // trưởng ban vật tư (MO, cần số liệu hỗ trợ chéo để lập kế hoạch vật tư)
+        // đọc được; vẫn chặn chéo giáo xứ bằng `ParishId` bên dưới.
+        if (!user.IsAuthenticated ||
+            (user.Role != GrottoWorksRoles.Parish && user.Role != GrottoWorksRoles.MaterialOfficer))
+            throw DomainRuleException.Forbidden("PARISH_ACCESS_DENIED", "Only a parish coordinator or material officer can read its support summary.");
         var season = await scopes.GetSeasonAsync(seasonId, ct)
             ?? throw DomainRuleException.NotFound("SEASON_NOT_FOUND", "The season does not exist.");
         if (user.ParishId != season.ParishId)

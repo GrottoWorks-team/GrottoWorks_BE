@@ -10,6 +10,27 @@
 
 ---
 
+## 2026-11-11 (lần 6) · `phongnltse/task-team-leader-progress`
+
+### 9. Cho `MO` đọc 3 báo cáo cấp giáo xứ (§11 / BR-57)
+
+- **Vấn đề**: MO (`anh.pham`) bị `403` ở `GET /dashboards/season`, `GET /seasons/{id}/recognition`,
+  `GET /seasons/{id}/support-summary` — trưởng ban vật tư không xem được số liệu mùa / hỗ trợ chéo để
+  lập kế hoạch vật tư, dù vẫn đọc được `GET /work-areas/{id}/shortages`.
+- **Sửa** (mở rộng quyền đọc, không đổi payload):
+  - `Reporting.Api/Endpoints/ReportEndpoints.cs` — `viewSeasonDashboard`: `RequireRole(PARISH, MO)`.
+  - `Reporting.Api/Endpoints/RecognitionEndpoints.cs` — `getSeasonRecognition`: `RequireRole(PARISH, MO)`.
+  - `TaskExecution.Api/Endpoints/SupportSummaryEndpoints.cs` — `getCrossCommunitySupportSummary`: `RequireRole(PARISH, MO)`.
+  - `TaskExecution.Application/Support/SupportSummary.cs` — `GetSupportSummaryHandler` chấp nhận role `MO`
+    (giữ nguyên kiểm tra `user.ParishId == season.ParishId` nên vẫn **không** đọc chéo giáo xứ;
+    `VOLUNTEER`/`LEADER` vẫn `403`).
+- **Test**: `TaskExecution.UnitTests` **377/377** (cập nhật `SupportResponseRouteTests` cho role của
+  `getCrossCommunitySupportSummary`), `Reporting.UnitTests` **71/71**. Kiểm chứng thật: MO → `200` cả 3
+  endpoint; VOLUNTEER → `403`.
+- **Ảnh hưởng client**: FE không cần đổi; các trang dashboard/báo cáo của MO hết 403.
+
+---
+
 ## 2026-11-11 (lần 5) · `phongnltse/task-team-leader-progress`
 
 ### 8. Thêm `GET /api/v1/support-response-materials/{itemId}/support-transfer` — sửa lỗi 412 khi nhận vật tư hỗ trợ

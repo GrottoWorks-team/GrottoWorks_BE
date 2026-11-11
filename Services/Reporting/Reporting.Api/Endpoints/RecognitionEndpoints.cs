@@ -21,7 +21,7 @@ public static class RecognitionEndpoints
         app.MapGet("/api/v1/seasons/{seasonId:guid}/recognition", GetSeasonAsync)
             .WithName("getSeasonRecognition")
             .WithTags("Reports")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Parish))
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Parish, GrottoWorksRoles.MaterialOfficer))
             .Produces<ApiResponse<RecognitionRankingDto>>()
             .ProducesProblem(StatusCodes.Status404NotFound);
     }

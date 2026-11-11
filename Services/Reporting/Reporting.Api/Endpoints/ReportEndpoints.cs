@@ -14,7 +14,7 @@ public static class ReportEndpoints
         var dashboards = app.MapGroup("/api/v1/dashboards").WithTags("Reports");
         dashboards.MapGet("/season", SeasonDashboardAsync)
             .WithName("viewSeasonDashboard")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Parish))
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Parish, GrottoWorksRoles.MaterialOfficer))
             .Produces<ApiResponse<SeasonDashboardDto>>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);

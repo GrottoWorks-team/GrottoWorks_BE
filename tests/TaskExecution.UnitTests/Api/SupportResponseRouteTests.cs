@@ -33,7 +33,9 @@ public sealed class SupportResponseRouteTests
         Roles(list).Should().Equal("LEADER");
         var summary=routes.Single(route=>route.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName=="getCrossCommunitySupportSummary");
         summary.RoutePattern.RawText.Should().Be("/api/v1/seasons/{seasonId:guid}/support-summary");
-        Roles(summary).Should().Equal("PARISH");
+        // 11/11/2026: trưởng ban vật tư (MO) cần số liệu hỗ trợ chéo để lập kế hoạch
+        // vật tư → mở thêm role MO bên cạnh PARISH (handler vẫn chặn chéo giáo xứ).
+        Roles(summary).Should().Equal("PARISH","MO");
         summary.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>().Select(meta=>meta.StatusCode).Should().Contain(new[] {200,400,401,403,404,503});
         foreach(var operation in new[] {"approveSupportMember","rejectSupportMember","approveSupportMaterial","rejectSupportMaterial","closeSupportRequest"})
         {

@@ -15,7 +15,9 @@ public sealed record CreateTaskCommand(
     int EstimatedMinutes,
     int RequiredVolunteers,
     DateTimeOffset? StartAt,
-    DateTimeOffset Deadline);
+    DateTimeOffset Deadline,
+    /// <summary>Loại task; mặc định `Work`. Dùng `Corrective` cho việc khắc phục readiness (BR-66).</summary>
+    TaskExecution.Domain.Tasks.TaskType Type = TaskExecution.Domain.Tasks.TaskType.Work);
 
 public sealed class CreateTaskCommandHandler(
     ITaskRepository tasks,
@@ -44,7 +46,8 @@ public sealed class CreateTaskCommandHandler(
             command.RequiredVolunteers,
             command.StartAt,
             command.Deadline,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            command.Type);
 
         tasks.Add(task);
         await tasks.SaveChangesAsync(cancellationToken);

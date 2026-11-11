@@ -39,7 +39,8 @@ public sealed partial class WorkTask
         int requiredVolunteerCount,
         DateTimeOffset? startAt,
         DateTimeOffset deadline,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        TaskType type = TaskType.Work)
     {
         if (id == Guid.Empty || workAreaId == Guid.Empty || createdByUserId == Guid.Empty)
         {
@@ -77,7 +78,7 @@ public sealed partial class WorkTask
             Id = id,
             WorkAreaId = workAreaId,
             CreatedByUserId = createdByUserId,
-            Type = TaskType.Work,
+            Type = type,
             Name = normalizedName,
             Description = normalizedDescription,
             CompletionCriteria = normalizedCriteria,

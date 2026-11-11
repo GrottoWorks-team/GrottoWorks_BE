@@ -145,7 +145,8 @@ public static class TaskEndpoints
                 request.EstimatedMinutes!.Value,
                 request.RequiredVolunteers,
                 request.StartAt,
-                request.Deadline!.Value),
+                request.Deadline!.Value,
+                request.TaskType ?? TaskExecution.Domain.Tasks.TaskType.Work),
             cancellationToken);
 
         httpContext.Response.Headers.ETag = $"\"{task.Version}\"";

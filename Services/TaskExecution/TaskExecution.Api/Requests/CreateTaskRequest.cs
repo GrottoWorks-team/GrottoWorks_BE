@@ -11,4 +11,6 @@ public sealed record CreateTaskRequest(
     [property: Required, Range(1, 599999)] int? EstimatedMinutes,
     [property: Range(1, int.MaxValue)] int RequiredVolunteers,
     DateTimeOffset? StartAt,
-    [property: Required] DateTimeOffset? Deadline);
+    [property: Required] DateTimeOffset? Deadline,
+    /// <summary>`WORK` (mặc định) | `PURCHASE` | `CORRECTIVE` — dùng `CORRECTIVE` cho việc khắc phục readiness (BR-66).</summary>
+    TaskType? TaskType = null);

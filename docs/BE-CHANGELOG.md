@@ -10,6 +10,29 @@
 
 ---
 
+## 2026-11-11 (lần 4) · `phongnltse/task-team-leader-progress`
+
+### 7. Cho phép tạo task theo loại (`taskType`) để hoàn tất BR-66
+
+- **Vấn đề**: `CreateTaskCommand`/`WorkTask.CreateOpen` hard-code `TaskType.Work` ⇒ không có cách nào
+  sinh task `CORRECTIVE`, trong khi readiness yêu cầu “Link an open CORRECTIVE task of this work area”
+  ⇒ mục bắt buộc fail **không thể** hoàn tất quy trình khắc phục.
+- **Files**
+  - `TaskExecution.Domain/Tasks/WorkTask.cs` — `CreateOpen(..., TaskType type = TaskType.Work)`;
+    bỏ hard-code `Type = TaskType.Work`.
+  - `TaskExecution.Application/Tasks/CreateTaskCommand.cs` — thêm `TaskType Type = TaskType.Work` (cuối record,
+    nên mọi caller cũ vẫn biên dịch) + truyền vào `CreateOpen`.
+  - `TaskExecution.Api/Requests/CreateTaskRequest.cs` — thêm `TaskType? TaskType = null`.
+  - `TaskExecution.Api/Endpoints/TaskEndpoints.cs` — `request.TaskType ?? TaskType.Work`.
+- **Contract**: `POST /api/v1/work-areas/{id}/tasks` nhận thêm field optional `taskType`
+  (`WORK` | `PURCHASE` | `CORRECTIVE`) — **additive**, client cũ không gửi thì mặc định `WORK`.
+- **Test**: `TaskExecution.UnitTests` **377/377 pass**; kiểm chứng thật:
+  tạo task `CORRECTIVE` → `201` (`taskType: CORRECTIVE`), gắn vào readiness item bằng
+  `PUT /readiness-checks/{id}/items/{itemId}/corrective-task` → `200`, `correctiveTaskId` được set.
+- **Lưu ý**: endpoint gắn corrective dùng **PUT**, không phải POST (POST trả `405`).
+
+---
+
 ## 2026-11-11 (lần 3) · `phongnltse/task-team-leader-progress`
 
 ### 6. Rule thông báo cho `attendance.session.closed-by-leader`

@@ -17,6 +17,7 @@ using ParishCoordination.Application.WorkAreaCategories.Queries.ListWorkAreaCate
 using ParishCoordination.Application.WorkAreaCategories.Commands.CreateWorkAreaCategory;
 using ParishCoordination.Application.WorkAreaCategories.Commands.UpdateWorkAreaCategory;
 using ParishCoordination.Application.Seasons.Commands.CreateSeason;
+using ParishCoordination.Application.Seasons.Commands.CloneSeason;
 using ParishCoordination.Application.Seasons.Commands.ActivateSeason;
 using ParishCoordination.Application.Seasons.Commands.ArchiveSeason;
 using ParishCoordination.Application.Seasons.Commands.CompleteSeason;
@@ -49,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<AssignMaterialOfficerCommandHandler>();
         services.AddScoped<UpdateWorkAreaCommandHandler>();
         services.AddScoped<CreateSeasonCommandHandler>();
+        services.AddScoped<CloneSeasonCommandHandler>();
         services.AddScoped<ActivateSeasonCommandHandler>();
         services.AddScoped<ArchiveSeasonCommandHandler>();
         services.AddScoped<CompleteSeasonCommandHandler>();

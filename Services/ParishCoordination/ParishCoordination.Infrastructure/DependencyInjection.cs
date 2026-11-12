@@ -71,6 +71,11 @@ public static class DependencyInjection
                 options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10);
             });
 
+        // Same client instance, exposed as the batch contract so season cloning validates
+        // every copied leader/officer with one internal call.
+        services.AddScoped<IIdentityUserBatchLookup>(provider =>
+            (IIdentityUserBatchLookup)provider.GetRequiredService<IIdentityUserLookup>());
+
         var taskExecutionClientOptions = TaskExecutionClientOptions.FromConfiguration(configuration);
         services.AddSingleton(taskExecutionClientOptions);
         services.AddHttpClient<IWorkAreaTaskCountClient, WorkAreaTaskCountClient>(client =>

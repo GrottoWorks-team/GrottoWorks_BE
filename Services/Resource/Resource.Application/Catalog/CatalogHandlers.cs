@@ -7,7 +7,16 @@ public sealed record CreateMaterialCategoryCommand(string Code, string Name, str
 
 public sealed record UpdateMaterialCategoryCommand(Guid CategoryId, string? Name, string? Description, CatalogStatus? Status);
 
-public sealed record CreateMaterialCommand(Guid CategoryId, string Code, string Name, string Unit, string? Description);
+public sealed record CreateMaterialCommand(
+    Guid CategoryId,
+    string Code,
+    string Name,
+    string Unit,
+    string? Description,
+    string? Specification = null,
+    string? SupplierName = null,
+    decimal? ReferenceUnitPrice = null,
+    decimal? MinimumStock = null);
 
 public sealed record UpdateMaterialCommand(
     Guid MaterialId,
@@ -15,7 +24,11 @@ public sealed record UpdateMaterialCommand(
     string? Name,
     string? Unit,
     string? Description,
-    CatalogStatus? Status);
+    CatalogStatus? Status,
+    string? Specification = null,
+    string? SupplierName = null,
+    decimal? ReferenceUnitPrice = null,
+    decimal? MinimumStock = null);
 
 /// <summary>F-RES-02 <c>listMaterialCategories</c> (USER). Defaults to ACTIVE ("List active material categories").</summary>
 public sealed class ListMaterialCategoriesQueryHandler(IMaterialCatalogStore store)
@@ -101,7 +114,8 @@ public sealed class CreateMaterialCommandHandler(IMaterialCatalogStore store)
         var category = await store.GetCategoryAsync(command.CategoryId, cancellationToken)
             ?? throw DomainRuleException.Validation("MATERIAL_CATEGORY_UNKNOWN", "The material category does not exist.");
 
-        var material = Material.Create(category, command.Code, command.Name, command.Unit, command.Description);
+        var material = Material.Create(category, command.Code, command.Name, command.Unit, command.Description,
+            command.Specification, command.SupplierName, command.ReferenceUnitPrice, command.MinimumStock);
 
         if (await store.MaterialCodeExistsAsync(material.Code, cancellationToken))
         {
@@ -135,7 +149,8 @@ public sealed class UpdateMaterialCommandHandler(IMaterialCatalogStore store)
                           !string.Equals(command.Unit.Trim(), material.Unit, StringComparison.Ordinal);
         var isReferenced = unitChanges && await store.IsMaterialReferencedAsync(material.MaterialId, cancellationToken);
 
-        material.Update(command.Name, command.Unit, command.Description, command.Status, isReferenced);
+        material.Update(command.Name, command.Unit, command.Description, command.Status, isReferenced,
+            command.Specification, command.SupplierName, command.ReferenceUnitPrice, command.MinimumStock);
         await store.SaveChangesAsync(cancellationToken);
         return MaterialDto.From(material);
     }

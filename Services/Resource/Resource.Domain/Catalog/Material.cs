@@ -9,12 +9,23 @@ public sealed class Material
     public const int MaxCodeLength = 50;
     public const int MaxNameLength = 150;
     public const int MaxUnitLength = 30;
+    public const int MaxSpecificationLength = 300;
+    public const int MaxSupplierNameLength = 150;
 
     private Material()
     {
     }
 
-    public static Material Create(MaterialCategory category, string code, string name, string unit, string? description)
+    public static Material Create(
+        MaterialCategory category,
+        string code,
+        string name,
+        string unit,
+        string? description,
+        string? specification = null,
+        string? supplierName = null,
+        decimal? referenceUnitPrice = null,
+        decimal? minimumStock = null)
     {
         ArgumentNullException.ThrowIfNull(category);
         EnsureCategoryUsable(category);
@@ -27,8 +38,35 @@ public sealed class Material
             Name = CatalogText.Required(name, MaxNameLength, "MATERIAL_NAME_INVALID", "Name"),
             Unit = CatalogText.Required(unit, MaxUnitLength, "MATERIAL_UNIT_INVALID", "Unit"),
             Description = CatalogText.Optional(description),
+            Specification = OptionalText(specification, MaxSpecificationLength, "MATERIAL_SPECIFICATION_INVALID", "Specification"),
+            SupplierName = OptionalText(supplierName, MaxSupplierNameLength, "MATERIAL_SUPPLIER_INVALID", "Supplier"),
+            ReferenceUnitPrice = NonNegative(referenceUnitPrice, "MATERIAL_REFERENCE_PRICE_INVALID", "Reference unit price"),
+            MinimumStock = NonNegative(minimumStock, "MATERIAL_MINIMUM_STOCK_INVALID", "Minimum stock"),
             Status = CatalogStatus.Active
         };
+    }
+
+    private static string? OptionalText(string? value, int maxLength, string errorCode, string field)
+    {
+        var trimmed = CatalogText.Optional(value);
+        if (trimmed is not null && trimmed.Length > maxLength)
+        {
+            throw DomainRuleException.Validation(
+                errorCode,
+                $"{field} must not exceed {maxLength} characters.");
+        }
+
+        return trimmed;
+    }
+
+    private static decimal? NonNegative(decimal? value, string errorCode, string field)
+    {
+        if (value is < 0)
+        {
+            throw DomainRuleException.Validation(errorCode, $"{field} must not be negative.");
+        }
+
+        return value;
     }
 
     public static string NormalizeCode(string? code) =>
@@ -45,6 +83,18 @@ public sealed class Material
     public string Unit { get; private set; } = string.Empty;
 
     public string? Description { get; private set; }
+
+    /// <summary>Detail shown to the buying team, e.g. "nhựa PP, 1m8 x 0.8m, chân inox".</summary>
+    public string? Specification { get; private set; }
+
+    /// <summary>Preferred supplier, free text — no supplier aggregate exists yet.</summary>
+    public string? SupplierName { get; private set; }
+
+    /// <summary>Planning price per unit in VND, used to estimate purchase cost.</summary>
+    public decimal? ReferenceUnitPrice { get; private set; }
+
+    /// <summary>Stock level that should trigger a re-purchase suggestion.</summary>
+    public decimal? MinimumStock { get; private set; }
 
     public CatalogStatus Status { get; private set; }
 
@@ -64,7 +114,16 @@ public sealed class Material
     /// Changing the unit after quantities were recorded would silently change their meaning, so the caller
     /// passes whether the material is already referenced by requirements or the stock ledger.
     /// </summary>
-    public void Update(string? name, string? unit, string? description, CatalogStatus? status, bool isReferenced)
+    public void Update(
+        string? name,
+        string? unit,
+        string? description,
+        CatalogStatus? status,
+        bool isReferenced,
+        string? specification = null,
+        string? supplierName = null,
+        decimal? referenceUnitPrice = null,
+        decimal? minimumStock = null)
     {
         if (name is not null)
         {
@@ -90,6 +149,26 @@ public sealed class Material
         if (description is not null)
         {
             Description = CatalogText.Optional(description);
+        }
+
+        if (specification is not null)
+        {
+            Specification = OptionalText(specification, MaxSpecificationLength, "MATERIAL_SPECIFICATION_INVALID", "Specification");
+        }
+
+        if (supplierName is not null)
+        {
+            SupplierName = OptionalText(supplierName, MaxSupplierNameLength, "MATERIAL_SUPPLIER_INVALID", "Supplier");
+        }
+
+        if (referenceUnitPrice is not null)
+        {
+            ReferenceUnitPrice = NonNegative(referenceUnitPrice, "MATERIAL_REFERENCE_PRICE_INVALID", "Reference unit price");
+        }
+
+        if (minimumStock is not null)
+        {
+            MinimumStock = NonNegative(minimumStock, "MATERIAL_MINIMUM_STOCK_INVALID", "Minimum stock");
         }
 
         if (status is not null)

@@ -11,6 +11,7 @@ using ParishCoordination.Application.Seasons;
 using ParishCoordination.Application.Seasons.Commands.ActivateSeason;
 using ParishCoordination.Application.Seasons.Commands.ArchiveSeason;
 using ParishCoordination.Application.Seasons.Commands.CompleteSeason;
+using ParishCoordination.Application.Seasons.Commands.CloneSeason;
 using ParishCoordination.Application.Seasons.Commands.CreateSeason;
 using ParishCoordination.Application.Seasons.Commands.UpdateSeason;
 using ParishCoordination.Application.Seasons.Queries.GetSeasons;
@@ -47,6 +48,22 @@ public static class SeasonEndpoints
                 GrottoWorksRoles.Admin,
                 GrottoWorksRoles.Parish))
             .Produces<ApiResponse<SeasonDto>>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        // F-SEA-xx "Tạo mùa mới từ mùa cũ": one request = one transaction (season + areas + outbox).
+        app.MapPost("/api/v1/seasons/{sourceSeasonId}/clone", CloneSeasonAsync)
+            .WithName("cloneSeason")
+            .WithTags("Parish")
+            .RequireAuthorization(policy => policy.RequireRole(
+                GrottoWorksRoles.Admin,
+                GrottoWorksRoles.Parish))
+            .Accepts<CloneSeasonRequest>("application/json")
+            .Produces<ApiResponse<CloneSeasonResult>>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
@@ -225,6 +242,71 @@ public static class SeasonEndpoints
 
         return Results.Json(
             ApiResults.Ok(season, httpContext),
+            statusCode: StatusCodes.Status201Created);
+    }
+
+    private static async Task<IResult> CloneSeasonAsync(
+        Guid sourceSeasonId,
+        CloneSeasonRequest request,
+        HttpContext httpContext,
+        CloneSeasonCommandHandler commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var command = new CloneSeasonCommand(
+            sourceSeasonId,
+            request.Name!.Trim(),
+            request.SeasonYear!.Value,
+            request.StartDate!.Value,
+            request.EndDate!.Value,
+            CleanOptionalText(request.Description),
+            request.EstimatedBudget,
+            request.ParseDateShift(),
+            request.CopyAssignments ?? true,
+            request.Areas?
+                .Select(area => new CloneAreaSelection(
+                    area.SourceWorkAreaId,
+                    CleanOptionalText(area.Name),
+                    area.CategoryId,
+                    area.CommunityId))
+                .ToList());
+
+        var result = await commandHandler.HandleAsync(command, cancellationToken);
+
+        if (result.Outcome == CloneSeasonOutcome.SourceSeasonNotFound)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status404NotFound,
+                "Source season not found",
+                $"Season with ID '{sourceSeasonId}' was not found.",
+                "SOURCE_SEASON_NOT_FOUND");
+        }
+
+        if (result.Outcome == CloneSeasonOutcome.NameConflict)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "Season name conflict",
+                "A season with the same name already exists in this parish.",
+                "SEASON_NAME_CONFLICT");
+        }
+
+        if (result.Outcome == CloneSeasonOutcome.YearConflict)
+        {
+            return CreateProblem(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "Season year conflict",
+                "A season with the same year already exists in this parish.",
+                "SEASON_YEAR_CONFLICT");
+        }
+
+        var body = CloneSeasonResultDto.From(result);
+        SetETag(httpContext, body.Season.Version);
+
+        return Results.Json(
+            ApiResults.Ok(body, httpContext),
             statusCode: StatusCodes.Status201Created);
     }
 

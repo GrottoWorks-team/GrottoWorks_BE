@@ -20,6 +20,17 @@ public interface IIdentityUserLookup
         CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Batch variant of <see cref="IIdentityUserLookup"/> backed by <c>GET /internal/users?ids=</c>.
+/// Season cloning validates every copied leader/officer in one call instead of N calls.
+/// </summary>
+public interface IIdentityUserBatchLookup
+{
+    Task<IReadOnlyDictionary<Guid, IdentityUser>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken = default);
+}
+
 public sealed class IdentityUserLookupUnavailableException(
     string message,
     Exception? innerException = null)

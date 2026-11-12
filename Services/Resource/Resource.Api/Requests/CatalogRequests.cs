@@ -51,6 +51,18 @@ public sealed class CreateMaterialRequest
 
     [StringLength(2000, ErrorMessage = "Description must not exceed 2000 characters.")]
     public string? Description { get; init; }
+
+    [StringLength(Material.MaxSpecificationLength, ErrorMessage = "Specification must not exceed 300 characters.")]
+    public string? Specification { get; init; }
+
+    [StringLength(Material.MaxSupplierNameLength, ErrorMessage = "Supplier must not exceed 150 characters.")]
+    public string? SupplierName { get; init; }
+
+    [Range(typeof(decimal), "0", "999999999999.99", ErrorMessage = "Reference unit price must not be negative.")]
+    public decimal? ReferenceUnitPrice { get; init; }
+
+    [Range(typeof(decimal), "0", "999999999999.999", ErrorMessage = "Minimum stock must not be negative.")]
+    public decimal? MinimumStock { get; init; }
 }
 
 /// <summary><c>UpdateMaterialRequest</c> — PATCH; the unit is locked once quantities were recorded.</summary>
@@ -66,6 +78,18 @@ public sealed class UpdateMaterialRequest
 
     [StringLength(2000, ErrorMessage = "Description must not exceed 2000 characters.")]
     public string? Description { get; init; }
+
+    [StringLength(Material.MaxSpecificationLength, ErrorMessage = "Specification must not exceed 300 characters.")]
+    public string? Specification { get; init; }
+
+    [StringLength(Material.MaxSupplierNameLength, ErrorMessage = "Supplier must not exceed 150 characters.")]
+    public string? SupplierName { get; init; }
+
+    [Range(typeof(decimal), "0", "999999999999.99", ErrorMessage = "Reference unit price must not be negative.")]
+    public decimal? ReferenceUnitPrice { get; init; }
+
+    [Range(typeof(decimal), "0", "999999999999.999", ErrorMessage = "Minimum stock must not be negative.")]
+    public decimal? MinimumStock { get; init; }
 
     public CatalogStatus? Status { get; init; }
 }

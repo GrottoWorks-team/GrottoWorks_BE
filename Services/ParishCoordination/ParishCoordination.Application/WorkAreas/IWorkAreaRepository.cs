@@ -27,6 +27,11 @@ public interface IWorkAreaRepository
         Guid workAreaId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Every work area of a season, used by season cloning (no paging).</summary>
+    Task<IReadOnlyList<WorkArea>> ListBySeasonIdAsync(
+        Guid seasonId,
+        CancellationToken cancellationToken = default);
+
     Task<WorkAreaActivationReadiness> GetActivationReadinessAsync(
         Guid seasonId,
         CancellationToken cancellationToken = default);

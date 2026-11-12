@@ -15,7 +15,11 @@ public sealed record MaterialDto(
     string Name,
     string Unit,
     string? Description,
-    CatalogStatus Status)
+    CatalogStatus Status,
+    string? Specification = null,
+    string? SupplierName = null,
+    decimal? ReferenceUnitPrice = null,
+    decimal? MinimumStock = null)
 {
     public static MaterialDto From(Material material) =>
         new(
@@ -25,7 +29,11 @@ public sealed record MaterialDto(
             material.Name,
             material.Unit,
             material.Description,
-            material.Status);
+            material.Status,
+            material.Specification,
+            material.SupplierName,
+            material.ReferenceUnitPrice,
+            material.MinimumStock);
 }
 
 public enum MaterialSortField

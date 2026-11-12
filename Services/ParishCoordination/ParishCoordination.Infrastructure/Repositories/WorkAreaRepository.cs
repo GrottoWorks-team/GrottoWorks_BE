@@ -85,6 +85,18 @@ public sealed class WorkAreaRepository(ParishCoordinationDbContext dbContext)
                 cancellationToken);
     }
 
+    public async Task<IReadOnlyList<WorkArea>> ListBySeasonIdAsync(
+        Guid seasonId,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.WorkAreas
+            .AsNoTracking()
+            .Where(workArea => workArea.SeasonId == seasonId)
+            .OrderBy(workArea => workArea.Name)
+            .ThenBy(workArea => workArea.Id)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<WorkAreaActivationReadiness> GetActivationReadinessAsync(
         Guid seasonId,
         CancellationToken cancellationToken = default)

@@ -16,6 +16,7 @@ using ParishCoordination.Application.Parishes.Commands.CreateParish;
 using ParishCoordination.Application.Seasons.Queries.GetSeasons;
 using ParishCoordination.Application.Seasons.Queries.GetSeason;
 using ParishCoordination.Application.Seasons.Commands.CreateSeason;
+using ParishCoordination.Application.Seasons.Commands.CloneSeason;
 using ParishCoordination.Application.Seasons.Commands.ActivateSeason;
 using ParishCoordination.Application.Seasons.Commands.ArchiveSeason;
 using ParishCoordination.Application.Seasons.Commands.CompleteSeason;
@@ -58,6 +59,7 @@ public sealed class RouteAuthorizationTests
         builder.Services.AddScoped<GetSeasonsQueryHandler>();
         builder.Services.AddScoped<GetSeasonQueryHandler>();
         builder.Services.AddScoped<CreateSeasonCommandHandler>();
+        builder.Services.AddScoped<CloneSeasonCommandHandler>();
         builder.Services.AddScoped<ActivateSeasonCommandHandler>();
         builder.Services.AddScoped<ArchiveSeasonCommandHandler>();
         builder.Services.AddScoped<CompleteSeasonCommandHandler>();
@@ -94,6 +96,7 @@ public sealed class RouteAuthorizationTests
         var seasons = FindByName(app, "listSeasons");
         var getSeason = FindByName(app, "getSeason");
         var createSeason = FindByName(app, "createSeason");
+        var cloneSeason = FindByName(app, "cloneSeason");
         var activateSeason = FindByName(app, "activateSeason");
         var archiveSeason = FindByName(app, "archiveSeason");
         var completeSeason = FindByName(app, "completeSeason");
@@ -116,6 +119,10 @@ public sealed class RouteAuthorizationTests
         GetRoles(createCommunity).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(updateCommunity).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
+        GetRoles(cloneSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
+        cloneSeason.RoutePattern.RawText.Should().Be("/api/v1/seasons/{sourceSeasonId}/clone");
+        cloneSeason.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
+            .Should().Contain(metadata => metadata.StatusCode == 201);
         GetRoles(activateSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(archiveSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(completeSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);

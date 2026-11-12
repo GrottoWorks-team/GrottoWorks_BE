@@ -19,11 +19,13 @@ internal sealed class FakeCurrentUser : ICurrentUser
     public Guid? CommunityId { get; init; }
 }
 
-internal sealed class FakeIdentityUserLookup : IIdentityUserLookup
+internal sealed class FakeIdentityUserLookup : IIdentityUserLookup, IIdentityUserBatchLookup
 {
     public List<IdentityUser> Items { get; } = [];
     public bool ThrowUnavailable { get; set; }
     public int CallCount { get; private set; }
+    public int BatchCallCount { get; private set; }
+    public List<Guid> LastBatchIds { get; } = [];
     public Guid? LastUserId { get; private set; }
 
     public Task<IdentityUser?> GetByIdAsync(
@@ -40,6 +42,28 @@ internal sealed class FakeIdentityUserLookup : IIdentityUserLookup
         }
 
         return Task.FromResult(Items.SingleOrDefault(user => user.UserId == userId));
+    }
+
+    public Task<IReadOnlyDictionary<Guid, IdentityUser>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken = default)
+    {
+        BatchCallCount++;
+        LastBatchIds.Clear();
+        LastBatchIds.AddRange(userIds);
+
+        if (ThrowUnavailable)
+        {
+            throw new IdentityUserLookupUnavailableException(
+                "Simulated Identity outage.");
+        }
+
+        var wanted = userIds.ToHashSet();
+        IReadOnlyDictionary<Guid, IdentityUser> found = Items
+            .Where(user => wanted.Contains(user.UserId))
+            .ToDictionary(user => user.UserId);
+
+        return Task.FromResult(found);
     }
 }
 
@@ -297,6 +321,14 @@ internal sealed class FakeWorkAreaRepository : IWorkAreaRepository
         Guid workAreaId,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.SingleOrDefault(workArea => workArea.Id == workAreaId));
+
+    public Task<IReadOnlyList<WorkArea>> ListBySeasonIdAsync(
+        Guid seasonId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<WorkArea>>(Items
+            .Where(workArea => workArea.SeasonId == seasonId)
+            .OrderBy(workArea => workArea.Name)
+            .ToList());
 
     public Task<WorkAreaActivationReadiness> GetActivationReadinessAsync(
         Guid seasonId,

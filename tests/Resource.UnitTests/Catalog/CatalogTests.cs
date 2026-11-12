@@ -150,4 +150,77 @@ public sealed class CatalogTests
         page.TotalItems.Should().Be(3);
         page.Items.Select(m => m.Code).Should().Equal("C-1", "B-1");
     }
+
+    [Fact]
+    public async Task CreateMaterial_keeps_specification_supplier_price_and_minimum_stock()
+    {
+        var category = _store.SeedCategory();
+
+        var created = await new CreateMaterialCommandHandler(_store).HandleAsync(
+            new CreateMaterialCommand(
+                category.MaterialCategoryId,
+                "BAN-1M8",
+                "Bàn nhựa 1m8",
+                "cái",
+                " Bàn gấp ",
+                " Nhựa PP, 1m8 x 0.8m ",
+                " Công ty Hoa Sen ",
+                450_000m,
+                10.5m));
+
+        created.Code.Should().Be("BAN-1M8");
+        created.Specification.Should().Be("Nhựa PP, 1m8 x 0.8m");
+        created.SupplierName.Should().Be("Công ty Hoa Sen");
+        created.ReferenceUnitPrice.Should().Be(450_000m);
+        created.MinimumStock.Should().Be(10.5m);
+    }
+
+    [Fact]
+    public async Task CreateMaterial_rejects_negative_price_or_minimum_stock()
+    {
+        var category = _store.SeedCategory();
+        var handler = new CreateMaterialCommandHandler(_store);
+
+        (await Fails(() => handler.HandleAsync(new CreateMaterialCommand(
+                category.MaterialCategoryId, "P-1", "Price", "cái", null,
+                ReferenceUnitPrice: -1m))))
+            .Code.Should().Be("MATERIAL_REFERENCE_PRICE_INVALID");
+
+        (await Fails(() => handler.HandleAsync(new CreateMaterialCommand(
+                category.MaterialCategoryId, "P-2", "Stock", "cái", null,
+                MinimumStock: -0.5m))))
+            .Code.Should().Be("MATERIAL_MINIMUM_STOCK_INVALID");
+
+        (await Fails(() => handler.HandleAsync(new CreateMaterialCommand(
+                category.MaterialCategoryId, "P-3", "Spec", "cái", null,
+                Specification: new string('x', Material.MaxSpecificationLength + 1)))))
+            .Code.Should().Be("MATERIAL_SPECIFICATION_INVALID");
+    }
+
+    [Fact]
+    public async Task UpdateMaterial_patches_detail_fields_without_touching_others()
+    {
+        var category = _store.SeedCategory();
+        var material = _store.SeedMaterial(category, unit: "cái");
+        var handler = new UpdateMaterialCommandHandler(_store);
+
+        var updated = await handler.HandleAsync(new UpdateMaterialCommand(
+            material.MaterialId, null, null, null, null, null,
+            Specification: "Gỗ thông",
+            SupplierName: "Nội thất An Phú",
+            ReferenceUnitPrice: 1_200_000m,
+            MinimumStock: 2m));
+
+        updated.Specification.Should().Be("Gỗ thông");
+        updated.SupplierName.Should().Be("Nội thất An Phú");
+        updated.ReferenceUnitPrice.Should().Be(1_200_000m);
+        updated.MinimumStock.Should().Be(2m);
+        updated.Unit.Should().Be("cái", "PATCH must not touch fields it does not receive");
+
+        // Empty string clears a text field; null leaves it untouched.
+        var cleared = await handler.HandleAsync(new UpdateMaterialCommand(
+            material.MaterialId, null, null, null, null, null, Specification: "  "));
+        cleared.Specification.Should().BeNull();
+        cleared.SupplierName.Should().Be("Nội thất An Phú");
+    }
 }

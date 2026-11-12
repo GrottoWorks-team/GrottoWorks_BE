@@ -134,7 +134,11 @@ public static class CatalogEndpoints
                 request.Code!,
                 request.Name!,
                 request.Unit!,
-                Text.Clean(request.Description)),
+                Text.Clean(request.Description),
+                Text.Clean(request.Specification),
+                Text.Clean(request.SupplierName),
+                request.ReferenceUnitPrice,
+                request.MinimumStock),
             cancellationToken);
         return Results.Json(ApiResults.Ok(material, httpContext), statusCode: StatusCodes.Status201Created);
     }
@@ -153,7 +157,11 @@ public static class CatalogEndpoints
                 Text.Clean(request.Name),
                 Text.Clean(request.Unit),
                 request.Description,
-                request.Status),
+                request.Status,
+                request.Specification,
+                request.SupplierName,
+                request.ReferenceUnitPrice,
+                request.MinimumStock),
             cancellationToken);
         return Results.Ok(ApiResults.Ok(material, httpContext));
     }

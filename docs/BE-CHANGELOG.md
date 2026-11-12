@@ -10,6 +10,53 @@
 
 ---
 
+## 2026-11-12 (lần 7) · `phongnltse/task-team-leader-progress`
+
+### 10. `POST /api/v1/seasons/{sourceSeasonId}/clone` — tạo mùa mới từ mùa cũ (1 request, 1 transaction)
+
+- **Vấn đề**: "Tạo mùa mới từ mùa cũ" nếu làm ở client sẽ là `1 × POST /seasons` +
+  `N × POST /seasons/{id}/work-areas` + `2N × PUT .../leader|material-officer` = **22 request** với 7 khu;
+  lỗi giữa đường để lại mùa thiếu khu vực/thiếu người phụ trách nên không `activate` được.
+- **Thêm** (ParishCoordination, không phá vỡ contract cũ):
+  - `Application/Seasons/Commands/CloneSeason/*` — `CloneSeasonCommandHandler`: đọc mùa nguồn → `ParishAccess`
+    → validate ngày (`SEASON_DATE_INVALID` 422) + unique `name`/`seasonYear` (409) → `Season.Create` (PLANNING)
+    → copy các khu vực được chọn (`areas` rỗng = tất cả), `dateShift` `NONE` (bỏ trống ngày) hoặc
+    `SAME_DAY_OF_SEASON` (giữ offset, clamp trong mùa mới) → **một** `SaveChangesAsync` cho season + N areas + outbox.
+  - `Users/IIdentityUserLookup.cs` — thêm `IIdentityUserBatchLookup.GetByIdsAsync` (`GET /internal/users?ids=`),
+    `Infrastructure/Identity/IdentityUserLookupClient` implement batch (chunk 100 id). Phân công chỉ được copy khi
+    user **ACTIVE + đúng role + cùng giáo xứ**; ngược lại bỏ + trả `warnings[]`
+    (`WORK_AREA_LEADER_NOT_VERIFIED:{khu}`, `WORK_AREA_MATERIAL_OFFICER_NOT_VERIFIED:{khu}`).
+  - `WorkAreas/IWorkAreaRepository.ListBySeasonIdAsync` + EF implementation.
+  - `Api/Requests/CloneSeasonRequest.cs`, `Api/Endpoints/SeasonEndpoints.cs` (`cloneSeason`, ADMIN|PARISH),
+    DI `CloneSeasonCommandHandler`. Gateway đã phủ bởi route catch-all `parish-seasons-route`.
+  - Response `201 ApiResponse<CloneSeasonResultDto>{season, areas[], warnings[]}` — client **không** cần GET lại.
+- **Lỗi có mã**: `404 SOURCE_SEASON_NOT_FOUND` · `409 SEASON_NAME_CONFLICT|SEASON_YEAR_CONFLICT` ·
+  `422 SEASON_DATE_INVALID|CLONE_AREA_NOT_IN_SOURCE|CLONE_AREA_DUPLICATE|CLONE_SOURCE_TOO_LARGE` ·
+  `403 PARISH_ACCESS_DENIED|SEASON_CLONE_FORBIDDEN`.
+- **Test**: `ParishCoordination.UnitTests` **313/313** (13 test mới `CloneSeasonHandlerTests`, route auth cập nhật).
+  Kiểm chứng thật qua gateway: clone mùa 2026 (8 khu) → `201`, mùa mới PLANNING, 8 khu có ngày dịch đúng,
+  phân công copy, `warnings` rỗng; dữ liệu test đã xoá.
+
+### 11. Chi tiết vật tư: `specification`, `supplierName`, `referenceUnitPrice`, `minimumStock`
+
+- **Vấn đề**: `material` chỉ có code/name/unit/description → trưởng ban vật tư không ghi được thông số,
+  nhà cung cấp quen, đơn giá tham khảo hay mức tồn tối thiểu để lập dự toán mua.
+- **Thêm** (Resource):
+  - `Domain/Catalog/Material.cs` — 4 field mới + validate (`MATERIAL_SPECIFICATION_INVALID` ≤300 ký tự,
+    `MATERIAL_SUPPLIER_INVALID` ≤150, `MATERIAL_REFERENCE_PRICE_INVALID` / `MATERIAL_MINIMUM_STOCK_INVALID` ≥ 0).
+    `Create(...)`/`Update(...)` nhận thêm tham số optional → **không phá vỡ** call site cũ.
+  - `Application/Catalog/CatalogDtos.cs` (`MaterialDto` +4 field), `CatalogHandlers.cs` (command + truyền qua).
+  - `Api/Requests/CatalogRequests.cs` + `Api/Endpoints/CatalogEndpoints.cs` — nhận/trả thêm 4 field cho
+    `POST /api/v1/materials` và `PATCH /api/v1/materials/{id}` (PATCH: `null` = giữ nguyên, chuỗi rỗng = xoá).
+  - `Infrastructure/Data/Configurations/CatalogConfigurations.cs` + migration `20261112130506_AddMaterialDetails`
+    (`material_specification` varchar(300), `material_supplier_name` varchar(150),
+    `material_reference_unit_price` numeric(18,2), `material_minimum_stock` numeric(18,3) — đều nullable).
+- **Ảnh hưởng client**: payload mở rộng, client cũ vẫn chạy (field optional). FE đã thêm ô nhập + cột bảng + CSV.
+- **Test**: `Resource.UnitTests` **255/255** (3 test mới). Kiểm chứng thật: `POST` 201 giữ đủ 4 field,
+  `PATCH` cập nhật từng phần, giá âm → `422`, list trả đúng; dữ liệu test đã xoá.
+
+---
+
 ## 2026-11-11 (lần 6) · `phongnltse/task-team-leader-progress`
 
 ### 9. Cho `MO` đọc 3 báo cáo cấp giáo xứ (§11 / BR-57)

@@ -45,6 +45,18 @@ public sealed class MaterialConfiguration : IEntityTypeConfiguration<Material>
         builder.Property(material => material.Name).HasColumnName("material_name").HasMaxLength(Material.MaxNameLength).IsRequired();
         builder.Property(material => material.Unit).HasColumnName("material_unit").HasMaxLength(Material.MaxUnitLength).IsRequired();
         builder.Property(material => material.Description).HasColumnName("material_description");
+        builder.Property(material => material.Specification)
+            .HasColumnName("material_specification")
+            .HasMaxLength(Material.MaxSpecificationLength);
+        builder.Property(material => material.SupplierName)
+            .HasColumnName("material_supplier_name")
+            .HasMaxLength(Material.MaxSupplierNameLength);
+        builder.Property(material => material.ReferenceUnitPrice)
+            .HasColumnName("material_reference_unit_price")
+            .HasPrecision(18, 2);
+        builder.Property(material => material.MinimumStock)
+            .HasColumnName("material_minimum_stock")
+            .HasPrecision(18, 3);
         builder.Property(material => material.Status).AsCatalogStatus("material_status");
         builder.HasIndex(material => material.MaterialCategoryId).HasDatabaseName("ix_material_material_category_id");
 

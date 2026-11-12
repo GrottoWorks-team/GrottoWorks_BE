@@ -78,6 +78,20 @@ Ghi chú kỹ thuật (đã xử lý trong `ObjectStorageClientFactory`): path-s
 3. Lỗi CORS trên trình duyệt (`PUT` bị chặn) → kiểm tra lại `AllowedOrigins` và header `Content-Type` (được ký trong URL — client phải gửi đúng giá trị BE trả trong `headers`).
 4. `403 SignatureDoesNotMatch` → sai secret, sai endpoint (phải là endpoint S3 có account ID), hoặc client gửi `Content-Type` khác.
 
+**Đã kiểm chứng end-to-end 12/11/2026** (máy dev, `Provider=R2`, bucket `grottoworks`):
+
+| Bước | Kết quả |
+|---|---|
+| `POST /api/v1/files/upload-requests` (`purpose=ProgressEvidence`, `image/png`) | `201`, `uploadUrl` trỏ `*.r2.cloudflarestorage.com` |
+| `PUT` presigned (header ký `Content-Type: image/png`) | `200` |
+| `POST /api/v1/files/{id}/complete` | OK, `sizeBytes = 70` (BE đọc lại object bằng HEAD trên R2) |
+| `GET /api/v1/files/{id}/download-url` rồi `GET` | `200`, đúng 70 byte, host R2 |
+| `DELETE /api/v1/files/{id}` | `204` |
+
+Lưu ý khi đổi provider trên máy đã dùng MinIO: object cũ nằm ở bucket MinIO `grottoworks-files`,
+nên `download-url` của file cũ sẽ `404` (metadata còn, object không còn) — cần copy object sang R2 trước khi đổi,
+hoặc chỉ đổi provider ở môi trường mới.
+
 Khôi phục backup vào R2 (`tools/Verification restore-objects`): tạo trước bucket rỗng tên `grottoworks-restore-*`, token có quyền trên bucket đó, rồi chạy với
 `VERIFY_STORAGE_PROVIDER=R2 VERIFY_STORAGE_ENDPOINT=... VERIFY_STORAGE_ACCESS_KEY=... VERIFY_STORAGE_SECRET_KEY=...`.
 

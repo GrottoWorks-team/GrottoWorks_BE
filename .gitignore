@@ -9,7 +9,12 @@
 *.user
 *.userosscache
 *.sln.docstates
+# Local secrets: .env (compose reads it) + biến thể copy tay (env.example, .env.local).
+# `.env.example` cố tình KHÔNG bị ignore — chỉ được chứa placeholder, không chứa khoá thật.
 *.env
+env.example
+.env.local
+.env.*.local
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs

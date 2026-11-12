@@ -1,6 +1,7 @@
 using Identity.Application.Abstractions;
 using Identity.Application.Accounts;
 using Identity.Application.Skills;
+using Identity.Contracts.Events;
 using Identity.Domain;
 using Identity.Domain.Enums;
 using Identity.Domain.Entities;
@@ -18,7 +19,8 @@ public sealed record ReplaceMySkillsCommand(IReadOnlyList<Guid> SkillIds,
 public sealed class ReplaceMySkillsCommandHandler(
     ICurrentUser currentUser,
     IUserAccountStore userAccountStore,
-    ISkillStore skillStore)
+    ISkillStore skillStore,
+    IIntegrationEventPublisher eventPublisher)
 {
     public async Task<UserProfileDto> HandleAsync(
         ReplaceMySkillsCommand command,
@@ -36,8 +38,8 @@ public sealed class ReplaceMySkillsCommandHandler(
             throw new DomainException("VOLUNTEER_SKILL_UNKNOWN", "One or more skills do not exist.");
         }
 
-        var alreadyDeclared = user.VolunteerSkills.Select(link => link.SkillId).ToHashSet();
-        if (skills.Any(skill => skill.Status != SkillStatus.Active && !alreadyDeclared.Contains(skill.SkillId)))
+        var previousSkills = user.VolunteerSkills.ToDictionary(link => link.SkillId, link => link.SkillLevel);
+        if (skills.Any(skill => skill.Status != SkillStatus.Active && !previousSkills.ContainsKey(skill.SkillId)))
         {
             throw new DomainException(
                 "VOLUNTEER_SKILL_INACTIVE",
@@ -54,6 +56,15 @@ public sealed class ReplaceMySkillsCommandHandler(
         else
         {
             user.ReplaceSkills(command.SkillIds, DateTimeOffset.UtcNow);
+        }
+
+        if (previousSkills.Count != user.VolunteerSkills.Count ||
+            user.VolunteerSkills.Any(skill =>
+                !previousSkills.TryGetValue(skill.SkillId, out var level) || level != skill.SkillLevel))
+        {
+            await eventPublisher.PublishAsync(IdentityUserEligibilityChanged.EventType,
+                IdentityUserEligibilityChanged.Version, new IdentityUserEligibilityChanged(user.UserId),
+                "user", user.UserId, cancellationToken);
         }
 
         await userAccountStore.SaveChangesAsync(cancellationToken);

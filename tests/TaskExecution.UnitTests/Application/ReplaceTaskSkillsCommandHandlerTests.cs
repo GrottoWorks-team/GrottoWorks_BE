@@ -194,7 +194,8 @@ public sealed class ReplaceTaskSkillsCommandHandlerTests
         var access = new TaskScopeAccess(
             new FakeScopeStore(season, workArea),
             new FakeCurrentUser(userId, parishId));
-        return new Fixture(new ReplaceTaskSkillsCommandHandler(repository, access), repository, task);
+        return new Fixture(new ReplaceTaskSkillsCommandHandler(repository, access,
+            new AssignmentTestFixture.TestAssignments(), new AssignmentTestFixture.TestUsers()), repository, task);
     }
 
     private sealed record Fixture(

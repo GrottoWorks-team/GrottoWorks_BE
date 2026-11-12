@@ -49,7 +49,7 @@ public sealed class PurchaseRequestTests
 
     private WorkAreaAccess Access(ICurrentUser user) => new(_scopes, user);
 
-    private PurchaseRequestLoader Loader(ICurrentUser user) => new(_store, Access(user), _catalog);
+    private PurchaseRequestLoader Loader(ICurrentUser user) => new(_store, Access(user), _catalog, user);
 
     private PurchaseShortageGuard Guard() => new(new InventoryReader(_inventory, _catalog), _store);
 
@@ -369,8 +369,14 @@ public sealed class PurchaseRequestTests
             .Code.Should().Be("PURCHASE_REQUEST_NOT_FOUND");
 
         var volunteer = User(Guid.NewGuid(), GrottoWorksRoles.Volunteer);
-        (await Fails(() => new GetPurchaseRequestQueryHandler(Loader(volunteer), new FakeTaskProjectionStore(), new FakePurchaseStore(), volunteer).HandleAsync(planning.Id)))
-            .Code.Should().Be("PURCHASE_REQUEST_NOT_FOUND");
+        var tasks = new FakeTaskProjectionStore();
+        var detail = new GetPurchaseRequestQueryHandler(Loader(volunteer), tasks, new FakePurchaseStore(), volunteer);
+        (await Fails(() => detail.HandleAsync(planning.Id))).Code.Should().Be("PURCHASE_REQUEST_NOT_FOUND");
+
+        tasks.Add(TaskProjection.FromSnapshot(
+            new TaskSnapshot(Guid.NewGuid(), _area.WorkAreaId, "Mua dây", ProjectedTaskType.Purchase,
+                ProjectedTaskStatus.InProgress, planning.Id, [volunteer.UserId], 1), DateTimeOffset.UtcNow));
+        (await detail.HandleAsync(planning.Id)).Id.Should().Be(planning.Id);
     }
 
     [Fact]
@@ -389,5 +395,74 @@ public sealed class PurchaseRequestTests
 
         var waiting = await handler.HandleAsync(new PurchaseRequestFilter(1, 20, null, _area.WorkAreaId, PurchaseRequestStatus.PendingApproval, true));
         waiting.Items.Should().ContainSingle().Which.Id.Should().Be(pending.Id);
+    }
+
+    [Theory]
+    [InlineData(GrottoWorksRoles.Leader)]
+    [InlineData(GrottoWorksRoles.MaterialOfficer)]
+    [InlineData(GrottoWorksRoles.Parish)]
+    public async Task Purchase_reads_respect_the_callers_work_area_scope(string role)
+    {
+        var own = await Planning(Line(_cable, 5));
+        var otherArea = _scopes.Seed(Parish, Guid.NewGuid(), _area.SeasonId);
+        var other = PurchaseRequest.Create(otherArea.WorkAreaId, otherArea.MaterialOfficerUserId!.Value,
+            "Khu vực khác", [], DateTimeOffset.UtcNow.AddMinutes(1));
+        _store.Add(other);
+        await _store.SaveChangesAsync();
+
+        var user = role == GrottoWorksRoles.Leader ? Leader() : User(role: role);
+        var loader = Loader(user);
+        var list = new ListPurchaseRequestsQueryHandler(Access(user), _scopes, _store, loader);
+        var detail = new GetPurchaseRequestQueryHandler(loader, new FakeTaskProjectionStore(), new FakePurchaseStore(), user);
+        var history = new GetPurchaseRequestHistoryQueryHandler(loader, _store);
+        var filter = new PurchaseRequestFilter(1, 1, _area.SeasonId, null, null, true);
+
+        (await detail.HandleAsync(own.Id)).Id.Should().Be(own.Id);
+        (await history.HandleAsync(own.Id)).Should().ContainSingle();
+        var page = await list.HandleAsync(filter);
+        var filtered = await list.HandleAsync(filter with { WorkAreaId = otherArea.WorkAreaId });
+
+        if (role == GrottoWorksRoles.Parish)
+        {
+            page.TotalItems.Should().Be(2);
+            page.Items.Should().ContainSingle().Which.Id.Should().Be(other.PurchaseRequestId);
+            filtered.TotalItems.Should().Be(1);
+            (await detail.HandleAsync(other.PurchaseRequestId)).Id.Should().Be(other.PurchaseRequestId);
+            (await history.HandleAsync(other.PurchaseRequestId)).Should().ContainSingle();
+            return;
+        }
+
+        page.TotalItems.Should().Be(1);
+        page.Items.Should().ContainSingle().Which.Id.Should().Be(own.Id);
+        filtered.TotalItems.Should().Be(0);
+        filtered.Items.Should().BeEmpty();
+        var detailError = await Fails(() => detail.HandleAsync(other.PurchaseRequestId));
+        detailError.Kind.Should().Be(DomainErrorKind.NotFound);
+        detailError.Code.Should().Be("PURCHASE_REQUEST_NOT_FOUND");
+        var historyError = await Fails(() => history.HandleAsync(other.PurchaseRequestId));
+        historyError.Kind.Should().Be(DomainErrorKind.NotFound);
+        historyError.Code.Should().Be("PURCHASE_REQUEST_NOT_FOUND");
+    }
+
+    [Theory]
+    [InlineData(GrottoWorksRoles.Leader)]
+    [InlineData(GrottoWorksRoles.MaterialOfficer)]
+    public async Task New_assignment_snapshot_transfers_read_access(string role)
+    {
+        var request = await Planning(Line(_cable, 5));
+        var previous = role == GrottoWorksRoles.Leader ? Leader() : User();
+        var replacement = User(Guid.NewGuid(), role);
+        var snapshot = new WorkAreaSnapshot(_area.WorkAreaId, _area.SeasonId, Parish, _area.Name,
+            _area.Status, _area.SeasonStatus, _area.CommunityId,
+            role == GrottoWorksRoles.Leader ? replacement.UserId : _leader,
+            role == GrottoWorksRoles.MaterialOfficer ? replacement.UserId : _officer,
+            _area.SourceVersion + 1);
+
+        _area.Apply(snapshot, DateTimeOffset.UtcNow).Should().BeTrue();
+
+        var previousHistory = new GetPurchaseRequestHistoryQueryHandler(Loader(previous), _store);
+        var replacementHistory = new GetPurchaseRequestHistoryQueryHandler(Loader(replacement), _store);
+        (await Fails(() => previousHistory.HandleAsync(request.Id))).Code.Should().Be("PURCHASE_REQUEST_NOT_FOUND");
+        (await replacementHistory.HandleAsync(request.Id)).Should().ContainSingle();
     }
 }

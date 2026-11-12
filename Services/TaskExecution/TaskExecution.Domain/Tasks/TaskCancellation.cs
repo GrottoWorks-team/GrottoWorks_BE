@@ -16,6 +16,7 @@ public sealed partial class WorkTask
         if (actorId == Guid.Empty || string.IsNullOrWhiteSpace(normalized) || normalized.Length > 500)
             throw DomainRuleException.Validation("TASK_CANCELLATION_INVALID", "Cancellation requires an actor and reason of 1–500 characters.");
         Status = TaskStatus.Cancelled;
+        TeamLeaderAssignmentId = null;
         CancellationReason = normalized;
         CancelledBy = actorId;
         CancelledAt = UpdatedAt = now.ToUniversalTime();

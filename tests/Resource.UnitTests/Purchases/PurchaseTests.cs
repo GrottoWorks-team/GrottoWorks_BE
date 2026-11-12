@@ -58,7 +58,7 @@ public sealed class PurchaseTests
 
     private FakeCurrentUser User(Guid id, string role) => new(id, role, Parish);
 
-    private PurchaseRequestLoader Loader(FakeCurrentUser user) => new(_requests, new WorkAreaAccess(_scopes, user), _catalog);
+    private PurchaseRequestLoader Loader(FakeCurrentUser user) => new(_requests, new WorkAreaAccess(_scopes, user), _catalog, user);
 
     private PurchaseContext Context(FakeCurrentUser user) => new(_purchases, Loader(user));
 

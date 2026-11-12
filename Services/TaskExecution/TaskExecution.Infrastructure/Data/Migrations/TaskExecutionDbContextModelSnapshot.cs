@@ -149,6 +149,9 @@ namespace TaskExecution.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasAlternateKey("TaskId", "Id")
+                        .HasName("ak_task_assignment_task_id_assignment_id");
+
                     b.HasIndex("VolunteerId")
                         .HasDatabaseName("ix_task_assignment_volunteer");
 
@@ -1245,6 +1248,10 @@ namespace TaskExecution.Infrastructure.Data.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("task_status");
 
+                    b.Property<Guid?>("TeamLeaderAssignmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_leader_assignment_id");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -1267,6 +1274,9 @@ namespace TaskExecution.Infrastructure.Data.Migrations
                         .HasColumnName("work_area_id");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Id", "TeamLeaderAssignmentId")
+                        .HasDatabaseName("ix_task_team_leader_assignment");
 
                     b.HasIndex("PurchaseRequestId")
                         .HasDatabaseName("ix_task_purchase_request_id");
@@ -1689,6 +1699,16 @@ namespace TaskExecution.Infrastructure.Data.Migrations
                     b.Navigation("Materials");
 
                     b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("TaskExecution.Domain.Tasks.WorkTask", b =>
+                {
+                    b.HasOne("TaskExecution.Domain.Assignments.TaskAssignment", null)
+                        .WithMany()
+                        .HasForeignKey("Id", "TeamLeaderAssignmentId")
+                        .HasPrincipalKey("TaskId", "Id")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("fk_task_team_leader_assignment");
                 });
 
             modelBuilder.Entity("TaskExecution.Domain.Tasks.WorkTask", b =>

@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using FluentAssertions;
 using Identity.Api.Requests;
 using Identity.Application.Users.ReplaceMySkills;
+using Identity.Contracts.Events;
 using Identity.Domain;
 using Identity.Domain.Entities;
 using Xunit;
@@ -35,12 +36,21 @@ public sealed class SkillLevelTests
         var catalog = new FakeSkillStore();
         var skill = Skill.Create("ELECTRIC", "Electrical");
         catalog.Seed(skill);
-        var handler = new ReplaceMySkillsCommandHandler(new FakeCurrentUser(volunteer.UserId), users, catalog);
+        var events = new FakeIntegrationEventPublisher();
+        var handler = new ReplaceMySkillsCommandHandler(new FakeCurrentUser(volunteer.UserId), users, catalog, events);
+        var statusVersion = volunteer.StatusVersion;
         var profile = await handler.HandleAsync(new ReplaceMySkillsCommand([skill.SkillId],
             [new VolunteerSkillInput(skill.SkillId, " advanced ")]));
         profile.Skills!.Single().SkillLevel.Should().Be("ADVANCED");
         profile = await handler.HandleAsync(new ReplaceMySkillsCommand([skill.SkillId]));
         profile.Skills!.Single().SkillLevel.Should().Be("ADVANCED");
+        events.Events.Should().ContainSingle();
+
+        await handler.HandleAsync(new([skill.SkillId], [new VolunteerSkillInput(skill.SkillId, "BASIC")]));
+        await handler.HandleAsync(new([]));
+        volunteer.StatusVersion.Should().Be(statusVersion);
+        events.Events.Should().HaveCount(3).And.OnlyContain(evt =>
+            evt.EventType == IdentityUserEligibilityChanged.EventType && evt.AggregateId == volunteer.UserId);
     }
 
     [Fact]

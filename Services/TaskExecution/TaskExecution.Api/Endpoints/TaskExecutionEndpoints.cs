@@ -11,6 +11,7 @@ public static class TaskExecutionEndpoints
         app.MapTaskMaterialEndpoints();
         app.MapVolunteerMatchEndpoints();
         app.MapAssignmentEndpoints();
+        app.MapTaskTeamLeaderEndpoints();
         app.MapApplicationEndpoints();
         app.MapMyTasksEndpoints();
         app.MapTaskLifecycleEndpoints();

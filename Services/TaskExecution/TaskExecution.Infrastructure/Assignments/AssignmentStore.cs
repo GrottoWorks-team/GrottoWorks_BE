@@ -95,6 +95,8 @@ public sealed class TaskAssignmentConfiguration : IEntityTypeConfiguration<TaskA
     {
         builder.ToTable("task_assignment");
         builder.HasKey(row => row.Id);
+        builder.HasAlternateKey(row => new { row.TaskId, row.Id })
+            .HasName("ak_task_assignment_task_id_assignment_id");
         builder.Property(row => row.Id).HasColumnName("task_assignment_id").ValueGeneratedNever();
         builder.Property(row => row.TaskId).HasColumnName("task_id");
         builder.Property(row => row.VolunteerId).HasColumnName("volunteer_user_id");

@@ -108,8 +108,25 @@ public static class PurchaseRequestRules
 }
 
 /// <summary>Loads a request and the work area it belongs to, applying parish tenancy (404 outside the parish).</summary>
-public sealed class PurchaseRequestLoader(IPurchaseRequestStore store, WorkAreaAccess access, IMaterialCatalogStore catalog)
+public sealed class PurchaseRequestLoader(
+    IPurchaseRequestStore store, WorkAreaAccess access, IMaterialCatalogStore catalog, ICurrentUser currentUser)
 {
+    public bool CanReadAsStaff(WorkAreaScope scope)
+    {
+        if (scope.ParishId != currentUser.ParishId)
+        {
+            return false;
+        }
+
+        return currentUser.Role switch
+        {
+            GrottoWorksRoles.Parish => true,
+            GrottoWorksRoles.Leader => scope.LeaderUserId == currentUser.UserId,
+            GrottoWorksRoles.MaterialOfficer => scope.MaterialOfficerUserId == currentUser.UserId,
+            _ => false
+        };
+    }
+
     public async Task<(PurchaseRequest Request, WorkAreaScope Scope)> ForReadAsync(Guid requestId, CancellationToken cancellationToken)
     {
         var request = await store.GetAsync(requestId, cancellationToken) ?? throw NotFound();
@@ -175,7 +192,7 @@ public sealed class PurchaseShortageGuard(InventoryReader reader, IPurchaseReque
     }
 }
 
-/// <summary>F-RES-06 <c>listPurchaseRequests</c> (PARISH, LEADER, MO): requests of the caller's parish, newest first.</summary>
+/// <summary>F-RES-06 <c>listPurchaseRequests</c>: requests from work areas visible to the caller, newest first.</summary>
 public sealed class ListPurchaseRequestsQueryHandler(
     WorkAreaAccess access,
     IWorkAreaScopeStore scopes,
@@ -186,6 +203,7 @@ public sealed class ListPurchaseRequestsQueryHandler(
     {
         var parishId = access.RequireParish();
         var areas = (await scopes.ListByParishAsync(parishId, filter.SeasonId, cancellationToken))
+            .Where(loader.CanReadAsStaff)
             .Where(area => filter.WorkAreaId is null || area.WorkAreaId == filter.WorkAreaId)
             .ToDictionary(area => area.WorkAreaId);
         if (areas.Count == 0)
@@ -205,7 +223,7 @@ public sealed class ListPurchaseRequestsQueryHandler(
 }
 
 /// <summary>
-/// F-RES-06 <c>getPurchaseRequest</c> (PARISH, LEADER, MO of the parish; VOLUNTEER only as the buyer — assignee of a
+/// F-RES-06 <c>getPurchaseRequest</c> (PARISH or assigned LEADER/MO; VOLUNTEER only as the buyer — assignee of a
 /// PURCHASE task of this request in <c>task_projection</c>), with its purchases so the officer can confirm delivery.
 /// </summary>
 public sealed class GetPurchaseRequestQueryHandler(
@@ -217,8 +235,11 @@ public sealed class GetPurchaseRequestQueryHandler(
     public async Task<PurchaseRequestDto> HandleAsync(Guid requestId, CancellationToken cancellationToken = default)
     {
         var (request, scope) = await loader.ForReadAsync(requestId, cancellationToken);
-        if (currentUser.Role == GrottoWorksRoles.Volunteer &&
-            !(await tasks.ListByPurchaseRequestAsync(requestId, cancellationToken)).Any(task => task.AssigneeUserIds.Contains(currentUser.UserId)))
+        var canRead = currentUser.Role == GrottoWorksRoles.Volunteer
+            ? (await tasks.ListByPurchaseRequestAsync(requestId, cancellationToken))
+                .Any(task => task.AssigneeUserIds.Contains(currentUser.UserId))
+            : loader.CanReadAsStaff(scope);
+        if (!canRead)
         {
             throw PurchaseRequestLoader.NotFound();
         }
@@ -235,7 +256,12 @@ public sealed class GetPurchaseRequestHistoryQueryHandler(PurchaseRequestLoader 
 {
     public async Task<IReadOnlyList<StateChangeDto>> HandleAsync(Guid requestId, CancellationToken cancellationToken = default)
     {
-        await loader.ForReadAsync(requestId, cancellationToken);
+        var (_, scope) = await loader.ForReadAsync(requestId, cancellationToken);
+        if (!loader.CanReadAsStaff(scope))
+        {
+            throw PurchaseRequestLoader.NotFound();
+        }
+
         return (await store.ListStateChangesAsync(requestId, cancellationToken))
             .Select(change => new StateChangeDto(change.FromStatus, change.ToStatus, change.ChangedByUserId, change.ChangedAt, change.Note))
             .ToList();

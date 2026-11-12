@@ -13,10 +13,12 @@ public static class ChecklistEndpoints
 
     public static void MapChecklistEndpoints(this IEndpointRouteBuilder app)
     {
+        // 12/11/2026: tiêu chí sẵn sàng do ban hành giáo (PARISH) đặt; LEADER chỉ được tạo khi khu chưa có
+        // (phương án dự phòng) — vẫn phải đủ minh báo và được PARISH duyệt.
         app.MapPost("/api/v1/work-areas/{workAreaId:guid}/readiness-checks", CreateAsync)
             .WithName("createReadinessCheck")
             .WithTags("Readiness")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Parish, GrottoWorksRoles.Leader))
             .Accepts<CreateReadinessCheckRequest>("application/json")
             .Produces<ApiResponse<ReadinessCheckDto>>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status403Forbidden)
@@ -41,7 +43,7 @@ public static class ChecklistEndpoints
 
         group.MapPut("/items", ReplaceItemsAsync)
             .WithName("replaceReadinessItems")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Parish, GrottoWorksRoles.Leader))
             .Accepts<List<ReadinessItemDefinitionRequest>>("application/json")
             .Produces<ApiResponse<ReadinessCheckDto>>()
             .ProducesProblem(StatusCodes.Status403Forbidden)
@@ -93,9 +95,11 @@ public static class ChecklistEndpoints
             .ProducesProblem(StatusCodes.Status412PreconditionFailed)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
 
+        // Duyệt tổng thể tiêu chí của khu vực = quyền của ban hành giáo (12/11/2026).
+        // Khi mọi khu vực đã READY, ParishCoordination tự chuyển mùa sang READY.
         group.MapPost("/confirm", ConfirmAsync)
             .WithName("confirmAreaReadiness")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Parish))
             .Accepts<VersionedCommandRequest>("application/json")
             .Produces<ApiResponse<ReadinessCheckDto>>()
             .ProducesProblem(StatusCodes.Status403Forbidden)
@@ -105,7 +109,7 @@ public static class ChecklistEndpoints
 
         group.MapPost("/reopen", ReopenAsync)
             .WithName("reopenReadinessCheck")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Parish, GrottoWorksRoles.Leader))
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Parish))
             .Accepts<ReasonCommandRequest>("application/json")
             .Produces<ApiResponse<ReadinessCheckDto>>()
             .ProducesProblem(StatusCodes.Status403Forbidden)

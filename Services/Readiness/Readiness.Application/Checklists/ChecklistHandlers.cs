@@ -123,12 +123,17 @@ public sealed class ChecklistLoader(IReadinessCheckStore store, WorkAreaAccess a
     public static DomainRuleException NotFound() => DomainRuleException.NotFound("READINESS_CHECK_NOT_FOUND", "The readiness check does not exist.");
 }
 
-/// <summary>F-RDY-02 <c>createReadinessCheck</c> (LEADER of the work area): one checklist per work area, leader-defined items (D-04).</summary>
-public sealed class CreateReadinessCheckCommandHandler(WorkAreaAccess access, IReadinessCheckStore store)
+/** <summary>
+/// F-RDY-02 <c>createReadinessCheck</c>: ban hành giáo (PARISH) đặt tiêu chí cho từng khu vực;
+/// LEADER chỉ được tự tạo khi khu chưa có (phương án dự phòng, 12/11/2026).
+/// </summary> */
+public sealed class CreateReadinessCheckCommandHandler(WorkAreaAccess access, IReadinessCheckStore store, ICurrentUser currentUser)
 {
     public async Task<ReadinessCheckDto> HandleAsync(CreateReadinessCheckCommand command, CancellationToken cancellationToken = default)
     {
-        var scope = await access.ForLeaderWriteAsync(command.WorkAreaId, cancellationToken);
+        var scope = currentUser.Role == GrottoWorksRoles.Parish
+            ? Writable(await access.ForReadAsync(command.WorkAreaId, cancellationToken))
+            : await access.ForLeaderWriteAsync(command.WorkAreaId, cancellationToken);
         var checklist = ReadinessChecklist.Create(scope.WorkAreaId, command.Name, command.Items);
         if (await store.ExistsForWorkAreaAsync(scope.WorkAreaId, cancellationToken))
         {
@@ -139,17 +144,33 @@ public sealed class CreateReadinessCheckCommandHandler(WorkAreaAccess access, IR
         await store.SaveChangesAsync(cancellationToken);
         return ReadinessCheckDto.From(checklist, scope);
     }
+
+    private static WorkAreaScope Writable(WorkAreaScope scope)
+    {
+        WorkAreaAccess.EnsureWritable(scope);
+        return scope;
+    }
 }
 
-/// <summary>F-RDY-02 <c>replaceReadinessItems</c> (LEADER) and <c>getReadinessCheck</c> (PARISH, LEADER, MO of the parish).</summary>
-public sealed class ChecklistDefinitionHandler(ChecklistLoader loader, IReadinessCheckStore store)
+/// <summary>F-RDY-02 <c>replaceReadinessItems</c> (PARISH or LEADER) and <c>getReadinessCheck</c> (PARISH, LEADER, MO of the parish).</summary>
+public sealed class ChecklistDefinitionHandler(ChecklistLoader loader, IReadinessCheckStore store, ICurrentUser currentUser)
 {
     public async Task<ReadinessCheckDto> ReplaceItemsAsync(ReplaceItemsCommand command, CancellationToken cancellationToken = default)
     {
-        var (checklist, scope) = await loader.ForLeaderAsync(command.CheckId, command.Version, cancellationToken);
+        var (checklist, scope) = currentUser.Role == GrottoWorksRoles.Parish
+            ? await ForParishWriteAsync(command.CheckId, command.Version, cancellationToken)
+            : await loader.ForLeaderAsync(command.CheckId, command.Version, cancellationToken);
         checklist.ReplaceItems(command.Items);
         await store.SaveChangesAsync(cancellationToken);
         return ReadinessCheckDto.From(checklist, scope);
+    }
+
+    private async Task<(ReadinessChecklist Checklist, WorkAreaScope Scope)> ForParishWriteAsync(Guid checkId, long? version, CancellationToken cancellationToken)
+    {
+        var (checklist, scope) = await loader.ForReadAsync(checkId, cancellationToken);
+        WorkAreaAccess.EnsureWritable(scope);
+        checklist.EnsureVersion(version);
+        return (checklist, scope);
     }
 
     public async Task<ReadinessCheckDto> GetAsync(Guid checkId, CancellationToken cancellationToken = default)
@@ -215,6 +236,18 @@ public sealed class InspectionCommandHandler(
     {
         var (checklist, scope) = await loader.ForLeaderAsync(command.CheckId, command.Version, cancellationToken);
         var target = checklist.Item(command.ItemId);
+
+        // 12/11/2026: LEADER phải nộp minh chứng trước khi đánh dấu ĐẠT (BR-52 tăng cường).
+        // Kiểm tra trước khi ghi để mục vẫn ở PENDING nếu bị từ chối.
+        if (command.Result == InspectionResult.Passed &&
+            target.EvidenceFileIds.Length == 0 &&
+            command.EvidenceFileIds.Count == 0)
+        {
+            throw DomainRuleException.Validation(
+                "READINESS_EVIDENCE_REQUIRED",
+                "Attach at least one evidence file before marking this item as passed.");
+        }
+
         await using var reservation = await files.ReserveAsync(command.EvidenceFileIds, FilePurposes.ReadinessEvidence, currentUser.UserId, target.ReadinessItemId, cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var item = recheck
@@ -278,9 +311,9 @@ public sealed class AttachEvidenceCommandHandler(
 }
 
 /// <summary>
-/// F-RDY-05 <c>confirmAreaReadiness</c> (LEADER, work area in READINESS_REVIEW, BR-52 → 409 while a mandatory item is not
-/// PASSED) and
-/// <c>reopenReadinessCheck</c> (PARISH of the parish or LEADER of the work area, reason required — BR-53).
+/// F-RDY-05 <c>confirmAreaReadiness</c> (PARISH — ban hành giáo duyệt tổng thể tiêu chí của khu vực,
+/// work area in READINESS_REVIEW, BR-52 → 409 while a mandatory item is not PASSED, 12/11/2026) and
+/// <c>reopenReadinessCheck</c> (PARISH, reason required — BR-53).
 /// </summary>
 public sealed class ReadinessDecisionHandler(
     ChecklistLoader loader,
@@ -294,7 +327,16 @@ public sealed class ReadinessDecisionHandler(
 
     private async Task<ReadinessCheckDto> ConfirmInTransactionAsync(CheckCommand command, CancellationToken cancellationToken)
     {
-        var (checklist, scope) = await loader.ForLeaderAsync(command.CheckId, command.Version, cancellationToken);
+        if (currentUser.Role != GrottoWorksRoles.Parish)
+        {
+            throw DomainRuleException.Forbidden(
+                "READINESS_PARISH_APPROVAL_REQUIRED",
+                "Only the parish board can give the final approval of a work area's readiness criteria.");
+        }
+
+        var (checklist, scope) = await loader.ForReadAsync(command.CheckId, cancellationToken);
+        WorkAreaAccess.EnsureWritable(scope);
+        checklist.EnsureVersion(command.Version);
         // BA 9.2 / BR-73: a work area reaches READY from READINESS_REVIEW, i.e. once every non-cancelled task is COMPLETED.
         if (scope.Status != WorkAreaStatus.ReadinessReview)
         {
@@ -321,9 +363,14 @@ public sealed class ReadinessDecisionHandler(
 
     private async Task<ReadinessCheckDto> ReopenInTransactionAsync(CheckCommand command, CancellationToken cancellationToken)
     {
-        var (checklist, scope) = currentUser.Role == GrottoWorksRoles.Parish
-            ? await loader.ForReadAsync(command.CheckId, cancellationToken)
-            : await loader.ForLeaderAsync(command.CheckId, null, cancellationToken);
+        if (currentUser.Role != GrottoWorksRoles.Parish)
+        {
+            throw DomainRuleException.Forbidden(
+                "READINESS_PARISH_APPROVAL_REQUIRED",
+                "Only the parish board can reopen a readiness check.");
+        }
+
+        var (checklist, scope) = await loader.ForReadAsync(command.CheckId, cancellationToken);
         WorkAreaAccess.EnsureWritable(scope);
         checklist.EnsureVersion(command.Version);
         checklist.Reopen(command.Reason);

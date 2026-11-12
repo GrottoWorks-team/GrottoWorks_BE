@@ -10,6 +10,44 @@
 
 ---
 
+## 2026-11-12 (lần 8) · `phongnltse/task-team-leader-progress`
+
+### 12. Quy trình sẵn sàng (§8.12): PARISH đặt tiêu chí & duyệt khu vực, LEADER nộp minh chứng
+
+- **Yêu cầu (12/11/2026)**: "readiness do parish tạo cho từng khu vực, leader chỉ cung cấp minh chứng trước khi
+  xác nhận đạt, cuối cùng parish duyệt tổng thể tiêu chí từng khu vực; khu đạt → mùa chuyển SẴN SÀNG".
+  Hai điểm đã chốt với người dùng: (a) **LEADER tự đánh dấu Đạt/Không đạt** sau khi nộp minh chứng;
+  (b) **LEADER vẫn được tạo phiếu nếu khu chưa có** (phương án dự phòng) — PARISH vẫn là người duyệt cuối.
+- **Sửa quyền route** (`Readiness.Api/Endpoints/ChecklistEndpoints.cs`):
+  - `createReadinessCheck`: `Leader` → **`Parish, Leader`**.
+  - `replaceReadinessItems`: `Leader` → **`Parish, Leader`** (ban hành giáo đặt/sửa tiêu chí).
+  - `confirmAreaReadiness`: `Leader` → **`Parish`** (duyệt tổng thể khu vực).
+  - `reopenReadinessCheck`: `Parish, Leader` → **`Parish`**.
+  - Giữ nguyên: `recordReadinessResult`/`recheck`/`linkCorrectiveTask` = LEADER,
+    `attachReadinessEvidence` = LEADER/VOLUNTEER, các endpoint đọc = PARISH/LEADER/MO.
+- **Sửa handler** (`Readiness.Application/Checklists/ChecklistHandlers.cs`):
+  - `CreateReadinessCheckCommandHandler` + `ChecklistDefinitionHandler`: PARISH ghi theo phạm vi giáo xứ
+    (`ForReadAsync` + `WorkAreaAccess.EnsureWritable`), LEADER vẫn qua `ForLeaderWriteAsync`.
+  - `InspectionCommandHandler.InspectAsync`: **bắt buộc có ≥1 minh chứng trước khi đánh `PASSED`** →
+    `422 READINESS_EVIDENCE_REQUIRED`; kiểm tra **trước khi ghi** nên mục bị từ chối vẫn ở `PENDING`.
+  - `ReadinessDecisionHandler`: `confirm`/`reopen` chỉ PARISH (`403 READINESS_PARISH_APPROVAL_REQUIRED`
+    ở tầng handler, route đã chặn trước).
+- **Không đổi**: domain (trạng thái mục/checklist), event `readiness.area.ready` → ParishCoordination đặt khu
+  `READY`; khi **mọi khu READY** thì `Season.ReconcileReadiness` tự chuyển mùa sang `READY` (đã có unit test
+  `SeasonReadinessAggregationTests`), không cần sửa thêm.
+- **Test**: `Readiness.UnitTests` **54/54** (thêm `Leader_cannot_give_the_final_area_approval`,
+  `Passing_an_item_requires_evidence_first`; `Confirm_publishes_area_ready_and_parish_can_reopen` →
+  `Parish_confirms_area_ready_and_can_reopen`). `Platform.UnitTests` 5/5.
+- **Kiểm chứng thật qua gateway** (checklist *Cổng chào và biển báo*, khu `READINESS_REVIEW`):
+  LEADER `reopen` **403** · PARISH `reopen` **200 REOPENED** · LEADER (đúng khu) `PASSED` không minh chứng
+  **422 `READINESS_EVIDENCE_REQUIRED`** · LEADER `confirm` **403** · PARISH `confirm` **200 READY**
+  (`completedBy` = user ban hành giáo) · PARISH tạo phiếu cho *Đèn LED khuôn viên* **201** (2 tiêu chí),
+  LEADER khu đó đọc được tiêu chí và bị chặn đúng như trên. Dữ liệu test đã xoá.
+- **Ảnh hưởng client**: FE đã đổi — `/community/checklist` (ban hành giáo) có nút **"Duyệt khu vực sẵn sàng"**
+  + gợi ý quy trình; `/leader/checklist` bỏ nút xác nhận, nút **Đạt bị khoá** khi mục chưa có minh chứng.
+
+---
+
 ## 2026-11-12 (lần 7) · `phongnltse/task-team-leader-progress`
 
 ### 9b. Quyền mùa Giáng sinh: **chỉ ban hành giáo (PARISH) được ghi**, ADMIN chỉ đọc

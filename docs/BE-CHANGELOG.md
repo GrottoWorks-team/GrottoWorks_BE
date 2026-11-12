@@ -10,6 +10,36 @@
 
 ---
 
+## 2026-11-12 (lần 10) · `phongnltse/task-team-leader-progress`
+
+### 14. Huỷ việc đi mua không còn chặn việc tạo lại (PURCHASE_TASK_EXISTS / đơn kẹt BUYER_ASSIGNED)
+
+- **Yêu cầu (12/11/2026)**: "việc đã huỷ rồi mà vào tạo việc mua mới thì lại báo là đã có việc cho đơn mua ấy rồi".
+- **Tái hiện**: `POST /api/v1/purchase-requests/{id}/purchase-tasks` → `409 PURCHASE_TASK_EXISTS` dù
+  task mua duy nhất của đơn đã `CANCELLED` (đơn vẫn `APPROVED`).
+- **Nguyên nhân**: `SpecialTaskStore.FindPurchaseAsync` lọc **chỉ theo `purchase_request_id`**, không xét
+  trạng thái task ⇒ task `CANCELLED` vẫn bị coi là "đã tồn tại".
+- **Sửa**:
+  - `TaskExecution.Infrastructure/Tasks/SpecialTaskStore.cs` — `FindPurchaseAsync` bỏ qua task
+    `CANCELLED` (và `SingleOrDefault` → `FirstOrDefault`).
+  - `TaskExecution.Application/Tasks/SpecialTaskService.cs` — chấp nhận đơn ở `APPROVED` **hoặc
+    `BUYER_ASSIGNED`** (đơn bị kẹt ở `BUYER_ASSIGNED` sau khi huỷ task đã giao vẫn tạo lại được việc thay thế;
+    chống trùng vẫn do `FindPurchaseAsync` bảo đảm). Đơn `PURCHASED/COMPLETED/…` vẫn bị chặn.
+  - `Resource.Domain/Purchases/PurchaseRequest.ReleaseBuyer` (mới) + `Resource.Application/Purchases/PurchaseHandlers.cs`
+    `PurchaseBuyerSync`: khi task mua chuyển `CANCELLED`, đơn `BUYER_ASSIGNED` **trả về `APPROVED`**
+    (ghi state change với `Guid.Empty` = hệ thống). Đơn đã `PURCHASED`/`COMPLETED` giữ nguyên.
+- **Ảnh hưởng client**: không đổi route/DTO. `GET /purchase-requests/{id}/history` có thêm bản ghi
+  `BUYER_ASSIGNED → APPROVED` khi huỷ việc mua (giống thao tác hệ thống).
+- **Không migration**, không đổi schema.
+- **Test**: `TaskExecution.UnitTests` **378/378** (+`Buyer_assigned_purchase_can_get_a_replacement_task`);
+  `Resource.UnitTests` **257/257** (+`Cancelling_the_purchase_task_returns_the_request_to_approved`,
+  `Cancelling_a_purchase_task_after_a_recorded_purchase_keeps_the_request_status`).
+- **Kiểm chứng thật**: sau khi rebuild, tạo lại việc mua cho đơn đã có task `CANCELLED` → `201`
+  (task `Mua 10 bóng Bóng đèn LED 9W`, sau đó TNV nhận việc → đơn `BUYER_ASSIGNED`); tạo thêm task
+  khi đang có task sống vẫn trả `409 PURCHASE_TASK_EXISTS` (đúng).
+
+---
+
 ## 2026-11-12 (lần 9) · `phongnltse/task-team-leader-progress`
 
 ### 13. Runtime seeder của ParishCoordination không tự tạo lại "GrottoWorks Demo Season 2026"

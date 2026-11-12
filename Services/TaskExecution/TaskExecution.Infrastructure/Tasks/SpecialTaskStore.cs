@@ -25,7 +25,8 @@ public sealed class SpecialTaskStore(TaskExecutionDbContext db) : ISpecialTaskSt
         await LockAsync(key,ct);var result=await action();await transaction.CommitAsync(ct);return result;
     }
     private Task LockAsync(string key,CancellationToken ct)=>db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({key},0))",ct);
-    public Task<WorkTask?> FindPurchaseAsync(Guid requestId,CancellationToken ct)=>db.Tasks.SingleOrDefaultAsync(row=>row.PurchaseRequestId==requestId,ct);
+    public Task<WorkTask?> FindPurchaseAsync(Guid requestId,CancellationToken ct)=>db.Tasks.FirstOrDefaultAsync(
+        row=>row.PurchaseRequestId==requestId && row.Status!=TaskExecution.Domain.Tasks.TaskStatus.Cancelled,ct);
     public async Task<TaskDto?> ReplayCorrectiveAsync(string key,Guid itemId,string fingerprint,CancellationToken ct)
     {
         var rows=await db.Set<CorrectiveTaskReplay>().Where(row=>row.Key==key || row.ReadinessItemId==itemId).ToListAsync(ct);

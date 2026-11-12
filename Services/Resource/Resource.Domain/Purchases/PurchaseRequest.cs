@@ -192,6 +192,21 @@ public sealed class PurchaseRequest
         return true;
     }
 
+    /// <summary>
+    /// <c>task.status.changed</c> CANCELLED for the PURCHASE task (12/11/2026): the request returns to APPROVED so the leader
+    /// can create a replacement purchase task. Only BUYER_ASSIGNED moves — a recorded purchase keeps its own status.
+    /// </summary>
+    public bool ReleaseBuyer(Guid systemUserId, DateTimeOffset now)
+    {
+        if (Status != PurchaseRequestStatus.BuyerAssigned)
+        {
+            return false;
+        }
+
+        Transition(PurchaseRequestStatus.Approved, systemUserId, null, now);
+        return true;
+    }
+
     /// <summary>F-RES-09: the buyer recorded a purchase — stock unchanged until delivery is confirmed (BR-26).</summary>
     public void MarkPurchased(Guid buyerUserId, DateTimeOffset now)
     {

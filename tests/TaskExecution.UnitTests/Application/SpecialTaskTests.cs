@@ -37,6 +37,15 @@ public sealed class SpecialTaskTests
         f.Tasks.Rows.Should().BeEmpty();f.Source.Events.Items.Should().BeEmpty();
     }
     [Fact]
+    public async Task Buyer_assigned_purchase_can_get_a_replacement_task()
+    {
+        // 12/11/2026: việc mua cũ bị huỷ ⇒ đơn có thể còn BUYER_ASSIGNED; vẫn phải tạo lại được việc thay thế.
+        var f=new Fixture();f.Resource.Status="BUYER_ASSIGNED";
+        var task=await f.Service.PurchaseAsync(Guid.NewGuid(),f.Command(),default);
+        task.TaskType.Should().Be(TaskType.Purchase);
+        f.Tasks.Rows.Should().ContainSingle();
+    }
+    [Fact]
     public async Task Corrective_replay_keeps_the_original_identity_and_does_not_duplicate_business_state()
     {
         var f=new Fixture();var command=new CorrectiveTaskCommand(f.Source.Area.WorkAreaId,Guid.NewGuid(),f.Source.User.UserId,

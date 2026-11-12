@@ -25,7 +25,10 @@ public sealed class SpecialTaskService(ITaskRepository tasks,ISpecialTaskStore s
         return await store.InTransactionAsync($"purchase-task:{requestId:D}",async ()=>
         {
             var snapshot=await resource.PurchaseRequestAsync(requestId,ct);
-            if(snapshot.Id!=requestId || snapshot.Status!="APPROVED")
+            // BUYER_ASSIGNED cũng được phép: khi việc mua cũ bị huỷ, Resource giữ đơn ở BUYER_ASSIGNED (chưa có
+            // cơ chế trả về APPROVED ngay), nên trưởng khu vẫn phải tạo lại được việc mua thay thế. Việc chặn
+            // trùng vẫn nằm ở FindPurchaseAsync bên dưới (chỉ tính task chưa huỷ).
+            if(snapshot.Id!=requestId || snapshot.Status is not ("APPROVED" or "BUYER_ASSIGNED"))
                 throw new DomainRuleException("PURCHASE_REQUEST_NOT_APPROVED","Only an approved purchase request can create a task.");
             if(command.WorkAreaId!=Guid.Empty && snapshot.WorkAreaId!=command.WorkAreaId) throw DomainRuleException.Validation("PURCHASE_REQUEST_SCOPE_MISMATCH","The purchase request belongs to another work area.");
             var (area,season)=await scope.GetWorkAreaForLeaderWriteAsync(snapshot.WorkAreaId,ct);

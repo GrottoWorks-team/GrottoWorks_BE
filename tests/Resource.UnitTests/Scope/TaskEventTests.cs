@@ -53,6 +53,34 @@ public sealed class TaskEventTests
     }
 
     [Fact]
+    public async Task Cancelling_the_purchase_task_returns_the_request_to_approved()
+    {
+        // 12/11/2026: huỷ việc mua ⇒ đơn về lại APPROVED để trưởng khu tạo được việc mua thay thế
+        // (trước đây đơn kẹt ở BUYER_ASSIGNED và POST /purchase-tasks trả PURCHASE_REQUEST_NOT_APPROVED).
+        (await Handler().HandleAsync(Event(TaskEventTypes.AssignmentResponded,
+            new { taskId = _task.TaskId, volunteerUserId = Guid.NewGuid(), decision = "ACCEPTED" }, 4))).Should().BeTrue();
+        _request.Status.Should().Be(PurchaseRequestStatus.BuyerAssigned);
+
+        (await Handler().HandleAsync(Event(TaskEventTypes.StatusChanged, new { status = "CANCELLED" }, 5))).Should().BeTrue();
+
+        _task.Status.Should().Be(ProjectedTaskStatus.Cancelled);
+        _request.Status.Should().Be(PurchaseRequestStatus.Approved);
+    }
+
+    [Fact]
+    public async Task Cancelling_a_purchase_task_after_a_recorded_purchase_keeps_the_request_status()
+    {
+        // Đã ghi nhận mua (PURCHASED) thì huỷ việc không được kéo đơn về APPROVED.
+        (await Handler().HandleAsync(Event(TaskEventTypes.AssignmentResponded,
+            new { taskId = _task.TaskId, volunteerUserId = Guid.NewGuid(), decision = "ACCEPTED" }, 4))).Should().BeTrue();
+        _request.MarkPurchased(Guid.NewGuid(), DateTimeOffset.UtcNow);
+
+        await Handler().HandleAsync(Event(TaskEventTypes.StatusChanged, new { status = "CANCELLED" }, 5));
+
+        _request.Status.Should().Be(PurchaseRequestStatus.Purchased);
+    }
+
+    [Fact]
     public async Task Cancelling_a_task_that_holds_materials_asks_the_officer_to_recall_them_once()
     {
         var officer = Guid.NewGuid();

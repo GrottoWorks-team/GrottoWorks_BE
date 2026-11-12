@@ -91,21 +91,36 @@ public interface IPurchaseStore
 /// <summary>
 /// <c>task.purchase-task.assigned</c> (F-RES-01): when the projected PURCHASE task of an APPROVED request has an accepted
 /// buyer, the request becomes BUYER_ASSIGNED (BR-30). Runs inside the projection update, same unit of work.
+/// When that task is CANCELLED the request goes back to APPROVED (12/11/2026) so the leader can create a replacement
+/// purchase task; otherwise the request would stay BUYER_ASSIGNED forever with nobody assigned.
 /// </summary>
 public sealed class PurchaseBuyerSync(IPurchaseRequestStore requests)
 {
     public async Task ApplyAsync(TaskProjection task, CancellationToken cancellationToken)
     {
-        if (task.Type != ProjectedTaskType.Purchase || task.PurchaseRequestId is not { } requestId || task.AssigneeUserIds.Length == 0 ||
-            task.Status == ProjectedTaskStatus.Cancelled)
+        if (task.Type != ProjectedTaskType.Purchase || task.PurchaseRequestId is not { } requestId)
         {
             return;
         }
 
-        if (await requests.GetAsync(requestId, cancellationToken) is { } request)
+        if (await requests.GetAsync(requestId, cancellationToken) is not { } request)
         {
-            request.MarkBuyerAssigned(task.AssigneeUserIds[0], DateTimeOffset.UtcNow);
+            return;
         }
+
+        if (task.Status == ProjectedTaskStatus.Cancelled)
+        {
+            // Guid.Empty = thay đổi do hệ thống (event của TaskExecution), không phải người dùng.
+            request.ReleaseBuyer(Guid.Empty, DateTimeOffset.UtcNow);
+            return;
+        }
+
+        if (task.AssigneeUserIds.Length == 0)
+        {
+            return;
+        }
+
+        request.MarkBuyerAssigned(task.AssigneeUserIds[0], DateTimeOffset.UtcNow);
     }
 }
 

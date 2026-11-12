@@ -26,11 +26,12 @@
 - **Ảnh hưởng client**: không đổi API/contract. Dev đang có dữ liệu: mùa duy nhất do
   `SeedingData` quyết định. Dev reset DB trắng: hành vi cũ (tạo demo parish/season 2026).
 - **Không migration**, không đổi schema.
-- **Cần làm thêm**: sau khi `SeedingData` chạy `--reset`, phải **restart `parishcoordination.api`
-  và `taskexecution.api`** để `PlanningSnapshotReconciliationWorker` /
-  `TaskSnapshotReconciliation` phát lại snapshot ⇒ các read model `season_scope`,
-  `work_area_scope`, `task_projection` được dựng lại (nếu không, gọi task theo khu sẽ 404
-  `WORK_AREA_NOT_FOUND`). Quy trình đầy đủ ghi ở `SeedingData/README.md`.
+- **Cần làm thêm**: sau khi `SeedingData` chạy `--reset`, phải restart **theo thứ tự**
+  `parishcoordination.api` → (chờ `task_db.work_area_scope` = 8) → `taskexecution.api`, để
+  `PlanningSnapshotReconciliationWorker` / `TaskSnapshotReconciliation` phát lại snapshot ⇒ các read model
+  `season_scope`, `work_area_scope`, `task_projection` được dựng lại (nếu không, gọi task theo khu sẽ 404
+  `WORK_AREA_NOT_FOUND`; nếu task service khởi động trước khi có scope, nó bỏ qua 10 task và chỉ thử lại
+  sau 30 phút). Quy trình đầy đủ ghi ở `SeedingData/README.md` §3.1.
 
 ---
 

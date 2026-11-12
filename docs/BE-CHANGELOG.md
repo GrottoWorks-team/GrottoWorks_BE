@@ -10,6 +10,30 @@
 
 ---
 
+## 2026-11-12 (lần 9) · `phongnltse/task-team-leader-progress`
+
+### 13. Runtime seeder của ParishCoordination không tự tạo lại "GrottoWorks Demo Season 2026"
+
+- **Yêu cầu (12/11/2026)**: "seed lại data nhưng chỉ dùng lại ở mùa giáng sinh 2025".
+- **Vấn đề**: `ParishCoordinationDataSeeder.SeedAsync` chạy mỗi lần service khởi động
+  (`Database:MigrateOnStartup=true`, Development) và luôn đảm bảo có giáo xứ demo + cộng đoàn +
+  mùa `GrottoWorks Demo Season 2026` + 1 khu vực. Sau khi nạp bộ seed `SeedingData`
+  (chỉ còn mùa Giáng sinh 2025), seeder này sẽ **thêm lại mùa 2026** ⇒ demo có 2 mùa.
+- **Sửa** (`ParishCoordination.Infrastructure/Data/ParishCoordinationDataSeeder.cs`):
+  `SeedAsync` thoát sớm `if (await dbContext.Parishes.AnyAsync(ct))` + log
+  `"ParishCoordination seed skipped: database already has parishes."`. Nghĩa là seeder chỉ
+  chạy khi database **hoàn toàn trống** (dev lần đầu), không xen vào dữ liệu thật/seed.
+- **Ảnh hưởng client**: không đổi API/contract. Dev đang có dữ liệu: mùa duy nhất do
+  `SeedingData` quyết định. Dev reset DB trắng: hành vi cũ (tạo demo parish/season 2026).
+- **Không migration**, không đổi schema.
+- **Cần làm thêm**: sau khi `SeedingData` chạy `--reset`, phải **restart `parishcoordination.api`
+  và `taskexecution.api`** để `PlanningSnapshotReconciliationWorker` /
+  `TaskSnapshotReconciliation` phát lại snapshot ⇒ các read model `season_scope`,
+  `work_area_scope`, `task_projection` được dựng lại (nếu không, gọi task theo khu sẽ 404
+  `WORK_AREA_NOT_FOUND`). Quy trình đầy đủ ghi ở `SeedingData/README.md`.
+
+---
+
 ## 2026-11-12 (lần 8) · `phongnltse/task-team-leader-progress`
 
 ### 12. Quy trình sẵn sàng (§8.12): PARISH đặt tiêu chí & duyệt khu vực, LEADER nộp minh chứng

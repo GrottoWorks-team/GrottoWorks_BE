@@ -17,6 +17,15 @@ public sealed class ParishCoordinationDataSeeder(
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
+        // 12/11/2026: chỉ tạo dữ liệu demo khi database hoàn toàn trống. Khi đã nạp bộ seed thật
+        // (SeedingData) thì không thêm giáo xứ/mùa "GrottoWorks Demo Season 2026" nữa, để mùa duy nhất
+        // trong hệ thống là mùa do bộ seed quyết định (ví dụ chỉ mùa Giáng sinh 2025).
+        if (await dbContext.Parishes.AnyAsync(cancellationToken))
+        {
+            logger.LogInformation("ParishCoordination seed skipped: database already has parishes.");
+            return;
+        }
+
         var changed = false;
         var parish = await dbContext.Parishes.FindAsync(
             new object[] { DemoParishId },

@@ -13,6 +13,7 @@ public static class DependencyInjection
         services.AddScoped<TaskScopeAccess>();
         services.AddScoped<TaskExecution.Application.Users.ActiveUserAccess>();
         services.AddScoped<TaskExecution.Application.Assignments.AssignmentService>();
+        services.AddScoped<TaskExecution.Application.Support.ITaskSupportCoverage, TaskExecution.Application.Support.TaskSupportCoverage>();
         services.AddScoped<TaskExecution.Application.Assignments.TaskTeamLeaderService>();
         services.AddScoped<TaskExecution.Application.Events.TaskEventRecorder>();
         services.AddScoped<GetTasksQueryHandler>();

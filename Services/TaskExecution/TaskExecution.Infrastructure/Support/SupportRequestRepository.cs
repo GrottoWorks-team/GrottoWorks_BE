@@ -36,6 +36,13 @@ public sealed partial class SupportRequestRepository(TaskExecutionDbContext db) 
             .AsNoTracking().Select(task => new SupportPositionTask(task.Id,task.WorkAreaId,task.Status)).ToListAsync(cancellationToken);
     }
 
+    public Task<bool> IsTaskRequestingSupportAsync(Guid taskId,CancellationToken cancellationToken) =>
+        db.Set<SupportPosition>()
+            .Where(position => position.TaskId == taskId)
+            .AnyAsync(position => db.SupportRequests.Any(request => request.Id == position.RequestId &&
+                (request.Status == SupportRequestStatus.Published || request.Status == SupportRequestStatus.PartiallyFulfilled)),
+                cancellationToken);
+
     public async Task<(IReadOnlyList<SupportRequest> Items,long Total)> GetPageAsync(Guid? parishId,Guid? seasonId,Guid? areaId,
         SupportType? type,SupportRequestStatus? status,int page,int size,bool descending,CancellationToken ct)
     {

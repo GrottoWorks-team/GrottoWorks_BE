@@ -10,7 +10,36 @@
 
 ---
 
-## 2026-11-12 (lần 11) · `phongnltse/task-team-leader-progress`
+## 2026-11-13 (lần 12) · `phongnltse/task-team-leader-progress`
+
+### 16. Phân công chỉ trong khu mình; khu khác chỉ thấy việc đang xin hỗ trợ
+
+- **Yêu cầu (13/11/2026)**: "khi phân bổ người cho task thì leader chỉ có thể phân bổ cho người của khu mình;
+  nếu thiếu người thì tạo xin hỗ trợ từ khu khác (và nhiệm vụ của các khu vực khác chỉ được hiện các nhiệm vụ
+  đang yêu cầu hỗ trợ)".
+- **Kiểm tra (trước khi sửa)**: `AssignAsync` chỉ kiểm tra tình nguyện viên **cùng giáo xứ** (`EnsureActiveAsync`
+  với `area.ParishId`) → trưởng khu phân công được người của cộng đoàn khác; `ReviewApplicationAsync` (duyệt đơn)
+  cũng vậy; `GetVolunteerMatchesHandler` lọc cộng đoàn theo **tham số client** (không truyền thì trả cả giáo xứ);
+  mobile `openTasksReal()` liệt kê task `OPEN` của **mọi khu** trong giáo xứ.
+- **Sửa**:
+  - `TaskExecution.Application/Support/TaskSupportCoverage.cs` (mới): `AssignmentCommunity.EnsureVolunteerBelongs`
+    (409 `TASK_ASSIGNEE_OUTSIDE_AREA`) + `ITaskSupportCoverage` cho biết việc có nằm trong yêu cầu hỗ trợ đang mở.
+  - `AssignmentService.AssignAsync` và `ReviewApplicationAsync` (nhánh duyệt) gọi luật trên.
+  - `ApplyAsync` (TNV tự đăng ký): người ngoài cộng đoàn chỉ đăng ký được khi việc đó nằm trong yêu cầu hỗ trợ
+    `PUBLISHED`/`PARTIALLY_FULFILLED`, nếu không → 409 `TASK_APPLICATION_OUTSIDE_AREA`.
+  - `GetVolunteerMatchesHandler`: khu đã gắn cộng đoàn thì **luôn** lọc theo cộng đoàn của khu (bỏ qua tham số).
+  - `ISupportRequestRepository.IsTaskRequestingSupportAsync` (mới) + implementation EF.
+  - Luồng support (duyệt thành viên/duyệt vật tư) **không** bị ảnh hưởng — người khu khác vào việc qua
+    `ISupportAssignmentLifecycle`.
+- **Khu không gắn cộng đoàn** (khu cấp giáo xứ): giữ nguyên hành vi cũ (mọi TNV trong giáo xứ).
+- **Ảnh hưởng client**: mobile "Đang tuyển" chỉ gồm việc `OPEN` của khu mình + việc `OPEN` của khu khác nằm trong
+  yêu cầu hỗ trợ; web hộp thoại phân công chỉ liệt kê gợi ý theo cộng đoàn của khu và có nút "Tạo yêu cầu hỗ trợ"
+  khi danh sách rỗng. Câu tiếng Việt cho 2 mã mới đã thêm ở cả hai app.
+- **Không migration** (dùng bảng `support_position`/`support_request` sẵn có).
+- **Test**: `TaskExecution.UnitTests` **388/388** (+3: `AssignmentCommunityTests`).
+- **Kiểm chứng thật**: đăng nhập trưởng khu "Hang đá trung tâm" (cộng đoàn `0348678a…`) →
+  phân công TNV cộng đoàn `88c016c6…` trả 409 `TASK_ASSIGNEE_OUTSIDE_AREA`; phân công TNV cùng cộng đoàn
+  vượt qua luật khu vực và dừng ở `TASK_INVALID_STATE` (việc đã COMPLETED) — đúng thứ tự kiểm tra.
 
 ### 15. Chưa đủ điều kiện thì không được bắt đầu việc (giờ bắt đầu / thành viên / vật tư)
 

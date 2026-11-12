@@ -33,6 +33,9 @@ public sealed class GetVolunteerMatchesHandler(ITaskRepository tasks, TaskScopeA
         var task = await tasks.GetByIdAsync(taskId, cancellationToken)
             ?? throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
         var area = await access.GetWorkAreaForLeaderReadAsync(task.WorkAreaId, cancellationToken);
+        // 13/11/2026: chỉ gợi ý người của khu mình — khu đã gắn cộng đoàn thì bỏ qua tham số từ client
+        // (thiếu người thì tạo yêu cầu hỗ trợ, không kéo người khu khác vào danh sách phân công).
+        var effectiveCommunityId = area.CommunityId ?? communityId;
         var current = await assignments.ListAsync(taskId, cancellationToken);
         var excluded = current.Where(row => row.Status is AssignmentStatus.Pending or AssignmentStatus.Accepted or
             AssignmentStatus.InProgress or AssignmentStatus.Completed).Select(row => row.VolunteerId).ToHashSet();
@@ -42,13 +45,13 @@ public sealed class GetVolunteerMatchesHandler(ITaskRepository tasks, TaskScopeA
         const int maximumCandidates = 10000;
         for (var page = 1; ; page++)
         {
-            var batch = await directory.GetPageAsync(area.ParishId, communityId, page, pageSize, cancellationToken);
+            var batch = await directory.GetPageAsync(area.ParishId, effectiveCommunityId, page, pageSize, cancellationToken);
             if (batch.TotalItems > maximumCandidates)
                 throw new DomainRuleException("IDENTITY_SERVICE_UNAVAILABLE", "The volunteer directory exceeds the supported matching batch.", DomainErrorKind.ServiceUnavailable);
             foreach (var volunteer in batch.Items)
             {
                 if (volunteer.Status != "ACTIVE" || volunteer.Role != "VOLUNTEER" || volunteer.ParishId != area.ParishId ||
-                    excluded.Contains(volunteer.UserId) || (communityId.HasValue && volunteer.CommunityId != communityId)) continue;
+                    excluded.Contains(volunteer.UserId) || (effectiveCommunityId.HasValue && volunteer.CommunityId != effectiveCommunityId)) continue;
                 if (task.Skills.All(skill => VolunteerSkills.Meets(volunteer, skill.SkillId, skill.RequiredSkillLevel)))
                     candidates[volunteer.UserId] = volunteer;
             }

@@ -42,6 +42,8 @@ public sealed partial class AssignmentService
             if (approve)
             {
                 var volunteer = await users.EnsureActiveAsync(row.VolunteerId, area.ParishId, GrottoWorksRoles.Volunteer, cancellationToken);
+                // 13/11/2026: duyệt đơn cũng không được vượt phạm vi cộng đoàn của khu.
+                TaskExecution.Application.Support.AssignmentCommunity.EnsureVolunteerBelongs(area, volunteer.CommunityId);
                 var existing = await assignments.ListAsync(task.Id, cancellationToken);
                 EnsureCapacity(existing, task.RequiredVolunteerCount, false);
                 EnsureSkills(task, volunteer, false);
@@ -67,6 +69,14 @@ public sealed partial class AssignmentService
                 ?? throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
             var (area, _) = await scopeAccess.GetWorkAreaForVolunteerWriteAsync(task.WorkAreaId, cancellationToken);
             var volunteer = await users.EnsureCallerAsync(area.ParishId, cancellationToken);
+            // 13/11/2026: người ngoài cộng đoàn của khu chỉ đăng ký được khi khu đó đang xin hỗ trợ cho việc này.
+            if (area.CommunityId.HasValue && volunteer.CommunityId != area.CommunityId &&
+                !await supportCoverage.IsTaskRequestingSupportAsync(taskId, cancellationToken))
+            {
+                throw new DomainRuleException("TASK_APPLICATION_OUTSIDE_AREA",
+                    "This work area is not requesting support, so only volunteers of its own community can apply.");
+            }
+
             task.EnsurePlanningCanBeUpdated(null);
             var existing = await assignments.ListAsync(taskId, cancellationToken);
             EnsureNoDuplicate(existing, user.UserId);

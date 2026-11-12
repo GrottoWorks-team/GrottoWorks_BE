@@ -118,6 +118,26 @@ guessing. Tasks without material requirements skip the Resource call. A Resource
 **fail-open** (`materialsKnown = false`, no blocker) so a stock-service incident cannot freeze
 the build; every other condition stays enforced.
 
+## Assignment scope (13/11/2026)
+
+A work area owns a **community**; the leader may only staff its tasks with volunteers of that
+community:
+
+| Action | Rule | Error code (409) |
+|---|---|---|
+| `POST /tasks/{taskId}/assignments` (direct assignment) | volunteer's `communityId` must equal the area's | `TASK_ASSIGNEE_OUTSIDE_AREA` |
+| `POST /task-applications/{id}/approve` | same check when the application is approved | `TASK_ASSIGNEE_OUTSIDE_AREA` |
+| `POST /tasks/{taskId}/applications` (volunteer self-registration) | a volunteer from another community may apply **only** when the area is asking for support | `TASK_APPLICATION_OUTSIDE_AREA` |
+| `GET /tasks/{taskId}/volunteer-matches` | always scoped to the area's community (a caller-supplied `communityId` is ignored once the area has one) | — |
+
+When the area is short of people the leader creates a support request (`POST /support-requests`,
+positions linked to the task) and publishes it; volunteers approved for support positions become
+assignments through the support flow (`ISupportAssignmentLifecycle`), which is not affected by
+this check. `SupportRequestRepository.IsTaskRequestingSupportAsync` answers "is this task covered
+by a PUBLISHED/PARTIALLY_FULFILLED request?" for both the application rule and the clients
+(web/mobile only list other areas' tasks that are asking for help). Areas without a community
+(parish-level areas) keep the previous behaviour: any volunteer of the parish.
+
 The source saves attachment intents before remote reservation, reserves under the
 Task mutation lock before saving progress, and retains these intents across rollback
 or restart. A worker checks pending intents every 15 seconds, with a five-minute

@@ -148,6 +148,9 @@ public sealed class SupportPublicationTests
         { await gate.WaitAsync(ct); inTransaction = true; try { return await operation(); } finally { inTransaction = false; gate.Release(); } }
         public Task<IReadOnlyList<SupportPositionTask>> GetPositionTasksAsync(IReadOnlyCollection<Guid> taskIds, CancellationToken ct)
         { TaskReads++; return Task.FromResult<IReadOnlyList<SupportPositionTask>>(Tasks.Where(task => taskIds.Contains(task.Id)).ToList()); }
+    public Task<bool> IsTaskRequestingSupportAsync(Guid taskId, CancellationToken ct) =>
+        Task.FromResult(Rows.Any(row => (row.Status == SupportRequestStatus.Published || row.Status == SupportRequestStatus.PartiallyFulfilled) &&
+            row.Positions.Any(position => position.TaskId == taskId)));
         public Task<SupportRequest?> GetAsync(Guid id, bool tracked, CancellationToken ct) => Task.FromResult(Rows.SingleOrDefault(row => row.Id == id));
         public Task<(IReadOnlyList<SupportRequest> Items, long Total)> GetPageAsync(Guid? parish, Guid? season, Guid? area,
             SupportType? type, SupportRequestStatus? status, int page, int size, bool descending, CancellationToken ct) => throw new NotSupportedException();

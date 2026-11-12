@@ -36,7 +36,8 @@ internal sealed class AssignmentTestFixture
         Identity.Items[User.UserId] = new(User.UserId,"Leader","ACTIVE","LEADER",User.ParishId,null,[]);
         Identity.Items[VolunteerId] = new(VolunteerId,"Volunteer","ACTIVE","VOLUNTEER",User.ParishId,null,[]);
         Service = new AssignmentService(Store,new TestTasks(Task),new TaskScopeAccess(new TestScopes(Season,Area),User),
-            new ActiveUserAccess(Identity,User),User,new TaskEventRecorder(Events,User,new TestCorrelation()),Support);
+            new ActiveUserAccess(Identity,User),User,new TaskEventRecorder(Events,User,new TestCorrelation()),Support,
+            new NoSupportCoverage());
     }
 
     public AssignVolunteerCommand Command() => new(Task.Id,VolunteerId,null,false,false,null);
@@ -148,4 +149,15 @@ internal sealed class AssignmentTestFixture
         public Task SaveChangesAsync(CancellationToken ct=default)
         { Saves++; return System.Threading.Tasks.Task.CompletedTask; }
     }
+}
+
+/// <summary>
+/// Luật 13/11/2026: chỉ phân công người của khu; khu gắn cộng đoàn thì test này cần bật/tắt việc
+/// “khu đang xin hỗ trợ” cho luồng đăng ký của người ngoài cộng đoàn.
+/// </summary>
+internal sealed class NoSupportCoverage(bool requesting = false) : TaskExecution.Application.Support.ITaskSupportCoverage
+{
+    public bool RequestingSupport { get; set; } = requesting;
+    public Task<bool> IsTaskRequestingSupportAsync(Guid taskId, CancellationToken ct) =>
+        Task.FromResult(RequestingSupport);
 }

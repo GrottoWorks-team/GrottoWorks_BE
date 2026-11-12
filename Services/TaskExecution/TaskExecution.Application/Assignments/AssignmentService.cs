@@ -25,7 +25,8 @@ public sealed record AssignmentDto(Guid Id, Guid TaskId, Guid VolunteerId, Assig
 
 public sealed partial class AssignmentService(IAssignmentStore assignments, ITaskRepository tasks,
     TaskScopeAccess scopeAccess, ActiveUserAccess users, ICurrentUser user, TaskEventRecorder events,
-    TaskExecution.Application.Support.ISupportAssignmentLifecycle support)
+    TaskExecution.Application.Support.ISupportAssignmentLifecycle support,
+    TaskExecution.Application.Support.ITaskSupportCoverage supportCoverage)
 {
     public async Task<AssignmentDto> RespondAsync(Guid assignmentId, bool accept, string? reason, int? expectedVersion,
         CancellationToken cancellationToken = default)
@@ -75,6 +76,8 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
             await users.EnsureCallerAsync(area.ParishId, cancellationToken);
             var volunteer = await users.EnsureActiveAsync(command.VolunteerId, area.ParishId,
                 GrottoWorksRoles.Volunteer, cancellationToken);
+            // 13/11/2026: trưởng khu chỉ phân công người của khu mình; thiếu người thì tạo yêu cầu hỗ trợ.
+            TaskExecution.Application.Support.AssignmentCommunity.EnsureVolunteerBelongs(area, volunteer.CommunityId);
             task.EnsurePlanningCanBeUpdated(null);
 
             var existing = await assignments.ListAsync(task.Id, cancellationToken);

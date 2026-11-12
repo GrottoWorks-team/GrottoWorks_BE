@@ -32,6 +32,11 @@ public interface ISupportRequestRepository
     Task<Guid?> FindRequestIdByMemberAsync(Guid memberId,CancellationToken cancellationToken);
     Task<T> InRequestTransactionAsync<T>(Guid requestId,Func<Task<T>> operation,CancellationToken cancellationToken);
     Task<IReadOnlyList<SupportPositionTask>> GetPositionTasksAsync(IReadOnlyCollection<Guid> taskIds,CancellationToken cancellationToken);
+    /// <summary>
+    /// Nhiệm vụ có nằm trong một yêu cầu hỗ trợ đang mở (PUBLISHED / PARTIALLY_FULFILLED) của khu?
+    /// Dùng cho luật 13/11/2026: khu khác chỉ được đăng ký khi khu đó đang xin hỗ trợ cho việc này.
+    /// </summary>
+    Task<bool> IsTaskRequestingSupportAsync(Guid taskId,CancellationToken cancellationToken);
     Task<SupportRequest?> GetAsync(Guid id,bool tracked,CancellationToken cancellationToken);
     Task<(IReadOnlyList<SupportRequest> Items,long Total)> GetPageAsync(Guid? parishId,Guid? seasonId,Guid? workAreaId,
         SupportType? type,SupportRequestStatus? status,int page,int size,bool descending,CancellationToken cancellationToken);

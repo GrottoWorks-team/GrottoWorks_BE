@@ -14,9 +14,26 @@ public interface ISupportTransferReceiptLookup
     Task<SupportTransferSnapshot?> GetAsync(Guid itemId, string correlationId, CancellationToken ct);
 }
 
+/// <summary>Kết quả đồng bộ tức thời sau khi MO xác nhận nhận vật tư (13/11/2026).</summary>
+public sealed record SupportReceiptReconciliationDto(Guid SupportRequestId, string Status, long Version, SupportResponseMaterialDto Item);
+
 public sealed class SupportTransferSynchronization(ISupportRequestRepository requests, ISupportMaterialSyncStore store,
     ISupportTransferReceiptLookup receipts, IScopeProjectionStore scopes, ITaskEventOutbox events, TimeProvider clock)
 {
+    /// <summary>
+    /// MO xác nhận nhận vật tư ở Resource; trạng thái yêu cầu thuộc TaskExecution nên trước đây chỉ đổi sau khi
+    /// consumer/worker chạy (trễ tới 15 giây). Hàm này kéo snapshot Resource và trả về trạng thái mới ngay cho client.
+    /// </summary>
+    public async Task<SupportReceiptReconciliationDto> ReconcileNowAsync(Guid itemId, CancellationToken ct)
+    {
+        var requestId = await FindRequestAsync(itemId, ct);
+        await ReconcileAsync(itemId, ct);
+        var request = await requests.GetAsync(requestId, false, ct) ?? throw Unavailable();
+        var item = request.GetMaterialOffer(itemId);
+        return new(request.Id, JsonNamingPolicy.SnakeCaseUpper.ConvertName(request.Status.ToString()), request.Version,
+            SupportResponseMaterialDto.From(item));
+    }
+
     public async Task ReconcileAsync(Guid itemId, CancellationToken ct)
     {
         var requestId = await FindRequestAsync(itemId, ct);

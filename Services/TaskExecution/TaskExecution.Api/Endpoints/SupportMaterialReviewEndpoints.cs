@@ -26,7 +26,19 @@ public static class SupportMaterialReviewEndpoints
         Configure(group.MapPost("/reject",async (Guid itemId,ReasonCommandRequest request,
             [FromHeader(Name="If-Match")] string? ifMatch,ReviewSupportMaterialHandler handler,HttpContext http,CancellationToken ct)=>
             await ReviewAsync(itemId,false,null,request.Reason,request.Version,ifMatch,handler,http,ct)).WithName("rejectSupportMaterial"));
+        app.MapPost("/api/v1/support-response-materials/{itemId:guid}/reconcile",ReconcileAsync)
+            .WithName("reconcileSupportMaterialReceipt").WithTags("Support")
+            .RequireAuthorization(policy=>policy.RequireRole(GrottoWorksRoles.Leader,GrottoWorksRoles.MaterialOfficer))
+            .Produces<ApiResponse<SupportReceiptReconciliationDto>>().Produces<ProblemDetails>(401).Produces<ProblemDetails>(403)
+            .Produces<ProblemDetails>(404).Produces<ProblemDetails>(503);
     }
+    /// <summary>
+    /// 13/11/2026: MO nhận vật tư ở Resource nên trạng thái yêu cầu chỉ đổi sau khi consumer/worker chạy
+    /// (trễ tới 15 giây, client thường thấy "Đã công bố"). Endpoint này đồng bộ ngay và trả trạng thái mới.
+    /// </summary>
+    private static async Task<IResult> ReconcileAsync(Guid itemId,SupportTransferSynchronization synchronization,
+        HttpContext http,CancellationToken ct)=>
+        Results.Ok(ApiResults.Ok(await synchronization.ReconcileNowAsync(itemId,ct),http));
     private static void Configure(RouteHandlerBuilder route)=>route.Produces<ApiResponse<SupportResponseMaterialDto>>()
         .Produces<ProblemDetails>(400).Produces<ProblemDetails>(401).Produces<ProblemDetails>(403).Produces<ProblemDetails>(404)
         .Produces<ProblemDetails>(409).Produces<ProblemDetails>(412).Produces<ProblemDetails>(422).Produces<ProblemDetails>(503);

@@ -88,6 +88,21 @@ public sealed class SupportTransferSynchronizationTests
         request.Status.Should().Be(SupportRequestStatus.Fulfilled);
     }
 
+    [Fact]
+    public async Task Reconcile_now_returns_the_refreshed_request_status_for_the_caller()
+    {
+        var f=await SupportMaterialReviewTests.Fixture.Create(); await f.Review(true,10);
+        f.Request.Status.Should().Be(SupportRequestStatus.Published);
+        var sync=Sync(f,new Lookup(Snapshot(f,7,3)));
+        var result=await sync.ReconcileNowAsync(f.Item.Id,default);
+        result.SupportRequestId.Should().Be(f.Request.Id);
+        result.Status.Should().Be("PARTIALLY_FULFILLED");
+        result.Version.Should().Be(f.Request.Version);
+        result.Item.Status.Should().Be(SupportMaterialStatus.Transferred);
+        result.Item.ReceivedUsableQuantity.Should().Be(7);
+        result.Item.PendingSync.Should().BeFalse();
+    }
+
     private static SupportTransferSynchronization Sync(SupportMaterialReviewTests.Fixture f,Lookup lookup)=>
         new(f.Offers.Base.Store,new SupportMaterialReviewTests.SyncStore(f.Request),lookup,f.Offers.Scopes,f.Source.Events,TimeProvider.System);
     private static SupportTransferSnapshot Snapshot(SupportMaterialReviewTests.Fixture f,decimal usable,decimal unusable)=>

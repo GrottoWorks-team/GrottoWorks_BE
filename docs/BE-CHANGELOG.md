@@ -10,6 +10,34 @@
 
 ---
 
+## 2026-11-13 (lần 14) · `phongnltse/task-team-leader-progress`
+
+### 18. MO xác nhận nhận vật tư → trạng thái yêu cầu hỗ trợ cập nhật ngay (không còn kẹt "Đã công bố")
+
+- **Yêu cầu (13/11/2026)**: "khi MO đã xác nhận nhận vật tư hỗ trợ nhưng yêu cầu hỗ trợ vẫn đang ở trạng thái đã công bố".
+- **Tái hiện (chạy thật toàn bộ luồng, poll 3 giây/lần)**: MO `confirm-receipt` trả 200, transfer `RECEIVED`, nhưng
+  `support_request.request_status` vẫn `PUBLISHED` cho tới **+9 giây** mới thành `FULFILLED`. Trước đó không có
+  bản ghi nhận nào trong dữ liệu (`task_event_outbox` không có `support.transfer.synchronized`).
+- **Nguyên nhân gốc**: `confirm-receipt` do **Resource** host, còn trạng thái yêu cầu thuộc **TaskExecution** (DB khác).
+  TaskExecution chỉ đổi trạng thái khi (a) consume `support.transfer.confirmed`, hoặc (b) worker quét nền 15 giây.
+  ⇒ có cửa sổ 0–15 giây API vẫn trả `PUBLISHED`; FE không refetch nên người xem thấy "Đã công bố" mãi.
+- **Sửa (B — đồng bộ tức thời)**:
+  - `TaskExecution.Application/Support/SupportTransferSynchronization.ReconcileNowAsync(itemId)` + `SupportReceiptReconciliationDto`.
+  - `TaskExecution.Api/Endpoints/SupportMaterialReviewEndpoints.cs`: `POST /api/v1/support-response-materials/{itemId}/reconcile`
+    (LEADER, MO) → trả `{ supportRequestId, status, version, item }` sau khi kéo snapshot Resource.
+  - `ApiGateway/YarpApiGateway/appsettings.json`: route `task-support-material-reconcile-route` (task cluster).
+  - Trạng thái trả về dạng `SNAKE_UPPER` (`PARTIALLY_FULFILLED`/`FULFILLED`) như event hiện có.
+- **Sửa (A — client)**: FE `features/support/api.ts` thêm `useReconcileSupportMaterialReceipt`, `useSupportRequests`
+  poll mặc định 5 giây; `MaterialReceiptsPage` gọi reconcile ngay sau khi xác nhận và hiện toast kèm trạng thái mới;
+  i18n `features.supportReceipts.savedWithStatus` / `savedPendingSync`.
+- **Ảnh hưởng client**: thêm 1 endpoint (không phá vỡ contract cũ). Event/worker giữ nguyên làm backstop; nếu
+  Resource chưa kịp trả snapshot thì endpoint trả 503 `SUPPORT_TRANSFER_SYNC_PENDING` và client poll tiếp.
+- **Cần làm thêm**: không.
+- **Test**: `tests/TaskExecution.UnitTests/Application/SupportTransferSynchronizationTests.Reconcile_now_returns_the_refreshed_request_status_for_the_caller`
+  → **389/389**; live: reconcile trả `FULFILLED` trong **73 ms**, GET ngay sau đó cũng `FULFILLED`.
+
+---
+
 ## 2026-11-13 (lần 13) · `phongnltse/task-team-leader-progress`
 
 ### 17. Nhu cầu vật tư của khu bao gồm nhu cầu của nhiệm vụ (hết báo "Đủ vật tư" sai)

@@ -98,6 +98,26 @@ Evidence download is `GET /api/v1/tasks/{taskId}/progress/{progressId}/evidence/
 It checks Task scope and exact evidence membership, finalizes the durable attachment
 idempotently, then obtains a record-authorized URL from NotificationAudit.
 
+## Start conditions (12/11/2026)
+
+A Task can only be **started** (volunteer `POST /task-assignments/{id}/attendance/check-in-requests`
+and the Leader's approval of that request) when all three hold:
+
+| Condition | Error code (409) | Source |
+|---|---|---|
+| Start time reached (`startAt`) | `TASK_START_NOT_DUE` | Task aggregate |
+| Full team accepted (`requiredVolunteerCount` ≤ accepted/in-progress/completed assignments) | `TASK_NOT_ENOUGH_MEMBERS` | `task_assignment` |
+| Planned materials fully allocated (`task_material_plan` vs `material_allocation`) | `TASK_NOT_ENOUGH_MATERIALS` | Resource `GET /internal/tasks/{id}/material-summary` |
+| Task not published yet (`OPEN`) | `TASK_NOT_PUBLISHED` | Task aggregate |
+| Task already submitted/closed | `TASK_INVALID_STATE` | Task aggregate |
+
+`GET /api/v1/tasks/{taskId}/start-eligibility` returns the same evaluation for clients
+(`canStart`, `blockers[{code, detail}]`, `acceptedMembers`/`requiredMembers`,
+`materialShortages[]`), so web and mobile can explain or disable the start action without
+guessing. Tasks without material requirements skip the Resource call. A Resource outage is
+**fail-open** (`materialsKnown = false`, no blocker) so a stock-service incident cannot freeze
+the build; every other condition stays enforced.
+
 The source saves attachment intents before remote reservation, reserves under the
 Task mutation lock before saving progress, and retains these intents across rollback
 or restart. A worker checks pending intents every 15 seconds, with a five-minute

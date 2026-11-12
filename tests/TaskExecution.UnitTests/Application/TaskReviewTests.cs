@@ -137,5 +137,6 @@ public sealed class TaskReviewTests
         public bool Fail {get;set;}
         public Task<PurchaseRequestSnapshot> PurchaseRequestAsync(Guid id,CancellationToken ct)=>throw new NotSupportedException();
         public Task<JsonElement> MaterialSummaryAsync(Guid id,CancellationToken ct)=>Fail ? throw new DomainRuleException("RESOURCE_SERVICE_UNAVAILABLE","Unavailable",DomainErrorKind.ServiceUnavailable) : Task.FromResult(JsonSerializer.SerializeToElement(new {taskId=id,materials=Array.Empty<object>()}));
+        public Task<IReadOnlyList<TaskMaterialAllocationLine>> TaskMaterialsAsync(Guid id,CancellationToken ct)=>Fail ? throw new DomainRuleException("RESOURCE_SERVICE_UNAVAILABLE","Unavailable",DomainErrorKind.ServiceUnavailable) : Task.FromResult<IReadOnlyList<TaskMaterialAllocationLine>>([]);
     }
 }

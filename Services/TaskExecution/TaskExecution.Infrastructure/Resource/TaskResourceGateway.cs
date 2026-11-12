@@ -31,6 +31,33 @@ public sealed class TaskResourceGateway(HttpClient client,IConfiguration configu
             !data.TryGetProperty("materials",out var materials) || materials.ValueKind!=JsonValueKind.Array) throw Unavailable();
         return data;
     }
+
+    /// <summary>
+    /// Đọc kế hoạch + số lượng đã cấp vật tư của nhiệm vụ (12/11/2026 — chặn bắt đầu khi thiếu vật tư).
+    /// Thiếu projection ở Resource → 404 `TASK_NOT_PROJECTED` (giữ nguyên mã của Resource).
+    /// </summary>
+    public async Task<IReadOnlyList<TaskMaterialAllocationLine>> TaskMaterialsAsync(Guid taskId,CancellationToken ct)
+    {
+        var data=await GetAsync($"internal/tasks/{taskId:D}/material-summary",ct);
+        if(!data.TryGetProperty("taskId",out var id) || !id.TryGetGuid(out var actual) || actual!=taskId ||
+            !data.TryGetProperty("materials",out var materials) || materials.ValueKind!=JsonValueKind.Array) throw Unavailable();
+        var lines=new List<TaskMaterialAllocationLine>();
+        foreach(var row in materials.EnumerateArray())
+        {
+            if(!row.TryGetProperty("materialId",out var materialId) || !materialId.TryGetGuid(out var id2) || id2==Guid.Empty ||
+                !TryDecimal(row,"requiredQuantity",out var required) || !TryDecimal(row,"allocatedQuantity",out var allocated))
+                throw Unavailable();
+            lines.Add(new(id2,required,allocated));
+        }
+        return lines;
+    }
+
+    private static bool TryDecimal(JsonElement row,string name,out decimal value)
+    {
+        value=0;
+        if(!row.TryGetProperty(name,out var element) || element.ValueKind!=JsonValueKind.Number) return false;
+        return element.TryGetDecimal(out value);
+    }
     private async Task<JsonElement> GetAsync(string path,CancellationToken ct)
     {
         var key=configuration["InternalApi:ApiKey"];

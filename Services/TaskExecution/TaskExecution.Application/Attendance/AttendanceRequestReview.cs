@@ -1,3 +1,4 @@
+using TaskExecution.Application.Tasks;
 using TaskExecution.Contracts.Events;
 using TaskExecution.Domain;
 using TaskExecution.Domain.Attendance;
@@ -58,6 +59,8 @@ public sealed partial class AttendanceService
                 EnsureTaskAllowsCheckIn(task);
                 if (assignment.Status!=AssignmentStatus.Accepted)
                     throw new DomainRuleException("ASSIGNMENT_NOT_ACCEPTED","The assignment is no longer accepted.");
+                // 12/11/2026: duyệt đơn là lúc việc THẬT SỰ bắt đầu → áp cùng điều kiện bắt đầu.
+                await startEligibility.EnsureCanStartAsync(task,cancellationToken);
                 if (await store.OverlapsAsync(request.VolunteerId,request.RequestedAt,null,null,cancellationToken))
                     throw new DomainRuleException("ATTENDANCE_OVERLAP","The session would overlap another session.");
                 sessionId=Guid.NewGuid();

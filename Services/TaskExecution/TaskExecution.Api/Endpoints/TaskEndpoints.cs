@@ -35,6 +35,15 @@ public static class TaskEndpoints
             .Produces<ProblemDetails>(StatusCodes.Status403Forbidden)
             .Produces<ProblemDetails>(StatusCodes.Status404NotFound);
 
+        // 12/11/2026: vì sao nhiệm vụ được / chưa được bắt đầu (giờ bắt đầu, thành viên, vật tư đã cấp).
+        group.MapGet("/tasks/{taskId:guid}/start-eligibility", GetStartEligibilityAsync)
+            .WithName("getTaskStartEligibility")
+            .Produces<ApiResponse<TaskStartEligibilityDto>>()
+            .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
+            .Produces<ProblemDetails>(StatusCodes.Status401Unauthorized)
+            .Produces<ProblemDetails>(StatusCodes.Status403Forbidden)
+            .Produces<ProblemDetails>(StatusCodes.Status404NotFound);
+
         group.MapPost("/work-areas/{workAreaId:guid}/tasks", CreateTaskAsync)
             .WithName("createTask")
             .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
@@ -127,6 +136,13 @@ public static class TaskEndpoints
         httpContext.Response.Headers.ETag = $"\"{task.Version}\"";
         return Results.Ok(ApiResults.Ok(task, httpContext));
     }
+
+    private static async Task<IResult> GetStartEligibilityAsync(
+        Guid taskId,
+        HttpContext httpContext,
+        TaskStartEligibilityService service,
+        CancellationToken cancellationToken) =>
+        Results.Ok(ApiResults.Ok(await service.HandleAsync(taskId, cancellationToken), httpContext));
 
     private static async Task<IResult> CreateTaskAsync(
         Guid workAreaId,

@@ -10,7 +10,34 @@
 
 ---
 
-## 2026-11-12 (lần 10) · `phongnltse/task-team-leader-progress`
+## 2026-11-12 (lần 11) · `phongnltse/task-team-leader-progress`
+
+### 15. Chưa đủ điều kiện thì không được bắt đầu việc (giờ bắt đầu / thành viên / vật tư)
+
+- **Yêu cầu (12/11/2026)**: "nếu task chưa đủ thành viên, chưa được phân bổ đủ vật tư yêu cầu mà chưa đến
+  thời gian bắt đầu thì sẽ không thể bắt đầu việc được".
+- **Trước đây**: `AttendanceService.CheckInAsync` chỉ kiểm tra `task.status ∈ {NOT_STARTED, IN_PROGRESS}`;
+  `ReviewRequestAsync` (duyệt đơn = lúc việc thật sự `IN_PROGRESS`) không kiểm tra gì thêm → TNV có thể vào ca
+  khi chưa tới giờ, thiếu người hoặc chưa có vật tư.
+- **Sửa**:
+  - `TaskExecution.Application/Tasks/TaskStartEligibility.cs` (mới) — `TaskStartEligibilityService` tính 3 điều kiện
+    (giờ bắt đầu, số thành viên đã nhận việc, vật tư đã cấp so với `task_material_plan`) và trả `blockers[]`
+    với mã `TASK_START_NOT_DUE` / `TASK_NOT_ENOUGH_MEMBERS` / `TASK_NOT_ENOUGH_MATERIALS` /
+    `TASK_NOT_PUBLISHED` / `TASK_INVALID_STATE`.
+  - `AttendanceService.CheckInAsync` + `AttendanceService.ReviewRequestAsync` (nhánh duyệt) gọi
+    `EnsureCanStartAsync` → 409 kèm mã cụ thể.
+  - `ITaskResourceGateway.TaskMaterialsAsync` (mới) đọc `GET /internal/tasks/{id}/material-summary` để lấy
+    `requiredQuantity` / `allocatedQuantity` từng vật tư. Nhiệm vụ **không** có nhu cầu vật tư thì bỏ qua lời gọi.
+  - Sự cố Resource là **fail-open** (`materialsKnown = false`, không chặn) để lỗi dịch vụ kho không chặn thi công;
+    các điều kiện còn lại luôn được áp.
+- **API mới**: `GET /api/v1/tasks/{taskId}/start-eligibility` (TaskExecution, `getTaskStartEligibility`) —
+  trả `canStart`, `blockers[{code, detail}]`, `acceptedMembers`/`requiredMembers`, `materialShortages[]`,
+  `materialsKnown`. Đã thêm route YARP `task-start-eligibility-route`.
+- **Ảnh hưởng client**: web hiện panel 3 điều kiện ở `TaskDetailPage` (LEADER); mobile hiện lý do chặn và ẩn nút
+  "Bắt đầu làm việc" ở `TaskDetailScreen`. Câu tiếng Việt cho 4 mã mới đã thêm ở cả hai app (`errors.*`).
+- **Không migration**, không đổi DTO cũ.
+- **Test**: `TaskExecution.UnitTests` **385/385** (+7: `TaskStartEligibilityTests` 5 kịch bản, route test cho
+  endpoint mới, fake gateway cập nhật).
 
 ### 14. Huỷ việc đi mua không còn chặn việc tạo lại (PURCHASE_TASK_EXISTS / đơn kẹt BUYER_ASSIGNED)
 

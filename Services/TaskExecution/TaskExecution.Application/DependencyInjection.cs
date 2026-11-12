@@ -16,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<TaskExecution.Application.Assignments.TaskTeamLeaderService>();
         services.AddScoped<TaskExecution.Application.Events.TaskEventRecorder>();
         services.AddScoped<GetTasksQueryHandler>();
+        services.AddScoped<TaskStartEligibilityService>();
         services.AddScoped<GetVolunteerMatchesHandler>();
         services.AddScoped<ReplaceTaskMaterialsHandler>();
         services.AddScoped<GetWorkAreaTaskCountsQueryHandler>();

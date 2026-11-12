@@ -20,6 +20,7 @@ public sealed class TaskRouteTests
         builder.Services.AddRouting();
         builder.Services.AddScoped<GetTasksQueryHandler>();
         builder.Services.AddScoped<GetTaskQueryHandler>();
+        builder.Services.AddScoped<TaskStartEligibilityService>();
         builder.Services.AddScoped<CreateTaskCommandHandler>();
         builder.Services.AddScoped<UpdateTaskCommandHandler>();
         builder.Services.AddScoped<ReplaceCompletionCriteriaCommandHandler>();
@@ -44,9 +45,16 @@ public sealed class TaskRouteTests
             endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == "replaceTaskSkills");
         var ready = endpoints.Single(endpoint =>
             endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == "markTaskReady");
+        var eligibility = endpoints.Single(endpoint =>
+            endpoint.Metadata.GetMetadata<EndpointNameMetadata>()?.EndpointName == "getTaskStartEligibility");
 
         list.RoutePattern.RawText.Should().Be("/api/v1/work-areas/{workAreaId:guid}/tasks");
         detail.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId:guid}");
+        // 12/11/2026: điều kiện bắt đầu việc (giờ bắt đầu / thành viên / vật tư đã cấp).
+        eligibility.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId:guid}/start-eligibility");
+        eligibility.Metadata.GetMetadata<IAuthorizeData>().Should().NotBeNull();
+        eligibility.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
+            .Select(metadata => metadata.StatusCode).Should().Contain([200, 400, 401, 403, 404]);
         list.Metadata.GetMetadata<IAuthorizeData>().Should().NotBeNull();
         detail.Metadata.GetMetadata<IAuthorizeData>().Should().NotBeNull();
         list.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()

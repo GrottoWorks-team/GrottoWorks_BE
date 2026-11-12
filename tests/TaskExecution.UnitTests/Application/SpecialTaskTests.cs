@@ -88,5 +88,6 @@ public sealed class SpecialTaskTests
         public string Status="APPROVED";
         public Task<PurchaseRequestSnapshot> PurchaseRequestAsync(Guid id,CancellationToken ct)=>Task.FromResult(new PurchaseRequestSnapshot(id,area,Status,1,[]));
         public Task<JsonElement> MaterialSummaryAsync(Guid id,CancellationToken ct)=>throw new NotSupportedException();
+        public Task<IReadOnlyList<TaskMaterialAllocationLine>> TaskMaterialsAsync(Guid id,CancellationToken ct)=>Task.FromResult<IReadOnlyList<TaskMaterialAllocationLine>>([]);
     }
 }

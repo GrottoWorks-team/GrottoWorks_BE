@@ -41,9 +41,21 @@ internal sealed class AssignmentTestFixture
 
     public AssignVolunteerCommand Command() => new(Task.Id,VolunteerId,null,false,false,null);
 
+    /// <summary>Điều kiện bắt đầu việc (12/11/2026): môi trường test không có vật tư yêu cầu → không chặn.</summary>
+    public TaskStartEligibilityService StartEligibility() =>
+        new(new TestTasks(Task),Store,new NoMaterials(),new TaskScopeAccess(new TestScopes(Season,Area),User));
+
     public TaskExecution.Application.Attendance.AttendanceService Attendance(TaskExecution.Application.Attendance.IAttendanceStore store) =>
         new(store,Store,new TestTasks(Task),new TaskScopeAccess(new TestScopes(Season,Area),User),
-            new ActiveUserAccess(Identity,User),User,new TaskEventRecorder(Events,User,new TestCorrelation()));
+            new ActiveUserAccess(Identity,User),User,new TaskEventRecorder(Events,User,new TestCorrelation()),StartEligibility());
+
+    internal sealed class NoMaterials : ITaskResourceGateway
+    {
+        public Task<PurchaseRequestSnapshot> PurchaseRequestAsync(Guid id,CancellationToken ct)=>throw new NotSupportedException();
+        public Task<System.Text.Json.JsonElement> MaterialSummaryAsync(Guid id,CancellationToken ct)=>throw new NotSupportedException();
+        public System.Threading.Tasks.Task<IReadOnlyList<TaskMaterialAllocationLine>> TaskMaterialsAsync(Guid id,CancellationToken ct)=>
+            System.Threading.Tasks.Task.FromResult<IReadOnlyList<TaskMaterialAllocationLine>>([]);
+    }
 
     public TaskExecution.Application.Attendance.AttendanceAlertProcessor Alerts(TaskExecution.Application.Attendance.ILongOpenAttendanceStore alerts,
         TaskExecution.Application.Attendance.IAttendanceStore store) => new(alerts,store,Store,new TestTasks(Task),new TestScopes(Season,Area),

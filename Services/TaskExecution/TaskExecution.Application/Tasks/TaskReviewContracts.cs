@@ -41,4 +41,6 @@ public interface ITaskResourceGateway
 {
     Task<PurchaseRequestSnapshot> PurchaseRequestAsync(Guid id, CancellationToken ct);
     Task<JsonElement> MaterialSummaryAsync(Guid taskId, CancellationToken ct);
+    /// <summary>Kế hoạch + số lượng đã cấp vật tư của nhiệm vụ (`GET /internal/tasks/{id}/material-summary`).</summary>
+    Task<IReadOnlyList<TaskMaterialAllocationLine>> TaskMaterialsAsync(Guid taskId, CancellationToken ct);
 }

@@ -44,7 +44,8 @@ public sealed record AttendanceDto(Guid Id, Guid AssignmentId, DateTimeOffset Ch
 }
 
 public sealed partial class AttendanceService(IAttendanceStore store, IAssignmentStore assignments, ITaskRepository tasks,
-    TaskScopeAccess scopes, ActiveUserAccess users, ICurrentUser user, TaskEventRecorder events)
+    TaskScopeAccess scopes, ActiveUserAccess users, ICurrentUser user, TaskEventRecorder events,
+    TaskStartEligibilityService startEligibility)
 {
     public async Task<AttendanceRequestDto> CheckInAsync(Guid assignmentId, string? note, Guid key, CancellationToken cancellationToken = default)
     {
@@ -59,6 +60,8 @@ public sealed partial class AttendanceService(IAttendanceStore store, IAssignmen
             EnsureTaskAllowsCheckIn(task);
             if (assignment.Status != AssignmentStatus.Accepted)
                 throw new DomainRuleException("ASSIGNMENT_NOT_ACCEPTED","Only accepted assignments can check in.");
+            // 12/11/2026: chưa tới giờ bắt đầu / chưa đủ thành viên / chưa cấp đủ vật tư → chưa được bắt đầu.
+            await startEligibility.EnsureCanStartAsync(task,cancellationToken);
             if (await store.HasPendingOrOpenAsync(user.UserId,cancellationToken))
                 throw new DomainRuleException("ATTENDANCE_ALREADY_OPEN","A pending request or open session already exists.");
             var row = AttendanceRequest.CheckIn(assignmentId,user.UserId,note,DateTimeOffset.UtcNow);

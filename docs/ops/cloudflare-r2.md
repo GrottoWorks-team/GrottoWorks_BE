@@ -23,7 +23,14 @@ Kế hoạch tổng: `GrottoWorks_Documents/GrottoWorks_Cloudflare_R2_Storage_Pl
    ```json
    [
      {
-       "AllowedOrigins": ["https://<domain-fe>", "http://localhost:5173"],
+       "AllowedOrigins": [
+         "https://<domain-fe>",
+         "http://localhost:5173",
+         "http://localhost:5174",
+         "http://localhost:5175",
+         "http://localhost:8081",
+         "http://localhost:8082"
+       ],
        "AllowedMethods": ["GET", "PUT", "HEAD"],
        "AllowedHeaders": ["Content-Type"],
        "ExposeHeaders": ["ETag", "Content-Length"],
@@ -31,6 +38,25 @@ Kế hoạch tổng: `GrottoWorks_Documents/GrottoWorks_Cloudflare_R2_Storage_Pl
      }
    ]
    ```
+   Thiếu `localhost:5175` = Vite dev server của FE — upload minh chứng sẽ chết với lỗi
+   `CORS not configured for this bucket` / `No 'Access-Control-Allow-Origin' header`.
+   Kiểm tra nhanh bucket đã có CORS chưa:
+
+   ```bash
+   curl -i -X OPTIONS "https://<ACCOUNT_ID>.r2.cloudflarestorage.com/<bucket>/pending/x" \
+     -H "Origin: http://localhost:5175" \
+     -H "Access-Control-Request-Method: PUT" \
+     -H "Access-Control-Request-Headers: content-type"
+   ```
+
+   - `204 No Content` + `Access-Control-Allow-Origin: http://localhost:5175` ⇒ đã cấu hình đúng.
+   - `403` + `<Message>CORS not configured for this bucket</Message>` ⇒ **chưa có CORS policy**.
+
+   Lưu ý: token R2 quyền **Object Read & Write** **không** đặt được CORS qua S3 API
+   (`PUT /<bucket>?cors` → `403 AccessDenied`), phải làm ở dashboard (hoặc tạo token
+   **Admin Read & Write** cho bucket). Trong lúc chưa cấu hình, local dev dùng MinIO
+   (`OBJECT_STORAGE_PROVIDER=MinIO`, xem `docker-compose.override.yml`) — MinIO đã bật
+   CORS cho `:5173-:5175`, `:8081-:8082`.
 3. Bucket → **Settings → Object lifecycle rules**:
    - `pending/` — Delete objects after **1 day** (upload bỏ dở).
    - Abort incomplete multipart uploads after **1 day**.

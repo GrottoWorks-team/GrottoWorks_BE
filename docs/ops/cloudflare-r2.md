@@ -97,6 +97,31 @@ Hoặc biến môi trường trực tiếp (`ObjectStorage__*`):
 
 Ghi chú kỹ thuật (đã xử lý trong `ObjectStorageClientFactory`): path-style URL, `AuthenticationRegion=auto`, tắt checksum CRC mặc định của AWSSDK v4 (`WHEN_REQUIRED`), `PutObject` qua HTTPS dùng `UNSIGNED-PAYLOAD` vì R2 không nhận chữ ký streaming.
 
+### 3.1 `PublicEndpoint` phải là địa chỉ **client** truy cập được (12/11/2026)
+
+Presigned PUT/GET ký cả header `host`, nên **không thể** sửa host ở client — MinIO sẽ trả
+`403 SignatureDoesNotMatch`. Vì vậy:
+
+| Client tải file | `OBJECT_STORAGE_PUBLIC_ENDPOINT` |
+|---|---|
+| Web trên máy dev | `http://localhost:9000` |
+| App mobile trên điện thoại/emulator (Expo) cùng Wi-Fi | `http://<IP-LAN-máy-dev>:9000`, ví dụ `http://192.168.0.3:9000` |
+| R2 (staging/prod) | để trống — R2 bỏ qua biến này |
+
+Triệu chứng khi để `localhost:9000` mà test trên điện thoại: app báo *"Không tải được ảnh hoá đơn
+lên máy chủ lưu trữ"* (`EVIDENCE_UPLOAD_FAILED`, `status = 0`) dù `POST /files/upload-requests`
+vẫn trả 201 — vì `localhost` trên điện thoại là chính điện thoại đó. Kiểm tra nhanh:
+
+```bash
+curl -s -X POST http://localhost:6102/api/v1/files/upload-requests \
+  -H "Content-Type: application/json" -H "Authorization: Bearer <token>" \
+  -d '{"fileName":"a.jpg","contentType":"image/jpeg","sizeBytes":1000,"purpose":"PurchaseReceipt","checksum":null}'
+# → uploadUrl phải trỏ tới host mà điện thoại truy cập được
+```
+
+Sau khi đổi biến, phải `docker compose up -d notificationaudit.api` (chỉ container này tạo
+presigned URL).
+
 ## 4. Kiểm tra sau khi cấu hình
 
 1. `GET /health/ready` của NotificationAudit OK, log không có `Object storage bucket ... is not accessible`.

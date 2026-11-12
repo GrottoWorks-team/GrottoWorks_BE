@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<ApplyTaskSnapshotHandler>();
         services.AddScoped<ScopeReplicationHandler>();
         services.AddScoped<TaskMaterialPlanProjector>();
+        services.AddScoped<Resource.Application.Scope.TaskMaterialAreaRequirementSync>();
         services.AddScoped<TaskMaterialEventIngestion>();
         services.AddScoped<ApplyTaskEventHandler>();
         services.AddScoped<WorkAreaAccess>();

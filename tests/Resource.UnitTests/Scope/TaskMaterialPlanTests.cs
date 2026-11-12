@@ -12,7 +12,8 @@ public sealed class TaskMaterialPlanTests
     {
         var store = new FakeTaskMaterialPlanStore();
         var inbox = new Inbox();
-        var handler = new TaskMaterialEventIngestion(inbox, new(store));
+        var handler = new TaskMaterialEventIngestion(inbox,
+            new TaskMaterialPlanProjector(store, new TaskMaterialAreaRequirementSync(store, new FakeRequirementStore())));
         var message = Message();
         await handler.HandleAsync(message, default);
         await handler.HandleAsync(message, default);
@@ -46,7 +47,8 @@ public sealed class TaskMaterialPlanTests
     {
         var inbox = new Inbox();
         var store = new FakeTaskMaterialPlanStore();
-        var handler = new TaskMaterialEventIngestion(inbox, new(store));
+        var handler = new TaskMaterialEventIngestion(inbox,
+            new TaskMaterialPlanProjector(store, new TaskMaterialAreaRequirementSync(store, new FakeRequirementStore())));
         var message = Message();
         var invalid = message with { Payload = JsonSerializer.SerializeToElement(new
         {
@@ -70,8 +72,10 @@ public sealed class TaskMaterialPlanTests
         var scopes = new FakeScopeStore();
         var tasks = new FakeTaskProjectionStore();
         var plans = new FakeTaskMaterialPlanStore();
+        var projector = new TaskMaterialPlanProjector(plans,
+            new TaskMaterialAreaRequirementSync(plans, new FakeRequirementStore()));
         var handler = new ScopeReplicationHandler(new Inbox(), new(scopes), new(scopes),
-            new(tasks, scopes, new(new FakePurchaseRequestStore())), new(plans));
+            new(tasks, scopes, new(new FakePurchaseRequestStore())), projector);
         await handler.ApplyAsync(snapshot, default);
         await handler.ApplyAsync(snapshot with { EventId = Guid.NewGuid(), SourceVersion = 3, Materials = null }, default);
         plans.Rows.Single().Items.Single().RequiredQuantity.Should().Be(4);
@@ -107,9 +111,17 @@ public sealed class TaskMaterialPlanTests
 internal sealed class FakeTaskMaterialPlanStore : ITaskMaterialPlanStore
 {
     public List<TaskMaterialPlan> Rows { get; } = [];
+    public HashSet<Guid> CancelledTasks { get; } = [];
     public int Saves { get; private set; }
     public Task<TaskMaterialPlan?> GetAsync(Guid taskId, CancellationToken cancellationToken) =>
         Task.FromResult(Rows.SingleOrDefault(row => row.TaskId == taskId));
+    public Task<IReadOnlyList<TaskMaterialPlanTotal>> GetAreaTotalsAsync(Guid workAreaId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<TaskMaterialPlanTotal>>(Rows
+            .Where(row => row.WorkAreaId == workAreaId && !CancelledTasks.Contains(row.TaskId))
+            .SelectMany(row => row.Items)
+            .GroupBy(item => item.MaterialId)
+            .Select(group => new TaskMaterialPlanTotal(group.Key, group.Sum(item => item.RequiredQuantity)))
+            .ToList());
     public void Add(TaskMaterialPlan plan) => Rows.Add(plan);
     public Task SaveAsync(CancellationToken cancellationToken) { Saves++; return Task.CompletedTask; }
 }

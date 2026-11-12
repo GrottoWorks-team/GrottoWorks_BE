@@ -115,9 +115,13 @@ public sealed class ScopeReplicationTests
         scopes.Seasons.Single().SourceVersion.Should().Be(advanced.Version + 1);
     }
 
-    private static ScopeReplicationHandler CreateReplicationHandler(FakeScopeStore scopes) =>
-        new(new MemoryInbox(), new(scopes), new(scopes), new(new FakeTaskProjectionStore(), scopes,
-            new(new FakePurchaseRequestStore())), new(new FakeTaskMaterialPlanStore()));
+    private static ScopeReplicationHandler CreateReplicationHandler(FakeScopeStore scopes)
+    {
+        var plans = new FakeTaskMaterialPlanStore();
+        var projector = new TaskMaterialPlanProjector(plans, new TaskMaterialAreaRequirementSync(plans, new FakeRequirementStore()));
+        return new(new MemoryInbox(), new(scopes), new(scopes), new(new FakeTaskProjectionStore(), scopes,
+            new(new FakePurchaseRequestStore())), projector);
+    }
 
     [Fact]
     public async Task Handler_bootstraps_parents_and_replay_does_not_reapply()
@@ -125,8 +129,10 @@ public sealed class ScopeReplicationTests
         var scopes = new FakeScopeStore();
         var tasks = new FakeTaskProjectionStore();
         var inbox = new MemoryInbox();
+        var plans = new FakeTaskMaterialPlanStore();
+        var projector = new TaskMaterialPlanProjector(plans, new TaskMaterialAreaRequirementSync(plans, new FakeRequirementStore()));
         var handler = new ScopeReplicationHandler(inbox, new(scopes), new(scopes),
-            new(tasks, scopes, new(new FakePurchaseRequestStore())), new(new FakeTaskMaterialPlanStore()));
+            new(tasks, scopes, new(new FakePurchaseRequestStore())), projector);
         var source = TaskSnapshot();
 
         await handler.ApplyAsync(source, default);

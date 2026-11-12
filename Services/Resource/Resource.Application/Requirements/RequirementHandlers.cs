@@ -32,6 +32,9 @@ public interface IMaterialRequirementStore
 {
     Task<IReadOnlyList<MaterialRequirement>> ListByWorkAreaAsync(Guid workAreaId, CancellationToken cancellationToken = default);
 
+    /// <summary>Tracked variant: mutations must be persisted by <see cref="SaveChangesAsync"/> (13/11/2026).</summary>
+    Task<IReadOnlyList<MaterialRequirement>> ListByWorkAreaForUpdateAsync(Guid workAreaId, CancellationToken cancellationToken = default);
+
     Task<MaterialRequirement?> GetAsync(Guid requirementId, CancellationToken cancellationToken = default);
 
     Task<bool> ExistsAsync(Guid workAreaId, Guid materialId, CancellationToken cancellationToken = default);

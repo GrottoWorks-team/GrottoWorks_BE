@@ -171,6 +171,9 @@ public sealed class FakeRequirementStore : Resource.Application.Requirements.IMa
     public Task<IReadOnlyList<Resource.Domain.Inventory.MaterialRequirement>> ListByWorkAreaAsync(Guid workAreaId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Resource.Domain.Inventory.MaterialRequirement>>(Requirements.Where(r => r.WorkAreaId == workAreaId).ToList());
 
+    public Task<IReadOnlyList<Resource.Domain.Inventory.MaterialRequirement>> ListByWorkAreaForUpdateAsync(Guid workAreaId, CancellationToken cancellationToken = default) =>
+        ListByWorkAreaAsync(workAreaId, cancellationToken);
+
     public Task<Resource.Domain.Inventory.MaterialRequirement?> GetAsync(Guid requirementId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Requirements.FirstOrDefault(r => r.MaterialRequirementId == requirementId));
 

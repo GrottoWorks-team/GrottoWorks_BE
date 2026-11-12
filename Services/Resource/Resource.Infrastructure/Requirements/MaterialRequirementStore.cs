@@ -12,6 +12,9 @@ public sealed class MaterialRequirementStore(ResourceDbContext dbContext) : IMat
     public async Task<IReadOnlyList<MaterialRequirement>> ListByWorkAreaAsync(Guid workAreaId, CancellationToken cancellationToken = default) =>
         await dbContext.MaterialRequirements.AsNoTracking().Where(r => r.WorkAreaId == workAreaId).ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<MaterialRequirement>> ListByWorkAreaForUpdateAsync(Guid workAreaId, CancellationToken cancellationToken = default) =>
+        await dbContext.MaterialRequirements.Where(r => r.WorkAreaId == workAreaId).ToListAsync(cancellationToken);
+
     public Task<MaterialRequirement?> GetAsync(Guid requirementId, CancellationToken cancellationToken = default) =>
         dbContext.MaterialRequirements.FirstOrDefaultAsync(r => r.MaterialRequirementId == requirementId, cancellationToken);
 

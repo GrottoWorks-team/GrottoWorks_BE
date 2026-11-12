@@ -10,6 +10,16 @@ public sealed class TaskMaterialPlanStore(ResourceDbContext db) : ITaskMaterialP
 {
     public Task<TaskMaterialPlan?> GetAsync(Guid taskId, CancellationToken cancellationToken) =>
         db.Set<TaskMaterialPlan>().Include(plan => plan.Items).SingleOrDefaultAsync(plan => plan.TaskId == taskId, cancellationToken);
+
+    /// <summary>Tổng nhu cầu từng vật tư của các nhiệm vụ chưa huỷ trong khu (13/11/2026).</summary>
+    public async Task<IReadOnlyList<TaskMaterialPlanTotal>> GetAreaTotalsAsync(Guid workAreaId, CancellationToken cancellationToken) =>
+        await db.Set<TaskMaterialPlanItem>()
+            .Where(item => db.Set<TaskMaterialPlan>().Any(plan => plan.TaskId == item.TaskId && plan.WorkAreaId == workAreaId) &&
+                db.TaskProjections.Any(task => task.TaskId == item.TaskId && task.Status != ProjectedTaskStatus.Cancelled))
+            .GroupBy(item => item.MaterialId)
+            .Select(group => new TaskMaterialPlanTotal(group.Key, group.Sum(item => item.RequiredQuantity)))
+            .ToListAsync(cancellationToken);
+
     public void Add(TaskMaterialPlan plan) => db.Set<TaskMaterialPlan>().Add(plan);
     public Task SaveAsync(CancellationToken cancellationToken) => db.SaveChangesAsync(cancellationToken);
 }

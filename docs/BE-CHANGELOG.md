@@ -10,6 +10,40 @@
 
 ---
 
+## 2026-11-13 (lần 13) · `phongnltse/task-team-leader-progress`
+
+### 17. Nhu cầu vật tư của khu bao gồm nhu cầu của nhiệm vụ (hết báo "Đủ vật tư" sai)
+
+- **Yêu cầu (13/11/2026)**: "khu vực có task yêu cầu 20 bóng đèn nhưng tồn kho chỉ có 10 mà vẫn để là đủ vật tư".
+- **Nguyên nhân gốc**: 3 nguồn số liệu rời nhau. Nhiệm vụ cần **20** (`task_material` +
+  `task_material_plan_item`), nhưng `material_requirement` của khu chỉ **10** (do leader tự khai), ledger có 10
+  ⇒ `/shortages` tính `shortage = 10 − 10 = 0` ⇒ FE hiện "Đủ vật tư". Nhu cầu của nhiệm vụ **chưa bao giờ**
+  được đẩy vào nhu cầu của khu, nên mọi tính toán thiếu hụt / quyên góp / kế hoạch mua đều thiếu 10.
+- **Sửa (Resource service)**:
+  - `Resource.Application/Scope/TaskMaterialAreaRequirementSync.cs` (mới): sau khi `task_material_plan` thay đổi,
+    tính **tổng** nhu cầu từng vật tư của **các nhiệm vụ chưa huỷ** trong khu
+    (`GetAreaTotalsAsync`) rồi **nâng** `material_requirement`: có rồi thì `RaiseRequiredQuantity`, chưa có thì
+    tạo mới với note `Tổng nhu cầu từ nhiệm vụ của khu`, `ExistingQuantity = 0`.
+  - `Resource.Domain/Inventory/MaterialRequirement.cs`: thêm `RaiseRequiredQuantity(quantity, now)` — **chỉ nâng,
+    không hạ** (`Math.Max`).
+  - `IMaterialRequirementStore.ListByWorkAreaForUpdateAsync` (mới, **tracked**): `ListByWorkAreaAsync` cũ dùng
+    `AsNoTracking()` nên sửa entity rồi `SaveChanges` **không ghi gì** (đã dính lỗi này khi verify live — nhu cầu
+    vẫn 10). Sync dùng bản tracked.
+  - `Resource.Application/Scope/TaskMaterialPlanIngestion.cs`: `TaskMaterialPlanProjector` gọi sync sau khi lưu
+    plan (áp dụng cho cả 2 đường: event `task.materials.changed` và `TaskScopeSnapshot`).
+  - `ITaskMaterialPlanStore.GetAreaTotalsAsync` + `TaskMaterialPlanTotal` (mới) và implementation EF
+    `Resource.Infrastructure/Scope/TaskMaterialPlanStore.cs` (SUM `task_material_plan_item.required_quantity`
+    join `task_projection` loại `CANCELLED`).
+  - `Resource.Application/DependencyInjection.cs`: đăng ký `TaskMaterialAreaRequirementSync`.
+- **Ảnh hưởng client**: không đổi contract. `/shortages`, `/contribution-needs`, badge "Đủ vật tư" của FE/mobile
+  tự đúng hơn. Chỉ **nâng**, nên dữ liệu seed 2025 (requirement không gắn nhiệm vụ) không bị xoá.
+- **Cần làm thêm**: muốn **hạ** nhu cầu thì dùng `PATCH /material-requirements/{id}` như trước (ghi đè thủ công).
+  Nếu nhiệm vụ bị huỷ, nhu cầu khu **không tự hạ** — chấp nhận (an toàn) và sẽ xem lại khi có yêu cầu.
+- **Test**: `tests/Resource.UnitTests/Scope/TaskMaterialAreaRequirementSyncTests.cs` (mới) — nâng 10 → 20,
+  không hạ 25, tạo mới khi thiếu, bỏ qua nhiệm vụ đã huỷ.
+
+---
+
 ## 2026-11-13 (lần 12) · `phongnltse/task-team-leader-progress`
 
 ### 16. Phân công chỉ trong khu mình; khu khác chỉ thấy việc đang xin hỗ trợ

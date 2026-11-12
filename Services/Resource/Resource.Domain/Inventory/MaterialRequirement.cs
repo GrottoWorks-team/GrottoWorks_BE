@@ -61,8 +61,7 @@ public sealed class MaterialRequirement
     /// <summary>Optimistic concurrency token mapped to PostgreSQL <c>xmin</c>.</summary>
     public uint Version { get; private set; }
 
-    public void EnsureVersion(long? expected)
-    {
+    public void EnsureVersion(long? expected)    {
         if (expected is { } value && value != Version)
         {
             throw new DomainRuleException(
@@ -98,8 +97,21 @@ public sealed class MaterialRequirement
         UpdatedAt = now.ToUniversalTime();
     }
 
-    private static decimal NonNegative(decimal value)
+    /// <summary>
+    /// 13/11/2026: nâng nhu cầu của khu theo tổng nhu cầu các nhiệm vụ chưa huỷ.
+    /// Chỉ **nâng**, không hạ — con số khu tự khai (hoặc nhu cầu cho hàng không gắn nhiệm vụ) được giữ nguyên;
+    /// muốn hạ thì dùng PATCH requirement như bình thường.
+    /// </summary>
+    public bool RaiseRequiredQuantity(decimal quantity, DateTimeOffset now)
     {
+        var target = Quantity.Positive(quantity, "REQUIREMENT_QUANTITY_INVALID", "Required quantity");
+        if (target <= RequiredQuantity) return false;
+        RequiredQuantity = target;
+        UpdatedAt = now.ToUniversalTime();
+        return true;
+    }
+
+    private static decimal NonNegative(decimal value)    {
         if (value < 0 || value > Quantity.Max || decimal.Round(value, 2) != value)
         {
             throw DomainRuleException.Validation(

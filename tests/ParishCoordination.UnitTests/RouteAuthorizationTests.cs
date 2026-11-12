@@ -118,15 +118,16 @@ public sealed class RouteAuthorizationTests
         GetRoles(createParish).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(createCommunity).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(updateCommunity).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
-        GetRoles(createSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
-        GetRoles(cloneSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
+        // 12/11/2026: chỉ ban hành giáo ghi mùa; ADMIN (hệ thống) chỉ đọc.
+        GetRoles(createSeason).Should().BeEquivalentTo(GrottoWorksRoles.Parish);
+        GetRoles(cloneSeason).Should().BeEquivalentTo(GrottoWorksRoles.Parish);
         cloneSeason.RoutePattern.RawText.Should().Be("/api/v1/seasons/{sourceSeasonId}/clone");
         cloneSeason.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
             .Should().Contain(metadata => metadata.StatusCode == 201);
-        GetRoles(activateSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
-        GetRoles(archiveSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
-        GetRoles(completeSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
-        GetRoles(updateSeason).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
+        GetRoles(activateSeason).Should().BeEquivalentTo(GrottoWorksRoles.Parish);
+        GetRoles(archiveSeason).Should().BeEquivalentTo(GrottoWorksRoles.Parish);
+        GetRoles(completeSeason).Should().BeEquivalentTo(GrottoWorksRoles.Parish);
+        GetRoles(updateSeason).Should().BeEquivalentTo(GrottoWorksRoles.Parish);
         GetRoles(createWorkArea).Should().BeEquivalentTo(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish);
         GetRoles(assignWorkAreaCommunity).Should().BeEquivalentTo(
             GrottoWorksRoles.Admin,

@@ -41,11 +41,11 @@ public static class SeasonEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
+        // Chỉ ban hành giáo (PARISH) được tạo mùa; ADMIN chỉ xem (GET).
         app.MapPost("/api/v1/seasons", CreateSeasonAsync)
             .WithName("createSeason")
             .WithTags("Parish")
             .RequireAuthorization(policy => policy.RequireRole(
-                GrottoWorksRoles.Admin,
                 GrottoWorksRoles.Parish))
             .Produces<ApiResponse<SeasonDto>>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest)
@@ -60,7 +60,6 @@ public static class SeasonEndpoints
             .WithName("cloneSeason")
             .WithTags("Parish")
             .RequireAuthorization(policy => policy.RequireRole(
-                GrottoWorksRoles.Admin,
                 GrottoWorksRoles.Parish))
             .Accepts<CloneSeasonRequest>("application/json")
             .Produces<ApiResponse<CloneSeasonResult>>(StatusCodes.Status201Created)
@@ -75,7 +74,6 @@ public static class SeasonEndpoints
             .WithName("updateSeason")
             .WithTags("Parish")
             .RequireAuthorization(policy => policy.RequireRole(
-                GrottoWorksRoles.Admin,
                 GrottoWorksRoles.Parish))
             .Accepts<UpdateSeasonRequest>("application/json")
             .Produces<ApiResponse<SeasonDto>>(StatusCodes.Status200OK)
@@ -91,7 +89,6 @@ public static class SeasonEndpoints
             .WithName("activateSeason")
             .WithTags("Parish")
             .RequireAuthorization(policy => policy.RequireRole(
-                GrottoWorksRoles.Admin,
                 GrottoWorksRoles.Parish))
             .Accepts<VersionedCommandRequest>("application/json")
             .Produces<ApiResponse<SeasonDto>>(StatusCodes.Status200OK)
@@ -107,7 +104,6 @@ public static class SeasonEndpoints
             .WithName("completeSeason")
             .WithTags("Parish")
             .RequireAuthorization(policy => policy.RequireRole(
-                GrottoWorksRoles.Admin,
                 GrottoWorksRoles.Parish))
             .Accepts<VersionedCommandRequest>("application/json")
             .Produces<ApiResponse<SeasonDto>>(StatusCodes.Status200OK)
@@ -123,7 +119,6 @@ public static class SeasonEndpoints
             .WithName("archiveSeason")
             .WithTags("Parish")
             .RequireAuthorization(policy => policy.RequireRole(
-                GrottoWorksRoles.Admin,
                 GrottoWorksRoles.Parish))
             .Accepts<VersionedCommandRequest>("application/json")
             .Produces<ApiResponse<SeasonDto>>(StatusCodes.Status200OK)

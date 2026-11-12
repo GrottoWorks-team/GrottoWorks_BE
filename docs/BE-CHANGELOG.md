@@ -12,6 +12,24 @@
 
 ## 2026-11-12 (lần 7) · `phongnltse/task-team-leader-progress`
 
+### 9b. Quyền mùa Giáng sinh: **chỉ ban hành giáo (PARISH) được ghi**, ADMIN chỉ đọc
+
+- **Yêu cầu (12/11/2026)**: "chỉ có parish mới được tạo và tương tác, còn admin chỉ có quyền xem".
+  Đồng bộ với quy tắc đã áp cho khu vực công tác (11/11/2026).
+- **Sửa** (`ParishCoordination.Api/Endpoints/SeasonEndpoints.cs`): 6 endpoint ghi đổi từ
+  `RequireRole(Admin, Parish)` → **`RequireRole(Parish)`**:
+  `POST /seasons` · `POST /seasons/{id}/clone` · `PATCH /seasons/{id}` ·
+  `POST /seasons/{id}/activate` · `POST /seasons/{id}/complete` · `POST /seasons/{id}/archive`.
+  `GET /seasons` và `GET /seasons/{id}` **giữ nguyên** (mọi user đã đăng nhập) → ADMIN vẫn xem được.
+- **Không đổi payload**; handler giữ nguyên logic (route policy là chốt chặn).
+- **Test**: `ParishCoordination.UnitTests` **313/313** — `RouteAuthorizationTests` cập nhật kỳ vọng
+  role của 6 route trên thành `PARISH` đơn lẻ.
+- **Kiểm chứng thật qua gateway**: `hoa.nguyen` (ADMIN) → `POST /seasons` **403**, `POST …/clone` **403**,
+  `GET /seasons` **200**; `bao.tran` (PARISH) → cả hai **201** (dữ liệu probe đã xoá).
+- **Ảnh hưởng client**: FE đã đổi theo — ADMIN chỉ thấy tab "Mùa Giáng sinh" **read-only** trong hub
+  "Giáo xứ & cộng đoàn" (`/parish/communities?tab=seasons`); ban hành giáo vẫn dùng
+  `/community/seasons` với đầy đủ thao tác.
+
 ### 10. `POST /api/v1/seasons/{sourceSeasonId}/clone` — tạo mùa mới từ mùa cũ (1 request, 1 transaction)
 
 - **Vấn đề**: "Tạo mùa mới từ mùa cũ" nếu làm ở client sẽ là `1 × POST /seasons` +

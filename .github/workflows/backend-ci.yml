@@ -1,0 +1,56 @@
+
+name: Backend CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and Unit Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore and build projects
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' project; do
+            echo "Building $project"
+            dotnet build "$project" \
+              --configuration Release \
+              --nologo
+          done < <(
+            find ApiGateway BuildingBlocks Services tests \
+              -name '*.csproj' -print0
+          )
+
+      - name: Run unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for project in tests/*/*.csproj; do
+            echo "Testing $project"
+            dotnet test "$project" \
+              --configuration Release \
+              --no-build \
+              --nologo
+          done

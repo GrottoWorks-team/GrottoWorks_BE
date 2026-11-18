@@ -64,6 +64,7 @@ builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
 var app = builder.Build();
+var swaggerEnabled = app.Configuration.GetValue<bool>("Swagger:Enabled");
 
 // Generate/propagate X-Correlation-Id before proxying so every service sees the same id (README §3).
 app.UseGrottoWorksDefaults();
@@ -74,16 +75,29 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 
-// Internal service endpoints are deliberately absent from proxy routes, including any future catch-all route.
+// Keep internal endpoints and disabled Swagger routes out of the proxy.
 app.Use(async (context,next)=>
 {
-    if(context.Request.Path.StartsWithSegments("/internal"))
+    if (PublicApiPaths.IsInternal(context.Request.Path.Value) ||
+        (!swaggerEnabled && context.Request.Path.StartsWithSegments("/swagger")))
     {
         context.Response.StatusCode=StatusCodes.Status404NotFound;
         return;
     }
     await next();
 });
+
+if (swaggerEnabled)
+{
+    app.UseSwaggerUI(options =>
+    {
+        options.RoutePrefix = "swagger";
+        foreach (var document in app.Configuration.GetSection("Swagger:Documents").GetChildren())
+        {
+            options.SwaggerEndpoint($"./openapi/{document.Key}.json", document.Value!);
+        }
+    });
+}
 
 app.MapReverseProxy();
 

@@ -173,6 +173,10 @@ Kết quả mong đợi:
 
 Gateway hiện không expose health endpoint riêng. Có thể smoke test Gateway bằng API login ở phần tiếp theo.
 
+Mở Swagger tổng hợp qua Gateway tại [localhost:6102/swagger](http://localhost:6102/swagger) khi chạy Docker. Chọn một trong bảy API ở đầu trang. Với API cần đăng nhập, dán access token vào **Authorize** (chỉ dán token) rồi dùng **Try it out**. Request được gửi qua Gateway.
+
+Trên môi trường deploy, mở `/swagger` trên domain Gateway. Đặt `Swagger__Enabled=false` ở Gateway để tắt trang và các URL tài liệu tổng hợp. Đặt `OpenApi__Enabled=false` ở một service để tắt tài liệu OpenAPI của service đó.
+
 ## 6. Swagger và OpenAPI
 
 Swagger chỉ bật trong môi trường `Development`, là môi trường Docker Compose đang sử dụng.

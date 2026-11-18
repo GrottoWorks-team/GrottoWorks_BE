@@ -13,7 +13,18 @@ using Reporting.Infrastructure.Data;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi(options =>
-    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
+{
+    var shouldInclude = options.ShouldInclude;
+    options.ShouldInclude = description =>
+        shouldInclude(description) && !PublicApiPaths.IsInternal(description.RelativePath);
+
+    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+    options.AddDocumentTransformer((document, _, _) =>
+    {
+        document.Servers = [new() { Url = "/" }];
+        return Task.CompletedTask;
+    });
+});
 builder.Services.AddValidation();
 builder.Services.AddGrottoWorksSecurity(builder.Configuration);
 builder.Services.AddGrottoWorksCurrentUser();
@@ -48,9 +59,14 @@ builder.Services.AddGrottoWorksObservability(builder.Configuration,"Reporting");
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+var openApiEnabled = app.Configuration.GetValue<bool>("OpenApi:Enabled");
+if (openApiEnabled)
 {
     app.MapOpenApi();
+}
+
+if (openApiEnabled && app.Environment.IsDevelopment())
+{
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/openapi/v1.json", "Reporting API v1");

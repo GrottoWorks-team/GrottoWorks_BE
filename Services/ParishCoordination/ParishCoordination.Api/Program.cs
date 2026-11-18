@@ -15,7 +15,18 @@ var builder = WebApplication.CreateBuilder(args);
 
 // OpenAPI + DataAnnotations validation for minimal API request DTOs (ParishCoordination pattern).
 builder.Services.AddOpenApi(options =>
-    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
+{
+    var shouldInclude = options.ShouldInclude;
+    options.ShouldInclude = description =>
+        shouldInclude(description) && !PublicApiPaths.IsInternal(description.RelativePath);
+
+    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+    options.AddDocumentTransformer((document, _, _) =>
+    {
+        document.Servers = [new() { Url = "/" }];
+        return Task.CompletedTask;
+    });
+});
 builder.Services.AddValidation();
 builder.Services.AddGrottoWorksSecurity(builder.Configuration);
 builder.Services.AddGrottoWorksCurrentUser();
@@ -59,9 +70,14 @@ builder.Services.AddScoped<BuildingBlocks.Web.IIntegrationQueueProbe, ParishCoor
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+var openApiEnabled = app.Configuration.GetValue<bool>("OpenApi:Enabled");
+if (openApiEnabled)
 {
     app.MapOpenApi();
+}
+
+if (openApiEnabled && app.Environment.IsDevelopment())
+{
     // Interactive API docs (Swagger UI, F-PLT-08) at /swagger — Development only.
     app.UseSwaggerUI(options =>
     {

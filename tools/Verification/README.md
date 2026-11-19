@@ -4,8 +4,7 @@ These are opt-in administrative checks, not application dependencies. They must
 never be started by an API, migration, test runner or production container.
 Business services continue to own and access only their own database.
 
-Run from the repository root. Python scripts require Python 3.10+ (standard
-library only). The console requires the solution's .NET SDK and restored packages.
+Run from the repository root. The console requires the solution's .NET SDK and restored packages.
 Keep credentials in the ignored local `.env` or process environment. Reports,
 database dumps and decrypted archives belong outside Git.
 
@@ -28,31 +27,6 @@ databases and verify migrations against restored copies first.
 `rollback ParishCoordination verify_parish_db` deliberately submits an invalid
 internal foreign key through EF, then verifies that both business and planning
 outbox rows rolled back. This command is restricted to that verification copy.
-
-## Isolated HTTP and broker acceptance
-
-`smoke.py`, `broker.py` and `support-smoke.py` default to preparation only. Read
-their `--help` before opting in. Configure the complete compose file set and
-separate `verify_*` databases, RabbitMQ vhost `verify20261103` and a private test
-bucket. Their administrative SQL checks are restricted to these named copies.
-
-- `smoke.py`: Gateway authentication, ownership, file verification/attachment,
-  Task/attendance/review, Readiness/corrective linkage, purchases and staffing.
-- `broker.py`: exact source/projection convergence, duplicate/stale/equal-version
-  delivery, durable queue/outbox recovery across Task and RabbitMQ outages.
-  It stops/starts only those two explicitly allowlisted services.
-- `support-smoke.py`: real material transfer/reconciliation and separate
-  acceptance/decline of community nominations.
-- `jobs.py`: seven-source export, idempotency, encrypted backup, authenticated
-  decryption and manifest inspection. It retains downloaded artifacts outside Git.
-- `parity.py`: read-only global Season/Work Area comparison for the original
-  Docker databases or the verification copies. It checks the container's cluster
-  identity, source stability, counts, IDs, versions, ownership and stored fields.
-
-Do not run outage checks concurrently with HTTP scenarios. Fixtures are created
-through public APIs and retained in the copies until the operator saves the
-reports and removes the isolated environment. A report containing skipped checks
-does not prove those flows have passed.
 
 ## Recovery checks
 

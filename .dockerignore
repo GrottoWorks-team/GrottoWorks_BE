@@ -22,6 +22,10 @@
 **/secrets.dev.yaml
 **/values.dev.yaml
 **/tests
+**/__pycache__
+**/*.pyc
+.tmp/
+.docx_qa/
 LICENSE
 README.md
 plan.md

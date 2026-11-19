@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using TaskExecution.Domain.Assignments;
 using TaskExecution.Domain.Tasks;
 using TaskExecution.Infrastructure.Data;
 
@@ -35,7 +36,23 @@ public sealed class TaskModelTests
         entity.GetCheckConstraints().Select(constraint => constraint.Name).Should().Contain(
             "ck_task_positive_estimate",
             "ck_task_positive_volunteer_count");
-        entity.GetForeignKeys().Should().BeEmpty("TaskExecution stores external ownership as IDs only");
+        var foreignKey = entity.GetForeignKeys().Should().ContainSingle().Subject;
+        foreignKey.PrincipalEntityType.ClrType.Should().Be(typeof(TaskAssignment));
+        foreignKey.Properties.Select(property => property.Name)
+            .Should().Equal(nameof(WorkTask.Id), nameof(WorkTask.TeamLeaderAssignmentId));
+        foreignKey.PrincipalKey.Properties.Select(property => property.Name)
+            .Should().Equal(nameof(TaskAssignment.TaskId), nameof(TaskAssignment.Id));
+        foreignKey.IsRequired.Should().BeFalse();
+        foreignKey.DeleteBehavior.Should().Be(DeleteBehavior.NoAction);
+
+        foreach (var propertyName in new[]
+                 {
+                     nameof(WorkTask.WorkAreaId), nameof(WorkTask.CreatedByUserId), nameof(WorkTask.PurchaseRequestId)
+                 })
+        {
+            entity.FindProperty(propertyName)!.GetContainingForeignKeys().Should()
+                .BeEmpty("external ownership is stored as IDs within TaskExecution");
+        }
     }
 
     [Fact]

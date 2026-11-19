@@ -138,4 +138,5 @@ checks covered progress/review/evidence, Readiness corrective linkage, purchase
 completion, material transfer reconciliation and explicit community nomination
 consent. Broker checks covered duplicate/stale/equal-version snapshots and recovery
 after Task/RabbitMQ outages. See the root `INTEGRATION.md` and
-`tools/Verification/README.md` for configuration and repeatable verification.
+`tools/Verification/README.md` for configuration and administrative .NET model,
+migration and recovery checks.

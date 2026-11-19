@@ -469,4 +469,4 @@ Route có thể chưa được khai báo trong YARP Gateway. Frontend không nê
 
 # Implementation and integration
 
-See [INTEGRATION.md](INTEGRATION.md) for service flows, RabbitMQ recovery, the isolated encrypted backup worker and deployment verification. Repeatable acceptance tools are documented in [tools/Verification/README.md](tools/Verification/README.md).
+See [INTEGRATION.md](INTEGRATION.md) for service flows, RabbitMQ recovery, the isolated encrypted backup worker and historical deployment verification. Administrative .NET tools for model, migration and recovery checks are documented in [tools/Verification/README.md](tools/Verification/README.md).

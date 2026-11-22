@@ -27,6 +27,8 @@ public sealed record TaskDto(
     int Version,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,
+    Guid? StartedByUserId,
+    DateTimeOffset? StartedAt,
     IReadOnlyList<TaskSkillDto> Skills,
     IReadOnlyList<TaskMaterialDto> Materials)
 {
@@ -49,6 +51,8 @@ public sealed record TaskDto(
             task.Version,
             task.CreatedAt,
             task.UpdatedAt,
+            task.StartedByUserId,
+            task.StartedAt,
             task.Skills
                 .OrderBy(skill => skill.SkillId)
                 .Select(skill => new TaskSkillDto(

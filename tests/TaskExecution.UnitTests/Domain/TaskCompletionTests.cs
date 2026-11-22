@@ -19,7 +19,7 @@ public sealed class TaskCompletionTests
     public void Full_progress_requires_manual_review_and_retains_revision_cycle()
     {
         var task=Create();var now=DateTimeOffset.UtcNow;
-        task.MarkReady(null,now);task.RecordProgress(false,false,null,now);
+        task.MarkReady(null,now);task.Start(Guid.NewGuid(),now);task.RecordProgress(false,false,null,now);
         task.Status.Should().Be(TaskState.InProgress);
         task.RecordProgress(true,false,null,now);task.Status.Should().Be(TaskState.Submitted);
         task.ReviewCompletion(false,null,now);task.Status.Should().Be(TaskState.RevisionRequired);

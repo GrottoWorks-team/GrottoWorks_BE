@@ -99,6 +99,21 @@ public sealed class TaskGatewayRouteTests
             .Should().Be("/api/v1/tasks/{taskId}/ready");
     }
 
+    [Theory]
+    [InlineData("task-start-route", "start", "POST")]
+    [InlineData("task-start-eligibility-route", "start-eligibility", "GET")]
+    public void Task_start_routes_target_the_authenticated_task_cluster(string routeId, string suffix, string method)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(GetGatewaySettingsPath()));
+        var route = document.RootElement.GetProperty("ReverseProxy").GetProperty("Routes").GetProperty(routeId);
+        route.GetProperty("ClusterId").GetString().Should().Be("task");
+        route.GetProperty("AuthorizationPolicy").GetString().Should().Be("authenticated");
+        route.GetProperty("Order").GetInt32().Should().Be(-1);
+        var match = route.GetProperty("Match");
+        match.GetProperty("Path").GetString().Should().Be($"/api/v1/tasks/{{taskId}}/{suffix}");
+        match.GetProperty("Methods").EnumerateArray().Select(value => value.GetString()).Should().Equal(method);
+    }
+
     private static string GetGatewaySettingsPath()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

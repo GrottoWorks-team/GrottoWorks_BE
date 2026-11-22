@@ -58,6 +58,19 @@ public static class TaskEndpoints
             .Produces<ProblemDetails>(StatusCodes.Status412PreconditionFailed)
             .Produces<ProblemDetails>(StatusCodes.Status422UnprocessableEntity);
 
+        group.MapGet("/tasks/{taskId:guid}/start-eligibility", GetStartEligibilityAsync)
+            .WithName("getTaskStartEligibility")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
+            .Produces<ApiResponse<TaskStartEligibility>>()
+            .ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(409).ProducesProblem(503);
+
+        group.MapPost("/tasks/{taskId:guid}/start", StartTaskAsync)
+            .WithName("startTask")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
+            .Produces<ApiResponse<TaskStartResult>>()
+            .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404)
+            .ProducesProblem(409).ProducesProblem(412).ProducesProblem(422).ProducesProblem(503);
+
         group.MapPut("/tasks/{taskId:guid}/completion-criteria", ReplaceCompletionCriteriaAsync)
             .WithName("replaceCompletionCriteria")
             .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
@@ -259,6 +272,21 @@ public static class TaskEndpoints
 
         httpContext.Response.Headers.ETag = $"\"{task.Version}\"";
         return Results.Ok(ApiResults.Ok(task, httpContext));
+    }
+
+    private static async Task<IResult> GetStartEligibilityAsync(
+        Guid taskId, TaskStartService service, HttpContext context, CancellationToken ct) =>
+        Results.Ok(ApiResults.Ok(await service.GetEligibilityAsync(taskId, ct), context));
+
+    private static async Task<IResult> StartTaskAsync(
+        Guid taskId,
+        [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] VersionedCommandRequest? request,
+        [FromHeader(Name = "If-Match")] string? ifMatch,
+        TaskStartService service, HttpContext context, CancellationToken ct)
+    {
+        var result = await service.StartAsync(taskId, TaskVersionPrecondition.Resolve(request?.Version, ifMatch), ct);
+        context.Response.Headers.ETag = $"\"{result.Task.Version}\"";
+        return Results.Ok(ApiResults.Ok(result, context));
     }
 
     private static IResult InvalidIfMatch(HttpContext httpContext) =>

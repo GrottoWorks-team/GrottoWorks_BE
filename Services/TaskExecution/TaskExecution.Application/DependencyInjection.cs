@@ -46,6 +46,7 @@ public static class DependencyInjection
         services.AddScoped<ReplaceCompletionCriteriaCommandHandler>();
         services.AddScoped<ReplaceTaskSkillsCommandHandler>();
         services.AddScoped<ReadyTaskCommandHandler>();
+        services.AddScoped<TaskStartService>();
         return services;
     }
 }

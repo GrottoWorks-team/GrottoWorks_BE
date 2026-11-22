@@ -16,14 +16,20 @@ public sealed partial class WorkTask
         if (version.HasValue && version != Version)
             throw new DomainRuleException("TASK_VERSION_MISMATCH", "The task changed.", DomainErrorKind.PreconditionFailed);
     }
-    public void RecordProgress(bool submission, bool resubmit, int? version, DateTimeOffset now)
+    public void EnsureProgressAllowed(bool submission, bool resubmit, int? version)
     {
         EnsureVersion(version);
         if (Type == TaskType.Purchase) throw new DomainRuleException("TASK_TYPE_INVALID", "Purchase completion is driven by delivery confirmation.");
-        if (submission ? (resubmit ? Status != TaskStatus.RevisionRequired : Status != TaskStatus.InProgress)
-            : Status is not (TaskStatus.NotStarted or TaskStatus.InProgress or TaskStatus.RevisionRequired))
+        if (Status == TaskStatus.NotStarted)
+            throw new DomainRuleException("TASK_INVALID_STATE", "The Leader must start the task before recording progress.");
+        if (Status != (submission && resubmit ? TaskStatus.RevisionRequired : TaskStatus.InProgress))
             throw new DomainRuleException("TASK_INVALID_STATE", "The task cannot receive progress or submission in its current state.");
-        Status=submission ? TaskStatus.Submitted : Status == TaskStatus.NotStarted ? TaskStatus.InProgress : Status;
+    }
+
+    public void RecordProgress(bool submission, bool resubmit, int? version, DateTimeOffset now)
+    {
+        EnsureProgressAllowed(submission, resubmit, version);
+        if (submission) Status = TaskStatus.Submitted;
         UpdatedAt=now.ToUniversalTime(); Version++;
     }
     public void ReviewCompletion(bool approve, int? version, DateTimeOffset now)

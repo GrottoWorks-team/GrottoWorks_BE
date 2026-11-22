@@ -2,6 +2,7 @@ using TaskExecution.Contracts.Events;
 using TaskExecution.Domain;
 using TaskExecution.Domain.Attendance;
 using TaskExecution.Domain.Assignments;
+using TaskExecution.Domain.Tasks;
 using TaskState=TaskExecution.Domain.Tasks.TaskStatus;
 
 namespace TaskExecution.Application.Attendance;
@@ -52,8 +53,9 @@ public sealed partial class AttendanceService
             if (approve)
             {
                 store.Add(AttendanceSession.Open(request));
-                task.BeginWork(DateTimeOffset.UtcNow);
             }
+            var startsPurchase = approve && task.Type == TaskType.Purchase && previous == TaskState.NotStarted;
+            if (startsPurchase) task.BeginWork(DateTimeOffset.UtcNow);
             else task.RegisterAssignmentChange(DateTimeOffset.UtcNow);
             events.Record(TaskEventTypes.AttendanceReviewed,task,area,new
             {
@@ -61,7 +63,7 @@ public sealed partial class AttendanceService
                 assignmentId=assignment.Id,attendanceId=sessionId,volunteerUserId=request.VolunteerId,
                 decision=approve ? "APPROVED" : "REJECTED",reviewNote=request.ReviewNote
             });
-            if (approve && previous==TaskState.NotStarted)
+            if (startsPurchase)
                 events.Record(TaskEventTypes.StatusChanged,task,area,new {taskId=task.Id,workAreaId=area.WorkAreaId,previousStatus="NOT_STARTED",status="IN_PROGRESS"});
             await store.SaveAsync(cancellationToken);
             return AttendanceRequestDto.From(request);

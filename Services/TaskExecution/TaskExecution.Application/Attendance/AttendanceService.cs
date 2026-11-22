@@ -106,8 +106,13 @@ public sealed partial class AttendanceService(IAttendanceStore store, IAssignmen
 
     private static void EnsureTaskAllowsCheckIn(WorkTask task)
     {
-        if (task.Status is not (TaskState.NotStarted or TaskState.InProgress))
-            throw new DomainRuleException("TASK_INVALID_STATE","The task must be ready and not yet submitted or completed.");
+        if (task.Status == TaskState.InProgress ||
+            (task.Type == TaskType.Purchase && task.Status == TaskState.NotStarted))
+            return;
+
+        throw new DomainRuleException("TASK_INVALID_STATE", task.Type == TaskType.Purchase
+            ? "The purchase task must be ready or in progress."
+            : "The task must be IN_PROGRESS. The Leader must start it before check-in.");
     }
 
     public static string Fingerprint<T>(T value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value))));

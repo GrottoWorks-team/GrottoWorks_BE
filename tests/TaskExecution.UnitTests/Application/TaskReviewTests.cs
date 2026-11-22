@@ -55,14 +55,27 @@ public sealed class TaskReviewTests
         await f.Service.DownloadAsync(f.F.Task.Id,progress.Id,progress.Evidence.Single().FileId,default);
         f.Files.Finalized.Should().ContainSingle();f.Files.Downloads.Should().Be(1);
     }
+    [Fact]
+    public async Task Progress_before_start_is_rejected_before_preparing_attachments()
+    {
+        var fixture = new ReviewFixture(started: false);
+        var action = () => fixture.Service.AddAsync(fixture.F.Task.Id,
+            new(50, null, [new(Guid.NewGuid(), null)]), false, false, default);
+        await action.Should().ThrowAsync<DomainRuleException>().Where(error => error.Code == "TASK_INVALID_STATE");
+        fixture.F.Task.Status.Should().Be(TaskState.NotStarted);
+        fixture.Store.Intents.Should().BeEmpty();
+        fixture.Store.Progress.Should().BeEmpty();
+    }
+
     private sealed class ReviewFixture
     {
         public AssignmentTestFixture F {get;}=new();public Store Store {get;}=new();public Files Files {get;}=new();public Resource Resource {get;}=new();
         public TaskReviewService Service {get;}
-        public ReviewFixture()
+        public ReviewFixture(bool started = true)
         {
             var a=TaskAssignment.Assign(F.Task.Id,F.VolunteerId,F.User.UserId,null,false,false,null,DateTimeOffset.UtcNow);a.Accept(null,DateTimeOffset.UtcNow);F.Store.Items.Add(a);
-            F.Task.MarkReady(null,DateTimeOffset.UtcNow);F.Task.BeginWork(DateTimeOffset.UtcNow);
+            F.Task.MarkReady(null,DateTimeOffset.UtcNow);
+            if (started) F.Task.Start(F.User.UserId, DateTimeOffset.UtcNow);
             F.User.UserId=F.VolunteerId;F.User.Role="VOLUNTEER";
             Service=new(new AssignmentTestFixture.TestTasks(F.Task),F.Store,Store,new TaskScopeAccess(new AssignmentTestFixture.TestScopes(F.Season,F.Area),F.User),
                 new ActiveUserAccess(F.Identity,F.User),F.User,new TaskEventRecorder(F.Events,F.User,new AssignmentTestFixture.TestCorrelation()),Files,Resource,F.Support);

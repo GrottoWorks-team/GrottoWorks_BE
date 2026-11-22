@@ -132,6 +132,27 @@ Progress and special-task migrations:
 - `20261103220001_AddTaskFileAttachmentIntents`
 - `20261103220002_AddSpecialTaskSynchronization`
 
+## Starting a task
+
+`POST /api/v1/tasks/{taskId}/ready` closes recruitment. The assigned Work Area
+Leader can then call `GET /api/v1/tasks/{taskId}/start-eligibility` to read
+`canStart`, `blockers`, and `warnings`. The check requires a `NOT_STARTED` task,
+an `ACTIVE` season, enough accepted volunteers, and sufficient allocations for
+each required material. Resource verifies allocations when the task needs
+materials. A start before the planned `startAt` adds a `TASK_START_NOT_DUE`
+warning.
+
+`POST /api/v1/tasks/{taskId}/start` accepts an optional `version` or `If-Match`
+and returns `{ task, warnings }` and an ETag. It records `startedAt` and
+`startedByUserId` and emits `task.status.changed`. An invalid state, inactive
+season, or insufficient members or materials returns 409. Unverified allocations
+return 503 `TASK_START_MATERIALS_UNAVAILABLE`. A stale version returns 412.
+
+`WORK` and `CORRECTIVE` tasks accept check-in requests, check-in approval and
+regular progress reports once they are `IN_PROGRESS`. Attendance remains per
+volunteer. `PURCHASE` skips material validation and still supports starting
+through the first check-in approval. Delivery confirmation completes it.
+
 Deployment verification on 2026-11-04 ran the solution tests and applied migrations
 to restored database copies before the original Docker databases. Isolated HTTP
 checks covered progress/review/evidence, Readiness corrective linkage, purchase

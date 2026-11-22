@@ -41,6 +41,8 @@ public sealed class WorkTaskConfiguration : IEntityTypeConfiguration<WorkTask>
         builder.Property(task => task.EstimatedMinutes).HasColumnName("estimated_minutes").IsRequired();
         builder.Property(task => task.RequiredVolunteerCount).HasColumnName("required_volunteers").IsRequired();
         builder.Property(task => task.StartAt).HasColumnName("start_at").HasColumnType("timestamp with time zone");
+        builder.Property(task => task.StartedAt).HasColumnName("started_at").HasColumnType("timestamp with time zone");
+        builder.Property(task => task.StartedByUserId).HasColumnName("started_by_user_id");
         builder.Property(task => task.Deadline).HasColumnName("deadline")
             .HasColumnType("timestamp with time zone").IsRequired();
         builder.Property(task => task.Status).HasColumnName("task_status")

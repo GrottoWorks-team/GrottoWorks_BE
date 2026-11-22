@@ -1,19 +1,33 @@
 using FluentAssertions;
 using TaskExecution.Domain;
 using TaskExecution.Domain.Attendance;
+using TaskExecution.Domain.Tasks;
 
 namespace TaskExecution.UnitTests.Application;
 
 public sealed class CheckInRequestTests
 {
-    internal static async Task<(AssignmentTestFixture Fixture,Guid Assignment)> ReadyVolunteerAsync()
+    internal static async Task<(AssignmentTestFixture Fixture,Guid Assignment)> ReadyVolunteerAsync(
+        bool started = true, TaskType type = TaskType.Work)
     {
         var f=new AssignmentTestFixture();
+        if (type == TaskType.Purchase) f.Task.SetSpecialType(type, Guid.NewGuid());
         var row=await f.Service.AssignAsync(f.Command());
         f.Store.Items.Single().Accept(1,DateTimeOffset.UtcNow);
         f.Task.MarkReady(f.Task.Version,DateTimeOffset.UtcNow);
+        if (started) f.Task.Start(f.User.UserId, DateTimeOffset.UtcNow);
         f.User.UserId=f.VolunteerId;f.User.Role="VOLUNTEER";
         return (f,row.Id);
+    }
+
+    [Fact]
+    public async Task Ready_work_task_rejects_check_in_until_the_leader_starts_it()
+    {
+        var (fixture, assignmentId) = await ReadyVolunteerAsync(started: false);
+        var store = new AttendanceTestStore(fixture);
+        var action = () => fixture.Attendance(store).CheckInAsync(assignmentId, null, Guid.NewGuid());
+        await action.Should().ThrowAsync<DomainRuleException>().Where(error => error.Code == "TASK_INVALID_STATE");
+        store.Requests.Should().BeEmpty();
     }
 
     [Fact]

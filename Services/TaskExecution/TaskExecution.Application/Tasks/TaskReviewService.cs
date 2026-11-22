@@ -44,6 +44,7 @@ public sealed class TaskReviewService(ITaskRepository tasks, IAssignmentStore as
         // Authorize before creating durable reservation intents or contacting the file service.
         var initial=await FindAsync(taskId,ct);
         await AuthorizeVolunteerAsync(initial,ct);
+        initial.EnsureProgressAllowed(submission,resubmit,command.Version);
         var intents=evidence.Select(row=>new AttachmentIntent(Guid.NewGuid(),taskId,progress.Id,row.FileId,user.UserId,now)).ToArray();
         await store.PrepareAttachmentsAsync(intents,ct);
         return await assignments.InTaskTransactionAsync(taskId,async ()=>

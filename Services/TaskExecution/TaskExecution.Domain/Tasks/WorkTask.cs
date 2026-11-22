@@ -167,6 +167,19 @@ public sealed partial class WorkTask
         }
     }
 
+    public Guid? StartedByUserId { get; private set; }
+    public DateTimeOffset? StartedAt { get; private set; }
+
+    public void Start(Guid leaderUserId, DateTimeOffset now)
+    {
+        if (Status != TaskStatus.NotStarted)
+            throw new DomainRuleException("TASK_INVALID_STATE", "Only a NOT_STARTED task can be started.");
+
+        BeginWork(now);
+        StartedByUserId = leaderUserId;
+        StartedAt = now.ToUniversalTime();
+    }
+
     public void BeginWork(DateTimeOffset now)
     {
         if (Status is not (TaskStatus.NotStarted or TaskStatus.InProgress))

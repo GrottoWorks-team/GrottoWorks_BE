@@ -26,8 +26,8 @@ public sealed class TaskResourceGateway(HttpClient client,IConfiguration configu
     public async Task<JsonElement> MaterialSummaryAsync(Guid taskId,CancellationToken ct)
     {
         var data=await GetAsync($"internal/tasks/{taskId:D}/material-summary",ct);
-        if(!data.TryGetProperty("taskId",out var id) || !id.TryGetGuid(out var actual) || actual!=taskId ||
-            !data.TryGetProperty("workAreaId",out var area) || !area.TryGetGuid(out var areaId) || areaId==Guid.Empty ||
+        if(!data.TryGetProperty("taskId",out var id) || id.ValueKind != JsonValueKind.String || !id.TryGetGuid(out var actual) || actual!=taskId ||
+            !data.TryGetProperty("workAreaId",out var area) || area.ValueKind != JsonValueKind.String || !area.TryGetGuid(out var areaId) || areaId==Guid.Empty ||
             !data.TryGetProperty("materials",out var materials) || materials.ValueKind!=JsonValueKind.Array) throw Unavailable();
         return data;
     }

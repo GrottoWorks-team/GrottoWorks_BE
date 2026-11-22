@@ -9,6 +9,21 @@ namespace TaskExecution.UnitTests.Infrastructure;
 public sealed class TaskSchemaMigrationTests
 {
     [Fact]
+    public void Explicit_start_migration_adds_nullable_metadata_to_existing_tasks()
+    {
+        var columns = new AddExplicitTaskStart().UpOperations
+            .Select(operation => operation.Should().BeOfType<AddColumnOperation>().Subject).ToArray();
+        columns.Select(column => column.Name).Should().Equal("started_at", "started_by_user_id");
+        foreach (var column in columns)
+        {
+            column.Table.Should().Be("task");
+            column.IsNullable.Should().BeTrue();
+            column.DefaultValue.Should().BeNull();
+            column.DefaultValueSql.Should().BeNull();
+        }
+    }
+
+    [Fact]
     public void Team_leader_migration_leaves_old_rows_null_and_references_the_same_task()
     {
         var operations = new AddTaskTeamLeaderAssignment().UpOperations;

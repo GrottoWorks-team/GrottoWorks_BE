@@ -135,6 +135,9 @@ Progress and special-task migrations:
 ## Starting a task
 
 `POST /api/v1/tasks/{taskId}/ready` moves the task from `OPEN` to `NOT_STARTED`.
+For `WORK` and `CORRECTIVE` tasks, Leaders can still send direct invitations and
+review applications, and Volunteers can still apply, in `NOT_STARTED` and
+`IN_PROGRESS`. The existing capacity and skill rules apply.
 The assigned Work Area Leader can call `GET /api/v1/tasks/{taskId}/start-eligibility`
 to read `canStart`, `blockers`, and `warnings`. A new start requires a `NOT_STARTED`
 work or corrective task in an `ACTIVE` season. `canStart` is true when there are

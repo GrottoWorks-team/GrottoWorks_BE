@@ -37,7 +37,7 @@ public sealed partial class AssignmentService
                 ?? throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
             var (area, _) = await scopeAccess.GetWorkAreaForLeaderWriteAsync(task.WorkAreaId, cancellationToken);
             await users.EnsureCallerAsync(area.ParishId, cancellationToken);
-            task.EnsurePlanningCanBeUpdated(null);
+            task.EnsureRecruitmentAllowed();
             row.EnsureVersion(version);
             if (approve)
             {
@@ -67,7 +67,7 @@ public sealed partial class AssignmentService
                 ?? throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
             var (area, _) = await scopeAccess.GetWorkAreaForVolunteerWriteAsync(task.WorkAreaId, cancellationToken);
             var volunteer = await users.EnsureCallerAsync(area.ParishId, cancellationToken);
-            task.EnsurePlanningCanBeUpdated(null);
+            task.EnsureRecruitmentAllowed();
             var existing = await assignments.ListAsync(taskId, cancellationToken);
             EnsureNoDuplicate(existing, user.UserId);
             EnsureCapacity(existing, task.RequiredVolunteerCount, false);

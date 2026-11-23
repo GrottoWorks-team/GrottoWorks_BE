@@ -75,7 +75,7 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
             await users.EnsureCallerAsync(area.ParishId, cancellationToken);
             var volunteer = await users.EnsureActiveAsync(command.VolunteerId, area.ParishId,
                 GrottoWorksRoles.Volunteer, cancellationToken);
-            task.EnsurePlanningCanBeUpdated(null);
+            task.EnsureRecruitmentAllowed();
 
             var existing = await assignments.ListAsync(task.Id, cancellationToken);
             EnsureNoDuplicate(existing, command.VolunteerId);

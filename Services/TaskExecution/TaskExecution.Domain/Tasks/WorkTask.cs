@@ -167,6 +167,15 @@ public sealed partial class WorkTask
         }
     }
 
+    public void EnsureRecruitmentAllowed()
+    {
+        if (Type is TaskType.Work or TaskType.Corrective &&
+            Status is TaskStatus.NotStarted or TaskStatus.InProgress)
+            return;
+
+        EnsurePlanningCanBeUpdated(null);
+    }
+
     public Guid? StartedByUserId { get; private set; }
     public DateTimeOffset? StartedAt { get; private set; }
 

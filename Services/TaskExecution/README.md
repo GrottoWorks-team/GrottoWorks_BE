@@ -134,24 +134,42 @@ Progress and special-task migrations:
 
 ## Starting a task
 
-`POST /api/v1/tasks/{taskId}/ready` closes recruitment. The assigned Work Area
-Leader can then call `GET /api/v1/tasks/{taskId}/start-eligibility` to read
-`canStart`, `blockers`, and `warnings`. The check requires a `NOT_STARTED` task,
-an `ACTIVE` season, enough accepted volunteers, and sufficient allocations for
-each required material. Resource verifies allocations when the task needs
-materials. A start before the planned `startAt` adds a `TASK_START_NOT_DUE`
-warning.
+`POST /api/v1/tasks/{taskId}/ready` moves the task from `OPEN` to `NOT_STARTED`.
+The assigned Work Area Leader can call `GET /api/v1/tasks/{taskId}/start-eligibility`
+to read `canStart`, `blockers`, and `warnings`. A new start requires a `NOT_STARTED`
+work or corrective task in an `ACTIVE` season. `canStart` is true when there are
+no blockers. Staffing and material readiness are advisory, including when nobody
+has accepted or Resource cannot verify allocations.
 
 `POST /api/v1/tasks/{taskId}/start` accepts an optional `version` or `If-Match`
-and returns `{ task, warnings }` and an ETag. It records `startedAt` and
-`startedByUserId` and emits `task.status.changed`. An invalid state, inactive
-season, or insufficient members or materials returns 409. Unverified allocations
-return 503 `TASK_START_MATERIALS_UNAVAILABLE`. A stale version returns 412.
+and returns `{ task, warnings }` and an ETag. The first start records `startedAt`
+and `startedByUserId` and emits `task.status.changed`. Invalid task state, purchase
+type or inactive season returns 409. A stale version returns 412 on a new start.
+An authorized repeat on an `IN_PROGRESS` work or corrective task returns 200
+with the current task, its current ETag and empty warnings, even with the original
+version. GET reports `canStart: false` once the task is running.
+
+Example response data excerpts. Several warnings may be returned together.
+
+```json
+[
+  {"canStart": true, "blockers": [], "warnings": []},
+  {"canStart": true, "acceptedMembers": 0, "requiredMembers": 2, "warnings": [{"code": "TASK_NOT_ENOUGH_MEMBERS", "detail": "The task needs 2 accepted volunteers and has 0."}]},
+  {"canStart": true, "materialsKnown": true, "materialShortages": [{"materialId": "11111111-1111-1111-1111-111111111111", "requiredQuantity": 5, "allocatedQuantity": 2}], "warnings": [{"code": "TASK_NOT_ENOUGH_MATERIALS", "detail": "Some required materials have not been fully allocated to the task."}]},
+  {"canStart": true, "materialsKnown": false, "materialShortages": [], "warnings": [{"code": "TASK_START_MATERIALS_UNAVAILABLE", "detail": "Task material allocations could not be verified."}]},
+  {"canStart": true, "warnings": [{"code": "TASK_START_NOT_DUE", "detail": "The scheduled start time has not arrived."}]},
+  {"task": {"status": "IN_PROGRESS", "version": 3}, "warnings": []}
+]
+```
+
+The last example shows the POST replay. To make staffing or known material
+shortages mandatory later, move those two checks from warnings to blockers in
+the shared start evaluation and update the API examples and tests.
 
 `WORK` and `CORRECTIVE` tasks accept check-in requests, check-in approval and
 regular progress reports once they are `IN_PROGRESS`. Attendance remains per
-volunteer. `PURCHASE` skips material validation and still supports starting
-through the first check-in approval. Delivery confirmation completes it.
+volunteer. `PURCHASE` continues to start through the first check-in approval.
+Delivery confirmation completes it.
 
 Deployment verification on 2026-11-04 ran the solution tests and applied migrations
 to restored database copies before the original Docker databases. Isolated HTTP

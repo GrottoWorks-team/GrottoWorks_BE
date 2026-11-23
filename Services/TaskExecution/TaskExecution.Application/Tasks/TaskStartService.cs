@@ -40,23 +40,29 @@ public sealed class TaskStartService(ITaskRepository tasks, IAssignmentStore ass
         var initial = await tasks.GetByIdAsync(taskId, ct) ?? throw MissingTask();
         var (initialArea, initialSeason) = await LoadScopeAsync(initial, ct);
         await users.EnsureCallerAsync(initialArea.ParishId, ct);
-        initial.EnsureVersion(version);
         var checkedVersion = initial.Version;
-        var initialCount = await CountAcceptedAsync(taskId, ct);
-        EnsureEligible(Evaluate(initial, initialSeason, initialCount, [], clock.GetUtcNow()));
-        var shortages = await GetShortagesAsync(initial, ct);
+        var shortages = GetBlockers(initial, initialSeason).Count == 0 &&
+                        (!version.HasValue || version == checkedVersion)
+            ? await GetShortagesAsync(initial, ct)
+            : null;
 
         return await assignments.InTaskTransactionAsync(taskId, async () =>
         {
             var task = await tasks.GetByIdForUpdateAsync(taskId, ct) ?? throw MissingTask();
             var (area, season) = await LoadScopeAsync(task, ct);
-            task.EnsureVersion(version);
+            if (task.Type != TaskType.Purchase && task.Status == TaskState.InProgress)
+                return new TaskStartResult(TaskDto.From(task), []);
+
+            if (task.Type != TaskType.Purchase)
+                task.EnsureVersion(version);
+            var blockers = GetBlockers(task, season);
+            if (blockers.FirstOrDefault() is { } blocker)
+                throw new DomainRuleException(blocker.Code, blocker.Detail);
+            task.EnsureVersion(checkedVersion);
+
             var accepted = await CountAcceptedAsync(taskId, ct);
             var now = clock.GetUtcNow();
-            EnsureEligible(Evaluate(task, season, accepted, [], now));
-            task.EnsureVersion(checkedVersion);
-            var eligibility = Evaluate(task, season, accepted, shortages, now);
-            EnsureEligible(eligibility);
+            var warnings = GetWarnings(task, accepted, task.Materials.Count == 0 ? [] : shortages, now);
             task.Start(user.UserId, now);
             events.Record(TaskEventTypes.StatusChanged, task, area, new
             {
@@ -64,7 +70,7 @@ public sealed class TaskStartService(ITaskRepository tasks, IAssignmentStore ass
                 startedByUserId = user.UserId, startedAt = now
             });
             await assignments.SaveAsync(ct);
-            return new TaskStartResult(TaskDto.From(task), eligibility.Warnings);
+            return new TaskStartResult(TaskDto.From(task), warnings);
         }, ct);
     }
 
@@ -143,32 +149,38 @@ public sealed class TaskStartService(ITaskRepository tasks, IAssignmentStore ass
     private static TaskStartEligibility Evaluate(WorkTask task, SeasonScope season, int accepted,
         IReadOnlyList<TaskMaterialShortage>? shortages, DateTimeOffset now)
     {
-        var required = Math.Max(1, task.RequiredVolunteerCount);
+        var blockers = GetBlockers(task, season);
+        return new(task.Id, task.Type, task.Status, task.StartAt, accepted, Math.Max(1, task.RequiredVolunteerCount),
+            shortages is not null, shortages ?? [], blockers.Count == 0, blockers, GetWarnings(task, accepted, shortages, now));
+    }
+
+    private static List<TaskStartReason> GetBlockers(WorkTask task, SeasonScope season)
+    {
         var blockers = new List<TaskStartReason>();
+        if (task.Type == TaskType.Purchase)
+            blockers.Add(new("TASK_TYPE_INVALID", "Purchase tasks start through check-in approval."));
         if (task.Status != TaskState.NotStarted)
             blockers.Add(new(task.Status == TaskState.Open ? "TASK_NOT_PUBLISHED" : "TASK_INVALID_STATE",
                 "Only a NOT_STARTED task can be started. Mark an OPEN task ready first."));
         if (season.Status != SeasonScopeStatus.Active)
             blockers.Add(new("TASK_START_SEASON_NOT_ACTIVE", "The owning season must be ACTIVE."));
-        if (accepted < required)
-            blockers.Add(new("TASK_NOT_ENOUGH_MEMBERS", $"The task needs {required} accepted volunteers and has {accepted}."));
-        if (shortages is null)
-            blockers.Add(new(MaterialsUnavailable, "Task material allocations could not be verified."));
-        else if (shortages.Count != 0)
-            blockers.Add(new("TASK_NOT_ENOUGH_MATERIALS", "Some required materials have not been fully allocated to the task."));
-
-        TaskStartReason[] warnings = task.StartAt > now
-            ? [new("TASK_START_NOT_DUE", "The scheduled start time has not arrived.")]
-            : [];
-        return new(task.Id, task.Type, task.Status, task.StartAt, accepted, required,
-            shortages is not null, shortages ?? [], blockers.Count == 0, blockers, warnings);
+        return blockers;
     }
 
-    private static void EnsureEligible(TaskStartEligibility eligibility)
+    private static List<TaskStartReason> GetWarnings(WorkTask task, int accepted,
+        IReadOnlyList<TaskMaterialShortage>? shortages, DateTimeOffset now)
     {
-        if (eligibility.Blockers.FirstOrDefault() is { } blocker)
-            throw new DomainRuleException(blocker.Code, blocker.Detail,
-                blocker.Code == MaterialsUnavailable ? DomainErrorKind.ServiceUnavailable : DomainErrorKind.Conflict);
+        var warnings = new List<TaskStartReason>();
+        var required = Math.Max(1, task.RequiredVolunteerCount);
+        if (task.StartAt > now)
+            warnings.Add(new("TASK_START_NOT_DUE", "The scheduled start time has not arrived."));
+        if (accepted < required)
+            warnings.Add(new("TASK_NOT_ENOUGH_MEMBERS", $"The task needs {required} accepted volunteers and has {accepted}."));
+        if (shortages is null)
+            warnings.Add(new(MaterialsUnavailable, "Task material allocations could not be verified."));
+        else if (shortages.Count != 0)
+            warnings.Add(new("TASK_NOT_ENOUGH_MATERIALS", "Some required materials have not been fully allocated to the task."));
+        return warnings;
     }
 
     private static DomainRuleException MissingTask() =>

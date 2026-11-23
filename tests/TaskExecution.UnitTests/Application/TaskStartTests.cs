@@ -58,7 +58,8 @@ public sealed class TaskStartTests
         using var preflight = JsonDocument.Parse(await eligibility.Content.ReadAsStringAsync());
         preflight.RootElement.GetProperty("data").GetProperty("canStart").GetBoolean().Should().BeTrue();
         using var request = new HttpRequestMessage(HttpMethod.Post, path + "/start");
-        request.Headers.TryAddWithoutValidation("If-Match", $"\"{fixture.Task.Version}\"");
+        var initialETag = $"\"{fixture.Task.Version}\"";
+        request.Headers.TryAddWithoutValidation("If-Match", initialETag);
         using var response = await client.SendAsync(request);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Headers.ETag!.Tag.Should().Be($"\"{fixture.Task.Version}\"");
@@ -66,6 +67,14 @@ public sealed class TaskStartTests
         var data = json.RootElement.GetProperty("data");
         data.GetProperty("task").GetProperty("startedByUserId").GetGuid().Should().Be(fixture.Source.User.UserId);
         data.GetProperty("warnings")[0].GetProperty("code").GetString().Should().Be("TASK_START_NOT_DUE");
+
+        using var replayRequest = new HttpRequestMessage(HttpMethod.Post, path + "/start");
+        replayRequest.Headers.TryAddWithoutValidation("If-Match", initialETag);
+        using var replay = await client.SendAsync(replayRequest);
+        replay.StatusCode.Should().Be(HttpStatusCode.OK);
+        replay.Headers.ETag!.Tag.Should().Be(response.Headers.ETag!.Tag);
+        using var replayJson = JsonDocument.Parse(await replay.Content.ReadAsStringAsync());
+        replayJson.RootElement.GetProperty("data").GetProperty("warnings").GetArrayLength().Should().Be(0);
     }
 
     [Fact]
@@ -88,8 +97,10 @@ public sealed class TaskStartTests
         message.Payload.GetProperty("status").GetString().Should().Be("IN_PROGRESS");
         message.Payload.GetProperty("startedAt").GetDateTimeOffset().Should().Be(Now);
 
-        var retry = () => fixture.Service.StartAsync(fixture.Task.Id, null, default);
-        await retry.Should().ThrowAsync<DomainRuleException>().Where(error => error.Code == "TASK_INVALID_STATE");
+        var replay = await fixture.Service.StartAsync(fixture.Task.Id, result.Task.Version - 1, default);
+        replay.Task.Should().BeEquivalentTo(result.Task);
+        replay.Warnings.Should().BeEmpty();
+        (await fixture.Service.GetEligibilityAsync(fixture.Task.Id, default)).CanStart.Should().BeFalse();
         fixture.Source.Events.Items.Should().ContainSingle();
     }
 
@@ -110,19 +121,23 @@ public sealed class TaskStartTests
     }
 
     [Fact]
-    public async Task Planning_season_and_pending_assignment_are_reported_as_blockers()
+    public async Task Planning_season_blocks_start_but_zero_accepted_members_only_warns()
     {
         var fixture = new Fixture(accepted: false, seasonStatus: SeasonScopeStatus.Planning);
         var eligibility = await fixture.Service.GetEligibilityAsync(fixture.Task.Id, default);
         eligibility.CanStart.Should().BeFalse();
         eligibility.AcceptedMembers.Should().Be(0);
         eligibility.Blockers.Select(reason => reason.Code).Should()
-            .Equal("TASK_START_SEASON_NOT_ACTIVE", "TASK_NOT_ENOUGH_MEMBERS");
+            .Equal("TASK_START_SEASON_NOT_ACTIVE");
+        eligibility.Warnings.Should().Contain(reason => reason.Code == "TASK_NOT_ENOUGH_MEMBERS");
+        var start = () => fixture.Service.StartAsync(fixture.Task.Id, null, default);
+        await start.Should().ThrowAsync<DomainRuleException>().Where(error => error.Code == "TASK_START_SEASON_NOT_ACTIVE");
+        fixture.Source.Events.Items.Should().BeEmpty();
         fixture.Source.Season.Apply(fixture.Source.Area.ParishId, fixture.Source.Season.StartDate,
             fixture.Source.Season.EndDate, SeasonScopeStatus.Active, 3, Now);
-        var start = () => fixture.Service.StartAsync(fixture.Task.Id, null, default);
-        await start.Should().ThrowAsync<DomainRuleException>().Where(error => error.Code == "TASK_NOT_ENOUGH_MEMBERS");
-        fixture.Source.Events.Items.Should().BeEmpty();
+        var result = await start();
+        result.Task.Status.Should().Be(TaskState.InProgress);
+        result.Warnings.Should().Contain(reason => reason.Code == "TASK_NOT_ENOUGH_MEMBERS");
     }
 
     [Theory]
@@ -130,30 +145,37 @@ public sealed class TaskStartTests
     [InlineData("outage", "TASK_START_MATERIALS_UNAVAILABLE", false)]
     [InlineData("stale", "TASK_START_MATERIALS_UNAVAILABLE", false)]
     [InlineData("malformed", "TASK_START_MATERIALS_UNAVAILABLE", false)]
-    public async Task Materials_that_are_short_or_unverified_prevent_start(string scenario, string code, bool known)
+    public async Task Materials_that_are_short_or_unverified_warn_without_blocking_start(string scenario, string code, bool known)
     {
         var fixture = new Fixture(needsMaterials: true);
         fixture.Resource.Scenario = scenario;
         var eligibility = await fixture.Service.GetEligibilityAsync(fixture.Task.Id, default);
-        eligibility.CanStart.Should().BeFalse();
+        eligibility.CanStart.Should().BeTrue();
         eligibility.MaterialsKnown.Should().Be(known);
-        eligibility.Blockers.Should().ContainSingle().Which.Code.Should().Be(code);
+        eligibility.Blockers.Should().BeEmpty();
+        eligibility.Warnings.Should().Contain(reason => reason.Code == code);
         if (known)
             eligibility.MaterialShortages.Should().ContainSingle().Which.AllocatedQuantity.Should().Be(2);
-        var start = () => fixture.Service.StartAsync(fixture.Task.Id, null, default);
-        var failure = await start.Should().ThrowAsync<DomainRuleException>();
-        failure.Which.Code.Should().Be(code);
-        failure.Which.Kind.Should().Be(known ? DomainErrorKind.Conflict : DomainErrorKind.ServiceUnavailable);
-        fixture.Task.Status.Should().Be(TaskState.NotStarted);
-        fixture.Source.Events.Items.Should().BeEmpty();
+        var result = await fixture.Service.StartAsync(fixture.Task.Id, null, default);
+        result.Task.Status.Should().Be(TaskState.InProgress);
+        result.Warnings.Should().Equal(eligibility.Warnings);
+        var calls = fixture.Resource.Calls;
+        (await fixture.Service.StartAsync(fixture.Task.Id, result.Task.Version - 1, default)).Warnings.Should().BeEmpty();
+        fixture.Resource.Calls.Should().Be(calls);
+        fixture.Source.Events.Items.Should().ContainSingle();
     }
 
     [Fact]
-    public async Task Purchase_can_start_without_querying_materials()
+    public async Task Purchase_is_excluded_from_explicit_start()
     {
         var fixture = new Fixture(purchase: true);
-        var result = await fixture.Service.StartAsync(fixture.Task.Id, null, default);
-        result.Task.Status.Should().Be(TaskState.InProgress);
+        var eligibility = await fixture.Service.GetEligibilityAsync(fixture.Task.Id, default);
+        eligibility.CanStart.Should().BeFalse();
+        eligibility.Blockers.Should().ContainSingle().Which.Code.Should().Be("TASK_TYPE_INVALID");
+        var start = () => fixture.Service.StartAsync(fixture.Task.Id, null, default);
+        await start.Should().ThrowAsync<DomainRuleException>().Where(error => error.Code == "TASK_TYPE_INVALID");
+        fixture.Task.BeginWork(Now);
+        await start.Should().ThrowAsync<DomainRuleException>().Where(error => error.Code == "TASK_TYPE_INVALID");
         fixture.Resource.Calls.Should().Be(0);
     }
 
@@ -163,23 +185,25 @@ public sealed class TaskStartTests
         var fixture = new Fixture(needsMaterials: true);
         fixture.Resource.WaitForBoth = true;
         var version = fixture.Task.Version;
-        async Task<bool> AttemptStartAsync()
-        {
-            try
-            {
-                await fixture.Service.StartAsync(fixture.Task.Id, version, default);
-                return true;
-            }
-            catch (DomainRuleException exception) when (exception.Code == "TASK_VERSION_MISMATCH")
-            {
-                return false;
-            }
-        }
-
-        var results = await Task.WhenAll(AttemptStartAsync(), AttemptStartAsync());
-        results.Should().BeEquivalentTo([true, false]);
+        var results = await Task.WhenAll(
+            fixture.Service.StartAsync(fixture.Task.Id, version, default),
+            fixture.Service.StartAsync(fixture.Task.Id, version, default));
+        results.Should().OnlyContain(result => result.Task.Version == version + 1);
+        results.Should().ContainSingle(result => result.Warnings.Count == 0);
         fixture.Task.Version.Should().Be(version + 1);
         fixture.Source.Events.Items.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Open_task_must_be_marked_ready_and_a_stale_version_cannot_start_a_ready_task()
+    {
+        var fixture = new Fixture(ready: false);
+        var version = fixture.Task.Version;
+        var start = () => fixture.Service.StartAsync(fixture.Task.Id, version, default);
+        await start.Should().ThrowAsync<DomainRuleException>().Where(error => error.Code == "TASK_NOT_PUBLISHED");
+        fixture.Task.MarkReady(null, Now);
+        await start.Should().ThrowAsync<DomainRuleException>().Where(error => error.Code == "TASK_VERSION_MISMATCH");
+        fixture.Source.Events.Items.Should().BeEmpty();
     }
 
     private sealed class HeaderAuthentication(IOptionsMonitor<AuthenticationSchemeOptions> options,
@@ -201,14 +225,14 @@ public sealed class TaskStartTests
         public TaskStartService Service { get; }
 
         public Fixture(bool needsMaterials = false, bool accepted = true, bool purchase = false,
-            SeasonScopeStatus seasonStatus = SeasonScopeStatus.Active)
+            SeasonScopeStatus seasonStatus = SeasonScopeStatus.Active, bool ready = true)
         {
             var material = Guid.NewGuid();
             Task = WorkTask.CreateOpen(Guid.NewGuid(), Source.Area.WorkAreaId, Source.User.UserId, "Task", null, null,
                 TaskPriority.Medium, 60, 1, Now.AddHours(1), Now.AddDays(1), Now);
             if (purchase) Task.SetSpecialType(TaskType.Purchase, Guid.NewGuid());
             if (needsMaterials) Task.ReplaceMaterials([new(material, 4, null)], null, Now);
-            Task.MarkReady(null, Now);
+            if (ready) Task.MarkReady(null, Now);
             Source.Season.Apply(Source.Area.ParishId, Source.Season.StartDate, Source.Season.EndDate, seasonStatus, 2, Now);
             var assignment = TaskAssignment.Assign(Task.Id, Source.VolunteerId, Source.User.UserId, null, false, false, null, Now);
             if (accepted) assignment.Accept(null, Now);

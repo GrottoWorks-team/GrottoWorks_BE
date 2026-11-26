@@ -88,44 +88,12 @@ public sealed class CreateMaterialRequirementCommandHandler(
     ShortageTracker shortages,
     IUnitOfWork unitOfWork)
 {
-    public async Task<MaterialRequirementDto> HandleAsync(
+    public Task<MaterialRequirementDto> HandleAsync(
         CreateMaterialRequirementCommand command,
-        CancellationToken cancellationToken = default)
-    {
-        var scope = await access.ForMaterialOfficerWriteAsync(command.WorkAreaId, cancellationToken);
-
-        var material = await catalog.GetMaterialAsync(command.MaterialId, cancellationToken)
-            ?? throw DomainRuleException.Validation("MATERIAL_UNKNOWN", "The material does not exist.");
-        if (material.Status != CatalogStatus.Active)
-        {
-            throw DomainRuleException.Validation("MATERIAL_INACTIVE", "The material is inactive.");
-        }
-
-        // Field validation (422) before the uniqueness conflict (409).
-        var requirement = MaterialRequirement.Create(
-            command.WorkAreaId,
-            command.MaterialId,
-            command.RequiredQuantity,
-            command.ExistingQuantity ?? 0,
-            command.Note,
-            DateTimeOffset.UtcNow);
-
-        if (await store.ExistsAsync(command.WorkAreaId, command.MaterialId, cancellationToken))
-        {
-            throw new DomainRuleException(
-                "REQUIREMENT_ALREADY_EXISTS",
-                "This work area already has a requirement for the material. Update it instead.");
-        }
-
-        var before = await shortages.CaptureAsync(scope, command.MaterialId, cancellationToken);
-        store.Add(requirement);
-        await unitOfWork.ExecuteAsync(async () =>
-        {
-            await store.SaveChangesAsync(cancellationToken);
-            await shortages.PublishIfChangedAsync(before, cancellationToken);
-        }, cancellationToken);
-        return MaterialRequirementDto.From(requirement, material);
-    }
+        CancellationToken cancellationToken = default) =>
+        throw DomainRuleException.Validation(
+            "MANUAL_MATERIAL_REQUIREMENT_DISABLED",
+            "Material requirements must be declared from the real materials of each task.");
 }
 
 /// <summary>F-RES-03 <c>updateMaterialRequirement</c> (MO of the work area): quantity, note, cancel/re-activate.</summary>
@@ -136,34 +104,10 @@ public sealed class UpdateMaterialRequirementCommandHandler(
     ShortageTracker shortages,
     IUnitOfWork unitOfWork)
 {
-    public async Task<MaterialRequirementDto> HandleAsync(
+    public Task<MaterialRequirementDto> HandleAsync(
         UpdateMaterialRequirementCommand command,
-        CancellationToken cancellationToken = default)
-    {
-        var requirement = await store.GetAsync(command.RequirementId, cancellationToken)
-            ?? throw DomainRuleException.NotFound("REQUIREMENT_NOT_FOUND", "The material requirement does not exist.");
-
-        // Scope first: an officer of another parish must not learn that the id exists.
-        var scope = await access.ForMaterialOfficerWriteAsync(requirement.WorkAreaId, cancellationToken);
-        requirement.EnsureVersion(command.Version);
-
-        var material = await catalog.GetMaterialAsync(requirement.MaterialId, cancellationToken)
-            ?? throw new InvalidOperationException("Requirement points to a missing material.");
-
-        if (command.Status == RequirementStatus.Active &&
-            requirement.Status != RequirementStatus.Active &&
-            material.Status != CatalogStatus.Active)
-        {
-            throw DomainRuleException.Validation("MATERIAL_INACTIVE", "An inactive material cannot be required again.");
-        }
-
-        var before = await shortages.CaptureAsync(scope, requirement.MaterialId, cancellationToken);
-        requirement.Update(command.RequiredQuantity, command.ExistingQuantity, command.Note, command.Status, DateTimeOffset.UtcNow);
-        await unitOfWork.ExecuteAsync(async () =>
-        {
-            await store.SaveChangesAsync(cancellationToken);
-            await shortages.PublishIfChangedAsync(before, cancellationToken);
-        }, cancellationToken);
-        return MaterialRequirementDto.From(requirement, material);
-    }
+        CancellationToken cancellationToken = default) =>
+        throw DomainRuleException.Validation(
+            "MANUAL_MATERIAL_REQUIREMENT_DISABLED",
+            "Material requirements must be declared from the real materials of each task.");
 }

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Resource.Application.Inventory;
 using Resource.Domain;
 using Resource.Domain.Inventory;
+using Resource.Domain.Scope;
 using Resource.Infrastructure.Data;
 using Resource.Infrastructure.Data.Configurations;
 
@@ -58,15 +59,21 @@ public sealed class InventoryStore(ResourceDbContext dbContext) : IInventoryStor
         Guid? materialId,
         CancellationToken cancellationToken = default)
     {
-        var query = dbContext.MaterialRequirements.AsNoTracking()
-            .Where(requirement => workAreaIds.Contains(requirement.WorkAreaId) && requirement.Status == RequirementStatus.Active);
+        var query =
+            from plan in dbContext.Set<TaskMaterialPlan>().AsNoTracking()
+            from scope in dbContext.Set<WorkAreaScope>().AsNoTracking()
+            from item in plan.Items
+            where scope.WorkAreaId == plan.WorkAreaId && scope.SeasonId == plan.SeasonId
+                  && workAreaIds.Contains(plan.WorkAreaId)
+            select new { plan.WorkAreaId, item.MaterialId, item.RequiredQuantity };
         if (materialId is { } material)
         {
-            query = query.Where(requirement => requirement.MaterialId == material);
+            query = query.Where(row => row.MaterialId == material);
         }
 
         return await query
-            .Select(requirement => new QuantityByMaterial(requirement.WorkAreaId, requirement.MaterialId, requirement.RequiredQuantity))
+            .GroupBy(row => new { row.WorkAreaId, row.MaterialId })
+            .Select(group => new QuantityByMaterial(group.Key.WorkAreaId, group.Key.MaterialId, group.Sum(row => row.RequiredQuantity)))
             .ToListAsync(cancellationToken);
     }
 

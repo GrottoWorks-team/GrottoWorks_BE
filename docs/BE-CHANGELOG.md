@@ -2,6 +2,15 @@
 
 ## 2026-11-26
 - Branch: `main`
+- Service: ApiGateway, NotificationAudit, local object storage
+- Files: `ApiGateway/YarpApiGateway/appsettings.Development.json`, `docker-compose.override.yml`, `docs/ops/cloudflare-r2.md`
+- Change: Added `http://127.0.0.1:5173` to local gateway and MinIO CORS origins, and documented the same origin for Cloudflare R2 bucket CORS.
+- Contract impact: None; local browser-origin configuration only.
+- Migration: No.
+- Follow-up: Apply the R2 CORS policy in the Cloudflare dashboard and verify a direct browser upload.
+
+## 2026-11-26
+- Branch: `main`
 - Service: NotificationAudit
 - Files: `Services/NotificationAudit/NotificationAudit.Contracts/Files/FileContracts.cs`, `Services/NotificationAudit/NotificationAudit.Domain/Files/FileObject.cs`, `Services/NotificationAudit/NotificationAudit.Application/Files/FileUpload.cs`
 - Change: Added `MapImage` and `DesignAsset` upload purposes for Cloudflare R2, with purpose-specific MIME/size validation.

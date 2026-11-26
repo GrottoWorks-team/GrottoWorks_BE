@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Net;
 using System.Security.Cryptography;
 using Amazon.S3;
@@ -14,25 +15,18 @@ namespace NotificationAudit.Infrastructure.Files;
 /// </summary>
 public sealed class S3FileObjectStorage(ObjectStorageClients clients, TimeProvider timeProvider) : IFileObjectStorage
 {
-    public const int MaximumInspectionBytes = 20 * 1024 * 1024;
     private readonly ObjectStorageOptions options = clients.Options;
     private IAmazonS3 internalClient => clients.Internal;
     private IAmazonS3 publicClient => clients.Public;
 
-    public async Task<StoredObjectInspection> InspectAsync(string objectKey, CancellationToken cancellationToken)
+    public async Task<StoredObjectInspection> InspectAsync(string objectKey, long maximumBytes, CancellationToken cancellationToken)
     {
         try
         {
             using var response = await internalClient.GetObjectAsync(
                 new GetObjectRequest { BucketName = options.Bucket, Key = objectKey }, cancellationToken);
-            if (response.ContentLength > MaximumInspectionBytes) throw new UploadedObjectTooLargeException();
-            var bytes = ReadBounded(response.ResponseStream, MaximumInspectionBytes, cancellationToken);
-            var checksum = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
-            return new StoredObjectInspection(
-                bytes.LongLength,
-                NormalizeContentType(response.Headers.ContentType),
-                checksum,
-                DetectContentType(bytes));
+            if (response.ContentLength > maximumBytes) throw new UploadedObjectTooLargeException();
+            return await InspectStreamAsync(response.ResponseStream, response.Headers.ContentType, maximumBytes, cancellationToken);
         }
         catch (Exception exception) when (exception is not (OperationCanceledException or UploadedObjectTooLargeException))
         {
@@ -159,21 +153,49 @@ public sealed class S3FileObjectStorage(ObjectStorageClients clients, TimeProvid
         return "application/octet-stream";
     }
 
-    public static byte[] ReadBounded(Stream stream, int maximumBytes, CancellationToken cancellationToken)
+    public static async Task<StoredObjectInspection> InspectStreamAsync(
+        Stream stream, string? contentType, long maximumBytes, CancellationToken ct)
     {
-        if (maximumBytes < 1 || maximumBytes > MaximumInspectionBytes)
+        if (maximumBytes < 1 || maximumBytes > FileUploadLimits.DesignAssetBytes)
             throw new ArgumentOutOfRangeException(nameof(maximumBytes));
-        using var content = new MemoryStream();
-        var buffer = new byte[Math.Min(81920, maximumBytes)];
+
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var buffer = new byte[(int)Math.Min(81920, maximumBytes)];
+        var header = new byte[20];
+        var headerLength = 0;
+        var total = 0L;
         while (true)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            // Read at most one byte beyond the limit, without trusting Content-Length.
-            var count = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, maximumBytes - content.Length + 1));
-            if (count == 0) return content.ToArray();
-            if (content.Length + count > maximumBytes) throw new UploadedObjectTooLargeException();
-            content.Write(buffer, 0, count);
+            ct.ThrowIfCancellationRequested();
+            var limit = (int)Math.Min(buffer.Length, maximumBytes - total + 1);
+            var count = await stream.ReadAsync(buffer.AsMemory(0, limit), ct);
+            if (count == 0) break;
+            total += count;
+            if (total > maximumBytes) throw new UploadedObjectTooLargeException();
+
+            hash.AppendData(buffer, 0, count);
+            var prefixCount = Math.Min(count, header.Length - headerLength);
+            buffer.AsSpan(0, prefixCount).CopyTo(header.AsSpan(headerLength));
+            headerLength += prefixCount;
         }
+
+        var prefix = header.AsSpan(0, headerLength);
+        var detected = IsGlb(prefix, total) ? FileUploadLimits.GlbContentType : DetectContentType(prefix);
+        return new StoredObjectInspection(total, NormalizeContentType(contentType),
+            Convert.ToHexStringLower(hash.GetHashAndReset()), detected);
+    }
+
+    private static bool IsGlb(ReadOnlySpan<byte> header, long total)
+    {
+        // GLB v2 has a 12-byte file header followed by a required JSON chunk.
+        if (header.Length < 20 || !header.StartsWith("glTF"u8) ||
+            BinaryPrimitives.ReadUInt32LittleEndian(header[4..]) != 2 ||
+            BinaryPrimitives.ReadUInt32LittleEndian(header[8..]) != total ||
+            !header[16..20].SequenceEqual("JSON"u8))
+            return false;
+
+        var jsonBytes = BinaryPrimitives.ReadUInt32LittleEndian(header[12..]);
+        return jsonBytes >= 4 && jsonBytes % 4 == 0 && jsonBytes <= total - 20;
     }
 }
 

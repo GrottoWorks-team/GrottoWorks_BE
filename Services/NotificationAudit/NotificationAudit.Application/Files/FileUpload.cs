@@ -27,7 +27,7 @@ public interface IFileObjectStorage
         TimeSpan lifetime,
         CancellationToken cancellationToken);
 
-    Task<StoredObjectInspection> InspectAsync(string objectKey, CancellationToken cancellationToken);
+    Task<StoredObjectInspection> InspectAsync(string objectKey, long maximumBytes, CancellationToken cancellationToken);
     Task UploadAsync(string objectKey, Stream content, string contentType, CancellationToken cancellationToken);
     // Copy only. The pending upload remains available until the metadata transaction commits.
     Task CopyToPrivateAsync(string pendingObjectKey, string completedObjectKey, CancellationToken cancellationToken);
@@ -62,6 +62,24 @@ public sealed class FileUploadOptions
     public bool AllowOtherPdf { get; init; }
 }
 
+public static class FileUploadLimits
+{
+    public const int EvidenceBytes = 10 * 1024 * 1024;
+    public const int ReceiptBytes = 15 * 1024 * 1024;
+    public const int GeneralBytes = 20 * 1024 * 1024;
+    public const int DesignAssetBytes = 100 * 1024 * 1024;
+    public const string GlbContentType = "model/gltf-binary";
+    public const string BinaryContentType = "application/octet-stream";
+
+    public static int For(FilePurpose purpose) => purpose switch
+    {
+        FilePurpose.ProgressEvidence or FilePurpose.ReadinessEvidence => EvidenceBytes,
+        FilePurpose.PurchaseReceipt => ReceiptBytes,
+        FilePurpose.DesignAsset => DesignAssetBytes,
+        _ => GeneralBytes
+    };
+}
+
 public sealed class ProxyUploadPendingHandler(
     ICurrentUser currentUser,
     IFileObjectRepository repository,
@@ -92,30 +110,38 @@ public sealed class ProxyUploadPendingHandler(
 
         try
         {
-            using var buffer = new MemoryStream();
+            var temporaryPath = Path.Combine(Path.GetTempPath(), $"grotto-upload-{Guid.NewGuid():N}.tmp");
+            await using var buffer = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None,
+                bufferSize: 81920, FileOptions.Asynchronous | FileOptions.SequentialScan | FileOptions.DeleteOnClose);
             var readBuffer = new byte[81920];
             var total = 0L;
+            var maximum = Math.Min(file.SizeBytes, FileUploadLimits.For(file.Purpose));
             while (true)
             {
-                var read = await content.ReadAsync(readBuffer.AsMemory(0, readBuffer.Length), cancellationToken);
+                var limit = (int)Math.Min(readBuffer.Length, maximum - total + 1);
+                var read = await content.ReadAsync(readBuffer.AsMemory(0, limit), cancellationToken);
                 if (read == 0) break;
                 total += read;
-                if (total > 20 * 1024 * 1024)
+                if (total > maximum)
                 {
-                    throw new DomainException("FILE_SIZE_MISMATCH", "Uploaded file exceeds the permitted size.", 422);
+                    throw SizeMismatch();
                 }
                 await buffer.WriteAsync(readBuffer.AsMemory(0, read), cancellationToken);
             }
+            if (total != file.SizeBytes) throw SizeMismatch();
             buffer.Position = 0;
             await storage.UploadAsync(file.ObjectKey, buffer, contentType, cancellationToken);
         }
-        catch (FileStorageUnavailableException)
+        catch (Exception error) when (error is FileStorageUnavailableException or IOException)
         {
             throw new DomainException("FILE_STORAGE_UNAVAILABLE", "File storage is temporarily unavailable.", 503);
         }
 
         return await completeUpload.HandleAsync(fileId, new CompleteUploadRequest(null), cancellationToken);
     }
+
+    private static DomainException SizeMismatch() =>
+        new("FILE_SIZE_MISMATCH", "Uploaded file size does not match the upload request.", 422);
 }
 
 public sealed class GetFileDownloadHandler(
@@ -282,7 +308,8 @@ public sealed class CompleteUploadHandler(
         try
         {
             await storage.CopyToPrivateAsync(pendingObjectKey, completedObjectKey, cancellationToken);
-            inspection = await storage.InspectAsync(completedObjectKey, cancellationToken);
+            var maximum = Math.Min(file.SizeBytes, FileUploadLimits.For(file.Purpose));
+            inspection = await storage.InspectAsync(completedObjectKey, maximum, cancellationToken);
         }
         catch (UploadedObjectTooLargeException)
         {
@@ -314,9 +341,7 @@ public sealed class CompleteUploadHandler(
             throw new DomainException("FILE_SIZE_MISMATCH", "Uploaded file size does not match the upload request.", 422);
         }
 
-        if (!string.Equals(inspection.DetectedContentType, file.ContentType, StringComparison.OrdinalIgnoreCase) ||
-            (!string.IsNullOrWhiteSpace(inspection.ContentType) &&
-             !string.Equals(inspection.ContentType, file.ContentType, StringComparison.OrdinalIgnoreCase)))
+        if (!MatchesContentType(file, inspection))
         {
             throw new DomainException("FILE_CONTENT_TYPE_MISMATCH", "Uploaded content does not match the declared type.", 422);
         }
@@ -336,6 +361,22 @@ public sealed class CompleteUploadHandler(
         {
             throw new DomainException("FILE_CHECKSUM_MISMATCH", "Uploaded file checksum is invalid.", 422);
         }
+    }
+
+    private static bool MatchesContentType(FileObject file, StoredObjectInspection inspection)
+    {
+        if (file.Purpose == FilePurpose.DesignAsset &&
+            file.ContentType is FileUploadLimits.GlbContentType or FileUploadLimits.BinaryContentType)
+        {
+            return inspection.DetectedContentType == FileUploadLimits.GlbContentType &&
+                (string.IsNullOrWhiteSpace(inspection.ContentType) ||
+                 inspection.ContentType == FileUploadLimits.GlbContentType ||
+                 inspection.ContentType == FileUploadLimits.BinaryContentType);
+        }
+
+        return string.Equals(inspection.DetectedContentType, file.ContentType, StringComparison.OrdinalIgnoreCase) &&
+            (string.IsNullOrWhiteSpace(inspection.ContentType) ||
+             string.Equals(inspection.ContentType, file.ContentType, StringComparison.OrdinalIgnoreCase));
     }
 
     private static FileReferenceDto Map(FileObject file) =>
@@ -393,17 +434,17 @@ public sealed class CreateUploadRequestHandler(
         var valid = purpose switch
         {
             FilePurposeDto.ProgressEvidence or FilePurposeDto.ReadinessEvidence =>
-                imageTypes.Contains(contentType) && sizeBytes <= 10L * 1024 * 1024,
+                imageTypes.Contains(contentType) && sizeBytes <= FileUploadLimits.EvidenceBytes,
             FilePurposeDto.PurchaseReceipt =>
                 (imageTypes.Contains(contentType) || contentType == "application/pdf") &&
-                sizeBytes <= 15L * 1024 * 1024,
+                sizeBytes <= FileUploadLimits.ReceiptBytes,
             FilePurposeDto.MapImage =>
-                imageTypes.Contains(contentType) && sizeBytes <= 20L * 1024 * 1024,
+                imageTypes.Contains(contentType) && sizeBytes <= FileUploadLimits.GeneralBytes,
             FilePurposeDto.DesignAsset =>
-                (imageTypes.Contains(contentType) || contentType is "model/gltf-binary" or "application/octet-stream") &&
-                sizeBytes <= 100L * 1024 * 1024,
+                (imageTypes.Contains(contentType) || contentType is FileUploadLimits.GlbContentType or FileUploadLimits.BinaryContentType) &&
+                sizeBytes <= FileUploadLimits.DesignAssetBytes,
             FilePurposeDto.Other =>
-                allowOtherPdf && contentType == "application/pdf" && sizeBytes <= 20L * 1024 * 1024,
+                allowOtherPdf && contentType == "application/pdf" && sizeBytes <= FileUploadLimits.GeneralBytes,
             _ => false
         };
 

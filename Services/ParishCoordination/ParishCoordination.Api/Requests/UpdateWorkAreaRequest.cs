@@ -17,12 +17,20 @@ public sealed class UpdateWorkAreaRequest : IValidatableObject
 
     private decimal? latitude;
     private decimal? longitude;
+    private decimal? mapX;
+    private decimal? mapY;
 
     [System.Text.Json.Serialization.JsonIgnore]
     public bool HasLatitude { get; private set; }
 
     [System.Text.Json.Serialization.JsonIgnore]
     public bool HasLongitude { get; private set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool HasMapX { get; private set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool HasMapY { get; private set; }
 
     [Range(typeof(decimal), "-90", "90")]
     public decimal? Latitude
@@ -38,13 +46,34 @@ public sealed class UpdateWorkAreaRequest : IValidatableObject
         init { longitude = value; HasLongitude = true; }
     }
 
+    [Range(typeof(decimal), "0", "1")]
+    public decimal? MapX
+    {
+        get => mapX;
+        init { mapX = value; HasMapX = true; }
+    }
+
+    [Range(typeof(decimal), "0", "1")]
+    public decimal? MapY
+    {
+        get => mapY;
+        init { mapY = value; HasMapY = true; }
+    }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
+        if (HasMapX != HasMapY || MapX.HasValue != MapY.HasValue)
+        {
+            yield return new ValidationResult(
+                "Send both map coordinates as numbers to set a pin, or both as null to remove it.",
+                [nameof(MapX), nameof(MapY)]);
+        }
+
         if (Name is null &&
             Description is null &&
             CategoryId is null &&
             StartDate is null &&
-            Deadline is null && !HasLatitude && !HasLongitude)
+            Deadline is null && !HasLatitude && !HasLongitude && !HasMapX && !HasMapY)
         {
             yield return new ValidationResult(
                 "At least one field must be provided.",
@@ -53,7 +82,9 @@ public sealed class UpdateWorkAreaRequest : IValidatableObject
                     nameof(Description),
                     nameof(CategoryId),
                     nameof(StartDate),
-                    nameof(Deadline)
+                    nameof(Deadline),
+                    nameof(MapX),
+                    nameof(MapY)
                 ]);
         }
 

@@ -21,7 +21,9 @@ public sealed class WorkArea
         WorkAreaStatus status,
         DateTimeOffset createdAtUtc,
         decimal? latitude = null,
-        decimal? longitude = null)
+        decimal? longitude = null,
+        decimal? mapX = null,
+        decimal? mapY = null)
     {
         return Create(
             Guid.NewGuid(),
@@ -35,7 +37,7 @@ public sealed class WorkArea
             startDate,
             deadline,
             status,
-            createdAtUtc, latitude, longitude);
+            createdAtUtc, latitude, longitude, mapX, mapY);
     }
 
     public static WorkArea Create(
@@ -52,9 +54,12 @@ public sealed class WorkArea
         WorkAreaStatus status,
         DateTimeOffset createdAtUtc,
         decimal? latitude = null,
-        decimal? longitude = null)
+        decimal? longitude = null,
+        decimal? mapX = null,
+        decimal? mapY = null)
     {
         ValidateCoordinates(latitude, longitude);
+        var mapPin = NormalizeMapPin(mapX, mapY);
         return new WorkArea
         {
             Id = id,
@@ -71,7 +76,9 @@ public sealed class WorkArea
             CreatedAt = createdAtUtc,
             Version = 1,
             Latitude = latitude,
-            Longitude = longitude
+            Longitude = longitude,
+            MapX = mapPin.X,
+            MapY = mapPin.Y
         };
     }
 
@@ -85,9 +92,18 @@ public sealed class WorkArea
         bool updateLatitude = false,
         decimal? latitude = null,
         bool updateLongitude = false,
-        decimal? longitude = null)
+        decimal? longitude = null,
+        bool updateMapPin = false,
+        decimal? mapX = null,
+        decimal? mapY = null)
     {
         ValidateCoordinates(latitude, longitude);
+        if (updateMapPin)
+        {
+            var mapPin = NormalizeMapPin(mapX, mapY);
+            MapX = mapPin.X;
+            MapY = mapPin.Y;
+        }
         if (updateLatitude) Latitude = latitude;
         if (updateLongitude) Longitude = longitude;
         Name = name.Trim();
@@ -182,6 +198,23 @@ public sealed class WorkArea
 
     public decimal? Latitude { get; private set; }
     public decimal? Longitude { get; private set; }
+    public decimal? MapX { get; private set; }
+    public decimal? MapY { get; private set; }
+
+    private static (decimal? X, decimal? Y) NormalizeMapPin(decimal? mapX, decimal? mapY)
+    {
+        if (mapX.HasValue != mapY.HasValue)
+            throw new ArgumentException("Map coordinates must both be present or both be null.");
+        if (mapX is < 0m or > 1m)
+            throw new ArgumentOutOfRangeException(nameof(mapX), "Map X must be between 0 and 1.");
+        if (mapY is < 0m or > 1m)
+            throw new ArgumentOutOfRangeException(nameof(mapY), "Map Y must be between 0 and 1.");
+
+        return mapX.HasValue && mapY.HasValue
+            ? (decimal.Round(mapX.Value, 7, MidpointRounding.AwayFromZero),
+               decimal.Round(mapY.Value, 7, MidpointRounding.AwayFromZero))
+            : (null, null);
+    }
 
     public static void ValidateCoordinates(decimal? latitude, decimal? longitude)
     {

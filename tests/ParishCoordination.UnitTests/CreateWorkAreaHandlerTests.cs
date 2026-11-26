@@ -29,7 +29,9 @@ public sealed class CreateWorkAreaHandlerTests
             CategoryNorth,
             CommunityNorth,
             new DateOnly(2026, 10, 10),
-            new DateOnly(2026, 12, 10)));
+            new DateOnly(2026, 12, 10),
+            MapX: 0m,
+            MapY: 1m));
 
         result.Outcome.Should().Be(CreateWorkAreaOutcome.Success);
         workAreas.Items.Should().ContainSingle();
@@ -43,6 +45,10 @@ public sealed class CreateWorkAreaHandlerTests
         workArea.LeaderUserId.Should().BeNull();
         workArea.MaterialOfficerUserId.Should().BeNull();
         result.WorkArea!.Id.Should().Be(workArea.Id);
+        workArea.MapX.Should().Be(0m);
+        workArea.MapY.Should().Be(1m);
+        result.WorkArea.MapX.Should().Be(workArea.MapX);
+        result.WorkArea.MapY.Should().Be(workArea.MapY);
     }
 
     [Fact]

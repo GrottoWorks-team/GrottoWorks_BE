@@ -17,7 +17,9 @@ public sealed record WorkAreaDto(
     WorkAreaStatus Status,
     int Version,
     decimal? Latitude = null,
-    decimal? Longitude = null)
+    decimal? Longitude = null,
+    decimal? MapX = null,
+    decimal? MapY = null)
 {
     public static WorkAreaDto From(WorkArea workArea)
     {
@@ -35,6 +37,8 @@ public sealed record WorkAreaDto(
             workArea.Status,
             workArea.Version,
             workArea.Latitude,
-            workArea.Longitude);
+            workArea.Longitude,
+            workArea.MapX,
+            workArea.MapY);
     }
 }

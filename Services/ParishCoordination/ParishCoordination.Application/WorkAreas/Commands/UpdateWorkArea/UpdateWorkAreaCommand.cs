@@ -12,4 +12,7 @@ public sealed record UpdateWorkAreaCommand(
     bool ShouldUpdateLatitude = false,
     decimal? Latitude = null,
     bool ShouldUpdateLongitude = false,
-    decimal? Longitude = null);
+    decimal? Longitude = null,
+    bool ShouldUpdateMapPin = false,
+    decimal? MapX = null,
+    decimal? MapY = null);

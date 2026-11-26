@@ -108,7 +108,9 @@ public sealed class CreateWorkAreaCommandHandler(
             WorkAreaStatus.Planned,
             DateTimeOffset.UtcNow,
             command.Latitude,
-            command.Longitude);
+            command.Longitude,
+            command.MapX,
+            command.MapY);
 
         workAreaRepository.Add(workArea);
         await workAreaRepository.SaveChangesAsync(cancellationToken);

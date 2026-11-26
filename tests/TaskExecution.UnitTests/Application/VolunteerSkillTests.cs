@@ -44,4 +44,16 @@ public sealed class VolunteerSkillTests
         VolunteerSkills.Meets(volunteer, Guid.NewGuid(), "BASIC").Should().BeFalse();
         VolunteerSkills.Meets(volunteer, declared, null).Should().BeTrue();
     }
+
+    [Fact]
+    public void A_declared_skill_without_a_level_counts_as_basic()
+    {
+        var declared = Guid.NewGuid();
+        var volunteer = new IdentityUser(Guid.NewGuid(), "Volunteer", "ACTIVE", "VOLUNTEER", Guid.NewGuid(), null,
+            [declared], [new(declared, null)]);
+
+        VolunteerSkills.Meets(volunteer, declared, "BASIC").Should().BeTrue("khai báo chưa xếp hạng = mức cơ bản");
+        VolunteerSkills.Meets(volunteer, declared, "INTERMEDIATE").Should().BeFalse();
+        VolunteerSkills.Meets(volunteer, declared, "ADVANCED").Should().BeFalse();
+    }
 }

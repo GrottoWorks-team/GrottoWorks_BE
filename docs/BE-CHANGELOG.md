@@ -1,5 +1,26 @@
 # BE Changelog
 
+## 2026-11-26 (rev 6) — kỹ năng khai báo thiếu cấp bậc không còn bị coi là "0 điểm"
+- Branch: `feat/backend-workflow-improvements`
+- Service: TaskExecution, Identity
+- Files:
+  - `TaskExecution.Application/Users/IIdentityUserLookup.cs` (`VolunteerSkills.DefaultLevel`, `Meets`)
+  - `Identity.Domain/Entities/SkillLevels.cs` (`Default = "BASIC"`)
+  - `Identity.Domain/Entities/AppUser.cs` (`ReplaceSkills`, `ReplaceSkillLevels`)
+  - `tests/TaskExecution.UnitTests/Application/VolunteerSkillTests.cs`, `.../VolunteerMatchTests.cs`
+  - `tests/Identity.UnitTests/Domain/AppUserS2Tests.cs`
+- Change:
+  - **`VolunteerSkills.Meets`:** kỹ năng đã khai báo nhưng `skill_level = null` được tính là **BASIC** (yêu cầu INTERMEDIATE/ADVANCED/EXPERT vẫn bị loại). Trước đây `SkillLevels.Meets(null, "BASIC")` = `0 >= 1` = false, nên TNV khai báo đúng kỹ năng vẫn bị:
+    - `409 TASK_SKILL_MISMATCH` khi đăng ký nhiệm vụ (`AssignmentService.EnsureSkills`),
+    - biến mất khỏi `GET /tasks/{id}/volunteer-matches` (danh sách mời phân công rỗng),
+    - không chọn được làm trưởng nhóm (`TaskTeamLeaderEligibility`).
+  - **Identity ghi cấp bậc mặc định:** `AppUser.ReplaceSkills` tạo link mới với `SkillLevels.Default` (BASIC) thay vì null; `ReplaceSkillLevels` chuẩn hoá `null → BASIC`. Nguyên nhân gốc là client (mobile) gọi `PUT /users/me/skills` chỉ với `{ skillIds }` → mọi kỹ năng mới đều `skill_level = null`. API shape không đổi (vẫn nhận cả `skillIds` và `skills`).
+- Contract impact: Không đổi shape. Hành vi: response `GET /internal/users` và `GET /users/me` có thể trả `skillLevel: "BASIC"` cho kỹ năng trước đây là `null`; matching coi null = BASIC.
+- Migration: Không (cột `skill_level` vẫn nullable; dữ liệu cũ null vẫn hoạt động nhờ quy tắc mới).
+- Tests: `TaskExecution.UnitTests` **407/407**, `Identity.UnitTests` **165/165** (thêm `A_declared_skill_without_a_level_counts_as_basic`, `A_volunteer_with_an_unlevelled_skill_still_matches_a_basic_requirement`, `A_newly_declared_skill_defaults_to_basic_and_a_null_level_is_not_stored`).
+- Verify E2E (docker, mùa `Giáng sinh 2026`): `GET /tasks/89d0da89-0154-43fa-8f0a-29ecdee2382d/volunteer-matches` → 3 ứng viên (trước: 0); `POST /tasks/{id}/applications` bằng TNV `khanh.dang@…` → **201** (trước: 409 `TASK_SKILL_MISMATCH`).
+- Follow-up: mobile đã gửi kèm `skills: [{skillId, skillLevel}]` khi lưu hồ sơ; dữ liệu demo (`SeedingData`) đã bổ sung cấp bậc cho các TNV liên quan hang đá.
+
 ## 2026-11-26 (rev 5) — seeder demo không còn tự thêm dữ liệu vào DB đã seed
 - Branch: `feat/backend-workflow-improvements`
 - Service: ParishCoordination

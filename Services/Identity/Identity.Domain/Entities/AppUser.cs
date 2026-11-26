@@ -260,7 +260,11 @@ public sealed class AppUser
     /// </summary>
     public void ReplaceSkillLevels(IReadOnlyList<VolunteerSkillInput> skills, DateTimeOffset now)
     {
-        var normalized = skills.Select(skill => new VolunteerSkillInput(skill.SkillId, SkillLevels.Normalize(skill.SkillLevel))).ToList();
+        // 26/11/2026: không gửi cấp bậc (null) ⇒ lưu BASIC thay vì null, để TNV đã khai báo kỹ năng
+        // không bị coi là "0 điểm" khi ghép việc.
+        var normalized = skills
+            .Select(skill => new VolunteerSkillInput(skill.SkillId, SkillLevels.Normalize(skill.SkillLevel) ?? SkillLevels.Default))
+            .ToList();
         ReplaceSkills(normalized.Select(skill => skill.SkillId).ToList(), now);
         foreach (var skill in normalized)
             VolunteerSkills.Single(link => link.SkillId == skill.SkillId).UpdateLevel(skill.SkillLevel);
@@ -293,7 +297,8 @@ public sealed class AppUser
         var existing = VolunteerSkills.Select(link => link.SkillId).ToHashSet();
         foreach (var skillId in requested.Where(skillId => !existing.Contains(skillId)))
         {
-            VolunteerSkills.Add(VolunteerSkill.Create(UserId, skillId));
+            // 26/11/2026: link mới luôn có cấp bậc (mặc định BASIC) thay vì null.
+            VolunteerSkills.Add(VolunteerSkill.Create(UserId, skillId, SkillLevels.Default));
         }
 
         UpdatedAt = now;

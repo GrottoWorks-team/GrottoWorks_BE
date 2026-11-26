@@ -58,6 +58,20 @@ public sealed class VolunteerMatchTests
     }
 
     [Fact]
+    public async Task A_volunteer_with_an_unlevelled_skill_still_matches_a_basic_requirement()
+    {
+        var fixture = new AssignmentTestFixture();
+        var skillId = Guid.NewGuid();
+        fixture.Task.ReplaceSkills([new(skillId, "BASIC", null)], null, DateTimeOffset.UtcNow);
+        var unlevelled = Candidate(fixture) with { SkillIds = [skillId], Skills = [new(skillId, null)] };
+        var handler = Handler(fixture, new Directory([unlevelled]), new Schedules([]));
+
+        var result = await handler.HandleAsync(fixture.Task.Id, null, 20, default);
+
+        result.Should().ContainSingle().Which.VolunteerId.Should().Be(unlevelled.UserId);
+    }
+
+    [Fact]
     public void Adjacent_availability_windows_cover_a_task_but_a_gap_does_not()
     {
         var start = DateTimeOffset.Parse("2026-12-01T01:00:00Z");

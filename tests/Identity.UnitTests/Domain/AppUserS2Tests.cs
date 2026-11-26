@@ -45,6 +45,22 @@ public sealed class AppUserS2Tests
     }
 
     [Fact]
+    public void A_newly_declared_skill_defaults_to_basic_and_a_null_level_is_not_stored()
+    {
+        var user = NewVolunteer();
+        var declared = Guid.NewGuid();
+        var detailed = Guid.NewGuid();
+
+        user.ReplaceSkills([declared], Now);
+        user.VolunteerSkills.Single().SkillLevel.Should().Be(SkillLevels.Default);
+
+        user.ReplaceSkillLevels([new VolunteerSkillInput(declared, null), new VolunteerSkillInput(detailed, "EXPERT")], Now);
+        user.VolunteerSkills.Should().OnlyContain(link => link.SkillLevel != null);
+        user.VolunteerSkills.Single(link => link.SkillId == declared).SkillLevel.Should().Be(SkillLevels.Default);
+        user.VolunteerSkills.Single(link => link.SkillId == detailed).SkillLevel.Should().Be("EXPERT");
+    }
+
+    [Fact]
     public void ReplaceSkills_rejects_duplicates_empty_ids_and_too_many()
     {
         var user = NewVolunteer();

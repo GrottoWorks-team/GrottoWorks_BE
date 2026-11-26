@@ -7,6 +7,8 @@ public enum FilePurposeDto
     ProgressEvidence,
     ReadinessEvidence,
     PurchaseReceipt,
+    MapImage,
+    DesignAsset,
     Other
 }
 

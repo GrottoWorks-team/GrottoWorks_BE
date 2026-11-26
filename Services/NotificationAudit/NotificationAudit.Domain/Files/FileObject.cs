@@ -5,6 +5,8 @@ public enum FilePurpose
     ProgressEvidence,
     ReadinessEvidence,
     PurchaseReceipt,
+    MapImage,
+    DesignAsset,
     Other,
     SystemExport,
     DatabaseBackup

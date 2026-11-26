@@ -334,6 +334,11 @@ public sealed class CreateUploadRequestHandler(
             FilePurposeDto.PurchaseReceipt =>
                 (imageTypes.Contains(contentType) || contentType == "application/pdf") &&
                 sizeBytes <= 15L * 1024 * 1024,
+            FilePurposeDto.MapImage =>
+                imageTypes.Contains(contentType) && sizeBytes <= 20L * 1024 * 1024,
+            FilePurposeDto.DesignAsset =>
+                (imageTypes.Contains(contentType) || contentType is "model/gltf-binary" or "application/octet-stream") &&
+                sizeBytes <= 100L * 1024 * 1024,
             FilePurposeDto.Other =>
                 allowOtherPdf && contentType == "application/pdf" && sizeBytes <= 20L * 1024 * 1024,
             _ => false
@@ -353,6 +358,8 @@ public sealed class CreateUploadRequestHandler(
         FilePurposeDto.ProgressEvidence => FilePurpose.ProgressEvidence,
         FilePurposeDto.ReadinessEvidence => FilePurpose.ReadinessEvidence,
         FilePurposeDto.PurchaseReceipt => FilePurpose.PurchaseReceipt,
+        FilePurposeDto.MapImage => FilePurpose.MapImage,
+        FilePurposeDto.DesignAsset => FilePurpose.DesignAsset,
         FilePurposeDto.Other => FilePurpose.Other,
         _ => throw new ArgumentOutOfRangeException(nameof(purpose))
     };

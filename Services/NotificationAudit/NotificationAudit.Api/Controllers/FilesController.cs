@@ -1,0 +1,25 @@
+using BuildingBlocks.Web;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using NotificationAudit.Application.Files;
+
+namespace NotificationAudit.Api.Controllers;
+
+[ApiController]
+[Route("api/v1/files")]
+[Authorize]
+public sealed class FilesController(ProxyUploadPendingHandler proxyUpload) : ControllerBase
+{
+    [HttpPut("{fileId:guid}/proxy-upload")]
+    [Consumes("application/octet-stream", "image/png", "image/jpeg", "image/webp")]
+    [Produces("application/json")]
+    public async Task<IActionResult> ProxyUpload(
+        Guid fileId,
+        CancellationToken cancellationToken)
+    {
+        var contentType = Request.ContentType?.Split(';')[0].Trim().ToLowerInvariant()
+            ?? "application/octet-stream";
+        var result = await proxyUpload.HandleAsync(fileId, Request.Body, contentType, cancellationToken);
+        return Ok(ApiResults.Ok(result, HttpContext));
+    }
+}

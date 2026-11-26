@@ -40,6 +40,26 @@ public sealed class S3FileObjectStorage(ObjectStorageClients clients, TimeProvid
         }
     }
 
+    public async Task UploadAsync(string objectKey, Stream content, string contentType, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await internalClient.PutObjectAsync(new PutObjectRequest
+            {
+                BucketName = options.Bucket,
+                Key = objectKey,
+                InputStream = content,
+                ContentType = contentType,
+                AutoCloseStream = false,
+                UseChunkEncoding = false
+            }, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw new FileStorageUnavailableException("Could not upload the file to object storage.", exception);
+        }
+    }
+
     public async Task CopyToPrivateAsync(string pendingObjectKey, string completedObjectKey, CancellationToken cancellationToken)
     {
         try

@@ -13,6 +13,7 @@ public static class DependencyInjection
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<CreateUploadRequestHandler>();
         services.AddScoped<CompleteUploadHandler>();
+        services.AddScoped<ProxyUploadPendingHandler>();
         services.AddScoped<GetFileDownloadHandler>();
         services.AddScoped<DeleteUnattachedFileHandler>();
         services.AddScoped<GetInternalFileHandler>();

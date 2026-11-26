@@ -2,6 +2,15 @@
 
 ## 2026-11-26
 - Branch: `main`
+- Service: NotificationAudit, ApiGateway
+- Files: `Services/NotificationAudit/NotificationAudit.Application/DependencyInjection.cs`, `NotificationAudit.Application/Files/FileUpload.cs`, `NotificationAudit.Infrastructure/Files/S3FileObjectStorage.cs`, `NotificationAudit.Api/Controllers/FilesController.cs`, `NotificationAudit.Api/Endpoints/NotificationAuditEndpoints.cs`, `NotificationAudit.Api/Program.cs`
+- Change: Added same-origin server-side R2 proxy upload flow for MapImage/DesignAsset; browser no longer performs direct presigned PUT, and pending objects are uploaded, copied, inspected, and completed through NotificationAudit.
+- Contract impact: Additive `PUT /api/v1/files/{fileId}/proxy-upload`; existing presigned upload contract remains available.
+- Migration: No.
+- Follow-up: Retain R2 CORS for direct client flows still used elsewhere until those flows are migrated; remove failed pending upload records/objects through cleanup jobs.
+
+## 2026-11-26
+- Branch: `main`
 - Service: ApiGateway, NotificationAudit, frontend map
 - Files: `ApiGateway/YarpApiGateway/appsettings.Development.json`, `docker-compose.override.yml`, `docs/ops/cloudflare-r2.md`, `GrottoWorks_FE/src/features/map/pages/ParishMapPage.tsx`, locale files
 - Change: Added 5175 local origins to gateway/MinIO/R2 CORS documentation and moved the hidden file input outside embedded-header mode so the admin map upload button opens the file picker.

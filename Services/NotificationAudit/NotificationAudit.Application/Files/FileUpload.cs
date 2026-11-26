@@ -28,6 +28,7 @@ public interface IFileObjectStorage
         CancellationToken cancellationToken);
 
     Task<StoredObjectInspection> InspectAsync(string objectKey, CancellationToken cancellationToken);
+    Task UploadAsync(string objectKey, Stream content, string contentType, CancellationToken cancellationToken);
     // Copy only. The pending upload remains available until the metadata transaction commits.
     Task CopyToPrivateAsync(string pendingObjectKey, string completedObjectKey, CancellationToken cancellationToken);
     Task<PresignedObjectRequest> CreateDownloadRequestAsync(
@@ -59,6 +60,62 @@ public sealed class FileUploadOptions
     public int UploadUrlMinutes { get; init; } = 10;
     public int DownloadUrlMinutes { get; init; } = 5;
     public bool AllowOtherPdf { get; init; }
+}
+
+public sealed class ProxyUploadPendingHandler(
+    ICurrentUser currentUser,
+    IFileObjectRepository repository,
+    IFileObjectStorage storage,
+    CompleteUploadHandler completeUpload)
+{
+    public async Task<FileReferenceDto> HandleAsync(
+        Guid fileId,
+        Stream content,
+        string contentType,
+        CancellationToken cancellationToken)
+    {
+        var file = await repository.GetAsync(fileId, cancellationToken);
+        if (file is null || file.UploadedByUserId != currentUser.UserId)
+        {
+            throw new DomainException("FILE_NOT_FOUND", "The file does not exist.", 404);
+        }
+
+        if (file.Status != FileObjectStatus.PendingUpload)
+        {
+            throw new DomainException("FILE_INVALID_STATE", "The file cannot be uploaded in its current state.", 409);
+        }
+
+        if (!string.Equals(file.ContentType, contentType, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new DomainException("FILE_CONTENT_TYPE_MISMATCH", "Uploaded content does not match the declared type.", 422);
+        }
+
+        try
+        {
+            using var buffer = new MemoryStream();
+            var readBuffer = new byte[81920];
+            var total = 0L;
+            while (true)
+            {
+                var read = await content.ReadAsync(readBuffer.AsMemory(0, readBuffer.Length), cancellationToken);
+                if (read == 0) break;
+                total += read;
+                if (total > 20 * 1024 * 1024)
+                {
+                    throw new DomainException("FILE_SIZE_MISMATCH", "Uploaded file exceeds the permitted size.", 422);
+                }
+                await buffer.WriteAsync(readBuffer.AsMemory(0, read), cancellationToken);
+            }
+            buffer.Position = 0;
+            await storage.UploadAsync(file.ObjectKey, buffer, contentType, cancellationToken);
+        }
+        catch (FileStorageUnavailableException)
+        {
+            throw new DomainException("FILE_STORAGE_UNAVAILABLE", "File storage is temporarily unavailable.", 503);
+        }
+
+        return await completeUpload.HandleAsync(fileId, new CompleteUploadRequest(null), cancellationToken);
+    }
 }
 
 public sealed class GetFileDownloadHandler(

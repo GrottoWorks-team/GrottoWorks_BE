@@ -1,4 +1,5 @@
 using BuildingBlocks.Web;
+using BuildingBlocks.Web.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using NotificationAudit.Application.Files;
 using NotificationAudit.Contracts.Files;

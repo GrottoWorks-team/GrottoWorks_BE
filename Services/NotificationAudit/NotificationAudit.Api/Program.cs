@@ -24,6 +24,7 @@ builder.Services.AddOpenApi(options =>
         return Task.CompletedTask;
     });
 });
+builder.Services.AddControllers();
 builder.Services.AddValidation();
 builder.Services.AddGrottoWorksSecurity(builder.Configuration);
 builder.Services.AddGrottoWorksCurrentUser();
@@ -66,6 +67,7 @@ app.UseGrottoWorksDefaults();
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapControllers();
 app.MapNotificationAuditEndpoints();
 app.MapSystemJobEndpoints();
 app.MapSystemExportEndpoints();

@@ -22,6 +22,20 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("ParishCoordination.Application.Parishes.ParishMapAttachmentIntent", b =>
+                {
+                    b.Property<Guid>("Id").HasColumnType("uuid").HasColumnName("reservation_id");
+                    b.Property<Guid>("FileId").HasColumnType("uuid").HasColumnName("file_id");
+                    b.Property<bool>("MapSaved").HasColumnType("boolean").HasColumnName("map_saved");
+                    b.Property<DateTimeOffset>("NextAttemptAt").HasColumnType("timestamp with time zone").HasColumnName("next_attempt_at");
+                    b.Property<Guid>("ParishId").HasColumnType("uuid").HasColumnName("parish_id");
+
+                    b.HasKey("Id");
+                    b.HasIndex("NextAttemptAt");
+                    b.HasIndex("ParishId", "FileId").IsUnique();
+                    b.ToTable("parish_map_attachment_intent");
+                });
+
             modelBuilder.Entity("ParishCoordination.Domain.Entities.Community", b =>
                 {
                     b.Property<Guid>("Id")
@@ -242,6 +256,16 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
                         .HasColumnType("numeric(10,7)")
                         .HasColumnName("longitude");
 
+                    b.Property<decimal?>("MapX")
+                        .HasPrecision(8, 7)
+                        .HasColumnType("numeric(8,7)")
+                        .HasColumnName("map_x");
+
+                    b.Property<decimal?>("MapY")
+                        .HasPrecision(8, 7)
+                        .HasColumnType("numeric(8,7)")
+                        .HasColumnName("map_y");
+
                     b.Property<Guid?>("MaterialOfficerUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("material_officer_user_id");
@@ -292,6 +316,8 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
                             t.HasCheckConstraint("work_area_latitude_range", "latitude IS NULL OR latitude BETWEEN -90 AND 90");
 
                             t.HasCheckConstraint("work_area_longitude_range", "longitude IS NULL OR longitude BETWEEN -180 AND 180");
+
+                            t.HasCheckConstraint("work_area_map_pin_valid", "(map_x IS NULL AND map_y IS NULL) OR (map_x IS NOT NULL AND map_y IS NOT NULL AND map_x BETWEEN 0 AND 1 AND map_y BETWEEN 0 AND 1)");
                         });
                 });
 

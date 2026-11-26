@@ -78,23 +78,25 @@ public sealed class FileFinalizationTests
     }
 
     [Fact]
-    public void Inspection_reads_no_more_than_one_byte_beyond_its_limit()
+    public async Task Inspection_reads_no_more_than_one_byte_beyond_its_limit()
     {
         using var stream = new MemoryStream(new byte[1024]);
-        Action read = () => S3FileObjectStorage.ReadBounded(stream, 16, default);
-        read.Should().Throw<UploadedObjectTooLargeException>();
+        await Assert.ThrowsAsync<UploadedObjectTooLargeException>(() =>
+            S3FileObjectStorage.InspectStreamAsync(stream, null, 16, default));
         stream.Position.Should().Be(17);
     }
 
     [Fact]
-    public void Exact_limit_is_accepted_and_cancellation_is_honored()
+    public async Task Exact_limit_is_accepted_and_cancellation_is_honored()
     {
         using var stream = new MemoryStream([1, 2, 3]);
-        S3FileObjectStorage.ReadBounded(stream, 3, default).Should().Equal(1, 2, 3);
+        var inspection = await S3FileObjectStorage.InspectStreamAsync(stream, null, 3, default);
+        inspection.SizeBytes.Should().Be(3);
+        inspection.Sha256.Should().Be(Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(new byte[] { 1, 2, 3 })));
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
-        Action read = () => S3FileObjectStorage.ReadBounded(stream, 3, cancelled.Token);
-        read.Should().Throw<OperationCanceledException>();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            S3FileObjectStorage.InspectStreamAsync(stream, null, 3, cancelled.Token));
     }
 
     internal sealed class Fixture
@@ -105,10 +107,10 @@ public sealed class FileFinalizationTests
         public Repository Repository { get; }
         public Storage Storage { get; }
         public CompleteUploadHandler Complete { get; }
-        public Fixture()
+        public Fixture(string contentType = "image/jpeg", long size = 4, FilePurpose purpose = FilePurpose.ProgressEvidence)
         {
-            File = FileObject.CreateUploadRequest(User.UserId, "photo.jpg", "image/jpeg", 4, null,
-                FilePurpose.ProgressEvidence, DateTimeOffset.UtcNow);
+            File = FileObject.CreateUploadRequest(User.UserId, "upload", contentType, size, null,
+                purpose, DateTimeOffset.UtcNow);
             Repository = new(File, Log);
             Storage = new(Log);
             Complete = new(User, Repository, Storage, TimeProvider.System);
@@ -148,10 +150,18 @@ public sealed class FileFinalizationTests
         public List<string> Deleted { get; } = [];
         public List<string> Downloaded { get; } = [];
         public StoredObjectInspection Inspection { get; set; } = new(4, "image/jpeg", "checksum", "image/jpeg");
+        public int Uploads { get; private set; }
+        public Func<Stream, Task>? OnUpload { get; set; }
+        public Func<long, Task<StoredObjectInspection>>? OnInspect { get; set; }
+        public async Task UploadAsync(string objectKey, Stream content, string contentType, CancellationToken cancellationToken)
+        {
+            Uploads++;
+            if (OnUpload is not null) await OnUpload(content);
+        }
         public Task CopyToPrivateAsync(string pending, string completed, CancellationToken cancellationToken)
         { log.Add("copy"); return Task.CompletedTask; }
-        public Task<StoredObjectInspection> InspectAsync(string key, CancellationToken cancellationToken)
-        { log.Add("inspect"); InspectedKey = key; return Task.FromResult(Inspection); }
+        public Task<StoredObjectInspection> InspectAsync(string key, long maximumBytes, CancellationToken cancellationToken)
+        { log.Add("inspect"); InspectedKey = key; return OnInspect?.Invoke(maximumBytes) ?? Task.FromResult(Inspection); }
         public Task DeleteAsync(string key, CancellationToken cancellationToken)
         {
             log.Add("delete");
@@ -160,11 +170,6 @@ public sealed class FileFinalizationTests
             return Task.CompletedTask;
         }
         public Task<PresignedObjectRequest> CreateUploadRequestAsync(string key, string type, TimeSpan lifetime, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task UploadAsync(string key, Stream content, string contentType, CancellationToken cancellationToken)
-        {
-            log.Add("upload");
-            return Task.CompletedTask;
-        }
         public Task<PresignedObjectRequest> CreateDownloadRequestAsync(string key, TimeSpan lifetime, CancellationToken cancellationToken)
         {
             Downloaded.Add(key);

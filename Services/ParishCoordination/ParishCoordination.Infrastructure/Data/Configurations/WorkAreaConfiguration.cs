@@ -13,9 +13,13 @@ public sealed class WorkAreaConfiguration : IEntityTypeConfiguration<WorkArea>
         {
             table.HasCheckConstraint("work_area_latitude_range", "latitude IS NULL OR latitude BETWEEN -90 AND 90");
             table.HasCheckConstraint("work_area_longitude_range", "longitude IS NULL OR longitude BETWEEN -180 AND 180");
+            table.HasCheckConstraint("work_area_map_pin_valid",
+                "(map_x IS NULL AND map_y IS NULL) OR (map_x IS NOT NULL AND map_y IS NOT NULL AND map_x BETWEEN 0 AND 1 AND map_y BETWEEN 0 AND 1)");
         });
         builder.Property(area => area.Latitude).HasColumnName("latitude").HasPrecision(10, 7);
         builder.Property(area => area.Longitude).HasColumnName("longitude").HasPrecision(10, 7);
+        builder.Property(area => area.MapX).HasColumnName("map_x").HasPrecision(8, 7);
+        builder.Property(area => area.MapY).HasColumnName("map_y").HasPrecision(8, 7);
 
         builder.HasKey(workArea => workArea.Id);
 

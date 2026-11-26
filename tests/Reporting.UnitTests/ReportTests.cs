@@ -1,6 +1,13 @@
 using System.Text.Json;
 using BuildingBlocks.Security;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Infrastructure;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Readiness.Contracts.Events;
+using Reporting.Api.Endpoints;
 using Reporting.Application.Ingestion;
 using Reporting.Application.ReadModels;
 using Reporting.Application.Recognition;
@@ -243,6 +250,40 @@ public sealed class ReportTests
         summary.Readiness.WithoutResult.Should().Be(1);
         summary.NotAvailable.Should().NotBeEmpty();
         dashboard.WorkAreas.Single(area => area.Name == "Hang đá").ProgressPercent.Should().Be(50m);
+    }
+
+    [Fact]
+    public async Task Season_dashboard_rejects_admin_and_uses_the_parish_claim()
+    {
+        var foreignSeason = Guid.NewGuid();
+        _scopes.Seed(Guid.NewGuid(), foreignSeason, Guid.NewGuid(), Guid.NewGuid(), "Other parish");
+
+        var foreign = () => Dashboards(User(GrottoWorksRoles.Parish)).SeasonAsync(foreignSeason);
+        (await foreign.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("SEASON_NOT_FOUND");
+
+        var admin = () => Dashboards(User(GrottoWorksRoles.Admin)).SeasonAsync(_seasonId);
+        (await admin.Should().ThrowAsync<DomainRuleException>()).Which.Kind.Should().Be(DomainErrorKind.Forbidden);
+    }
+
+    [Fact]
+    public async Task Season_dashboard_route_only_allows_parish_and_rejects_the_old_parish_filter()
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Services.AddRouting();
+        builder.Services.AddSingleton(Dashboards(User(GrottoWorksRoles.Parish)));
+        builder.Services.AddSingleton(Reports(User(GrottoWorksRoles.Parish)));
+        await using var app = builder.Build();
+        app.MapReportEndpoints();
+        var endpoint = ((IEndpointRouteBuilder)app).DataSources.SelectMany(source => source.Endpoints)
+            .OfType<RouteEndpoint>().Single(route => route.RoutePattern.RawText == "/api/v1/dashboards/season");
+        endpoint.Metadata.GetOrderedMetadata<AuthorizationPolicy>().SelectMany(policy => policy.Requirements)
+            .OfType<RolesAuthorizationRequirement>().SelectMany(requirement => requirement.AllowedRoles)
+            .Should().Equal(GrottoWorksRoles.Parish);
+
+        var context = new DefaultHttpContext { RequestServices = app.Services };
+        context.Request.QueryString = new QueryString($"?seasonId={_seasonId}&parishId={Guid.NewGuid()}");
+        var call = () => endpoint.RequestDelegate!(context);
+        (await call.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("INVALID_FILTER_FIELD");
     }
 
     [Fact]

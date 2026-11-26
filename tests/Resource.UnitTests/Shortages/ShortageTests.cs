@@ -44,8 +44,7 @@ public sealed class ShortageTests
 
     private ShortageTracker Tracker() => new(Reader(), _events);
 
-    // 26/11/2026: manual requirement creation is disabled (requirements come from task materials),
-    // so the test seeds the requirement and publishes the shortage move itself.
+    // 26/11/2026: the test seeds the requirement row and publishes the shortage move itself (no handler in the way).
     private async Task<MaterialRequirementDto> Require(WorkAreaScope area, Material material, decimal quantity)
     {
         var tracker = Tracker();
@@ -107,8 +106,7 @@ public sealed class ShortageTests
     [Fact]
     public async Task Shortage_changed_is_published_on_requirement_and_stock_changes_only_when_it_moves()
     {
-        // 26/11/2026: the manual create/update handlers are disabled (requirements come from task materials),
-        // so this test drives the aggregate and the tracker directly.
+        // 26/11/2026: this test drives the aggregate and the tracker directly (no handler in the way).
         var tracker = Tracker();
         var requirement = MaterialRequirement.Create(_grotto.WorkAreaId, _cable.MaterialId, 100, 0, null, DateTimeOffset.UtcNow);
         var beforeCreation = await tracker.CaptureAsync(_grotto, _cable.MaterialId);

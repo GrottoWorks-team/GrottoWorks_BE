@@ -52,6 +52,38 @@ public sealed class UpdateWorkAreaHandlerTests
     }
 
     [Fact]
+    public async Task Map_pin_patch_can_set_move_preserve_and_clear_the_pair()
+    {
+        var area = BuildWorkArea();
+        var originalName = area.Name;
+        var repository = WorkAreas(area);
+        var handler = Handler(repository, Seasons(BuildSeason()), Categories(), User(GrottoWorksRoles.Leader, ParishNorth, LeaderId));
+
+        var pin = new UpdateWorkAreaCommand(WorkAreaId, null, false, null, null, null, null, 1,
+            ShouldUpdateMapPin: true, MapX: 0m, MapY: 1m);
+        var created = await handler.HandleAsync(pin);
+        created.Outcome.Should().Be(UpdateWorkAreaOutcome.Success);
+        created.WorkArea!.MapX.Should().Be(0m);
+        created.WorkArea.MapY.Should().Be(1m);
+        created.WorkArea.Version.Should().Be(2);
+        area.Name.Should().Be(originalName);
+
+        var moved = await handler.HandleAsync(pin with { ExpectedVersion = 2, MapX = 0.25m, MapY = 0.6m });
+        moved.WorkArea!.MapX.Should().Be(0.25m);
+        moved.WorkArea.MapY.Should().Be(0.6m);
+
+        var renamed = await handler.HandleAsync(Command(expectedVersion: 3));
+        renamed.WorkArea!.MapX.Should().Be(0.25m);
+        renamed.WorkArea.MapY.Should().Be(0.6m);
+
+        var cleared = await handler.HandleAsync(pin with { ExpectedVersion = 4, MapX = null, MapY = null });
+        cleared.WorkArea!.MapX.Should().BeNull();
+        cleared.WorkArea.MapY.Should().BeNull();
+        cleared.WorkArea.Version.Should().Be(5);
+        repository.SaveChangesCount.Should().Be(4);
+    }
+
+    [Fact]
     public async Task Parish_user_updates_work_area_in_its_parish()
     {
         var workAreas = WorkAreas(BuildWorkArea());
@@ -170,7 +202,7 @@ public sealed class UpdateWorkAreaHandlerTests
             Categories(),
             User(GrottoWorksRoles.Parish, ParishSouth));
 
-        var action = () => handler.HandleAsync(Command());
+        var action = () => handler.HandleAsync(Command() with { ShouldUpdateMapPin = true, MapX = 0.25m, MapY = 0.6m });
 
         var exception = await action.Should().ThrowAsync<DomainException>();
         exception.Which.Code.Should().Be("PARISH_ACCESS_DENIED");
@@ -230,7 +262,7 @@ public sealed class UpdateWorkAreaHandlerTests
                 Seasons(BuildSeason(SeasonStatus.Archived)),
                 Categories(),
                 User(GrottoWorksRoles.Parish, ParishNorth))
-            .HandleAsync(Command());
+            .HandleAsync(Command() with { ShouldUpdateMapPin = true, MapX = 0.25m, MapY = 0.6m });
 
         result.Outcome.Should().Be(UpdateWorkAreaOutcome.SeasonInvalidState);
         workAreas.SaveChangesCount.Should().Be(0);
@@ -283,7 +315,7 @@ public sealed class UpdateWorkAreaHandlerTests
                 Seasons(BuildSeason()),
                 Categories(),
                 User(GrottoWorksRoles.Parish, ParishNorth))
-            .HandleAsync(Command(expectedVersion: 2));
+            .HandleAsync(Command(expectedVersion: 2) with { ShouldUpdateMapPin = true, MapX = 0.25m, MapY = 0.6m });
 
         var raceRepository = WorkAreas(BuildWorkArea());
         raceRepository.ThrowConcurrencyOnSave = true;

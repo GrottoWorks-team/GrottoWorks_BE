@@ -212,7 +212,9 @@ public sealed class WorkAreaHandlerTests
             nameof(WorkAreaDto.Status),
             nameof(WorkAreaDto.Version),
             nameof(WorkAreaDto.Latitude),
-            nameof(WorkAreaDto.Longitude));
+            nameof(WorkAreaDto.Longitude),
+            nameof(WorkAreaDto.MapX),
+            nameof(WorkAreaDto.MapY));
         dtoProperties.Should().NotContain("WorkAreaCategoryId");
     }
 

@@ -24,8 +24,20 @@ public sealed class CreateWorkAreaRequest : IValidatableObject
     [Range(typeof(decimal), "-180", "180")]
     public decimal? Longitude { get; init; }
 
+    [Range(typeof(decimal), "0", "1")]
+    public decimal? MapX { get; init; }
+
+    [Range(typeof(decimal), "0", "1")]
+    public decimal? MapY { get; init; }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
+        if (MapX.HasValue != MapY.HasValue)
+        {
+            yield return new ValidationResult(
+                "Provide both map coordinates to set a pin.", [nameof(MapX), nameof(MapY)]);
+        }
+
         if (string.IsNullOrWhiteSpace(Name))
         {
             yield return new ValidationResult(

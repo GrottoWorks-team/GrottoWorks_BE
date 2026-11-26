@@ -63,6 +63,10 @@ public static class DependencyInjection
         var fileAddress = configuration[NotificationAuditClientOptions.BaseAddressConfigurationKey];
         var validFiles = Uri.TryCreate(fileAddress, UriKind.Absolute, out var files) &&
             (files.Scheme == Uri.UriSchemeHttp || files.Scheme == Uri.UriSchemeHttps);
+        services.AddScoped<IParishMapAttachmentStore, ParishMapAttachmentStore>();
+        services.AddScoped<ParishMapAttachmentRecovery>();
+        if (validFiles)
+            services.AddHostedService<ParishMapAttachmentWorker>();
         services.AddSingleton(new NotificationAuditClientOptions(
             validFiles ? files! : new Uri("http://unconfigured.invalid/"),
             validFiles ? configuration["InternalApi:ApiKey"] ?? string.Empty : string.Empty));

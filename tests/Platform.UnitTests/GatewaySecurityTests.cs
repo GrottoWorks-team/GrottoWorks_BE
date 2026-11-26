@@ -24,5 +24,10 @@ public sealed class GatewaySecurityTests
         }
         Assert.Equal("task",routes.GetProperty("task-purchase-create-route").GetProperty("ClusterId").GetString());
         Assert.Equal(-1,routes.GetProperty("task-purchase-create-route").GetProperty("Order").GetInt32());
+        var proxyUpload = routes.GetProperty("notificationaudit-proxy-upload-route");
+        Assert.Equal("authenticated", proxyUpload.GetProperty("AuthorizationPolicy").GetString());
+        Assert.Equal("notificationaudit", proxyUpload.GetProperty("ClusterId").GetString());
+        Assert.Equal(100 * 1024 * 1024, proxyUpload.GetProperty("MaxRequestBodySize").GetInt32());
+        Assert.Equal("/api/v1/files/{fileId}/proxy-upload", proxyUpload.GetProperty("Match").GetProperty("Path").GetString());
     }
 }

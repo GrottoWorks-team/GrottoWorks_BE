@@ -2,6 +2,15 @@
 
 ## 2026-11-26
 - Branch: `main`
+- Service: ApiGateway, NotificationAudit, frontend map
+- Files: `ApiGateway/YarpApiGateway/appsettings.Development.json`, `docker-compose.override.yml`, `docs/ops/cloudflare-r2.md`, `GrottoWorks_FE/src/features/map/pages/ParishMapPage.tsx`, locale files
+- Change: Added 5175 local origins to gateway/MinIO/R2 CORS documentation and moved the hidden file input outside embedded-header mode so the admin map upload button opens the file picker.
+- Contract impact: None.
+- Migration: No.
+- Follow-up: Apply both 5175 origins to the Cloudflare R2 bucket CORS policy, then re-test direct browser upload.
+
+## 2026-11-26
+- Branch: `main`
 - Service: Reporting, NotificationAudit/Frontend map handling
 - Files: `Services/Reporting/Reporting.Api/Endpoints/ReportEndpoints.cs`, `Services/Reporting/Reporting.Application/Reports/DashboardHandlers.cs`, `GrottoWorks_FE/src/features/dashboards/api.ts`, `GrottoWorks_FE/src/features/dashboards/ParishOverview.tsx`, `GrottoWorks_FE/src/features/map/localStore.ts`, `GrottoWorks_FE/src/features/map/pages/ParishMapPage.tsx`, `GrottoWorks_FE/src/features/areas/pages/AreaFormDialog.tsx`
 - Change: Added ADMIN access and explicit parish scope to season dashboards; stopped legacy/non-GUID map keys from calling the file download endpoint and added orphan map cleanup.

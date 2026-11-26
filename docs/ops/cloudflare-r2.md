@@ -23,7 +23,7 @@ Kế hoạch tổng: `GrottoWorks_Documents/GrottoWorks_Cloudflare_R2_Storage_Pl
    ```json
    [
      {
-       "AllowedOrigins": ["https://<domain-fe>", "http://localhost:5173", "http://127.0.0.1:5173"],
+       "AllowedOrigins": ["https://<domain-fe>", "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5175", "http://127.0.0.1:5175"],
        "AllowedMethods": ["GET", "PUT", "HEAD"],
        "AllowedHeaders": ["Content-Type"],
        "ExposeHeaders": ["ETag", "Content-Length"],

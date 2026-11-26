@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using Resource.Application.Catalog;
 using Resource.Application.Inventory;
 using Resource.Application.Scope;
@@ -28,15 +29,9 @@ public sealed record MaterialRequirementDto(
 
     private static Guid StableId(Guid workAreaId, Guid materialId)
     {
-        Span<byte> identity = stackalloc byte[32];
-        workAreaId.TryWriteBytes(identity[..16], bigEndian: true, out _);
-        materialId.TryWriteBytes(identity[16..], bigEndian: true, out _);
-        Span<byte> hash = stackalloc byte[32];
-        SHA256.HashData(identity, hash);
-        // Version 8 UUID and standard variant for an identity derived from the aggregate key.
-        hash[6] = (byte)((hash[6] & 0x0f) | 0x80);
-        hash[8] = (byte)((hash[8] & 0x3f) | 0x80);
-        return new Guid(hash[..16], bigEndian: true);
+        // The list has no stored row ID. The same area and material always produce the same ID.
+        var key = $"Resource:MaterialRequirement:{workAreaId:D}:{materialId:D}";
+        return new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(key))[..16]);
     }
 }
 

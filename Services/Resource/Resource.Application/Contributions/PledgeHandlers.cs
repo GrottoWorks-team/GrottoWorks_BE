@@ -128,6 +128,7 @@ public sealed class PledgeMaterialCommandHandler(
 
         await MaterialRules.EnsureActiveAsync(catalog, command.Items.Select(item => item.MaterialId), cancellationToken);
         var required = (await requirements.ListByWorkAreaAsync(scope.WorkAreaId, cancellationToken))
+            .Where(requirement => requirement.Status == RequirementStatus.Active)
             .Select(requirement => requirement.MaterialId)
             .ToHashSet();
         if (command.Items.FirstOrDefault(item => !required.Contains(item.MaterialId)) is { } notNeeded)

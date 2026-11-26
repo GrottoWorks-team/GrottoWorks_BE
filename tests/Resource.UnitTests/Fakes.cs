@@ -168,9 +168,8 @@ public sealed class FakeRequirementStore : Resource.Application.Requirements.IMa
 
     public int SaveChangesCount { get; private set; }
 
-    public Task<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>> ListByWorkAreaAsync(
-        Guid workAreaId, CancellationToken cancellationToken = default) =>
-        new FakeInventoryStore(this).GetRequiredTotalsAsync([workAreaId], null, cancellationToken);
+    public Task<IReadOnlyList<Resource.Domain.Inventory.MaterialRequirement>> ListByWorkAreaAsync(Guid workAreaId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Inventory.MaterialRequirement>>(Requirements.Where(r => r.WorkAreaId == workAreaId).ToList());
 
     public Task<Resource.Domain.Inventory.MaterialRequirement?> GetAsync(Guid requirementId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Requirements.FirstOrDefault(r => r.MaterialRequirementId == requirementId));
@@ -224,9 +223,7 @@ public sealed class FakeInventoryStore(FakeRequirementStore requirements) : Reso
         Task.FromResult<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>>(requirements.Requirements
             .Where(r => workAreaIds.Contains(r.WorkAreaId) && r.Status == Resource.Domain.Inventory.RequirementStatus.Active &&
                         (materialId is null || r.MaterialId == materialId))
-            .GroupBy(r => (r.WorkAreaId, r.MaterialId))
-            .Select(g => new Resource.Application.Inventory.QuantityByMaterial(
-                g.Key.WorkAreaId, g.Key.MaterialId, g.Sum(r => r.RequiredQuantity)))
+            .Select(r => new Resource.Application.Inventory.QuantityByMaterial(r.WorkAreaId, r.MaterialId, r.RequiredQuantity))
             .ToList());
 
     public Task<IReadOnlyList<Resource.Application.Inventory.QuantityByMaterial>> GetAllocatedTotalsAsync(

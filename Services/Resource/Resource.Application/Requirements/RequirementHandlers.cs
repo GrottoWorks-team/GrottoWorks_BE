@@ -1,8 +1,7 @@
-using System.Security.Cryptography;
-using System.Text;
+using Resource.Application.Abstractions;
 using Resource.Application.Catalog;
-using Resource.Application.Inventory;
 using Resource.Application.Scope;
+using Resource.Application.Shortages;
 using Resource.Domain;
 using Resource.Domain.Catalog;
 using Resource.Domain.Inventory;
@@ -23,21 +22,23 @@ public sealed record MaterialRequirementDto(
     string? Note,
     long Version)
 {
-    public static MaterialRequirementDto From(QuantityByMaterial requirement, Material material) =>
-        new(StableId(requirement.WorkAreaId, requirement.MaterialId), requirement.WorkAreaId, requirement.MaterialId,
-            material.Code, material.Name, material.Unit, requirement.Quantity, 0, RequirementStatus.Active, null, 0);
-
-    private static Guid StableId(Guid workAreaId, Guid materialId)
-    {
-        // The list has no stored row ID. The same area and material always produce the same ID.
-        var key = $"Resource:MaterialRequirement:{workAreaId:D}:{materialId:D}";
-        return new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(key))[..16]);
-    }
+    public static MaterialRequirementDto From(MaterialRequirement requirement, Material material) =>
+        new(requirement.MaterialRequirementId, requirement.WorkAreaId, requirement.MaterialId, material.Code, material.Name,
+            material.Unit, requirement.RequiredQuantity, requirement.ExistingQuantity, requirement.Status, requirement.Note,
+            requirement.Version);
 }
 
 public interface IMaterialRequirementStore
 {
-    Task<IReadOnlyList<QuantityByMaterial>> ListByWorkAreaAsync(Guid workAreaId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<MaterialRequirement>> ListByWorkAreaAsync(Guid workAreaId, CancellationToken cancellationToken = default);
+
+    Task<MaterialRequirement?> GetAsync(Guid requirementId, CancellationToken cancellationToken = default);
+
+    Task<bool> ExistsAsync(Guid workAreaId, Guid materialId, CancellationToken cancellationToken = default);
+
+    void Add(MaterialRequirement requirement);
+
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed record CreateMaterialRequirementCommand(Guid WorkAreaId, Guid MaterialId, decimal RequiredQuantity, decimal? ExistingQuantity, string? Note);
@@ -63,8 +64,9 @@ public sealed class ListMaterialRequirementsQueryHandler(
     {
         await access.ForReadAsync(workAreaId, cancellationToken);
 
-        if (status is not (null or RequirementStatus.Active)) return [];
-        var requirements = await store.ListByWorkAreaAsync(workAreaId, cancellationToken);
+        var requirements = (await store.ListByWorkAreaAsync(workAreaId, cancellationToken))
+            .Where(requirement => status is null || requirement.Status == status)
+            .ToList();
         var materials = (await catalog.GetMaterialsAsync(requirements.Select(r => r.MaterialId).ToList(), cancellationToken))
             .ToDictionary(material => material.MaterialId);
 
@@ -75,8 +77,16 @@ public sealed class ListMaterialRequirementsQueryHandler(
     }
 }
 
-/// <summary>Former manual create command. Area requirements now derive from task material plans.</summary>
-public sealed class CreateMaterialRequirementCommandHandler
+/// <summary>
+/// F-RES-03 <c>createMaterialRequirement</c> (MO of the work area): material must be ACTIVE, quantity &gt; 0,
+/// one requirement per (work area, material) — a cancelled one is re-activated through PATCH instead.
+/// </summary>
+public sealed class CreateMaterialRequirementCommandHandler(
+    WorkAreaAccess access,
+    IMaterialRequirementStore store,
+    IMaterialCatalogStore catalog,
+    ShortageTracker shortages,
+    IUnitOfWork unitOfWork)
 {
     public Task<MaterialRequirementDto> HandleAsync(
         CreateMaterialRequirementCommand command,
@@ -86,8 +96,13 @@ public sealed class CreateMaterialRequirementCommandHandler
             "Material requirements must be declared from the real materials of each task.");
 }
 
-/// <summary>Former manual update command. Area requirements now derive from task material plans.</summary>
-public sealed class UpdateMaterialRequirementCommandHandler
+/// <summary>F-RES-03 <c>updateMaterialRequirement</c> (MO of the work area): quantity, note, cancel/re-activate.</summary>
+public sealed class UpdateMaterialRequirementCommandHandler(
+    WorkAreaAccess access,
+    IMaterialRequirementStore store,
+    IMaterialCatalogStore catalog,
+    ShortageTracker shortages,
+    IUnitOfWork unitOfWork)
 {
     public Task<MaterialRequirementDto> HandleAsync(
         UpdateMaterialRequirementCommand command,

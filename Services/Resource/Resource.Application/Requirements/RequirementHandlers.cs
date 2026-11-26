@@ -1,7 +1,7 @@
-using Resource.Application.Abstractions;
+using System.Security.Cryptography;
 using Resource.Application.Catalog;
+using Resource.Application.Inventory;
 using Resource.Application.Scope;
-using Resource.Application.Shortages;
 using Resource.Domain;
 using Resource.Domain.Catalog;
 using Resource.Domain.Inventory;
@@ -22,23 +22,27 @@ public sealed record MaterialRequirementDto(
     string? Note,
     long Version)
 {
-    public static MaterialRequirementDto From(MaterialRequirement requirement, Material material) =>
-        new(requirement.MaterialRequirementId, requirement.WorkAreaId, requirement.MaterialId, material.Code, material.Name,
-            material.Unit, requirement.RequiredQuantity, requirement.ExistingQuantity, requirement.Status, requirement.Note,
-            requirement.Version);
+    public static MaterialRequirementDto From(QuantityByMaterial requirement, Material material) =>
+        new(StableId(requirement.WorkAreaId, requirement.MaterialId), requirement.WorkAreaId, requirement.MaterialId,
+            material.Code, material.Name, material.Unit, requirement.Quantity, 0, RequirementStatus.Active, null, 0);
+
+    private static Guid StableId(Guid workAreaId, Guid materialId)
+    {
+        Span<byte> identity = stackalloc byte[32];
+        workAreaId.TryWriteBytes(identity[..16], bigEndian: true, out _);
+        materialId.TryWriteBytes(identity[16..], bigEndian: true, out _);
+        Span<byte> hash = stackalloc byte[32];
+        SHA256.HashData(identity, hash);
+        // Version 8 UUID and standard variant for an identity derived from the aggregate key.
+        hash[6] = (byte)((hash[6] & 0x0f) | 0x80);
+        hash[8] = (byte)((hash[8] & 0x3f) | 0x80);
+        return new Guid(hash[..16], bigEndian: true);
+    }
 }
 
 public interface IMaterialRequirementStore
 {
-    Task<IReadOnlyList<MaterialRequirement>> ListByWorkAreaAsync(Guid workAreaId, CancellationToken cancellationToken = default);
-
-    Task<MaterialRequirement?> GetAsync(Guid requirementId, CancellationToken cancellationToken = default);
-
-    Task<bool> ExistsAsync(Guid workAreaId, Guid materialId, CancellationToken cancellationToken = default);
-
-    void Add(MaterialRequirement requirement);
-
-    Task SaveChangesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<QuantityByMaterial>> ListByWorkAreaAsync(Guid workAreaId, CancellationToken cancellationToken = default);
 }
 
 public sealed record CreateMaterialRequirementCommand(Guid WorkAreaId, Guid MaterialId, decimal RequiredQuantity, decimal? ExistingQuantity, string? Note);
@@ -64,9 +68,8 @@ public sealed class ListMaterialRequirementsQueryHandler(
     {
         await access.ForReadAsync(workAreaId, cancellationToken);
 
-        var requirements = (await store.ListByWorkAreaAsync(workAreaId, cancellationToken))
-            .Where(requirement => status is null || requirement.Status == status)
-            .ToList();
+        if (status is not (null or RequirementStatus.Active)) return [];
+        var requirements = await store.ListByWorkAreaAsync(workAreaId, cancellationToken);
         var materials = (await catalog.GetMaterialsAsync(requirements.Select(r => r.MaterialId).ToList(), cancellationToken))
             .ToDictionary(material => material.MaterialId);
 
@@ -77,16 +80,8 @@ public sealed class ListMaterialRequirementsQueryHandler(
     }
 }
 
-/// <summary>
-/// F-RES-03 <c>createMaterialRequirement</c> (MO of the work area): material must be ACTIVE, quantity &gt; 0,
-/// one requirement per (work area, material) — a cancelled one is re-activated through PATCH instead.
-/// </summary>
-public sealed class CreateMaterialRequirementCommandHandler(
-    WorkAreaAccess access,
-    IMaterialRequirementStore store,
-    IMaterialCatalogStore catalog,
-    ShortageTracker shortages,
-    IUnitOfWork unitOfWork)
+/// <summary>Former manual create command. Area requirements now derive from task material plans.</summary>
+public sealed class CreateMaterialRequirementCommandHandler
 {
     public Task<MaterialRequirementDto> HandleAsync(
         CreateMaterialRequirementCommand command,
@@ -96,13 +91,8 @@ public sealed class CreateMaterialRequirementCommandHandler(
             "Material requirements must be declared from the real materials of each task.");
 }
 
-/// <summary>F-RES-03 <c>updateMaterialRequirement</c> (MO of the work area): quantity, note, cancel/re-activate.</summary>
-public sealed class UpdateMaterialRequirementCommandHandler(
-    WorkAreaAccess access,
-    IMaterialRequirementStore store,
-    IMaterialCatalogStore catalog,
-    ShortageTracker shortages,
-    IUnitOfWork unitOfWork)
+/// <summary>Former manual update command. Area requirements now derive from task material plans.</summary>
+public sealed class UpdateMaterialRequirementCommandHandler
 {
     public Task<MaterialRequirementDto> HandleAsync(
         UpdateMaterialRequirementCommand command,

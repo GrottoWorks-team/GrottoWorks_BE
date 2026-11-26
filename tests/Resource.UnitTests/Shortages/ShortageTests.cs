@@ -1,6 +1,5 @@
 using BuildingBlocks.Security;
 using Resource.Application.Inventory;
-using Resource.Application.Requirements;
 using Resource.Application.Scope;
 using Resource.Application.Shortages;
 using Resource.Contracts.Events;
@@ -44,9 +43,15 @@ public sealed class ShortageTests
 
     private ShortageTracker Tracker() => new(Reader(), _events);
 
-    private Task<MaterialRequirementDto> Require(WorkAreaScope area, Material material, decimal quantity) =>
-        new CreateMaterialRequirementCommandHandler(Access(), _requirements, _catalog, Tracker(), new FakeUnitOfWork())
-            .HandleAsync(new CreateMaterialRequirementCommand(area.WorkAreaId, material.MaterialId, quantity, null, null));
+    private async Task<MaterialRequirement> Require(WorkAreaScope area, Material material, decimal quantity)
+    {
+        var tracker = Tracker();
+        var before = await tracker.CaptureAsync(area, material.MaterialId);
+        var requirement = MaterialRequirement.Create(area.WorkAreaId, material.MaterialId, quantity, 0, null, DateTimeOffset.UtcNow);
+        _requirements.Add(requirement);
+        await tracker.PublishIfChangedAsync(before);
+        return requirement;
+    }
 
     private Task Open(WorkAreaScope area, Material material, decimal quantity) =>
         new RecordOpeningStockCommandHandler(Access(), new FakeCurrentUser(_officer, GrottoWorksRoles.MaterialOfficer, Parish),
@@ -101,10 +106,13 @@ public sealed class ShortageTests
     {
         var requirement = await Require(_grotto, _cable, 100);
         await Open(_grotto, _cable, 40);
-        await new UpdateMaterialRequirementCommandHandler(Access(), _requirements, _catalog, Tracker(), new FakeUnitOfWork())
-            .HandleAsync(new UpdateMaterialRequirementCommand(requirement.Id, null, null, null, "chỉ sửa ghi chú", null));
-        await new UpdateMaterialRequirementCommandHandler(Access(), _requirements, _catalog, Tracker(), new FakeUnitOfWork())
-            .HandleAsync(new UpdateMaterialRequirementCommand(requirement.Id, null, null, null, null, RequirementStatus.Cancelled));
+        var tracker = Tracker();
+        var before = await tracker.CaptureAsync(_grotto, _cable.MaterialId);
+        requirement.Update(null, null, "chỉ sửa ghi chú", null, DateTimeOffset.UtcNow);
+        await tracker.PublishIfChangedAsync(before);
+        before = await tracker.CaptureAsync(_grotto, _cable.MaterialId);
+        _requirements.Requirements.Remove(requirement);
+        await tracker.PublishIfChangedAsync(before);
 
         var payloads = _events.Events.Select(e => (MaterialShortageChanged)e.Payload).ToList();
         _events.Events.Should().OnlyContain(e => e.EventType == MaterialShortageChanged.EventType);

@@ -1,5 +1,15 @@
 # BE Changelog
 
+## 2026-11-26 (rev 4) — merge `main` + clone copies the map pin
+- Branch: `feat/backend-workflow-improvements`
+- Service: ParishCoordination
+- Files: `ParishCoordination.Application/Seasons/Commands/CloneSeason/CloneSeasonCommand.cs`
+- Change: `CloneSeason` now copies **`MapX/MapY`** (ghim khu trên sơ đồ) sang khu vực của mùa mới, cùng với `Latitude/Longitude`. Trước đó FE phải ghim lại từng khu sau khi clone (localStorage) — giờ BE clone nguyên tử.
+- Contract impact: Không đổi shape. `WorkAreaDto.mapX/mapY` + `mapX/mapY` trong POST/PATCH work-area là tính năng của `main` (migration `20261126040000_AddWorkAreaMapPin`).
+- Migration: Không (dùng migration của `main`).
+- Tests: `dotnet build GrottoWorks_BE.slnx` 0 warning; toàn bộ unit test xanh — Resource 260, ParishCoordination 334, TaskExecution 405, Identity 164, NotificationAudit 164, Reporting 76, Readiness 52, Platform 12.
+- Follow-up (FE đã làm cùng đợt): ghim đọc/ghi qua `WorkArea.mapX/mapY` thay cho localStorage; màn ADMIN bỏ gọi `/dashboards/season` (endpoint nay chỉ cho PARISH); hiển thị thông báo khi lưu sơ đồ trả 503 `FILE_ATTACHMENT_PENDING`.
+
 ## 2026-11-26 (rev 3) — parish buys, no cost estimate, area material estimate
 - Branch: `feat/backend-workflow-improvements`
 - Service: Resource

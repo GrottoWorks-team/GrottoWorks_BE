@@ -109,7 +109,9 @@ public sealed class CloneSeasonCommandHandler(
                 WorkAreaStatus.Planned,
                 now,
                 area.Latitude,
-                area.Longitude);
+                area.Longitude,
+                area.MapX,
+                area.MapY);
             workAreaRepository.Add(copy);
             created.Add(copy);
         }

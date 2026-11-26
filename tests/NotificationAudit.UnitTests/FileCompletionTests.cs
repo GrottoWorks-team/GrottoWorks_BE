@@ -62,6 +62,15 @@ public sealed class FileCompletionTests
     }
 
     [Fact]
+    public async Task Glb_with_an_incorrect_declared_length_is_not_recognized()
+    {
+        await using var file = CreateGlb(40);
+        file.SetLength(36);
+        var result = await S3FileObjectStorage.InspectStreamAsync(file, "model/gltf-binary", 40, default);
+        result.DetectedContentType.Should().Be("application/octet-stream");
+    }
+
+    [Fact]
     public async Task Proxy_rejects_a_short_body_before_writing_to_storage()
     {
         var fixture = new FileFinalizationTests.Fixture();

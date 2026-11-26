@@ -188,14 +188,15 @@ public sealed class S3FileObjectStorage(ObjectStorageClients clients, TimeProvid
     private static bool IsGlb(ReadOnlySpan<byte> header, long total)
     {
         // GLB v2 has a 12-byte file header followed by a required JSON chunk.
-        if (header.Length < 20 || !header.StartsWith("glTF"u8) ||
-            BinaryPrimitives.ReadUInt32LittleEndian(header[4..]) != 2 ||
-            BinaryPrimitives.ReadUInt32LittleEndian(header[8..]) != total ||
-            !header[16..20].SequenceEqual("JSON"u8))
+        if (header.Length < 20 || !header.StartsWith("glTF"u8))
             return false;
 
+        var version = BinaryPrimitives.ReadUInt32LittleEndian(header[4..]);
+        var declaredSize = BinaryPrimitives.ReadUInt32LittleEndian(header[8..]);
         var jsonBytes = BinaryPrimitives.ReadUInt32LittleEndian(header[12..]);
-        return jsonBytes >= 4 && jsonBytes % 4 == 0 && jsonBytes <= total - 20;
+        var hasJsonChunk = header[16..20].SequenceEqual("JSON"u8);
+        return version == 2 && declaredSize == total && hasJsonChunk &&
+            jsonBytes >= 4 && jsonBytes % 4 == 0 && jsonBytes <= total - 20;
     }
 }
 

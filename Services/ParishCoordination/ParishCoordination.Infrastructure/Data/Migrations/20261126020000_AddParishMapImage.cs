@@ -1,9 +1,11 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace ParishCoordination.Infrastructure.Data.Migrations;
 
+[DbContext(typeof(ParishCoordinationDbContext))]
 [Migration("20261126020000_AddParishMapImage")]
 public partial class AddParishMapImage : Migration
 {

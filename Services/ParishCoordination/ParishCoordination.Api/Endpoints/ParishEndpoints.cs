@@ -41,7 +41,8 @@ public static class ParishEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
-            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         app.MapGet("/api/v1/parishes/{parishId}", GetParishAsync)
             .WithName("getParish")

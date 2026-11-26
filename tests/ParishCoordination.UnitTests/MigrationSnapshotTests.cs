@@ -42,6 +42,18 @@ public sealed class MigrationSnapshotTests
     }
 
     [Fact]
+    public void Map_image_and_recovery_migrations_are_discoverable()
+    {
+        using var db = new ParishCoordinationDbContext(new DbContextOptionsBuilder<ParishCoordinationDbContext>()
+            .UseNpgsql("Host=localhost;Database=metadata_only").Options);
+        var migrations = db.Database.GetMigrations().ToArray();
+        Assert.Contains("20261126020000_AddParishMapImage", migrations);
+        Assert.Contains("20261126030000_AddParishMapAttachmentIntent", migrations);
+        Assert.Equal("parish_map_attachment_intent",
+            Assert.IsType<CreateTableOperation>(new AddParishMapAttachmentIntent().UpOperations[0]).Name);
+    }
+
+    [Fact]
     public void Current_model_matches_the_frozen_migration_snapshot()
     {
         using var db = new ParishCoordinationDbContext(new DbContextOptionsBuilder<ParishCoordinationDbContext>()

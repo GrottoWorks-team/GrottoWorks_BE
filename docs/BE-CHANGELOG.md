@@ -1,5 +1,16 @@
 # BE Changelog
 
+## 2026-11-26 (rev 8) — proxy-upload nhận thêm PDF
+- Branch: `feat/backend-workflow-improvements`
+- Service: NotificationAudit
+- Files: `NotificationAudit.Api/Controllers/FilesController.cs`
+- Change: `PUT /api/v1/files/{fileId}/proxy-upload` thêm `application/pdf` vào `[Consumes]` (trước chỉ octet-stream/glb/png/jpeg/webp). Cần cho đường tải dự phòng khi presigned PUT thẳng lên R2 bị **CORS** chặn (bucket chưa có AllowedOrigins cho `http://localhost:5175`) — FE nay tự chuyển sang proxy-upload khi presigned PUT thất bại. File vẫn phải qua kiểm tra loại/kích thước theo purpose như cũ (`FileUploadOptions.AllowOtherPdf` mới cho PDF thật).
+- Contract impact: Không đổi shape; chỉ mở thêm content type.
+- Migration: Không.
+- Tests: `dotnet build` 0 warning; `NotificationAudit.UnitTests` 164/164.
+- Verify: `POST /files/upload-requests` (purpose `ReadinessEvidence`, PNG) → `PUT /api/v1/files/{id}/proxy-upload` → **200** (host presigned là `146b9d71….r2.cloudflarestorage.com`, đúng host bị CORS).
+- Follow-up (hạ tầng): cấu hình CORS cho bucket R2 (`AllowedOrigins` = domain web + `http://localhost:5175`, `AllowedMethods` PUT/GET/HEAD, `AllowedHeaders` `content-type`) để đường presigned trực tiếp hoạt động trở lại; khi đó fallback proxy chỉ còn là lưới an toàn.
+
 ## 2026-11-26 (rev 7) — TNV được đọc điều kiện bắt đầu của nhiệm vụ mình nhận
 - Branch: `feat/backend-workflow-improvements`
 - Service: TaskExecution

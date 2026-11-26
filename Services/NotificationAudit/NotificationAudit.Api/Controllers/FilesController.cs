@@ -12,7 +12,10 @@ public sealed class FilesController(ProxyUploadPendingHandler proxyUpload) : Con
 {
     [HttpPut("{fileId:guid}/proxy-upload", Name = "proxyUploadFile")]
     [RequestSizeLimit(FileUploadLimits.DesignAssetBytes)]
-    [Consumes(FileUploadLimits.BinaryContentType, FileUploadLimits.GlbContentType, "image/png", "image/jpeg", "image/webp")]
+    // 26/11/2026: thêm application/pdf để minh chứng sẵn sàng / hoá đơn PDF tải được qua máy chủ
+    // khi bucket chưa cấu hình CORS (FE tự chuyển sang đường proxy).
+    [Consumes(FileUploadLimits.BinaryContentType, FileUploadLimits.GlbContentType, "image/png", "image/jpeg",
+        "image/webp", "application/pdf")]
     [Produces("application/json")]
     public async Task<IActionResult> ProxyUpload(
         Guid fileId,

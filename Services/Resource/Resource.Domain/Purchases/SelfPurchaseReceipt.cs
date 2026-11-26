@@ -18,6 +18,15 @@ public sealed class SelfPurchaseReceipt
     public const int MaxSupplierLength = 150;
     public const int MaxNoteLength = 500;
 
+    /// <summary>Recorded by the material officer for goods someone else bought (normal top-up path).</summary>
+    public const string SourceMaterialOfficer = "MO_SELF_PURCHASE";
+
+    /// <summary>Recorded by a volunteer during a task when materials ran out (emergency, below the limit).</summary>
+    public const string SourceVolunteerEmergency = "VOLUNTEER_EMERGENCY";
+
+    /// <summary>Emergency purchases during a task must stay under 500,000 VND; larger shortages go through the parish.</summary>
+    public const decimal EmergencyPurchaseLimit = 500_000m;
+
     private readonly List<SelfPurchaseItem> _items = [];
 
     private SelfPurchaseReceipt()
@@ -31,6 +40,12 @@ public sealed class SelfPurchaseReceipt
     public Guid ParishId { get; private set; }
 
     public Guid SeasonId { get; private set; }
+
+    /// <summary>The task whose execution ran out of materials (emergency purchases only).</summary>
+    public Guid? TaskId { get; private set; }
+
+    /// <summary><see cref="SourceMaterialOfficer"/> or <see cref="SourceVolunteerEmergency"/>.</summary>
+    public string Source { get; private set; } = SourceMaterialOfficer;
 
     /// <summary>Material officer who entered the receipt.</summary>
     public Guid RecordedByUserId { get; private set; }
@@ -64,7 +79,9 @@ public sealed class SelfPurchaseReceipt
         IReadOnlyCollection<Guid> invoiceFileIds,
         string? note,
         DateOnly today,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? taskId = null,
+        string source = SourceMaterialOfficer)
     {
         if (purchaseDate > today)
         {
@@ -106,12 +123,19 @@ public sealed class SelfPurchaseReceipt
             throw DomainRuleException.Validation("SELF_PURCHASE_NOTE_TOO_LONG", $"Note must not exceed {MaxNoteLength} characters.");
         }
 
+        if (source is not (SourceMaterialOfficer or SourceVolunteerEmergency))
+        {
+            throw DomainRuleException.Validation("SELF_PURCHASE_SOURCE_INVALID", "Unknown self-purchase source.");
+        }
+
         var receipt = new SelfPurchaseReceipt
         {
             SelfPurchaseReceiptId = Guid.NewGuid(),
             WorkAreaId = workAreaId,
             ParishId = parishId,
             SeasonId = seasonId,
+            TaskId = taskId,
+            Source = source,
             RecordedByUserId = recordedByUserId,
             BuyerName = buyer,
             SupplierName = supplier,
@@ -127,6 +151,14 @@ public sealed class SelfPurchaseReceipt
         }
 
         receipt.TotalCost = receipt._items.Sum(item => item.TotalPrice);
+        if (string.Equals(receipt.Source, SourceVolunteerEmergency, StringComparison.Ordinal) &&
+            receipt.TotalCost >= EmergencyPurchaseLimit)
+        {
+            throw DomainRuleException.Validation(
+                "EMERGENCY_PURCHASE_LIMIT",
+                $"An emergency purchase during a task must stay under {EmergencyPurchaseLimit:N0} VND; larger shortages go through the parish supply request.");
+        }
+
         return receipt;
     }
 }

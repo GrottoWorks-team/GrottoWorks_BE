@@ -231,7 +231,7 @@ public sealed class RecordPurchaseCommandHandler(
 
             if (buyer is not null &&
                 string.Equals(buyer.Status, "ACTIVE", StringComparison.OrdinalIgnoreCase) &&
-                buyer.Role is GrottoWorksRoles.Parish or GrottoWorksRoles.Volunteer &&
+                buyer.Role == GrottoWorksRoles.Parish &&
                 buyer.ParishId == scope.ParishId)
             {
                 return buyer;
@@ -240,7 +240,7 @@ public sealed class RecordPurchaseCommandHandler(
 
         throw DomainRuleException.Validation(
             "PURCHASE_BUYER_NOT_PARISH",
-            "The buyer assigned to the PURCHASE task must be an active parish user or volunteer of the same parish.");
+            "The buyer assigned to the PURCHASE task must be an active parish user of the same parish.");
     }
 }
 

@@ -9,6 +9,7 @@ using Resource.Domain;
 using Resource.Domain.Catalog;
 using Resource.Domain.Inventory;
 using Resource.Domain.Purchases;
+using Resource.Domain.Scope;
 
 namespace Resource.Application.Inventory;
 
@@ -20,6 +21,8 @@ public sealed record SelfPurchaseReceiptDto(
     Guid Id,
     Guid WorkAreaId,
     Guid SeasonId,
+    Guid? TaskId,
+    string Source,
     string BuyerName,
     string? SupplierName,
     DateOnly PurchaseDate,
@@ -31,7 +34,8 @@ public sealed record SelfPurchaseReceiptDto(
     IReadOnlyList<SelfPurchaseLineDto> Items)
 {
     public static SelfPurchaseReceiptDto From(SelfPurchaseReceipt receipt, IReadOnlyDictionary<Guid, Material> materials) =>
-        new(receipt.SelfPurchaseReceiptId, receipt.WorkAreaId, receipt.SeasonId, receipt.BuyerName, receipt.SupplierName,
+        new(receipt.SelfPurchaseReceiptId, receipt.WorkAreaId, receipt.SeasonId, receipt.TaskId, receipt.Source,
+            receipt.BuyerName, receipt.SupplierName,
             receipt.PurchaseDate, receipt.TotalCost, receipt.InvoiceFileIds, receipt.Note, receipt.RecordedByUserId,
             receipt.CreatedAt,
             receipt.Items.Select(item => materials.TryGetValue(item.MaterialId, out var material)
@@ -138,5 +142,102 @@ public sealed class ListSelfPurchaseReceiptsQueryHandler(
                 receipts.SelectMany(receipt => receipt.Items.Select(item => item.MaterialId)).Distinct().ToList(), cancellationToken))
             .ToDictionary(material => material.MaterialId);
         return receipts.Select(receipt => SelfPurchaseReceiptDto.From(receipt, materials)).ToList();
+    }
+}
+
+/// <summary>
+/// Emergency purchase during a task (26/11/2026, rule change): a volunteer with an ACCEPTED assignment on a running task
+/// may buy materials themselves ONLY when the goods cost less than <see cref="SelfPurchaseReceipt.EmergencyPurchaseLimit"/>.
+/// The invoice photo is mandatory, the stock enters the work-area ledger immediately, and the receipt is flagged
+/// <c>VOLUNTEER_EMERGENCY</c> so the material officer/parish can review it later. Larger shortages never take this path —
+/// the material officer raises a supplementary supply request to the parish.
+/// </summary>
+public sealed record RecordEmergencyPurchaseCommand(
+    Guid TaskId,
+    string? BuyerName,
+    string? SupplierName,
+    DateOnly? PurchaseDate,
+    IReadOnlyCollection<SelfPurchaseLineInput> Lines,
+    IReadOnlyCollection<Guid> InvoiceFileIds,
+    string? Note);
+
+public sealed class RecordEmergencyPurchaseCommandHandler(
+    WorkAreaAccess access,
+    ITaskProjectionStore tasks,
+    IMaterialCatalogStore catalog,
+    ISelfPurchaseStore store,
+    IInventoryStore inventory,
+    ShortageTracker shortages,
+    IFileVerifier files,
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork)
+{
+    public Task<SelfPurchaseReceiptDto> HandleAsync(RecordEmergencyPurchaseCommand command, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteAsync(() => HandleInTransactionAsync(command, cancellationToken), cancellationToken);
+
+    private async Task<SelfPurchaseReceiptDto> HandleInTransactionAsync(
+        RecordEmergencyPurchaseCommand command, CancellationToken cancellationToken)
+    {
+        var task = await tasks.GetAsync(command.TaskId, cancellationToken)
+            ?? throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
+        if (!task.AssigneeUserIds.Contains(currentUser.UserId))
+        {
+            throw DomainRuleException.Forbidden("EMERGENCY_PURCHASE_NOT_ASSIGNEE",
+                "Only a volunteer assigned to this task can record an emergency purchase.");
+        }
+
+        if (task.Status != ProjectedTaskStatus.InProgress)
+        {
+            throw new DomainRuleException("TASK_INVALID_STATE",
+                "An emergency purchase can only be recorded while the task is in progress.");
+        }
+
+        var scope = await access.ForReadAsync(task.WorkAreaId, cancellationToken);
+        WorkAreaAccess.EnsureWritable(scope);
+
+        var materials = (await catalog.GetMaterialsAsync(command.Lines.Select(line => line.MaterialId).Distinct().ToList(), cancellationToken))
+            .ToDictionary(material => material.MaterialId);
+        if (command.Lines.FirstOrDefault(line => !materials.ContainsKey(line.MaterialId)) is not null)
+        {
+            throw DomainRuleException.Validation("MATERIAL_UNKNOWN", "The material does not exist.");
+        }
+
+        var draftTotal = command.Lines.Sum(line => line.Quantity * line.UnitPrice);
+        if (draftTotal >= SelfPurchaseReceipt.EmergencyPurchaseLimit)
+        {
+            throw DomainRuleException.Validation("EMERGENCY_PURCHASE_LIMIT",
+                $"An emergency purchase during a task must stay under {SelfPurchaseReceipt.EmergencyPurchaseLimit:N0} VND; " +
+                "ask the material officer for a supplementary supply instead.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var today = ParishClock.Today(now);
+        var receipt = SelfPurchaseReceipt.Record(
+            scope.WorkAreaId, scope.ParishId, scope.SeasonId, currentUser.UserId,
+            command.BuyerName, command.SupplierName, command.PurchaseDate ?? today,
+            command.Lines, command.InvoiceFileIds, command.Note, today, now,
+            task.TaskId, SelfPurchaseReceipt.SourceVolunteerEmergency);
+
+        await using var reservation = await files.ReserveAsync(
+            receipt.InvoiceFileIds, FilePurposes.PurchaseReceipt, currentUser.UserId, receipt.SelfPurchaseReceiptId, cancellationToken);
+
+        var before = new List<ShortageTracker.Snapshot>();
+        foreach (var item in receipt.Items)
+        {
+            before.Add(await shortages.CaptureAsync(scope, item.MaterialId, cancellationToken));
+            inventory.Append(MaterialTransaction.Post(
+                scope.WorkAreaId, item.MaterialId, TransactionType.PurchaseDelivery, item.Quantity, now, currentUser.UserId,
+                $"Mua khẩn cấp trong task {task.Name}", TransactionReferenceType.SelfPurchaseItem, item.SelfPurchaseItemId));
+        }
+
+        store.Add(receipt);
+        await store.SaveChangesAsync(cancellationToken);
+
+        foreach (var snapshot in before)
+        {
+            await shortages.PublishIfChangedAsync(snapshot, cancellationToken);
+        }
+
+        return SelfPurchaseReceiptDto.From(receipt, materials);
     }
 }

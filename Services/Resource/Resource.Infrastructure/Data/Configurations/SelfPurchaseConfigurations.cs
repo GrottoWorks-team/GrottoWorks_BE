@@ -17,6 +17,9 @@ public sealed class SelfPurchaseReceiptConfiguration : IEntityTypeConfiguration<
         builder.Property(receipt => receipt.WorkAreaId).HasColumnName("work_area_id").IsRequired();
         builder.Property(receipt => receipt.ParishId).HasColumnName("parish_id").IsRequired();
         builder.Property(receipt => receipt.SeasonId).HasColumnName("season_id").IsRequired();
+        builder.Property(receipt => receipt.TaskId).HasColumnName("task_id");
+        builder.Property(receipt => receipt.Source).HasColumnName("source").HasMaxLength(30)
+            .HasDefaultValue(SelfPurchaseReceipt.SourceMaterialOfficer).IsRequired();
         builder.Property(receipt => receipt.RecordedByUserId).HasColumnName("recorded_by_user_id").IsRequired();
         builder.Property(receipt => receipt.BuyerName).HasColumnName("buyer_name").HasMaxLength(SelfPurchaseReceipt.MaxBuyerNameLength).IsRequired();
         builder.Property(receipt => receipt.SupplierName).HasColumnName("supplier_name").HasMaxLength(SelfPurchaseReceipt.MaxSupplierLength);
@@ -28,6 +31,7 @@ public sealed class SelfPurchaseReceiptConfiguration : IEntityTypeConfiguration<
 
         builder.HasIndex(receipt => new { receipt.WorkAreaId, receipt.PurchaseDate }, "ix_self_purchase_work_area_date");
         builder.HasIndex(receipt => new { receipt.SeasonId, receipt.PurchaseDate }, "ix_self_purchase_season_date");
+        builder.HasIndex(receipt => receipt.TaskId, "ix_self_purchase_task");
         builder.HasMany(receipt => receipt.Items).WithOne().HasForeignKey(item => item.SelfPurchaseReceiptId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(receipt => receipt.Items).HasField("_items").UsePropertyAccessMode(PropertyAccessMode.Field);
     }

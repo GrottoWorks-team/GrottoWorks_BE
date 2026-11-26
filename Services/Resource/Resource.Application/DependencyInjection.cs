@@ -59,6 +59,7 @@ public static class DependencyInjection
 
         // 26/11/2026 self-purchase receipts (materials bought outside the purchase flow)
         services.AddScoped<CreateSelfPurchaseReceiptCommandHandler>();
+        services.AddScoped<RecordEmergencyPurchaseCommandHandler>();
         services.AddScoped<ListSelfPurchaseReceiptsQueryHandler>();
 
         // F-RES-21 parish warehouse (central store) and two-step distributions

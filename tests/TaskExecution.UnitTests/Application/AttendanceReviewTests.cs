@@ -62,21 +62,6 @@ public sealed class AttendanceReviewTests
     }
 
     [Fact]
-    public async Task First_purchase_check_in_still_starts_the_task()
-    {
-        var (fixture, assignmentId) = await CheckInRequestTests.ReadyVolunteerAsync(started: false, type: TaskType.Purchase);
-        var store = new AttendanceTestStore(fixture);
-        var service = fixture.Attendance(store);
-        var request = await service.CheckInAsync(assignmentId, null, Guid.NewGuid());
-        fixture.User.UserId = fixture.Area.LeaderUserId!.Value;
-        fixture.User.Role = "LEADER";
-        await service.ReviewRequestAsync(request.Id, true, null, request.Version);
-        fixture.Task.Status.Should().Be(TaskState.InProgress);
-        fixture.Task.StartedAt.Should().BeNull();
-        fixture.Events.Items.Should().ContainSingle(message => message.EventType == "task.status.changed");
-    }
-
-    [Fact]
     public async Task Rejection_requires_a_note_and_never_creates_hours()
     {
         var (f,id)=await CheckInRequestTests.ReadyVolunteerAsync();var store=new AttendanceTestStore(f);

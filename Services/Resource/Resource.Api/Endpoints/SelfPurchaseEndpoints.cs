@@ -35,6 +35,38 @@ public static class SelfPurchaseEndpoints
             .Produces<ApiResponse<IReadOnlyList<SelfPurchaseReceiptDto>>>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        // 26/11/2026: TNV tự mua khi đang làm task mà thiếu vật tư khẩn cấp (giá trị < 500.000đ).
+        app.MapPost("/api/v1/tasks/{taskId:guid}/emergency-purchases", RecordEmergencyAsync)
+            .WithName("recordEmergencyPurchase")
+            .WithTags("Materials")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Volunteer))
+            .Accepts<RecordEmergencyPurchaseRequest>("application/json")
+            .Produces<ApiResponse<SelfPurchaseReceiptDto>>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+    }
+
+    private static async Task<IResult> RecordEmergencyAsync(
+        Guid taskId,
+        RecordEmergencyPurchaseRequest request,
+        HttpContext httpContext,
+        RecordEmergencyPurchaseCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var receipt = await handler.HandleAsync(
+            new RecordEmergencyPurchaseCommand(
+                taskId,
+                request.BuyerName,
+                request.SupplierName,
+                request.PurchaseDate,
+                request.Items!.Select(item => new SelfPurchaseLineInput(item.MaterialId!.Value, item.Quantity, item.UnitPrice)).ToList(),
+                (request.Invoices ?? []).Select(file => file.Id!.Value).ToList(),
+                request.Note),
+            cancellationToken);
+        return Results.Json(ApiResults.Ok(receipt, httpContext), statusCode: StatusCodes.Status201Created);
     }
 
     private static async Task<IResult> RecordAsync(

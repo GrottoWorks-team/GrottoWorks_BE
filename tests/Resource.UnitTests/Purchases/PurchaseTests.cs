@@ -122,7 +122,7 @@ public sealed class PurchaseTests
     }
 
     [Fact]
-    public async Task Only_the_material_officer_of_the_area_records_and_the_buyer_can_be_parish_or_volunteer()
+    public async Task Only_the_material_officer_of_the_area_records_and_the_buyer_must_be_parish()
     {
         (await Fails(() => Record(Guid.NewGuid()).HandleAsync(Bought(1)))).Code.Should().Be("WORK_AREA_SCOPE_DENIED");
         (await Fails(() => Record().HandleAsync(Bought(1) with { Items = [new PurchaseLineInput(Guid.NewGuid(), 1, 1, null)] })))
@@ -130,14 +130,14 @@ public sealed class PurchaseTests
         (await Fails(() => Record().HandleAsync(Bought(1) with { PurchaseDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(3)) })))
             .Code.Should().Be("PURCHASE_DATE_IN_FUTURE");
 
-        // 26/11/2026: a shortage found during the task may be bought by a volunteer.
+        // 26/11/2026 (rev 2): volunteers no longer take purchase tasks; a non-parish assignee is rejected.
         _identity.Users[_buyer] = new Resource.Application.Users.IdentityUser(
             _buyer, "Tình nguyện viên", "ACTIVE", GrottoWorksRoles.Volunteer, Parish);
-        (await Record().HandleAsync(Bought(1))).BuyerUserId.Should().Be(_buyer);
+        (await Fails(() => Record().HandleAsync(Bought(1)))).Code.Should().Be("PURCHASE_BUYER_NOT_PARISH");
     }
 
     [Fact]
-    public async Task Purchase_task_volunteer_assignee_is_the_buyer()
+    public async Task Purchase_task_without_a_parish_assignee_uses_the_approving_parish_user_as_buyer()
     {
         _identity.Users[_buyer] = new Resource.Application.Users.IdentityUser(
             _buyer, "Tình nguyện viên", "ACTIVE", GrottoWorksRoles.Volunteer, Parish);
@@ -146,7 +146,7 @@ public sealed class PurchaseTests
 
         var dto = await Record().HandleAsync(Bought(10));
 
-        dto.BuyerUserId.Should().Be(_buyer);
+        dto.BuyerUserId.Should().Be(_leader);
         dto.RecordedBy.Should().Be(_officer);
     }
 

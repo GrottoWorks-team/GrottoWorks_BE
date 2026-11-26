@@ -1634,10 +1634,22 @@ namespace Resource.Infrastructure.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("season_id");
 
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("MO_SELF_PURCHASE")
+                        .HasColumnName("source");
+
                     b.Property<string>("SupplierName")
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)")
                         .HasColumnName("supplier_name");
+
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
 
                     b.Property<decimal>("TotalCost")
                         .HasPrecision(14, 2)
@@ -1651,6 +1663,8 @@ namespace Resource.Infrastructure.Data.Migrations
                     b.HasKey("SelfPurchaseReceiptId");
 
                     b.HasIndex(new[] { "SeasonId", "PurchaseDate" }, "ix_self_purchase_season_date");
+
+                    b.HasIndex(new[] { "TaskId" }, "ix_self_purchase_task");
 
                     b.HasIndex(new[] { "WorkAreaId", "PurchaseDate" }, "ix_self_purchase_work_area_date");
 

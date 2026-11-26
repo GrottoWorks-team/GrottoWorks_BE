@@ -596,6 +596,31 @@ public sealed class FakePurchaseStore : Resource.Application.Purchases.IPurchase
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
 
+/// <summary>In-memory self-purchase receipts (materials bought outside the purchase flow).</summary>
+public sealed class FakeSelfPurchaseStore : Resource.Application.Inventory.ISelfPurchaseStore
+{
+    public List<Resource.Domain.Purchases.SelfPurchaseReceipt> Receipts { get; } = [];
+
+    public int SaveChangesCount { get; private set; }
+
+    public void Add(Resource.Domain.Purchases.SelfPurchaseReceipt receipt) => Receipts.Add(receipt);
+
+    public Task<IReadOnlyList<Resource.Domain.Purchases.SelfPurchaseReceipt>> ListAsync(
+        Guid parishId, Guid? workAreaId, Guid? seasonId, int limit, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Purchases.SelfPurchaseReceipt>>(Receipts
+            .Where(r => r.ParishId == parishId && (workAreaId is null || r.WorkAreaId == workAreaId) &&
+                        (seasonId is null || r.SeasonId == seasonId))
+            .OrderByDescending(r => r.CreatedAt)
+            .Take(limit)
+            .ToList());
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+        return Task.CompletedTask;
+    }
+}
+
 /// <summary>Accepts every file unless <see cref="Reject"/> is set (then throws it, like the NotificationAudit check).</summary>
 public sealed class FakeFileVerifier : Resource.Application.Files.IFileVerifier
 {

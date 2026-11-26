@@ -2,6 +2,19 @@
 
 ## 2026-11-26
 - Branch: `feat/backend-workflow-improvements`
+- Service: Resource, TaskExecution, ApiGateway
+- Files: `Resource.Domain/Purchases/SelfPurchaseReceipt.cs`, `Resource.Infrastructure/Data/Configurations/SelfPurchaseConfigurations.cs`, `Resource.Application/Inventory/SelfPurchaseHandlers.cs`, `Resource.Api/Requests/EmergencyPurchaseRequests.cs` (new), `Resource.Api/Endpoints/SelfPurchaseEndpoints.cs`, `Resource.Application/DependencyInjection.cs`, `Data/Migrations/20261126142831_EmergencyPurchaseFields.cs` (+ designer + snapshot), `TaskExecution.Application/Assignments/AssignmentService.cs`, `Resource.Application/Purchases/PurchaseHandlers.cs`, `ApiGateway/YarpApiGateway/appsettings.json`, `tests/Resource.UnitTests/Purchases/PurchaseTests.cs`, `tests/Resource.UnitTests/Inventory/SelfPurchaseTests.cs` (new), `tests/Resource.UnitTests/Fakes.cs` (`FakeSelfPurchaseStore`), `tests/TaskExecution.UnitTests/Application/AssignmentTestFixture.cs` (parish buyer), `tests/TaskExecution.UnitTests/Application/TaskRecruitmentTests.cs`, `tests/TaskExecution.UnitTests/Application/AttendanceReviewTests.cs`.
+- Change:
+  - **Mua khẩn cấp của TNV trong lúc làm việc:** new `POST /api/v1/tasks/{taskId}/emergency-purchases` (VOLUNTEER, 201). The volunteer must be an assignee of the task (`EMERGENCY_PURCHASE_NOT_ASSIGNEE`), the task must be `IN_PROGRESS` (`TASK_INVALID_STATE`), the invoice file(s) are mandatory, and the draft total must be **under 500,000 VND** (`EMERGENCY_PURCHASE_LIMIT`). The receipt is stored with `source = VOLUNTEER_EMERGENCY` and `task_id`, posts the same `PURCHASE_DELIVERY` ledger rows as MO self-purchases and publishes shortage signals.
+  - **`self_purchase_receipt` gains `task_id` (nullable, indexed) and `source` (`MO_SELF_PURCHASE` | `VOLUNTEER_EMERGENCY`)** so finance/reporting can separate the two origins; the domain rejects any other source (`SELF_PURCHASE_SOURCE_INVALID`).
+  - **Việc đi mua trở lại do Ban phụ trách đảm nhận:** a `PURCHASE` task assignee must be a PARISH user again (`EnsureActiveAsync(..., Parish)`) and the purchase buyer must be PARISH (`PURCHASE_BUYER_NOT_PARISH`) — volunteers no longer receive purchase tasks; large shortages stay MO → supplementary supply request → PARISH.
+- Contract impact: Additive endpoint + 2 additive fields on the self-purchase receipt DTO (`taskId`, `source`). `POST /purchase-requests/{id}/purchases` reverts to parish-only buyer (restores the documented rule from before `075ea73`).
+- Migration: Yes — `20261126142831_EmergencyPurchaseFields` (`task_id`, `source` default `MO_SELF_PURCHASE`, index `ix_self_purchase_task`). Apply before starting Resource.
+- Tests: `SelfPurchaseTests` covers assignee-only, task must be in progress, < 500,000 VND (boundary), mandatory invoice, unknown material and the happy path (ledger + `VOLUNTEER_EMERGENCY`). `TaskRecruitmentTests`/`AttendanceReviewTests` now assert a purchase task cannot be offered to a volunteer (`USER_ROLE_MISMATCH`); the old "first purchase check-in starts the task" case was removed with the volunteer purchase flow. Resource 246 → 251 passing, TaskExecution 405 passing (Docker `dotnet test`).
+- Follow-up: FE/mobile read the new `source` field when listing self-purchases (mobile now shows an emergency-purchase screen in the task detail); Reporting still needs an aggregate for volunteer emergency purchases.
+
+## 2026-11-26
+- Branch: `feat/backend-workflow-improvements`
 - Service: ParishCoordination, Resource
 - Files: `ParishCoordination.Application/Seasons/Commands/CloneSeason/CloneSeasonCommand.cs` (new), `ParishCoordination.Api/Requests/CloneSeasonRequest.cs` (new), `ParishCoordination.Api/Endpoints/SeasonEndpoints.cs`, `ParishCoordination.Application/DependencyInjection.cs`, `Resource.Application/Purchases/PurchaseRequestHandlers.cs`, `docs/BE-CHANGELOG.md`.
 - Change:

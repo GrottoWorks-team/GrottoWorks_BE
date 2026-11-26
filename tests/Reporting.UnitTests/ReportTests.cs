@@ -118,6 +118,23 @@ public sealed class ReportTests
     }
 
     [Fact]
+    public async Task Parish_warehouse_row_leads_the_materials_report()
+    {
+        await SeedEventsAsync();
+        await Send(ParishMaterialStockChanged.EventType, new ParishMaterialStockChanged(_parishId, _seasonId, Guid.NewGuid(), 18m, Dec10, "VAT-001", "Đèn", "cái"));
+
+        var report = await Reports(User(GrottoWorksRoles.Parish)).BuildAsync(ReportType.Materials, new ReportQuery(_seasonId));
+
+        report.Rows.Should().HaveCount(3);
+        report.Rows[0]["workArea"].Should().Be(ReportQueryHandler.ParishWarehouseLabel);
+        report.Rows[0]["material"].Should().Be("Đèn");
+        report.Rows[0]["confirmedAvailable"].Should().Be(18m);
+        report.Rows[0]["required"].Should().BeNull();
+        report.Totals["lines"].Should().Be(2);
+        report.Totals["parishLines"].Should().Be(1);
+    }
+
+    [Fact]
     public async Task Parish_report_covers_every_area_and_states_its_context()
     {
         await SeedEventsAsync();

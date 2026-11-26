@@ -69,4 +69,20 @@ public sealed class TaskScopeAccess(IScopeProjectionStore scopes, ICurrentUser c
         if (season.IsReadOnly) throw new DomainRuleException("SEASON_READ_ONLY", "The archived season is read-only.");
         return (area, season);
     }
+
+    /// <summary>
+    /// 26/11/2026: a PURCHASE task is assigned to a parish user (the buyer), so accepting / declining it needs the same
+    /// parish + writable-season checks as a volunteer assignment, without the VOLUNTEER role requirement.
+    /// </summary>
+    public async Task<(WorkAreaScope WorkArea, SeasonScope Season)> GetWorkAreaForAssigneeWriteAsync(
+        Guid workAreaId, CancellationToken cancellationToken = default)
+    {
+        var area = await GetWorkAreaForReadAsync(workAreaId, cancellationToken);
+        if (currentUser.Role is not (GrottoWorksRoles.Volunteer or GrottoWorksRoles.Parish))
+            throw DomainRuleException.Forbidden("WORK_AREA_ACCESS_DENIED", "Assignee access is required.");
+        var season = await scopes.GetSeasonAsync(area.SeasonId, cancellationToken)
+            ?? throw DomainRuleException.NotFound("SEASON_NOT_FOUND", "The owning season is missing.");
+        if (season.IsReadOnly) throw new DomainRuleException("SEASON_READ_ONLY", "The archived season is read-only.");
+        return (area, season);
+    }
 }

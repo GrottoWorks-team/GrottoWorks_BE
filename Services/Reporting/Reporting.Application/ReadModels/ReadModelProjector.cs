@@ -12,6 +12,9 @@ public interface IReadModelStore
 {
     Task<MaterialLine?> GetMaterialLineAsync(Guid workAreaId, Guid materialId, CancellationToken cancellationToken = default);
 
+    /// <summary>Tracked parish warehouse line (26/11/2026).</summary>
+    Task<ParishMaterialLine?> GetParishMaterialLineAsync(Guid parishId, Guid seasonId, Guid materialId, CancellationToken cancellationToken = default);
+
     Task<PurchaseRequestView?> GetPurchaseRequestAsync(Guid purchaseRequestId, CancellationToken cancellationToken = default);
 
     Task<DonationView?> GetDonationAsync(Guid donationId, CancellationToken cancellationToken = default);
@@ -21,6 +24,8 @@ public interface IReadModelStore
     Task<ReadinessAreaView?> GetReadinessAreaAsync(Guid workAreaId, CancellationToken cancellationToken = default);
 
     void Add(MaterialLine line);
+
+    void Add(ParishMaterialLine line);
 
     void Add(PurchaseRequestView request);
 
@@ -33,6 +38,9 @@ public interface IReadModelStore
     void Add(ReadinessHistoryEntry entry);
 
     Task<IReadOnlyList<MaterialLine>> ListMaterialLinesAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default);
+
+    /// <summary>Parish warehouse balances of one season (26/11/2026).</summary>
+    Task<IReadOnlyList<ParishMaterialLine>> ListParishMaterialLinesAsync(Guid parishId, Guid seasonId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<PurchaseRequestView>> ListPurchaseRequestsAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default);
 
@@ -70,6 +78,14 @@ public sealed class ReadModelProjector(IReadModelStore store)
                 var e = (MaterialShortageChanged)read(typeof(MaterialShortageChanged));
                 var line = await LineAsync(e.WorkAreaId, e.MaterialId, e.SeasonId, e.ParishId, cancellationToken);
                 line.SetBalance(e.RequiredQuantity, e.ConfirmedAvailable, e.Shortage, e.MaterialCode, e.MaterialName, e.Unit, e.OccurredAt);
+                return true;
+            }
+
+            case ParishMaterialStockChanged.EventType:
+            {
+                var e = (ParishMaterialStockChanged)read(typeof(ParishMaterialStockChanged));
+                var line = await ParishLineAsync(e.ParishId, e.SeasonId, e.MaterialId, cancellationToken);
+                line.SetBalance(e.ConfirmedAvailable, e.MaterialCode, e.MaterialName, e.Unit, e.OccurredAt);
                 return true;
             }
 
@@ -231,6 +247,18 @@ public sealed class ReadModelProjector(IReadModelStore store)
         if (line is null)
         {
             line = MaterialLine.Create(workAreaId, materialId, seasonId, parishId);
+            store.Add(line);
+        }
+
+        return line;
+    }
+
+    private async Task<ParishMaterialLine> ParishLineAsync(Guid parishId, Guid seasonId, Guid materialId, CancellationToken cancellationToken)
+    {
+        var line = await store.GetParishMaterialLineAsync(parishId, seasonId, materialId, cancellationToken);
+        if (line is null)
+        {
+            line = ParishMaterialLine.Create(parishId, seasonId, materialId);
             store.Add(line);
         }
 

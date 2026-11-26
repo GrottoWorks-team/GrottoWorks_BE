@@ -13,6 +13,7 @@ using Identity.Application.Auth.RegisterUser;
 using Identity.Application.Skills.CreateSkill;
 using Identity.Application.Skills.ListSkills;
 using Identity.Application.Skills.UpdateSkill;
+using Identity.Application.Users.GetInternalParishUsers;
 using Identity.Application.Users.GetInternalUsers;
 using Identity.Application.Users.GetMyProfile;
 using Identity.Application.Users.ListParishUsers;
@@ -61,6 +62,7 @@ public static class DependencyInjection
         // S2: F-IDN-09 internal lookup, F-IDN-10 parish users
         services.AddScoped<GetInternalUsersQueryHandler>();
         services.AddScoped<GetInternalVolunteersQueryHandler>();
+        services.AddScoped<GetInternalParishUsersQueryHandler>();
         services.AddScoped<ListParishUsersQueryHandler>();
 
         return services;

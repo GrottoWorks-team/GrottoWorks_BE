@@ -192,6 +192,8 @@ public sealed class FakeReadModelStore : Reporting.Application.ReadModels.IReadM
 {
     public List<Reporting.Domain.ReadModels.MaterialLine> Lines { get; } = [];
 
+    public List<Reporting.Domain.ReadModels.ParishMaterialLine> ParishLines { get; } = [];
+
     public List<Reporting.Domain.ReadModels.PurchaseRequestView> Requests { get; } = [];
 
     public List<Reporting.Domain.ReadModels.DonationView> Donations { get; } = [];
@@ -207,6 +209,9 @@ public sealed class FakeReadModelStore : Reporting.Application.ReadModels.IReadM
     public Task<Reporting.Domain.ReadModels.MaterialLine?> GetMaterialLineAsync(Guid workAreaId, Guid materialId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Lines.FirstOrDefault(l => l.WorkAreaId == workAreaId && l.MaterialId == materialId));
 
+    public Task<Reporting.Domain.ReadModels.ParishMaterialLine?> GetParishMaterialLineAsync(Guid parishId, Guid seasonId, Guid materialId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ParishLines.FirstOrDefault(l => l.ParishId == parishId && l.SeasonId == seasonId && l.MaterialId == materialId));
+
     public Task<Reporting.Domain.ReadModels.PurchaseRequestView?> GetPurchaseRequestAsync(Guid purchaseRequestId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Requests.FirstOrDefault(r => r.PurchaseRequestId == purchaseRequestId));
 
@@ -221,6 +226,8 @@ public sealed class FakeReadModelStore : Reporting.Application.ReadModels.IReadM
 
     public void Add(Reporting.Domain.ReadModels.MaterialLine line) => Lines.Add(line);
 
+    public void Add(Reporting.Domain.ReadModels.ParishMaterialLine line) => ParishLines.Add(line);
+
     public void Add(Reporting.Domain.ReadModels.PurchaseRequestView request) => Requests.Add(request);
 
     public void Add(Reporting.Domain.ReadModels.DonationView donation) => Donations.Add(donation);
@@ -233,6 +240,10 @@ public sealed class FakeReadModelStore : Reporting.Application.ReadModels.IReadM
 
     public Task<IReadOnlyList<Reporting.Domain.ReadModels.MaterialLine>> ListMaterialLinesAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.MaterialLine>>(Lines.Where(l => workAreaIds.Contains(l.WorkAreaId)).ToList());
+
+    public Task<IReadOnlyList<Reporting.Domain.ReadModels.ParishMaterialLine>> ListParishMaterialLinesAsync(Guid parishId, Guid seasonId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.ParishMaterialLine>>(
+            ParishLines.Where(l => l.ParishId == parishId && l.SeasonId == seasonId).ToList());
 
     public Task<IReadOnlyList<Reporting.Domain.ReadModels.PurchaseRequestView>> ListPurchaseRequestsAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Reporting.Domain.ReadModels.PurchaseRequestView>>(Requests.Where(r => workAreaIds.Contains(r.WorkAreaId)).ToList());

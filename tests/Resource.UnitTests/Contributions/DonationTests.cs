@@ -21,6 +21,7 @@ public sealed class DonationTests
     private readonly FakeCatalogStore _catalog = new();
     private readonly FakeRequirementStore _requirements = new();
     private readonly FakeInventoryStore _inventory;
+    private readonly FakeParishInventoryStore _parishInventory = new();
     private readonly FakeDonorStore _donors = new();
     private readonly FakeDonationStore _store = new();
     private readonly FakeIntegrationEventPublisher _events = new();
@@ -52,8 +53,10 @@ public sealed class DonationTests
     private RecordDirectDonationCommandHandler Record(FakeCurrentUser? user = null)
     {
         var current = user ?? Officer();
-        return new(new MaterialOfficerScope(new WorkAreaAccess(_scopes, current), _scopes, current), _donors, _store, _catalog,
-            new DonationReceiptPoster(_inventory, new ShortageTracker(new InventoryReader(_inventory, _catalog), _events), _events, current),
+        return new(new MaterialOfficerScope(new WorkAreaAccess(_scopes, current), new ParishWarehouseAccess(_scopes, current), _scopes, current),
+            _donors, _store, _catalog,
+            new DonationReceiptPoster(_inventory, _parishInventory, _catalog,
+                new ShortageTracker(new InventoryReader(_inventory, _catalog), _events), _events, current),
             Projector(), current, new FakeUnitOfWork());
     }
 

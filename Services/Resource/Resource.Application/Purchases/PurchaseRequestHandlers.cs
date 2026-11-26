@@ -368,6 +368,7 @@ public sealed class SubmitPurchaseRequestCommandHandler(
 /// </summary>
 public sealed class DecidePurchaseRequestCommandHandler(
     WorkAreaAccess access,
+    Resource.Application.Scope.ParishWarehouseAccess parishAccess,
     IPurchaseRequestStore store,
     PurchaseRequestLoader loader,
     IIntegrationEventPublisher publisher,
@@ -385,7 +386,13 @@ public sealed class DecidePurchaseRequestCommandHandler(
     private async Task<PurchaseRequestDto> DecideInTransactionAsync(PurchaseRequestCommand command, bool approve, CancellationToken cancellationToken)
     {
         var (request, _) = await loader.ForReadAsync(command.PurchaseRequestId, cancellationToken);
-        var scope = await access.ForLeaderWriteAsync(request.WorkAreaId, cancellationToken);
+        var scope = await access.ForReadAsync(request.WorkAreaId, cancellationToken);
+        var (_, parishId) = await parishAccess.RequireWritableSeasonAsync(scope.SeasonId, cancellationToken);
+        if (parishId != scope.ParishId)
+        {
+            throw PurchaseRequestLoader.NotFound();
+        }
+
         request.EnsureVersion(command.Version);
 
         var now = DateTimeOffset.UtcNow;

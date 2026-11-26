@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using ParishCoordination.Contracts.Events;
 using Resource.Application.Scope;
 using Resource.Domain.Scope;
@@ -16,7 +16,7 @@ public sealed class ScopeReplicationTests
     {
         var now = new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero);
         var parent = Season();
-        var season = SeasonScope.Create(parent.SeasonId, SeasonStatus.Active, parent.Version, now);
+        var season = SeasonScope.Create(parent.SeasonId, parent.ParishId, SeasonStatus.Active, parent.Version, now);
         season.Apply(changed ? SeasonStatus.Archived : SeasonStatus.Active, parent.Version, now.AddHours(1)).Should().BeFalse();
         season.Status.Should().Be(SeasonStatus.Active);
         season.UpdatedAt.Should().Be(now);
@@ -55,7 +55,7 @@ public sealed class ScopeReplicationTests
         var parent = Season();
         var original = ScopeReplicationMapping.Area(Area(parent), parent) with { SeasonStatus = SeasonStatus.Active };
         var scopes = new FakeScopeStore();
-        scopes.AddSeason(SeasonScope.Create(parent.SeasonId, SeasonStatus.Archived, parent.Version + 1, now));
+        scopes.AddSeason(SeasonScope.Create(parent.SeasonId, parent.ParishId, SeasonStatus.Archived, parent.Version + 1, now));
         scopes.Add(WorkAreaScope.FromSnapshot(original, now));
         var handler = new ApplyWorkAreaSnapshotHandler(scopes);
 
@@ -77,7 +77,7 @@ public sealed class ScopeReplicationTests
         var sourceArea = Area(parent);
         var original = ScopeReplicationMapping.Area(sourceArea, parent) with { SeasonStatus = SeasonStatus.Active };
         var scopes = new FakeScopeStore();
-        scopes.AddSeason(SeasonScope.Create(parent.SeasonId, SeasonStatus.Active, parent.Version, now));
+        scopes.AddSeason(SeasonScope.Create(parent.SeasonId, parent.ParishId, SeasonStatus.Active, parent.Version, now));
         scopes.Add(WorkAreaScope.FromSnapshot(original, now));
         var handler = CreateReplicationHandler(scopes);
         PlanningScopeSnapshot Snapshot(SeasonScopeSnapshot season, WorkAreaScopeSnapshot area) =>

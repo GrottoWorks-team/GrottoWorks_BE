@@ -24,6 +24,7 @@ public sealed class PurchaseRequestTests
     private readonly FakeIntegrationEventPublisher _events = new();
     private readonly WorkAreaScope _area;
     private readonly Guid _leader;
+    private readonly Guid _parishUserId = Guid.NewGuid();
     private readonly Material _cable;
     private readonly Material _paint;
 
@@ -31,6 +32,7 @@ public sealed class PurchaseRequestTests
     {
         _inventory = new FakeInventoryStore(_requirements);
         _area = _scopes.Seed(Parish, _officer);
+        _scopes.AddSeason(SeasonScope.Create(_area.SeasonId, Parish, SeasonStatus.Active, 1, DateTimeOffset.UtcNow));
         _leader = _area.LeaderUserId!.Value;
         var category = _catalog.SeedCategory();
         _cable = _catalog.SeedMaterial(category, "CABLE", "Dây điện", "m");
@@ -47,7 +49,11 @@ public sealed class PurchaseRequestTests
 
     private FakeCurrentUser Leader(Guid? id = null) => User(id ?? _leader, GrottoWorksRoles.Leader);
 
+    private FakeCurrentUser ParishUser(Guid? id = null) => User(id ?? _parishUserId, GrottoWorksRoles.Parish);
+
     private WorkAreaAccess Access(ICurrentUser user) => new(_scopes, user);
+
+    private ParishWarehouseAccess ParishAccess(ICurrentUser user) => new(_scopes, user);
 
     private PurchaseRequestLoader Loader(ICurrentUser user) => new(_store, Access(user), _catalog, user);
 
@@ -73,8 +79,8 @@ public sealed class PurchaseRequestTests
 
     private DecidePurchaseRequestCommandHandler Decide(FakeCurrentUser? user = null)
     {
-        var current = user ?? Leader();
-        return new(Access(current), _store, Loader(current), _events, current);
+        var current = user ?? ParishUser();
+        return new(Access(current), ParishAccess(current), _store, Loader(current), _events, current);
     }
 
     private static PurchaseRequestItemInput Line(Material material, decimal quantity, decimal? cost = null, string? overrideReason = null) =>
@@ -290,7 +296,7 @@ public sealed class PurchaseRequestTests
     }
 
     [Fact]
-    public async Task Leader_of_the_work_area_approves_and_Task_is_told()
+    public async Task Parish_approves_and_Task_is_told()
     {
         var pending = await Pending(Line(_cable, 5));
         _events.Events.Clear();
@@ -298,22 +304,22 @@ public sealed class PurchaseRequestTests
         var approved = await Decide().ApproveAsync(new PurchaseRequestCommand(pending.Id, pending.Version, " Đồng ý "));
 
         approved.Status.Should().Be(PurchaseRequestStatus.Approved);
-        approved.ApprovedBy.Should().Be(_leader);
+        approved.ApprovedBy.Should().Be(_parishUserId);
         approved.ApprovedAt.Should().NotBeNull();
         approved.DecisionNote.Should().Be("Đồng ý");
         var payload = _events.Events.Should().ContainSingle(e => e.EventType == "purchase.request.decided")
             .Which.Payload.Should().BeOfType<PurchaseRequestDecided>().Which;
         payload.Decision.Should().Be("APPROVED");
-        payload.DecidedByUserId.Should().Be(_leader);
+        payload.DecidedByUserId.Should().Be(_parishUserId);
         payload.WorkAreaId.Should().Be(_area.WorkAreaId);
     }
 
     [Fact]
-    public async Task Another_leader_cannot_decide_and_a_planning_request_cannot_be_approved()
+    public async Task Leader_cannot_decide_and_a_planning_request_cannot_be_approved()
     {
         var pending = await Pending(Line(_cable, 5));
         (await Fails(() => Decide(Leader(Guid.NewGuid())).ApproveAsync(new PurchaseRequestCommand(pending.Id, null))))
-            .Code.Should().Be("WORK_AREA_SCOPE_DENIED");
+            .Code.Should().Be("PARISH_SCOPE_REQUIRED");
 
         var planning = await Planning(Line(_cable, 5));
         (await Fails(() => Decide().ApproveAsync(new PurchaseRequestCommand(planning.Id, null)))).Code.Should().Be("PURCHASE_REQUEST_INVALID_STATE");
@@ -334,7 +340,7 @@ public sealed class PurchaseRequestTests
         var rejected = await Decide().RejectAsync(new PurchaseRequestCommand(pending.Id, null, "Vượt ngân sách"));
 
         rejected.Status.Should().Be(PurchaseRequestStatus.Rejected);
-        rejected.ApprovedBy.Should().Be(_leader);
+        rejected.ApprovedBy.Should().Be(_parishUserId);
         rejected.RejectedAt.Should().NotBeNull();
         rejected.DecisionNote.Should().Be("Vượt ngân sách");
         _events.Events.Last().Payload.Should().BeOfType<PurchaseRequestDecided>().Which.Decision.Should().Be("REJECTED");
@@ -352,7 +358,7 @@ public sealed class PurchaseRequestTests
             PurchaseRequestStatus.Planning, PurchaseRequestStatus.PendingApproval, PurchaseRequestStatus.Approved);
         history[0].FromStatus.Should().BeNull();
         history[1].ChangedBy.Should().Be(_officer);
-        history[2].ChangedBy.Should().Be(_leader);
+        history[2].ChangedBy.Should().Be(_parishUserId);
         history[2].Note.Should().Be("OK");
     }
 

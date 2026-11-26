@@ -1,6 +1,15 @@
 # BE Changelog
 
 ## 2026-11-26
+- Branch: `feat/backend-workflow-improvements`
+- Service: Identity, Reporting, Resource, TaskExecution, NotificationAudit, ApiGateway
+- Files: `Services/Identity/*`, `Services/Reporting/*`, `Services/Resource/*`, `Services/TaskExecution/*`, `Services/NotificationAudit/*`, `ApiGateway/YarpApiGateway/appsettings.json`, unit tests, and parish warehouse docs
+- Change: Completed pending workflow and reporting improvements, added parish warehouse inventory/distribution APIs and read models, expanded identity scope handling, and aligned purchase/donation/task notification behavior.
+- Contract impact: Additive parish warehouse endpoints and scope/read-model data; existing contracts remain backward-compatible.
+- Migration: Yes. Reporting and Resource database snapshots/migrations add parish warehouse and read-model structures.
+- Follow-up: Build and run unit tests, apply reporting/resource migrations, restart affected services, then verify warehouse, purchase, donation, and notification flows through the API gateway.
+
+## 2026-11-26
 - Branch: `main`
 - Service: ParishCoordination, NotificationAudit
 - Files: `Services/ParishCoordination/ParishCoordination.Domain/Entities/Parish.cs`, `ParishCoordination.Application/Parishes/*`, `ParishCoordination.Infrastructure/Data/Configurations/ParishConfiguration.cs`, `ParishCoordination.Infrastructure/Data/Migrations/20261126020000_AddParishMapImage.cs`, `ParishCoordination.Infrastructure/Files/ParishFileAttachmentClient.cs`, `ParishCoordination.Api/Endpoints/ParishEndpoints.cs`, `Services/NotificationAudit/NotificationAudit.Application/Files/FileUpload.cs`, `NotificationAudit.Application/Files/FileAttachmentHandler.cs`, `GrottoWorks_FE/src/features/map/api.ts`

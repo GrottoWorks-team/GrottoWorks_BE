@@ -1,6 +1,7 @@
 using Identity.Api.Common;
 using Identity.Api.Requests;
 using Identity.Application.Accounts;
+using Identity.Application.Users.GetInternalParishUsers;
 using Identity.Application.Users.GetInternalUsers;
 using Identity.Application.Users.GetMyProfile;
 using Identity.Application.Users.ListParishUsers;
@@ -81,6 +82,14 @@ public static class UserEndpoints
             .AllowAnonymous()
             .AddEndpointFilter<InternalApiKeyFilter>()
             .ExcludeFromDescription();
+
+        // 26/11/2026: NotificationAudit notifies the parish committee (PARISH) about purchase requests awaiting a
+        // decision; the volunteer directory only serves VOLUNTEER.
+        app.MapGet("/internal/parish-users", GetInternalParishUsersAsync)
+            .WithName("internalGetParishUsers")
+            .AllowAnonymous()
+            .AddEndpointFilter<InternalApiKeyFilter>()
+            .ExcludeFromDescription();
     }
 
     private static async Task<IResult> ReplaceMySkillsAsync(
@@ -106,6 +115,17 @@ public static class UserEndpoints
         var pageNumber = page ?? 1;
         var pageSize = size ?? 100;
         var result = await handler.HandleAsync(parishId, communityId, skillId, pageNumber, pageSize, cancellationToken);
+        return Results.Ok(ApiResults.Page(result.Items, result.TotalItems, pageNumber, pageSize, httpContext));
+    }
+
+    private static async Task<IResult> GetInternalParishUsersAsync(
+        Guid parishId, string? role, int? page, int? size,
+        GetInternalParishUsersQueryHandler handler, HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var pageNumber = page ?? 1;
+        var pageSize = size ?? 100;
+        var result = await handler.HandleAsync(new GetInternalParishUsersQuery(parishId, role, pageNumber, pageSize), cancellationToken);
         return Results.Ok(ApiResults.Page(result.Items, result.TotalItems, pageNumber, pageSize, httpContext));
     }
 

@@ -345,8 +345,6 @@ namespace Resource.Infrastructure.Data.Migrations
                         {
                             t.HasCheckConstraint("donation_cancel_reason", "\"donation_status\" <> 'CANCELLED' OR \"cancel_reason\" IS NOT NULL");
 
-                            t.HasCheckConstraint("donation_material_requires_work_area", "\"donation_type\" <> 'MATERIAL' OR \"work_area_id\" IS NOT NULL");
-
                             t.HasCheckConstraint("donation_type_amount_consistency", "(\"donation_type\" = 'MONEY' AND (\"pledged_amount\" IS NULL OR \"pledged_amount\" > 0) AND (\"amount\" IS NULL OR \"amount\" >= 0)) OR (\"donation_type\" = 'MATERIAL' AND \"amount\" IS NULL AND \"pledged_amount\" IS NULL)");
                         });
                 });
@@ -1108,6 +1106,10 @@ namespace Resource.Infrastructure.Data.Migrations
                         .HasColumnType("uuid[]")
                         .HasColumnName("receipt_file_ids");
 
+                    b.Property<Guid?>("RecordedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recorded_by_user_id");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -1362,6 +1364,10 @@ namespace Resource.Infrastructure.Data.Migrations
                     b.Property<Guid>("SeasonId")
                         .HasColumnType("uuid")
                         .HasColumnName("season_id");
+
+                    b.Property<Guid?>("ParishId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_id");
 
                     b.Property<long>("SourceVersion")
                         .HasColumnType("bigint")
@@ -1643,6 +1649,195 @@ namespace Resource.Infrastructure.Data.Migrations
                     b.ToTable("integration_event_outbox", (string)null);
                 });
 
+            modelBuilder.Entity("Resource.Domain.Inventory.ParishDistribution", b =>
+                {
+                    b.Property<Guid>("ParishDistributionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_distribution_id");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("cancel_reason");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("distribution_note");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("distribution_origin");
+
+                    b.Property<Guid>("ParishId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_id");
+
+                    b.Property<Guid?>("ReceivedConfirmedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("received_confirmed_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ReceivedConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_confirmed_at");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("distribution_status");
+
+                    b.Property<Guid>("TargetWorkAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_work_area_id");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issued_at");
+
+                    b.Property<Guid>("IssuedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issued_by_user_id");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("ParishDistributionId");
+
+                    b.HasIndex("TargetWorkAreaId")
+                        .HasDatabaseName("ix_parish_distribution_target");
+
+                    b.HasIndex(new[] { "ParishId", "SeasonId", "TargetWorkAreaId", "Status" }, "ix_parish_distribution_scope");
+
+                    b.ToTable("parish_distribution", (string)null);
+                });
+
+            modelBuilder.Entity("Resource.Domain.Inventory.ParishDistributionItem", b =>
+                {
+                    b.Property<Guid>("ParishDistributionItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_distribution_item_id");
+
+                    b.Property<decimal>("IssuedQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("issued_quantity");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_id");
+
+                    b.Property<Guid>("ParishDistributionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_distribution_id");
+
+                    b.Property<decimal?>("ReceivedUnusableQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("received_unusable_quantity");
+
+                    b.Property<decimal?>("ReceivedUsableQuantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("received_usable_quantity");
+
+                    b.HasKey("ParishDistributionItemId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex(new[] { "ParishDistributionId", "MaterialId" }, "ux_parish_distribution_item_material")
+                        .IsUnique();
+
+                    b.ToTable("parish_distribution_item", null, t =>
+                        {
+                            t.HasCheckConstraint("parish_distribution_item_issued_positive", "\"issued_quantity\" > 0");
+
+                            t.HasCheckConstraint("parish_distribution_item_receipt_valid", "(\"received_usable_quantity\" IS NULL OR \"received_usable_quantity\" >= 0) AND (\"received_unusable_quantity\" IS NULL OR \"received_unusable_quantity\" >= 0)");
+                        });
+                });
+
+            modelBuilder.Entity("Resource.Domain.Inventory.ParishMaterialTransaction", b =>
+                {
+                    b.Property<Guid>("ParishMaterialTransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_material_transaction_id");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_id");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("transaction_note");
+
+                    b.Property<Guid>("ParishId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("transaction_quantity");
+
+                    b.Property<Guid?>("ReferenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reference_id");
+
+                    b.Property<string>("ReferenceType")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("reference_type");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<DateTimeOffset>("TransactionDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("transaction_date");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("transaction_type");
+
+                    b.HasKey("ParishMaterialTransactionId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("ReferenceType", "ReferenceId", "Type")
+                        .IsUnique()
+                        .HasDatabaseName("ux_parish_material_transaction_reference");
+
+                    b.HasIndex(new[] { "ParishId", "SeasonId", "MaterialId" }, "ix_parish_material_transaction_parish_season_material");
+
+                    b.HasIndex(new[] { "ParishId", "SeasonId", "MaterialId" }, "ux_parish_material_transaction_opening_stock")
+                        .IsUnique()
+                        .HasFilter("\"transaction_type\" = 'OPENING_STOCK'");
+
+                    b.ToTable("parish_material_transaction", null, t =>
+                        {
+                            t.HasCheckConstraint("parish_material_transaction_quantity_non_zero", "\"transaction_quantity\" <> 0");
+
+                            t.HasCheckConstraint("parish_material_transaction_quantity_sign", "(\"transaction_type\" IN ('OPENING_STOCK','PURCHASE_DELIVERY','DONATION_RECEIPT','DISTRIBUTION_RETURN') AND \"transaction_quantity\" > 0) OR (\"transaction_type\" IN ('DISTRIBUTION_OUT','ADJUSTMENT_DAMAGED','ADJUSTMENT_LOST','ADJUSTMENT_DISPOSED') AND \"transaction_quantity\" < 0)");
+                        });
+                });
+
             modelBuilder.Entity("Resource.Domain.Catalog.Material", b =>
                 {
                     b.HasOne("Resource.Domain.Catalog.MaterialCategory", null)
@@ -1717,6 +1912,30 @@ namespace Resource.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Resource.Domain.Catalog.Material", null)
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Resource.Domain.Inventory.ParishDistributionItem", b =>
+                {
+                    b.HasOne("Resource.Domain.Inventory.ParishDistribution", null)
+                        .WithMany("Items")
+                        .HasForeignKey("ParishDistributionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Resource.Domain.Catalog.Material", null)
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Resource.Domain.Inventory.ParishMaterialTransaction", b =>
+                {
                     b.HasOne("Resource.Domain.Catalog.Material", null)
                         .WithMany()
                         .HasForeignKey("MaterialId")
@@ -1847,6 +2066,11 @@ namespace Resource.Infrastructure.Data.Migrations
                 });
 
             modelBuilder.Entity("Resource.Domain.Inventory.MaterialAllocation", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Resource.Domain.Inventory.ParishDistribution", b =>
                 {
                     b.Navigation("Items");
                 });

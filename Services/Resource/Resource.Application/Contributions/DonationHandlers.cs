@@ -124,33 +124,77 @@ public sealed record RecordDirectDonationCommand(
 /// </summary>
 public sealed class DonationReceiptPoster(
     IInventoryStore inventory,
+    IParishInventoryStore parishInventory,
+    IMaterialCatalogStore catalog,
     ShortageTracker shortages,
     IIntegrationEventPublisher publisher,
     ICurrentUser currentUser)
 {
     public async Task<IReadOnlyList<ShortageTracker.Snapshot>> StageAsync(
         WorkAreaScope? scope,
+        Guid? parishId,
+        Guid seasonId,
         Donation donation,
         DonationReceipt receipt,
         CancellationToken cancellationToken)
     {
         var before = new List<ShortageTracker.Snapshot>();
-        if (scope is null)
+        var materialOfItem = donation.Items.ToDictionary(item => item.DonationItemId, item => item.MaterialId);
+
+        if (scope is not null)
         {
+            foreach (var line in receipt.Items.Where(line => line.UsableQuantity > 0))
+            {
+                var materialId = materialOfItem[line.DonationItemId];
+                before.Add(await shortages.CaptureAsync(scope, materialId, cancellationToken));
+                inventory.Append(MaterialTransaction.Post(
+                    scope.WorkAreaId, materialId, TransactionType.DonationReceipt, line.UsableQuantity, receipt.ReceivedAt,
+                    currentUser.UserId, null, TransactionReferenceType.DonationReceiptItem, line.DonationReceiptItemId));
+            }
+
             return before;
         }
 
-        var materialOfItem = donation.Items.ToDictionary(item => item.DonationItemId, item => item.MaterialId);
-        foreach (var line in receipt.Items.Where(line => line.UsableQuantity > 0))
+        if (parishId is { } warehouse && donation.Type == DonationType.Material)
         {
-            var materialId = materialOfItem[line.DonationItemId];
-            before.Add(await shortages.CaptureAsync(scope, materialId, cancellationToken));
-            inventory.Append(MaterialTransaction.Post(
-                scope.WorkAreaId, materialId, TransactionType.DonationReceipt, line.UsableQuantity, receipt.ReceivedAt,
-                currentUser.UserId, null, TransactionReferenceType.DonationReceiptItem, line.DonationReceiptItemId));
+            foreach (var line in receipt.Items.Where(line => line.UsableQuantity > 0))
+            {
+                parishInventory.Append(ParishMaterialTransaction.Post(
+                    warehouse, seasonId, materialOfItem[line.DonationItemId], TransactionType.DonationReceipt,
+                    line.UsableQuantity, receipt.ReceivedAt, currentUser.UserId, null,
+                    TransactionReferenceType.DonationReceiptItem, line.DonationReceiptItemId));
+            }
         }
 
         return before;
+    }
+
+    /// <summary>Reports the new parish warehouse balance for each material a parish donation touched.</summary>
+    public async Task PublishParishStockAsync(
+        Guid parishId,
+        Guid seasonId,
+        IReadOnlyCollection<Guid> materialIds,
+        CancellationToken cancellationToken)
+    {
+        if (materialIds.Count == 0)
+        {
+            return;
+        }
+
+        var materials = await catalog.GetMaterialsAsync(materialIds.Distinct().ToList(), cancellationToken);
+        foreach (var material in materials)
+        {
+            var available = Math.Max(0, (await parishInventory.GetTotalsAsync(parishId, seasonId, material.MaterialId, cancellationToken))
+                .Sum(row => row.Quantity));
+            await publisher.PublishAsync(
+                ParishMaterialStockChanged.EventType,
+                ParishMaterialStockChanged.Version,
+                new ParishMaterialStockChanged(parishId, seasonId, material.MaterialId, available, DateTimeOffset.UtcNow,
+                    material.Code, material.Name, material.Unit),
+                "parish_material",
+                material.MaterialId,
+                cancellationToken: cancellationToken);
+        }
     }
 
     public async Task PublishAsync(
@@ -233,12 +277,17 @@ public sealed class RecordDirectDonationCommandHandler(
         await MaterialRules.EnsureActiveAsync(catalog, donation.Items.Select(item => item.MaterialId), cancellationToken);
 
         var receipt = donation.Receipts.Single();
-        var posting = await poster.StageAsync(scope, donation, receipt, cancellationToken);
+        var posting = await poster.StageAsync(scope, scope is null ? parishId : null, seasonId, donation, receipt, cancellationToken);
 
         store.Add(donation);
         await store.SaveChangesAsync(cancellationToken);
 
         await poster.PublishAsync(posting, donation, receipt, donor, parishId, isDirect: true, isFirstReceipt: true, cancellationToken);
+        if (scope is null && command.Type == DonationType.Material)
+        {
+            await poster.PublishParishStockAsync(parishId, seasonId, donation.Items.Select(item => item.MaterialId).ToList(), cancellationToken);
+        }
+
         return await projector.ToDtoAsync(donation, cancellationToken);
     }
 }
@@ -390,12 +439,16 @@ public sealed class RecordDonationReceiptCommandHandler(
 
         var now = DateTimeOffset.UtcNow;
         var recorded = donation.RecordReceipt(command.ReceivedAt ?? now, command.Amount, command.Items, command.Note, currentUser.UserId, now);
-        var posting = await poster.StageAsync(scope, donation, recorded.Receipt, cancellationToken);
+        var posting = await poster.StageAsync(scope, scope is null ? parishId : null, donation.SeasonId, donation, recorded.Receipt, cancellationToken);
         await store.SaveChangesAsync(cancellationToken);
 
         var donor = await donors.GetAsync(donation.DonorId, cancellationToken)
             ?? throw new InvalidOperationException("Donation points to a missing donor.");
         await poster.PublishAsync(posting, donation, recorded.Receipt, donor, parishId, isDirect: false, recorded.IsFirstReceipt, cancellationToken);
+        if (scope is null && donation.Type == DonationType.Material)
+        {
+            await poster.PublishParishStockAsync(parishId, donation.SeasonId, donation.Items.Select(item => item.MaterialId).ToList(), cancellationToken);
+        }
 
         var materialOfItem = donation.Items.ToDictionary(item => item.DonationItemId, item => item.MaterialId);
         var receipt = recorded.Receipt;

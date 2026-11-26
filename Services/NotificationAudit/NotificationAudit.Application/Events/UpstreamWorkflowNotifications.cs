@@ -17,12 +17,25 @@ public sealed partial class IntegrationEventIngestionHandler
         switch (message.EventType)
         {
             case "purchase.request.submitted":
+            {
+                var requestId = GetGuid(payload, "purchaseRequestId");
+                const string reviewTitle = "Purchase request awaiting review";
+                const string reviewBody = "A purchase request is awaiting the parish committee's decision.";
+                // PARISH now decides purchase requests: the audience resolver fans the request out to the committee.
+                if (requestId is { } id && ReadRecipientIds(payload) is { Count: > 0 } committee)
+                {
+                    return committee
+                        .Select(userId => new NotificationCandidate(userId, reviewTitle, reviewBody, "PURCHASE_REQUEST", id))
+                        .ToList();
+                }
+
                 recipient = GetGuid(payload, "leaderUserId");
-                reference = GetGuid(payload, "purchaseRequestId");
+                reference = requestId;
                 referenceType = "PURCHASE_REQUEST";
-                title = "Purchase request awaiting review";
-                body = "A purchase request in your work area is awaiting your decision.";
+                title = reviewTitle;
+                body = "A purchase request in your work area is awaiting a decision.";
                 break;
+            }
             case "purchase.request.decided":
                 var decision = GetString(payload, "decision");
                 if (decision is not ("APPROVED" or "REJECTED")) break;
@@ -31,6 +44,20 @@ public sealed partial class IntegrationEventIngestionHandler
                 referenceType = "PURCHASE_REQUEST";
                 title = decision == "APPROVED" ? "Purchase request approved" : "Purchase request rejected";
                 body = decision == "APPROVED" ? "Your purchase request was approved." : "Your purchase request was rejected.";
+                break;
+            case "parish.distribution.issued":
+                recipient = GetGuid(payload, "targetMaterialOfficerUserId");
+                reference = GetGuid(payload, "parishDistributionId");
+                referenceType = "PARISH_DISTRIBUTION";
+                title = "Materials handed down from the parish store";
+                body = "The parish issued materials to your work area. Confirm what arrived so stock is usable.";
+                break;
+            case "parish.distribution.received":
+                recipient = GetGuid(payload, "issuedByUserId");
+                reference = GetGuid(payload, "parishDistributionId");
+                referenceType = "PARISH_DISTRIBUTION";
+                title = "Hand-down confirmed";
+                body = "The work area confirmed the materials issued from the parish store.";
                 break;
             case "readiness.item.failed":
                 if (!payload.TryGetProperty("mandatory", out var mandatory) ||

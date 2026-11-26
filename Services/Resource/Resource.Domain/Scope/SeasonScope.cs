@@ -13,14 +13,36 @@ public sealed class SeasonScope
 
     public Guid SeasonId { get; private set; }
 
+    /// <summary>
+    /// Owning parish. Null only while no snapshot carried it (season events alone do not); it is filled by the first
+    /// work-area snapshot or season snapshot and is what lets the parish warehouse reject another parish's season.
+    /// </summary>
+    public Guid? ParishId { get; private set; }
+
     public SeasonStatus Status { get; private set; }
 
     public long SourceVersion { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    public static SeasonScope Create(Guid seasonId, SeasonStatus status, long? version, DateTimeOffset now) =>
-        new() { SeasonId = seasonId, Status = status, SourceVersion = version ?? 0, UpdatedAt = now.ToUniversalTime() };
+    public static SeasonScope Create(Guid seasonId, Guid? parishId, SeasonStatus status, long? version, DateTimeOffset now) =>
+        new()
+        {
+            SeasonId = seasonId,
+            ParishId = parishId,
+            Status = status,
+            SourceVersion = version ?? 0,
+            UpdatedAt = now.ToUniversalTime()
+        };
+
+    /// <summary>Fills the parish once a snapshot provides it; never overwrites a different value.</summary>
+    public void ApplyParish(Guid parishId)
+    {
+        if (ParishId is null && parishId != Guid.Empty)
+        {
+            ParishId = parishId;
+        }
+    }
 
     /// <summary>
     /// Returns false when <paramref name="version"/> is equal to or older than the stored one. An update without version (manual feed)

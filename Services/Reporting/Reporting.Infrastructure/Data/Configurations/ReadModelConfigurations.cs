@@ -33,6 +33,29 @@ public sealed class MaterialLineConfiguration : IEntityTypeConfiguration<Materia
     }
 }
 
+/// <summary>
+/// <c>rm_parish_material_line</c> (26/11/2026): the parish warehouse balance of one material in one season, kept from
+/// <c>parish.material.stock.changed</c> so the materials report can show a "Kho tổng" row.
+/// </summary>
+public sealed class ParishMaterialLineConfiguration : IEntityTypeConfiguration<ParishMaterialLine>
+{
+    public void Configure(EntityTypeBuilder<ParishMaterialLine> builder)
+    {
+        builder.ToTable("rm_parish_material_line");
+        builder.HasKey(line => new { line.ParishId, line.SeasonId, line.MaterialId });
+        builder.Property(line => line.ParishId).HasColumnName("parish_id");
+        builder.Property(line => line.SeasonId).HasColumnName("season_id");
+        builder.Property(line => line.MaterialId).HasColumnName("material_id");
+        builder.Property(line => line.MaterialCode).HasColumnName("material_code").HasMaxLength(50);
+        builder.Property(line => line.MaterialName).HasColumnName("material_name").HasMaxLength(150);
+        builder.Property(line => line.Unit).HasColumnName("unit").HasMaxLength(30);
+        builder.Property(line => line.ConfirmedAvailable).HasColumnName("confirmed_available").HasPrecision(12, 2);
+        builder.Property(line => line.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone");
+        builder.Property(line => line.Version).IsRowVersion();
+        builder.HasIndex(line => new { line.ParishId, line.SeasonId }, "ix_rm_parish_material_line_parish_season");
+    }
+}
+
 public sealed class PurchaseRequestViewConfiguration : IEntityTypeConfiguration<PurchaseRequestView>
 {
     public void Configure(EntityTypeBuilder<PurchaseRequestView> builder)

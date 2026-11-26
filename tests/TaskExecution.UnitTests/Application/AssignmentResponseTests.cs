@@ -2,6 +2,7 @@ using FluentAssertions;
 using TaskExecution.Contracts.Events;
 using TaskExecution.Domain;
 using TaskExecution.Domain.Assignments;
+using TaskExecution.Domain.Tasks;
 
 namespace TaskExecution.UnitTests.Application;
 
@@ -33,6 +34,24 @@ public sealed class AssignmentResponseTests
         result.Note.Should().Be("Original note");
         result.ResponseReason.Should().Be("Not available");
         f.Store.Items.Single().ReservesCapacity.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Purchase_task_is_assigned_to_a_parish_buyer_who_can_accept_it()
+    {
+        // 26/11/2026: PURCHASE tasks go to a parish user (the buyer), not a volunteer.
+        var f = new AssignmentTestFixture();
+        var buyer = Guid.NewGuid();
+        f.Identity.Items[buyer] = new(buyer, "Ban hành giáo", "ACTIVE", "PARISH", f.User.ParishId, null, []);
+        f.Task.SetSpecialType(TaskType.Purchase, Guid.NewGuid());
+
+        var assigned = await f.Service.AssignAsync(f.Command() with { VolunteerId = buyer });
+        f.User.UserId = buyer;
+        f.User.Role = "PARISH";
+        var accepted = await f.Service.RespondAsync(assigned.Id, true, null, assigned.Version);
+
+        accepted.Status.Should().Be(AssignmentStatus.Accepted);
+        accepted.VolunteerId.Should().Be(buyer);
     }
 
     [Fact]

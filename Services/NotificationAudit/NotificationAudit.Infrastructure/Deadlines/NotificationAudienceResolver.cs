@@ -21,6 +21,9 @@ public sealed class NotificationAudienceResolver(HttpClient client,IHttpClientFa
 
     private async Task<IReadOnlyList<Guid>?> ResolveCoreAsync(IncomingIntegrationEvent message,CancellationToken ct)
     {
+        if(message.EventType=="purchase.request.submitted")
+            return await ResolveParishCommitteeAsync(message,ct);
+
         var areas=await GetCompleteAudienceAsync(message,ct);
         if(areas is null)return null;
         if(message.EventType.StartsWith("planning.season.",StringComparison.Ordinal))
@@ -57,6 +60,41 @@ public sealed class NotificationAudienceResolver(HttpClient client,IHttpClientFa
         }
         return recipients.Order().ToArray();
     }
+    /// <summary>
+    /// 26/11/2026: purchase requests are decided by the parish committee, so the recipients are the ACTIVE PARISH users
+    /// of the parish (Identity internal directory). The area leader is no longer the approver.
+    /// </summary>
+    private async Task<IReadOnlyList<Guid>> ResolveParishCommitteeAsync(IncomingIntegrationEvent message,CancellationToken ct)
+    {
+        if(message.ParishId==Guid.Empty)throw new HttpRequestException("Purchase request event has no parish context.");
+        var key=configuration["InternalApi:ApiKey"];
+        if(string.IsNullOrWhiteSpace(key) || key.Length<32)throw new HttpRequestException("Internal audience service is not configured.");
+        var recipients=new HashSet<Guid>();
+        for(var page=1;page<=100;page++)
+        {
+            using var request=new HttpRequestMessage(HttpMethod.Get,
+                $"internal/parish-users?parishId={message.ParishId:D}&role=PARISH&page={page}&size=100");
+            request.Headers.Add("X-Internal-Api-Key",key);
+            request.Headers.Add("X-Correlation-Id",message.CorrelationId);
+            using var response=await client.SendAsync(request,ct);
+            // A missing directory must not be reported as "nobody to notify": keep the event pending for replay.
+            if(response.StatusCode==System.Net.HttpStatusCode.NotFound)
+                throw new HttpRequestException("Parish audience directory is not available yet.");
+            response.EnsureSuccessStatusCode();
+            var result=await response.Content.ReadFromJsonAsync<DirectoryPage>(ct);
+            if(result?.Data is null || result.Page is null || result.Page.TotalPages>100)
+                throw new HttpRequestException("Audience directory returned incomplete pagination.");
+            foreach(var candidate in result.Data)
+            {
+                if(candidate.ParishId!=message.ParishId || candidate.Role!="PARISH" || candidate.Status!="ACTIVE" || candidate.UserId==Guid.Empty)
+                    throw new HttpRequestException("Audience directory returned invalid tenant context.");
+                recipients.Add(candidate.UserId);
+            }
+            if(page>=result.Page.TotalPages)break;
+        }
+        return recipients.Order().ToArray();
+    }
+
     private async Task<IReadOnlyList<Area>?> GetCompleteAudienceAsync(IncomingIntegrationEvent message,CancellationToken ct)
     {
         var key=configuration["InternalApi:ApiKey"];

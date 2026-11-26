@@ -24,6 +24,10 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
 
     public DbSet<MaterialTransaction> MaterialTransactions => Set<MaterialTransaction>();
 
+    public DbSet<ParishMaterialTransaction> ParishMaterialTransactions => Set<ParishMaterialTransaction>();
+
+    public DbSet<ParishDistribution> ParishDistributions => Set<ParishDistribution>();
+
     public DbSet<MaterialAllocation> MaterialAllocations => Set<MaterialAllocation>();
 
     public DbSet<TaskMaterialReport> TaskMaterialReports => Set<TaskMaterialReport>();

@@ -168,10 +168,8 @@ public sealed class Donation
             throw DomainRuleException.Validation("DONATION_MATERIAL_HAS_AMOUNT", "A MATERIAL donation has no money amount.");
         }
 
-        if (workAreaId is null)
-        {
-            throw DomainRuleException.Validation("DONATION_WORK_AREA_REQUIRED", "A MATERIAL donation needs the receiving work area (BR-37).");
-        }
+        // BR-37: MATERIAL goes either to a work area or (new) to the parish warehouse when workAreaId is null.
+        // Which of the two the caller may use is decided by the application layer from their role.
 
         if (items.Count == 0)
         {

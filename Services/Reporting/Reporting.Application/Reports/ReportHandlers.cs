@@ -31,6 +31,9 @@ public sealed class ReportQueryHandler(ReportScopeResolver resolver, IReadModelS
 {
     private const string Money = "VND";
 
+    /// <summary>Label of the parish central warehouse row in the materials report (26/11/2026).</summary>
+    public const string ParishWarehouseLabel = "Kho tổng giáo xứ";
+
     public Task<ReportDataDto> BuildAsync(ReportType type, ReportQuery query, CancellationToken cancellationToken = default) =>
         BuildAsync(type, query, resolver.Caller(), cancellationToken);
 
@@ -90,7 +93,24 @@ public sealed class ReportQueryHandler(ReportScopeResolver resolver, IReadModelS
             .OrderBy(line => names[line.WorkAreaId], StringComparer.CurrentCulture)
             .ThenBy(line => line.MaterialName ?? line.MaterialId.ToString(), StringComparer.CurrentCulture)
             .ToList();
-        var rows = lines.Select(line => Row(
+        // Parish warehouse first (26/11/2026): the whole parish reads how much the central store still holds.
+        var parishLines = (await store.ListParishMaterialLinesAsync(scope.ParishId, scope.SeasonId, cancellationToken))
+            .OrderBy(line => line.MaterialName ?? line.MaterialId.ToString(), StringComparer.CurrentCulture)
+            .ToList();
+        var rows = parishLines.Select(line => Row(
+                ("workArea", ParishWarehouseLabel),
+                ("materialCode", line.MaterialCode),
+                ("material", line.MaterialName ?? line.MaterialId.ToString()),
+                ("unit", line.Unit),
+                ("required", (decimal?)null),
+                ("confirmedAvailable", line.ConfirmedAvailable),
+                ("shortage", (decimal?)null),
+                ("pledged", (decimal?)null),
+                ("donatedUsable", (decimal?)null),
+                ("donatedUnusable", (decimal?)null),
+                ("purchasedUsable", (decimal?)null),
+                ("purchasedUnusable", (decimal?)null)))
+            .Concat(lines.Select(line => Row(
                 ("workArea", names[line.WorkAreaId]),
                 ("materialCode", line.MaterialCode),
                 ("material", line.MaterialName ?? line.MaterialId.ToString()),
@@ -102,12 +122,13 @@ public sealed class ReportQueryHandler(ReportScopeResolver resolver, IReadModelS
                 ("donatedUsable", line.DonatedUsable),
                 ("donatedUnusable", line.DonatedUnusable),
                 ("purchasedUsable", line.PurchasedUsable),
-                ("purchasedUnusable", line.PurchasedUnusable)))
+                ("purchasedUnusable", line.PurchasedUnusable))))
             .ToList();
         var totals = new Dictionary<string, object?>
         {
             ["lines"] = lines.Count,
-            ["linesWithShortage"] = lines.Count(line => line.Shortage > 0)
+            ["linesWithShortage"] = lines.Count(line => line.Shortage > 0),
+            ["parishLines"] = parishLines.Count
         };
         return new Parts(
             [new("workArea", "Khu vực"), new("materialCode", "Mã"), new("material", "Vật tư"), new("unit", "Đơn vị"), new("required", "Cần", "unit"),
@@ -116,6 +137,7 @@ public sealed class ReportQueryHandler(ReportScopeResolver resolver, IReadModelS
                 new("purchasedUsable", "Đã mua (dùng được)", "unit"), new("purchasedUnusable", "Đã mua (không dùng được)", "unit")],
             rows, totals,
             ["Số lượng tính theo đơn vị của từng vật tư; cần / đã có / còn thiếu là số liệu tại lần thay đổi shortage gần nhất.",
+                $"Dòng \"{ParishWarehouseLabel}\" là tồn kho tổng của giáo xứ (không có cần / thiếu vì không thuộc khu nào).",
                 "Shortage không bao giờ âm (BR-25)."]);
     }
 

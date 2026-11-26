@@ -23,7 +23,7 @@ public static class DonationEndpoints
 
         group.MapPost("", RecordAsync)
             .WithName("recordDirectDonation")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer))
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer, GrottoWorksRoles.Parish))
             .Accepts<CreateDonationRequest>("application/json")
             .Produces<ApiResponse<DonationDto>>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status403Forbidden)

@@ -33,7 +33,9 @@ public sealed class AdjustDonationCommandHandler(
     IMaterialCatalogStore catalog,
     InventoryReader reader,
     IInventoryStore inventory,
+    IParishInventoryStore parishInventory,
     IWorkAreaStockLock stockLock,
+    IParishStockLock parishStockLock,
     ShortageTracker shortages,
     DonationProjector projector,
     IIntegrationEventPublisher publisher,
@@ -91,6 +93,51 @@ public sealed class AdjustDonationCommandHandler(
 
             await store.SaveChangesAsync(cancellationToken);
             await lease.CommitAsync(cancellationToken);
+        }
+        else if (scope is null && donation.Type == DonationType.Material && changed.Count > 0)
+        {
+            var materials = (await catalog.GetMaterialsAsync(changed.Select(line => line.MaterialId).Distinct().ToList(), cancellationToken))
+                .ToDictionary(material => material.MaterialId);
+            await using var lease = await parishStockLock.AcquireAsync(parishId, donation.SeasonId, cancellationToken);
+            var balances = (await parishInventory.GetTotalsAsync(parishId, donation.SeasonId, null, cancellationToken))
+                .ToDictionary(row => row.MaterialId, row => row.Quantity);
+            foreach (var line in changed.Where(line => line.UsableDelta < 0))
+            {
+                if (-line.UsableDelta > balances.GetValueOrDefault(line.MaterialId))
+                {
+                    var material = materials[line.MaterialId];
+                    throw new DomainRuleException(
+                        "PARISH_STOCK_INSUFFICIENT",
+                        $"Only {balances.GetValueOrDefault(line.MaterialId)} {material.Unit} of {material.Code} is available in the parish warehouse.");
+                }
+            }
+
+            foreach (var line in changed)
+            {
+                parishInventory.Append(ParishMaterialTransaction.Post(
+                    parishId, donation.SeasonId, line.MaterialId,
+                    line.UsableDelta > 0 ? TransactionType.DonationReceipt : TransactionType.AdjustmentDisposed,
+                    Math.Abs(line.UsableDelta), now, currentUser.UserId,
+                    $"Correction of donation receipt {adjustment.Receipt.DonationReceiptId}: {reason}",
+                    TransactionReferenceType.InventoryAdjustment, Guid.NewGuid()));
+            }
+
+            await store.SaveChangesAsync(cancellationToken);
+            await lease.CommitAsync(cancellationToken);
+
+            foreach (var material in materials.Values)
+            {
+                var available = Math.Max(0, (await parishInventory.GetTotalsAsync(parishId, donation.SeasonId, material.MaterialId,
+                    cancellationToken)).Sum(row => row.Quantity));
+                await publisher.PublishAsync(
+                    ParishMaterialStockChanged.EventType,
+                    ParishMaterialStockChanged.Version,
+                    new ParishMaterialStockChanged(parishId, donation.SeasonId, material.MaterialId, available, now,
+                        material.Code, material.Name, material.Unit),
+                    "parish_material",
+                    material.MaterialId,
+                    cancellationToken: cancellationToken);
+            }
         }
         else
         {

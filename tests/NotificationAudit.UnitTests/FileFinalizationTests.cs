@@ -160,6 +160,11 @@ public sealed class FileFinalizationTests
             return Task.CompletedTask;
         }
         public Task<PresignedObjectRequest> CreateUploadRequestAsync(string key, string type, TimeSpan lifetime, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task UploadAsync(string key, Stream content, string contentType, CancellationToken cancellationToken)
+        {
+            log.Add("upload");
+            return Task.CompletedTask;
+        }
         public Task<PresignedObjectRequest> CreateDownloadRequestAsync(string key, TimeSpan lifetime, CancellationToken cancellationToken)
         {
             Downloaded.Add(key);

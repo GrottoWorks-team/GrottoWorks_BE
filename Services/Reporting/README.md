@@ -102,10 +102,14 @@ Mẫu request: `Reporting.Api.http`.
 
 - Read model (bảng kỹ thuật `rm_*`, cập nhật trong cùng transaction với inbox, mỗi dòng có `xmin` → event đồng thời trên
   cùng dòng: một cái 409 và được gửi lại, không mất cập nhật):
-  `rm_material_line` (`material.shortage.changed` + pledge / receipt / delivery theo vật tư), `rm_purchase_request`
+  `rm_material_line` (`material.shortage.changed` + pledge / receipt / delivery theo vật tư), `rm_parish_material_line`
+  (`parish.material.stock.changed` — tồn kho tổng, 26/11/2026), `rm_purchase_request`
   (`purchase.request.*`, `purchase.delivery.confirmed`), `rm_donation` (`contribution.*`), `rm_attendance`
   (`attendance.hours.approved`, duyệt lại thay số giờ), `rm_readiness_area` + `rm_readiness_history` (`readiness.*`);
   task dùng `task_projection` (+ `due_at`) nạp qua `/internal/task-scopes`.
+- Báo cáo vật tư có thêm dòng đầu tiên **"Kho tổng giáo xứ"** cho mỗi vật tư còn tồn ở kho tổng giáo xứ (chỉ có "đã có";
+  cần / thiếu / pledge / tặng / mua để trống vì không thuộc khu nào). Tổng `lines` vẫn đếm dòng theo khu, thêm
+  `parishLines` cho số dòng kho tổng.
 - Phạm vi (BR-57): PARISH toàn bộ khu vực của season trong parish; LEADER khu vực mình lead; MO khu vực mình quản lý.
   Season ngoài parish → 404; `workAreaId` ngoài phạm vi → 404; donation không gắn khu vực (tiền) chỉ hiện với PARISH.
 - `ReportQuery`: `seasonId` bắt buộc, `workAreaId`, `communityId`, `from`, `to` (`yyyy-MM-dd`, giờ Việt Nam; áp theo

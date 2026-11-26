@@ -18,6 +18,7 @@ public sealed class PurchaseConfiguration : IEntityTypeConfiguration<Purchase>
         // task_id and user ids reference other services: no FK (spec 2.1).
         builder.Property(purchase => purchase.TaskId).HasColumnName("task_id").IsRequired();
         builder.Property(purchase => purchase.BuyerUserId).HasColumnName("buyer_user_id").IsRequired();
+        builder.Property(purchase => purchase.RecordedByUserId).HasColumnName("recorded_by_user_id");
         builder.Property(purchase => purchase.ConfirmedByUserId).HasColumnName("confirmed_by_user_id");
         builder.Property(purchase => purchase.SupplierName).HasColumnName("supplier_name").HasMaxLength(Purchase.MaxSupplierLength);
         builder.Property(purchase => purchase.PurchaseDate).HasColumnName("purchase_date").HasColumnType("date").IsRequired();

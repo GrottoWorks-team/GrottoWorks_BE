@@ -65,7 +65,7 @@ public static class PurchaseRequestEndpoints
 
         group.MapPost("/{requestId:guid}/approve", ApproveAsync)
             .WithName("approvePurchaseRequest")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Parish))
             .Accepts<ApprovalCommandRequest>("application/json")
             .Produces<ApiResponse<PurchaseRequestDto>>()
             .ProducesProblem(StatusCodes.Status403Forbidden)
@@ -75,7 +75,7 @@ public static class PurchaseRequestEndpoints
 
         group.MapPost("/{requestId:guid}/reject", RejectAsync)
             .WithName("rejectPurchaseRequest")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Parish))
             .Accepts<ReasonCommandRequest>("application/json")
             .Produces<ApiResponse<PurchaseRequestDto>>()
             .ProducesProblem(StatusCodes.Status403Forbidden)

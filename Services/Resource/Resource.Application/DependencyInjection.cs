@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<TaskMaterialEventIngestion>();
         services.AddScoped<ApplyTaskEventHandler>();
         services.AddScoped<WorkAreaAccess>();
+        services.AddScoped<ParishWarehouseAccess>();
 
         // F-RES-03 material requirements
         services.AddScoped<ListMaterialRequirementsQueryHandler>();
@@ -55,6 +56,19 @@ public static class DependencyInjection
 
         // F-RES-16 inventory adjustments
         services.AddScoped<CreateInventoryAdjustmentCommandHandler>();
+
+        // F-RES-21 parish warehouse (central store) and two-step distributions
+        services.AddScoped<RecordParishOpeningStockCommandHandler>();
+        services.AddScoped<ListParishInventoryQueryHandler>();
+        services.AddScoped<GetParishMaterialHistoryQueryHandler>();
+        services.AddScoped<CreateParishAdjustmentCommandHandler>();
+        services.AddScoped<ParishDistributionIssuer>();
+        services.AddScoped<ParishDistributionProjector>();
+        services.AddScoped<CreateParishDistributionCommandHandler>();
+        services.AddScoped<ListParishDistributionsQueryHandler>();
+        services.AddScoped<GetParishDistributionQueryHandler>();
+        services.AddScoped<ConfirmParishDistributionCommandHandler>();
+        services.AddScoped<CancelParishDistributionCommandHandler>();
 
         // F-RES-17 task material reports
         services.AddScoped<MaterialReportContext>();

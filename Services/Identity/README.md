@@ -69,6 +69,7 @@ tests/Identity.UnitTests/     # xUnit + FluentAssertions (chạy local, không c
 | `PUT /api/v1/admin/users/{id}/role` | `assignUserRole` | ADMIN | `{ role, parishId? }` — 1 role/account |
 | `GET /api/v1/roles` | `listAssignableRoles` | ADMIN | 5 role theo thứ tự chuẩn |
 | `GET /internal/users?ids=a,b` | — | Service (`X-Internal-Api-Key`) | ≤ 100 id; không qua gateway, ẩn khỏi OpenAPI |
+| `GET /internal/parish-users?parishId=&role=&page=&size=` | — | Service (`X-Internal-Api-Key`) | User ACTIVE của parish theo role (mặc định `PARISH`), ≤ 100/trang; cho NotificationAudit báo ban hành giáo (26/11/2026) |
 
 Concurrency: `app_user` dùng cột hệ thống `xmin` của PostgreSQL làm `version` (không thêm cột ERD).
 Admin không tự khóa / tự vô hiệu hóa / tự đổi role của chính mình (đảm bảo luôn còn ≥ 1 ADMIN).

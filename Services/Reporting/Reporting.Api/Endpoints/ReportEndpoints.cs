@@ -14,7 +14,7 @@ public static class ReportEndpoints
         var dashboards = app.MapGroup("/api/v1/dashboards").WithTags("Reports");
         dashboards.MapGet("/season", SeasonDashboardAsync)
             .WithName("viewSeasonDashboard")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Parish))
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish))
             .Produces<ApiResponse<SeasonDashboardDto>>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
@@ -70,8 +70,14 @@ public static class ReportEndpoints
 
     private static async Task<IResult> SeasonDashboardAsync(HttpContext httpContext, DashboardQueryHandler handler, CancellationToken cancellationToken)
     {
-        var seasonId = new QueryReader(httpContext.Request.Query, "seasonId").RequiredGuid("seasonId");
-        return Results.Ok(ApiResults.Ok(await handler.SeasonAsync(seasonId, cancellationToken), httpContext));
+        var seasonId = new QueryReader(httpContext.Request.Query, "seasonId", "parishId").RequiredGuid("seasonId");
+        Guid? parishId = null;
+        if (httpContext.Request.Query.TryGetValue("parishId", out var rawParishId) &&
+            Guid.TryParse(rawParishId.FirstOrDefault(), out var parsedParishId))
+        {
+            parishId = parsedParishId;
+        }
+        return Results.Ok(ApiResults.Ok(await handler.SeasonAsync(seasonId, parishId, cancellationToken), httpContext));
     }
 
     private static async Task<IResult> WorkAreaDashboardAsync(HttpContext httpContext, DashboardQueryHandler handler, CancellationToken cancellationToken)

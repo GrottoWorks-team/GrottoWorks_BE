@@ -93,9 +93,25 @@ public sealed class DashboardQueryHandler(
 {
     private static readonly string[] Pending = ["Support request đang mở (chờ event support.request.*)", "Check-in chờ duyệt (chờ event attendance.request.*)"];
 
-    public async Task<SeasonDashboardDto> SeasonAsync(Guid seasonId, CancellationToken cancellationToken = default)
+    public async Task<SeasonDashboardDto> SeasonAsync(Guid seasonId, Guid? parishId = null, CancellationToken cancellationToken = default)
     {
-        var scope = await resolver.ResolveAsync(new ReportQuery(seasonId), cancellationToken);
+        Guid resolvedParishId;
+        if (parishId.HasValue)
+        {
+            resolvedParishId = parishId.Value;
+        }
+        else if (currentUser.Role == GrottoWorksRoles.Admin)
+        {
+            resolvedParishId = (await scopes.ListBySeasonAsync(seasonId, cancellationToken)).FirstOrDefault()?.ParishId
+                ?? throw DomainRuleException.NotFound("SEASON_NOT_FOUND", "The season does not exist or has no work areas.");
+        }
+        else
+        {
+            resolvedParishId = access.RequireParish();
+        }
+
+        var requester = new ReportRequester(currentUser.UserId, currentUser.Role, resolvedParishId);
+        var scope = await resolver.ResolveAsync(new ReportQuery(seasonId), requester, cancellationToken);
         var data = await LoadAsync(scope, cancellationToken);
         var summary = Summarise(scope, data);
         var communities = scope.WorkAreas

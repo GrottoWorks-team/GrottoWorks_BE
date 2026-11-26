@@ -2,6 +2,15 @@
 
 ## 2026-11-26
 - Branch: `main`
+- Service: Reporting, NotificationAudit/Frontend map handling
+- Files: `Services/Reporting/Reporting.Api/Endpoints/ReportEndpoints.cs`, `Services/Reporting/Reporting.Application/Reports/DashboardHandlers.cs`, `GrottoWorks_FE/src/features/dashboards/api.ts`, `GrottoWorks_FE/src/features/dashboards/ParishOverview.tsx`, `GrottoWorks_FE/src/features/map/localStore.ts`, `GrottoWorks_FE/src/features/map/pages/ParishMapPage.tsx`, `GrottoWorks_FE/src/features/areas/pages/AreaFormDialog.tsx`
+- Change: Added ADMIN access and explicit parish scope to season dashboards; stopped legacy/non-GUID map keys from calling the file download endpoint and added orphan map cleanup.
+- Contract impact: Additive dashboard query parameter `parishId`; season dashboard now accepts ADMIN and PARISH. No existing request shape is removed.
+- Migration: No.
+- Follow-up: Restart Reporting and frontend dev server, then re-login and verify the 403/404 logs disappear.
+
+## 2026-11-26
+- Branch: `main`
 - Service: ApiGateway, NotificationAudit, local object storage
 - Files: `ApiGateway/YarpApiGateway/appsettings.Development.json`, `docker-compose.override.yml`, `docs/ops/cloudflare-r2.md`
 - Change: Added `http://127.0.0.1:5173` to local gateway and MinIO CORS origins, and documented the same origin for Cloudflare R2 bucket CORS.

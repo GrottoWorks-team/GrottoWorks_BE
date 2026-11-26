@@ -148,6 +148,8 @@ public sealed class FileFinalizationTests
         public List<string> Deleted { get; } = [];
         public List<string> Downloaded { get; } = [];
         public StoredObjectInspection Inspection { get; set; } = new(4, "image/jpeg", "checksum", "image/jpeg");
+        public Task UploadAsync(string objectKey, Stream content, string contentType, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
         public Task CopyToPrivateAsync(string pending, string completed, CancellationToken cancellationToken)
         { log.Add("copy"); return Task.CompletedTask; }
         public Task<StoredObjectInspection> InspectAsync(string key, CancellationToken cancellationToken)

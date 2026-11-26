@@ -17,6 +17,7 @@ public static class ResourceEndpoints
         app.MapShortageEndpoints();
         app.MapPurchaseRequestEndpoints();
         app.MapPurchaseEndpoints();
+        app.MapSelfPurchaseEndpoints();
         app.MapDonorEndpoints();
         app.MapDonationEndpoints();
         app.MapMaterialReportEndpoints();

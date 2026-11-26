@@ -91,7 +91,7 @@ public sealed class PurchaseTests
 
     private RecordPurchaseCommand Bought(decimal quantity, decimal unitPrice = 10_000m) =>
         new(_request.PurchaseRequestId, "Điện Quang", null,
-            [new PurchaseLineInput(_request.Items.Single().PurchaseRequestItemId, quantity, unitPrice, null)], []);
+            [new PurchaseLineInput(_request.Items.Single().PurchaseRequestItemId, quantity, unitPrice, null)], [Guid.NewGuid()]);
 
     private static ConfirmDeliveryCommand Delivered(PurchaseDto purchase, decimal usable, decimal unusable = 0) =>
         new(purchase.Id, null, [new DeliveryLineInput(purchase.Items.Single().Id, usable, unusable)]);
@@ -122,7 +122,7 @@ public sealed class PurchaseTests
     }
 
     [Fact]
-    public async Task Only_the_material_officer_of_the_area_records_and_the_buyer_must_be_parish()
+    public async Task Only_the_material_officer_of_the_area_records_and_the_buyer_can_be_parish_or_volunteer()
     {
         (await Fails(() => Record(Guid.NewGuid()).HandleAsync(Bought(1)))).Code.Should().Be("WORK_AREA_SCOPE_DENIED");
         (await Fails(() => Record().HandleAsync(Bought(1) with { Items = [new PurchaseLineInput(Guid.NewGuid(), 1, 1, null)] })))
@@ -130,15 +130,15 @@ public sealed class PurchaseTests
         (await Fails(() => Record().HandleAsync(Bought(1) with { PurchaseDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(3)) })))
             .Code.Should().Be("PURCHASE_DATE_IN_FUTURE");
 
+        // 26/11/2026: a shortage found during the task may be bought by a volunteer.
         _identity.Users[_buyer] = new Resource.Application.Users.IdentityUser(
             _buyer, "Tình nguyện viên", "ACTIVE", GrottoWorksRoles.Volunteer, Parish);
-        (await Fails(() => Record().HandleAsync(Bought(1)))).Code.Should().Be("PURCHASE_BUYER_NOT_PARISH");
+        (await Record().HandleAsync(Bought(1))).BuyerUserId.Should().Be(_buyer);
     }
 
     [Fact]
-    public async Task Purchase_task_without_a_parish_assignee_uses_the_approving_parish_user_as_buyer()
+    public async Task Purchase_task_volunteer_assignee_is_the_buyer()
     {
-        // The assignment subsystem only assigns volunteers, so a non-parish assignee falls back to the approver.
         _identity.Users[_buyer] = new Resource.Application.Users.IdentityUser(
             _buyer, "Tình nguyện viên", "ACTIVE", GrottoWorksRoles.Volunteer, Parish);
         _identity.Users[_leader] = new Resource.Application.Users.IdentityUser(
@@ -146,7 +146,7 @@ public sealed class PurchaseTests
 
         var dto = await Record().HandleAsync(Bought(10));
 
-        dto.BuyerUserId.Should().Be(_leader);
+        dto.BuyerUserId.Should().Be(_buyer);
         dto.RecordedBy.Should().Be(_officer);
     }
 
@@ -243,7 +243,7 @@ public sealed class PurchaseTests
         var resubmitted = await new AttachPurchaseReceiptsCommandHandler(Context(buyer), _purchases, buyer, _files)
             .HandleAsync(new AttachPurchaseReceiptsCommand(purchase.Id, [Guid.NewGuid()]));
         resubmitted.Status.Should().Be(PurchaseStatus.Submitted);
-        resubmitted.ReceiptFileIds.Should().ContainSingle();
+        resubmitted.ReceiptFileIds.Should().HaveCount(2); // the recorded one + the new file
         resubmitted.InfoRequestReason.Should().BeNull();
 
         var stranger = User(Guid.NewGuid(), GrottoWorksRoles.Volunteer);

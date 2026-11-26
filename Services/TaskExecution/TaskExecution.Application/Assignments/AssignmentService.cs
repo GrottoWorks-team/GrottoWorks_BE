@@ -77,8 +77,12 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
                 ?? throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
             var (area, _) = await scopeAccess.GetWorkAreaForLeaderWriteAsync(task.WorkAreaId, cancellationToken);
             await users.EnsureCallerAsync(area.ParishId, cancellationToken);
-            var volunteer = await users.EnsureActiveAsync(command.VolunteerId, area.ParishId,
-                task.Type == TaskType.Purchase ? GrottoWorksRoles.Parish : GrottoWorksRoles.Volunteer, cancellationToken);
+            // 26/11/2026 (rev): a PURCHASE task may be carried by a parish user OR a volunteer — the committee buys
+            // directly up-front, while a shortage found during the task is handed to a volunteer.
+            var volunteer = task.Type == TaskType.Purchase
+                ? await users.EnsureActiveAnyAsync(command.VolunteerId, area.ParishId,
+                    [GrottoWorksRoles.Parish, GrottoWorksRoles.Volunteer], cancellationToken)
+                : await users.EnsureActiveAsync(command.VolunteerId, area.ParishId, GrottoWorksRoles.Volunteer, cancellationToken);
             task.EnsureRecruitmentAllowed();
 
             var existing = await assignments.ListAsync(task.Id, cancellationToken);

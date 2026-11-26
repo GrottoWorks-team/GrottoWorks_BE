@@ -2,6 +2,19 @@
 
 ## 2026-11-26
 - Branch: `feat/backend-workflow-improvements`
+- Service: Resource, TaskExecution, ApiGateway
+- Files: `Resource.Domain/Purchases/SelfPurchaseReceipt.cs` (new), `Resource.Infrastructure/Data/Configurations/SelfPurchaseConfigurations.cs` (new), `Resource.Infrastructure/Inventory/SelfPurchaseStore.cs` (new), `Resource.Application/Inventory/ISelfPurchaseStore.cs` + `SelfPurchaseHandlers.cs` (new), `Resource.Api/Requests/SelfPurchaseRequests.cs` + `Endpoints/SelfPurchaseEndpoints.cs` (new), `Resource.Domain/Inventory/MaterialTransaction.cs`, `Resource.Domain/Purchases/Purchase.cs`, `Resource.Infrastructure/Data/ResourceDbContext.cs`, DI + `ResourceEndpoints.cs`, `Data/Migrations/20261126131758_SelfPurchaseReceipts.cs` (+ snapshot), `TaskExecution.Application/Users/IIdentityUserLookup.cs`, `TaskExecution.Application/Assignments/AssignmentService.cs`, `Resource.Application/Purchases/PurchaseHandlers.cs`, `ApiGateway/YarpApiGateway/appsettings.json`, unit tests (`PurchaseTests`, `ShortageTests`, `DonationTests`).
+- Change:
+  - **Vật tư người khác tự mua (ngoài luồng purchase request):** new tables `self_purchase_receipt` + `self_purchase_item`; MO of the work area records buyer name, supplier, date, lines and **mandatory invoice photos**; each line posts a `PURCHASE_DELIVERY` ledger row referenced by `SELF_PURCHASE_ITEM` so stock and cost stay linked (`POST /api/v1/work-areas/{workAreaId}/self-purchases`, `GET /api/v1/self-purchases`).
+  - **Mua trong lúc thực hiện task:** a `PURCHASE` task may again be carried by a VOLUNTEER as well as a PARISH user (`EnsureActiveAnyAsync`, `TaskScopeAccess.GetWorkAreaForAssigneeWriteAsync`, buyer resolution accepts both roles).
+  - **Chứng từ bắt buộc:** `Purchase.ConfirmDelivery` now rejects a delivery with no receipt file (`PURCHASE_RECEIPT_REQUIRED`).
+- Contract impact: Additive (2 new endpoints + new tables). `confirmPurchaseDelivery` now enforces an existing documented rule; buy-task assignment accepts VOLUNTEER again (additive for callers).
+- Migration: Yes — `20261126131758_SelfPurchaseReceipts` (2 tables, 4 indexes).
+- Tests: Resource 246 pass, TaskExecution 405 pass (via `mcr.microsoft.com/dotnet/sdk:10.0` container). Two stale tests updated: manual requirement handlers are disabled (shortage test now drives the aggregate) and BR-37 material-donation-without-area now requires PARISH.
+- Follow-up: Apply the migration, rebuild/restart Resource + TaskExecution + gateway, extend Reporting read models with self-purchase lines (finance report currently sums via the list API), and update `docs/api-contract-parish-warehouse.md` when the contract is published.
+
+## 2026-11-26
+- Branch: `feat/backend-workflow-improvements`
 - Service: Identity, Reporting, Resource, TaskExecution, NotificationAudit, ApiGateway
 - Files: `Services/Identity/*`, `Services/Reporting/*`, `Services/Resource/*`, `Services/TaskExecution/*`, `Services/NotificationAudit/*`, `ApiGateway/YarpApiGateway/appsettings.json`, unit tests, and parish warehouse docs
 - Change: Completed pending workflow and reporting improvements, added parish warehouse inventory/distribution APIs and read models, expanded identity scope handling, and aligned purchase/donation/task notification behavior.

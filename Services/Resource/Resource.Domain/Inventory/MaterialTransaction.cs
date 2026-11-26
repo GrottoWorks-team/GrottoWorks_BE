@@ -30,7 +30,10 @@ public enum TransactionReferenceType
     InventoryAdjustment,
 
     /// <summary>A line of a parish warehouse distribution; the same id posts the out and in rows.</summary>
-    ParishDistributionItem
+    ParishDistributionItem,
+
+    /// <summary>26/11/2026: a line of a receipt for materials someone bought outside the purchase flow.</summary>
+    SelfPurchaseItem
 }
 
 /// <summary>

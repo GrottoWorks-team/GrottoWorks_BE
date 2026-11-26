@@ -40,6 +40,8 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
 
     public DbSet<Purchase> Purchases => Set<Purchase>();
 
+    public DbSet<SelfPurchaseReceipt> SelfPurchaseReceipts => Set<SelfPurchaseReceipt>();
+
     public DbSet<Donor> Donors => Set<Donor>();
 
     public DbSet<Donation> Donations => Set<Donation>();

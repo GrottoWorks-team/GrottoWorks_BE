@@ -44,6 +44,18 @@ public sealed class ActiveUserAccess(IIdentityUserLookup users, ICurrentUser cur
         return user;
     }
 
+    /// <summary>Same checks as <see cref="EnsureActiveAsync"/>, but the user may hold any of <paramref name="roles"/>.</summary>
+    public async Task<IdentityUser> EnsureActiveAnyAsync(Guid userId, Guid parishId, IReadOnlyCollection<string> roles,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await users.FindAsync(userId, cancellationToken)
+            ?? throw DomainRuleException.NotFound("USER_NOT_FOUND", "The user does not exist.");
+        if (user.Status != "ACTIVE") throw new DomainRuleException("USER_NOT_ACTIVE", "The user is not active.");
+        if (user.ParishId != parishId) throw DomainRuleException.Forbidden("PARISH_ACCESS_DENIED", "The user belongs to another parish.");
+        if (!roles.Contains(user.Role)) throw new DomainRuleException("USER_ROLE_MISMATCH", "The user has an incompatible role.");
+        return user;
+    }
+
     public Task<IdentityUser> EnsureCallerAsync(Guid parishId, CancellationToken cancellationToken = default) =>
         EnsureActiveAsync(currentUser.UserId, parishId, currentUser.Role, cancellationToken);
 }

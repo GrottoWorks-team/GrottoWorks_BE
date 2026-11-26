@@ -166,8 +166,10 @@ public sealed class DonationTests
         (await Fails(() => Record().HandleAsync(Material(Cable(1)) with { Amount = 100 }))).Code.Should().Be("DONATION_MATERIAL_HAS_AMOUNT");
         (await Fails(() => Record().HandleAsync(Material())))
             .Code.Should().Be("DONATION_ITEMS_REQUIRED");
+        // BR-37 changed 26/11/2026: a MATERIAL donation without a work area goes to the parish warehouse
+        // and only the parish committee may record it.
         (await Fails(() => Record().HandleAsync(Material(Cable(1)) with { WorkAreaId = null, SeasonId = _area.SeasonId })))
-            .Code.Should().Be("DONATION_WORK_AREA_REQUIRED");
+            .Code.Should().Be("PARISH_SCOPE_REQUIRED");
         (await Fails(() => Record().HandleAsync(Money(100))))
             .Code.Should().Be("DONATION_SEASON_REQUIRED");
     }

@@ -206,6 +206,12 @@ public sealed class Purchase
     public void ConfirmDelivery(Guid officerUserId, IReadOnlyCollection<DeliveryLineInput> lines, decimal? remainingEstimate, DateTimeOffset now)
     {
         EnsureSubmitted();
+        if (ReceiptFileIds.Length == 0)
+        {
+            // 26/11/2026: no delivery without an invoice — a large purchase must never be confirmed without a receipt.
+            throw DomainRuleException.Validation("PURCHASE_RECEIPT_REQUIRED", "Attach at least one receipt file before the delivery is confirmed.");
+        }
+
         if (ExceedsEstimate(remainingEstimate) && CostOverrunApprovedByUserId is null)
         {
             throw new DomainRuleException(

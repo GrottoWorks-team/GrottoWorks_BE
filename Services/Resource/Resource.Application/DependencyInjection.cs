@@ -57,6 +57,10 @@ public static class DependencyInjection
         // F-RES-16 inventory adjustments
         services.AddScoped<CreateInventoryAdjustmentCommandHandler>();
 
+        // 26/11/2026 self-purchase receipts (materials bought outside the purchase flow)
+        services.AddScoped<CreateSelfPurchaseReceiptCommandHandler>();
+        services.AddScoped<ListSelfPurchaseReceiptsQueryHandler>();
+
         // F-RES-21 parish warehouse (central store) and two-step distributions
         services.AddScoped<RecordParishOpeningStockCommandHandler>();
         services.AddScoped<ListParishInventoryQueryHandler>();

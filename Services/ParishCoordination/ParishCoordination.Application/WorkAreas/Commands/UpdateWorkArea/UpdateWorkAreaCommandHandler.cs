@@ -96,7 +96,10 @@ public sealed class UpdateWorkAreaCommandHandler(
             command.ShouldUpdateLatitude,
             command.Latitude,
             command.ShouldUpdateLongitude,
-            command.Longitude);
+            command.Longitude,
+            command.ShouldUpdateMapPin,
+            command.MapX,
+            command.MapY);
 
         try
         {

@@ -261,7 +261,9 @@ public static class WorkAreaEndpoints
                 request.StartDate,
                 request.Deadline,
                 request.Latitude,
-                request.Longitude),
+                request.Longitude,
+                request.MapX,
+                request.MapY),
             cancellationToken);
 
         if (result.Outcome == CreateWorkAreaOutcome.SeasonNotFound)
@@ -352,7 +354,10 @@ public static class WorkAreaEndpoints
             request.HasLatitude,
             request.Latitude,
             request.HasLongitude,
-            request.Longitude);
+            request.Longitude,
+            ShouldUpdateMapPin: request.HasMapX && request.HasMapY,
+            MapX: request.MapX,
+            MapY: request.MapY);
 
         var result = await commandHandler.HandleAsync(command, cancellationToken);
 

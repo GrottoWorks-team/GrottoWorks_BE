@@ -16,7 +16,7 @@ public sealed class SystemExportSource(ParishCoordinationDbContext db)
         ["christmas_season"] = ["season_id", "parish_id", "created_by_user_id", "season_name", "season_year", "start_date", "end_date", "season_status", "season_description", "estimated_budget", "created_at", "updated_at", "version"],
         ["community"] = ["community_id", "parish_id", "community_name", "community_description", "community_status", "created_at", "updated_at", "version"],
         ["parish"] = ["parish_id", "parish_name", "parish_address", "parish_description", "parish_status", "created_at", "updated_at", "version"],
-        ["work_area"] = ["latitude", "longitude", "work_area_id", "season_id", "community_id", "work_area_category_id", "leader_user_id", "material_officer_user_id", "work_area_name", "work_area_description", "start_date", "deadline", "work_area_status", "created_at", "updated_at", "version"],
+        ["work_area"] = ["latitude", "longitude", "work_area_id", "season_id", "community_id", "work_area_category_id", "leader_user_id", "material_officer_user_id", "work_area_name", "work_area_description", "start_date", "deadline", "work_area_status", "created_at", "updated_at", "version", "map_x", "map_y"],
         ["work_area_category"] = ["work_area_category_id", "category_code", "category_name", "category_description", "category_status"],
     });
 

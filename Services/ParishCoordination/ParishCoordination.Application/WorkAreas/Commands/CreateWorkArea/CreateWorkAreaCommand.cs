@@ -9,4 +9,6 @@ public sealed record CreateWorkAreaCommand(
     DateOnly? StartDate,
     DateOnly? Deadline,
     decimal? Latitude = null,
-    decimal? Longitude = null);
+    decimal? Longitude = null,
+    decimal? MapX = null,
+    decimal? MapY = null);

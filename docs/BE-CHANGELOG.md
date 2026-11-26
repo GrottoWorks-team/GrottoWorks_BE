@@ -1,5 +1,15 @@
 # BE Changelog
 
+## 2026-11-26 (rev 5) — seeder demo không còn tự thêm dữ liệu vào DB đã seed
+- Branch: `feat/backend-workflow-improvements`
+- Service: ParishCoordination
+- Files: `ParishCoordination.Infrastructure/Data/ParishCoordinationDataSeeder.cs`
+- Change: `ParishCoordinationDataSeeder` chỉ tạo dữ liệu demo khi **bảng `parish` còn rỗng**. Trước đây nó kiểm tra theo id cố định nên sau khi nạp dữ liệu demo thật (`SeedingData`, mùa 2025) mỗi lần restart service lại thêm `GrottoWorks Demo Parish` + `Demo Season 2026` + `Demo Work Area North` → rác trong màn hình demo (mùa 2026 xuất hiện lại, khu vực thứ 4).
+- Contract impact: Không.
+- Migration: Không.
+- Verify: `docker compose down -v && build && up -d` → `npm run seed:2025:demo` (mùa 2025 + 3 khu) → restart parish → `work_area_scope`=3, `parish`=2, `work_area`=3; API qua gateway: 1 mùa 2025 COMPLETED, 3 khu READY, 4 task COMPLETED; `GET /parish-inventory/purchases` + `GET /dashboards/season` OK.
+- Follow-up: seeder các service khác (Identity/Readiness/…) có thể vẫn seed khi bảng rỗng — nếu cần demo sạch hoàn toàn thì nên áp dụng cùng nguyên tắc "chỉ seed khi DB rỗng".
+
 ## 2026-11-26 (rev 4) — merge `main` + clone copies the map pin
 - Branch: `feat/backend-workflow-improvements`
 - Service: ParishCoordination

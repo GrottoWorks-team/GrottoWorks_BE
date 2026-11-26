@@ -1,5 +1,22 @@
 # BE Changelog
 
+## 2026-11-26 (rev 7) — TNV được đọc điều kiện bắt đầu của nhiệm vụ mình nhận
+- Branch: `feat/backend-workflow-improvements`
+- Service: TaskExecution
+- Files: `TaskExecution.Application/Tasks/TaskStartService.cs`, `TaskExecution.Api/Endpoints/TaskEndpoints.cs`, `tests/TaskExecution.UnitTests/Application/TaskStartTests.cs`, `tests/TaskExecution.UnitTests/Api/TaskRouteTests.cs`
+- Change:
+  - `GET /api/v1/tasks/{taskId}/start-eligibility` nay cho cả **VOLUNTEER** (trước chỉ LEADER). Trong service, `LoadEligibilityScopeAsync` cho phép:
+    - trưởng khu (LEADER + đúng `LeaderUserId`) như cũ, hoặc
+    - **người có assignment** trên task (PENDING/ACCEPTED/IN_PROGRESS/COMPLETED) đọc điều kiện (advisory).
+    Các role khác và người không có assignment vẫn nhận 403 `WORK_AREA_ACCESS_DENIED`.
+  - `POST /tasks/{taskId}/start` **vẫn chỉ LEADER** (không đổi).
+  - Lý do: app mobile (dành cho TNV) gọi endpoint này để hiển thị cảnh báo trước khi vào ca; trước đây luôn 403 nên app hiểu là "chưa xác minh được điều kiện" và **khoá nút Bắt đầu việc** dù việc đã đủ người/đủ vật tư.
+- Contract impact: Không đổi shape response. Thay đổi quyền: VOLUNTEER có assignment đọc được `start-eligibility` (200 thay vì 403).
+- Migration: Không.
+- Tests: TaskExecution **408/408** (thêm `Assigned_volunteer_reads_the_start_conditions_but_cannot_start_the_task`; route test nay kỳ vọng `Leader, Volunteer`; test HTTP dùng MO cho ca bị chặn và thêm ca VOLUNTEER đọc 200 / start 403).
+- Verify E2E (docker): TNV `dinh.truong@…` (trưởng nhóm nhiệm vụ, ACCEPTED) gọi `start-eligibility` → **200** (`acceptedMembers 2/2`, `materialsKnown true`); trước khi sửa là 403.
+- Follow-up: web leader nay có nút **Bắt đầu làm** (`POST /tasks/{id}/start`) — trước đây web chỉ có `ready` nên việc không chuyển sang IN_PROGRESS.
+
 ## 2026-11-26 (rev 6) — kỹ năng khai báo thiếu cấp bậc không còn bị coi là "0 điểm"
 - Branch: `feat/backend-workflow-improvements`
 - Service: TaskExecution, Identity

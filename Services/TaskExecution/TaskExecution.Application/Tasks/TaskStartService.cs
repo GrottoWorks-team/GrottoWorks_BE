@@ -28,12 +28,34 @@ public sealed class TaskStartService(ITaskRepository tasks, IAssignmentStore ass
     public async Task<TaskStartEligibility> GetEligibilityAsync(Guid taskId, CancellationToken ct)
     {
         var task = await tasks.GetByIdAsync(taskId, ct) ?? throw MissingTask();
-        var (area, season) = await LoadScopeAsync(task, ct);
+        var (area, season) = await LoadEligibilityScopeAsync(task, ct);
         await users.EnsureCallerAsync(area.ParishId, ct);
         var accepted = await CountAcceptedAsync(taskId, ct);
         var shortages = await GetShortagesAsync(task, ct);
         return Evaluate(task, season, accepted, shortages, clock.GetUtcNow());
     }
+
+    /// <summary>
+    /// 26/11/2026: app TNV hiển thị điều kiện bắt đầu của nhiệm vụ mình nhận, nên người đang có assignment
+    /// (PENDING/ACCEPTED/IN_PROGRESS/COMPLETED) được **đọc** điều kiện. Chỉ trưởng khu mới được gọi
+    /// <see cref="StartAsync"/> — trước đây TNV bị 403 ngay ở endpoint nên app khoá luôn nút vào ca.
+    /// </summary>
+    private async Task<(WorkAreaScope Area, SeasonScope Season)> LoadEligibilityScopeAsync(WorkTask task, CancellationToken ct)
+    {
+        if (user.Role == BuildingBlocks.Security.GrottoWorksRoles.Leader) return await LoadScopeAsync(task, ct);
+        if (user.Role != BuildingBlocks.Security.GrottoWorksRoles.Volunteer) throw EligibilityForbidden();
+        var rows = await assignments.ListAsync(task.Id, ct);
+        if (!rows.Any(row => row.VolunteerId == user.UserId && row.Status is AssignmentStatus.Pending or
+                AssignmentStatus.Accepted or AssignmentStatus.InProgress or AssignmentStatus.Completed))
+            throw EligibilityForbidden();
+        var area = await access.GetWorkAreaForReadAsync(task.WorkAreaId, ct);
+        var season = await scopes.GetSeasonAsync(area.SeasonId, ct)
+            ?? throw DomainRuleException.NotFound("SEASON_NOT_FOUND", "The owning season does not exist in TaskExecution.");
+        return (area, season);
+    }
+
+    private static DomainRuleException EligibilityForbidden() =>
+        DomainRuleException.Forbidden("WORK_AREA_ACCESS_DENIED", "Only the assigned leader or an assignee can read the start conditions.");
 
     public async Task<TaskStartResult> StartAsync(Guid taskId, int? version, CancellationToken ct)
     {

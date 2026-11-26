@@ -73,7 +73,8 @@ public sealed class TaskRouteTests
             .Select(metadata => metadata.StatusCode).Should().Contain([200, 400, 401, 403, 404, 409, 412]);
         startEligibility.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId:guid}/start-eligibility");
         startEligibility.Metadata.GetMetadata<IHttpMethodMetadata>()!.HttpMethods.Should().Equal("GET");
-        Roles(startEligibility).Should().Equal(GrottoWorksRoles.Leader);
+        // 26/11/2026: app TNV đọc điều kiện bắt đầu của nhiệm vụ mình nhận (advisory) — start thì vẫn chỉ LEADER.
+        Roles(startEligibility).Should().Equal(GrottoWorksRoles.Leader, GrottoWorksRoles.Volunteer);
         startEligibility.Metadata.GetOrderedMetadata<IProducesResponseTypeMetadata>()
             .Select(metadata => metadata.StatusCode).Should().Contain([200, 401, 403, 404, 409, 503]);
         start.RoutePattern.RawText.Should().Be("/api/v1/tasks/{taskId:guid}/start");

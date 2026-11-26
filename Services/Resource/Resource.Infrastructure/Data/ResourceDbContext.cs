@@ -42,6 +42,9 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
 
     public DbSet<SelfPurchaseReceipt> SelfPurchaseReceipts => Set<SelfPurchaseReceipt>();
 
+    /// <summary>26/11/2026: materials the parish committee bought for the central warehouse.</summary>
+    public DbSet<ParishPurchaseReceipt> ParishPurchaseReceipts => Set<ParishPurchaseReceipt>();
+
     public DbSet<Donor> Donors => Set<Donor>();
 
     public DbSet<Donation> Donations => Set<Donation>();

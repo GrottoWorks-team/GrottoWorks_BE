@@ -1,5 +1,19 @@
 # BE Changelog
 
+## 2026-11-26 (rev 3) — parish buys, no cost estimate, area material estimate
+- Branch: `feat/backend-workflow-improvements`
+- Service: Resource
+- Files: `Resource.Domain/Inventory/ParishPurchaseReceipt.cs` (new), `Resource.Domain/Inventory/MaterialTransaction.cs` (`TransactionReferenceType.ParishPurchaseItem`), `Resource.Infrastructure/Data/Configurations/ParishPurchaseConfigurations.cs` (new), `Resource.Infrastructure/Data/ResourceDbContext.cs`, `Resource.Infrastructure/Inventory/ParishPurchaseStore.cs` (new), `Resource.Infrastructure/Inventory/InventoryStore.cs`, `Resource.Infrastructure/DependencyInjection.cs`, `Resource.Application/Inventory/IParishPurchaseStore.cs` (new), `Resource.Application/Inventory/ParishPurchaseHandlers.cs` (new), `Resource.Application/Requirements/RequirementHandlers.cs`, `Resource.Application/DependencyInjection.cs`, `Resource.Api/Requests/ParishPurchaseRequests.cs` (new), `Resource.Api/Endpoints/ParishWarehouseEndpoints.cs`, `Resource.Api/Endpoints/RequirementEndpoints.cs`, `Data/Migrations/20261126150936_ParishPurchaseReceipts*.cs` (+ snapshot), `tests/Resource.UnitTests/Inventory/ParishPurchaseTests.cs` (new), `tests/Resource.UnitTests/Requirements/RequirementTests.cs`, `tests/Resource.UnitTests/Fakes.cs`.
+- Change:
+  - **Ban phụ trách nhập vật tư đã mua (có hoá đơn):** `POST /api/v1/parish-inventory/purchases` (PARISH, 201) + `GET /api/v1/parish-inventory/purchases?seasonId=&limit=` (PARISH/ADMIN). Body: `seasonId`, `buyerName` (bắt buộc), `supplierName`, `purchaseDate`, `items[{materialId, quantity, unitPrice}]`, `invoices[{id}]` (**bắt buộc**), `note`. Tổng tiền tính ở server, mỗi dòng post `PURCHASE_DELIVERY` vào **ledger kho tổng** (reference `PARISH_PURCHASE_ITEM`), phát `ParishMaterialStockChanged` để các màn khác thấy tồn mới → sau đó phân bổ xuống khu vực.
+  - **Ước lượng vật tư của khu vực được bật lại:** `POST /work-areas/{id}/material-requirements` và `PATCH /material-requirements/{id}` trả về nghiệp vụ thật (bỏ `MANUAL_MATERIAL_REQUIREMENT_DISABLED`). Người ghi: **MO của khu** (khi mùa chưa archived) hoặc **PARISH/ADMIN khi mùa còn `PLANNING`** (`WORK_AREA_SCOPE_DENIED` nếu khác). Vật tư phải ACTIVE, mỗi (khu, vật tư) 1 dòng (`REQUIREMENT_EXISTS`), PATCH có optimistic version.
+  - **"Cần" = max(ước lượng khu, tổng vật tư task):** `IInventoryStore.GetRequiredTotalsAsync` gộp `material_requirement` (ACTIVE) với `task_material_plan` theo từng (khu, vật tư) và lấy **max** → ước lượng có tác dụng khi chưa có task, task khai nhiều hơn thì theo task, không đếm trùng.
+  - **Bỏ ước tính chi phí khỏi yêu cầu bổ sung:** BE giữ cột `estimated_cost` (nullable) để tương thích, nhưng client đã ngừng gửi → `EstimatedTotal = 0`, BR-32 (duyệt vượt dự toán) không còn kích hoạt vì không có dự toán.
+- Contract impact: Additive 2 endpoint (`parish-inventory/purchases` GET/POST). `material-requirements` POST/PATCH đổi từ luôn 422 sang nghiệp vụ thật (thay đổi hành vi, không đổi shape).
+- Migration: Yes — `20261126150936_ParishPurchaseReceipts` (`parish_purchase_receipt`, `parish_purchase_item`, unique `ux_parish_purchase_item_material`, index theo parish/season/ngày). Apply trước khi start Resource.
+- Tests: `dotnet test tests/Resource.UnitTests` → **260/260 pass** (thêm `ParishPurchaseTests`, viết lại `RequirementTests`, `MigrationSnapshotTests` xác nhận snapshot khớp model).
+- Follow-up: dashboard/báo cáo tài chính nên cộng thêm "vật tư Ban phụ trách đã mua" (hiện chỉ có self-purchase); FE web đã có dialog nhập + danh sách gần đây ở `/community/warehouse`.
+
 ## 2026-11-26
 - Branch: `feat/backend-workflow-improvements`
 - Service: Resource, TaskExecution, ApiGateway

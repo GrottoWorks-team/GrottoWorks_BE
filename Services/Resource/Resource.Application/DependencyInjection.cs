@@ -67,6 +67,10 @@ public static class DependencyInjection
         services.AddScoped<ListParishInventoryQueryHandler>();
         services.AddScoped<GetParishMaterialHistoryQueryHandler>();
         services.AddScoped<CreateParishAdjustmentCommandHandler>();
+
+        // 26/11/2026: vật tư Ban phụ trách đã mua → nhập vào kho tổng (bắt buộc hoá đơn)
+        services.AddScoped<RecordParishPurchaseCommandHandler>();
+        services.AddScoped<ListParishPurchasesQueryHandler>();
         services.AddScoped<ParishDistributionIssuer>();
         services.AddScoped<ParishDistributionProjector>();
         services.AddScoped<CreateParishDistributionCommandHandler>();

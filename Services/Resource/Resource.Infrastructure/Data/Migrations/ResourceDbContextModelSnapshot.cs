@@ -990,6 +990,111 @@ namespace Resource.Infrastructure.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Resource.Domain.Inventory.ParishPurchaseItem", b =>
+                {
+                    b.Property<Guid>("ParishPurchaseItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_purchase_item_id");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_id");
+
+                    b.Property<Guid>("ParishPurchaseReceiptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_purchase_receipt_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("quantity");
+
+                    b.Property<decimal>("TotalPrice")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("total_price");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("ParishPurchaseItemId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("ParishPurchaseReceiptId", "MaterialId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_parish_purchase_item_material");
+
+                    b.ToTable("parish_purchase_item", null, t =>
+                        {
+                            t.HasCheckConstraint("parish_purchase_item_valid_amounts", "\"quantity\" > 0 AND \"unit_price\" >= 0 AND \"total_price\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Resource.Domain.Inventory.ParishPurchaseReceipt", b =>
+                {
+                    b.Property<Guid>("ParishPurchaseReceiptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_purchase_receipt_id");
+
+                    b.Property<string>("BuyerName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("buyer_name");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.PrimitiveCollection<Guid[]>("InvoiceFileIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("invoice_file_ids");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("ParishId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_id");
+
+                    b.Property<DateOnly>("PurchaseDate")
+                        .HasColumnType("date")
+                        .HasColumnName("purchase_date");
+
+                    b.Property<Guid>("RecordedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recorded_by_user_id");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<string>("SupplierName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("supplier_name");
+
+                    b.Property<decimal>("TotalCost")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("total_cost");
+
+                    b.HasKey("ParishPurchaseReceiptId");
+
+                    b.HasIndex(new[] { "ParishId", "SeasonId", "PurchaseDate" }, "ix_parish_purchase_parish_season_date");
+
+                    b.ToTable("parish_purchase_receipt", null, t =>
+                        {
+                            t.HasCheckConstraint("parish_purchase_nonnegative_cost", "\"total_cost\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Resource.Domain.Inventory.SupportTransfer", b =>
                 {
                     b.Property<Guid>("SupportResponseMaterialId")
@@ -2087,6 +2192,21 @@ namespace Resource.Infrastructure.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Resource.Domain.Inventory.ParishPurchaseItem", b =>
+                {
+                    b.HasOne("Resource.Domain.Catalog.Material", null)
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Resource.Domain.Inventory.ParishPurchaseReceipt", null)
+                        .WithMany("Items")
+                        .HasForeignKey("ParishPurchaseReceiptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Resource.Domain.Inventory.SupportTransfer", b =>
                 {
                     b.HasOne("Resource.Domain.Catalog.Material", null)
@@ -2212,6 +2332,11 @@ namespace Resource.Infrastructure.Data.Migrations
                 });
 
             modelBuilder.Entity("Resource.Domain.Inventory.ParishDistribution", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Resource.Domain.Inventory.ParishPurchaseReceipt", b =>
                 {
                     b.Navigation("Items");
                 });

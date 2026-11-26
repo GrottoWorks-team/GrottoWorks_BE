@@ -33,7 +33,10 @@ public enum TransactionReferenceType
     ParishDistributionItem,
 
     /// <summary>26/11/2026: a line of a receipt for materials someone bought outside the purchase flow.</summary>
-    SelfPurchaseItem
+    SelfPurchaseItem,
+
+    /// <summary>26/11/2026: a line of a parish committee purchase receipt (parish warehouse inflow).</summary>
+    ParishPurchaseItem
 }
 
 /// <summary>

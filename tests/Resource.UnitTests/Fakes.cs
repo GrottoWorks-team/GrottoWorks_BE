@@ -596,6 +596,30 @@ public sealed class FakePurchaseStore : Resource.Application.Purchases.IPurchase
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
 
+/// <summary>In-memory parish purchase receipts (materials the parish committee bought).</summary>
+public sealed class FakeParishPurchaseStore : Resource.Application.Inventory.IParishPurchaseStore
+{
+    public List<Resource.Domain.Inventory.ParishPurchaseReceipt> Receipts { get; } = [];
+
+    public int SaveChangesCount { get; private set; }
+
+    public void Add(Resource.Domain.Inventory.ParishPurchaseReceipt receipt) => Receipts.Add(receipt);
+
+    public Task<IReadOnlyList<Resource.Domain.Inventory.ParishPurchaseReceipt>> ListAsync(
+        Guid parishId, Guid seasonId, int limit, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Inventory.ParishPurchaseReceipt>>(Receipts
+            .Where(receipt => receipt.ParishId == parishId && receipt.SeasonId == seasonId)
+            .OrderByDescending(receipt => receipt.CreatedAt)
+            .Take(limit)
+            .ToList());
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+        return Task.CompletedTask;
+    }
+}
+
 /// <summary>In-memory self-purchase receipts (materials bought outside the purchase flow).</summary>
 public sealed class FakeSelfPurchaseStore : Resource.Application.Inventory.ISelfPurchaseStore
 {

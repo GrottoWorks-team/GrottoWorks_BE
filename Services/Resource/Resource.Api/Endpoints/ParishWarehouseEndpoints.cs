@@ -55,6 +55,27 @@ public static class ParishWarehouseEndpoints
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
 
+        // 26/11/2026: vật tư Ban phụ trách đã MUA (không qua đơn mua/việc đi mua) — nhập thẳng vào kho tổng,
+        // bắt buộc ảnh hoá đơn, sau đó phân bổ xuống khu vực đang thiếu.
+        app.MapPost("/api/v1/parish-inventory/purchases", RecordPurchaseAsync)
+            .WithName("recordParishPurchase")
+            .WithTags("Materials")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Parish))
+            .Accepts<RecordParishPurchaseRequest>("application/json")
+            .Produces<ApiResponse<ParishPurchaseReceiptDto>>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        app.MapGet("/api/v1/parish-inventory/purchases", ListPurchasesAsync)
+            .WithName("listParishPurchases")
+            .WithTags("Materials")
+            .RequireAuthorization(policy => policy.RequireRole(InventoryReaders))
+            .Produces<ApiResponse<IReadOnlyList<ParishPurchaseReceiptDto>>>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
         // PARISH records a material donation straight into the parish warehouse; the donor picker needs the parish's
         // donor list, which the material-officer donor endpoint does not serve to PARISH.
         app.MapGet("/api/v1/parish-donors", ListDonorsAsync)
@@ -253,6 +274,42 @@ public static class ParishWarehouseEndpoints
                 request.Reason),
             cancellationToken);
         return Results.Ok(ApiResults.Ok(distribution, httpContext));
+    }
+
+    private static async Task<IResult> RecordPurchaseAsync(
+        RecordParishPurchaseRequest request,
+        HttpContext httpContext,
+        RecordParishPurchaseCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var receipt = await handler.HandleAsync(
+            new RecordParishPurchaseCommand(
+                request.SeasonId!.Value,
+                request.BuyerName,
+                request.SupplierName,
+                request.PurchaseDate,
+                (request.Items ?? []).Select(item => new ParishPurchaseLineInput(
+                    item.MaterialId!.Value, item.Quantity, item.UnitPrice)).ToList(),
+                (request.Invoices ?? []).Select(file => file.Id!.Value).ToList(),
+                Text.Clean(request.Note)),
+            cancellationToken);
+        return Results.Json(ApiResults.Ok(receipt, httpContext), statusCode: StatusCodes.Status201Created);
+    }
+
+    private static async Task<IResult> ListPurchasesAsync(
+        HttpContext httpContext,
+        ListParishPurchasesQueryHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var reader = new QueryReader(httpContext.Request.Query, "seasonId", "limit", "parishId");
+        var limit = int.TryParse(reader.String("limit"), out var parsedLimit) ? parsedLimit : 50;
+        var receipts = await handler.HandleAsync(
+            new ListParishPurchasesQuery(
+                reader.Guid("seasonId") ?? throw MissingSeason(),
+                limit,
+                reader.Guid("parishId")),
+            cancellationToken);
+        return Results.Ok(ApiResults.Ok(receipts, httpContext));
     }
 
     private static async Task<IResult> ListDonorsAsync(

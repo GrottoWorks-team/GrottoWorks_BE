@@ -2,6 +2,15 @@
 
 ## 2026-11-26
 - Branch: `main`
+- Service: ParishCoordination, NotificationAudit
+- Files: `Services/ParishCoordination/ParishCoordination.Domain/Entities/Parish.cs`, `ParishCoordination.Application/Parishes/*`, `ParishCoordination.Infrastructure/Data/Configurations/ParishConfiguration.cs`, `ParishCoordination.Infrastructure/Data/Migrations/20261126020000_AddParishMapImage.cs`, `ParishCoordination.Infrastructure/Files/ParishFileAttachmentClient.cs`, `ParishCoordination.Api/Endpoints/ParishEndpoints.cs`, `Services/NotificationAudit/NotificationAudit.Application/Files/FileUpload.cs`, `NotificationAudit.Application/Files/FileAttachmentHandler.cs`, `GrottoWorks_FE/src/features/map/api.ts`
+- Change: Made parish map metadata server-backed per parish, added MapImage attachment/finalization against the parish record, and allowed same-parish/ADMIN download of attached map images.
+- Contract impact: Additive `GET/PUT /api/v1/parishes/{parishId}/map`; existing parish DTO gains optional `mapImageFileId` and `mapImageFileName` fields.
+- Migration: Yes. Adds `map_image_file_id` and `map_image_file_name` to `parish`.
+- Follow-up: Build/restart ParishCoordination and NotificationAudit, re-upload the map, and verify the parish account can resolve the download URL. Existing pending upload records can be cleaned after migration.
+
+## 2026-11-26
+- Branch: `main`
 - Service: NotificationAudit, ApiGateway
 - Files: `Services/NotificationAudit/NotificationAudit.Application/DependencyInjection.cs`, `NotificationAudit.Application/Files/FileUpload.cs`, `NotificationAudit.Infrastructure/Files/S3FileObjectStorage.cs`, `NotificationAudit.Api/Controllers/FilesController.cs`, `NotificationAudit.Api/Endpoints/NotificationAuditEndpoints.cs`, `NotificationAudit.Api/Program.cs`
 - Change: Added same-origin server-side R2 proxy upload flow for MapImage/DesignAsset; browser no longer performs direct presigned PUT, and pending objects are uploaded, copied, inspected, and completed through NotificationAudit.

@@ -26,6 +26,23 @@ public static class ParishEndpoints
             .Produces<PagedResponse<ParishDto>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest);
 
+        app.MapGet("/api/v1/parishes/{parishId}/map", GetParishMapAsync)
+            .WithName("getParishMap")
+            .WithTags("Parish")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish))
+            .Produces<ApiResponse<ParishMapDto>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        app.MapPut("/api/v1/parishes/{parishId}/map", SaveParishMapAsync)
+            .WithName("saveParishMap")
+            .WithTags("Parish")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish))
+            .Produces<ApiResponse<ParishMapDto>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
         app.MapGet("/api/v1/parishes/{parishId}", GetParishAsync)
             .WithName("getParish")
             .WithTags("Parish")
@@ -50,6 +67,34 @@ public static class ParishEndpoints
             .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Admin, GrottoWorksRoles.Parish))
             .Produces<ApiResponse<ParishDto>>(StatusCodes.Status201Created)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+    }
+
+    private static async Task<IResult> GetParishMapAsync(
+        Guid parishId,
+        HttpContext httpContext,
+        GetParishMapQueryHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var map = await handler.HandleAsync(new GetParishMapQuery(parishId), cancellationToken);
+        if (map is null)
+        {
+            return CreateProblem(httpContext, StatusCodes.Status404NotFound,
+                "Parish not found", "The parish does not exist.", "PARISH_NOT_FOUND");
+        }
+        return Results.Ok(ApiResults.Ok(map, httpContext));
+    }
+
+    private static async Task<IResult> SaveParishMapAsync(
+        Guid parishId,
+        SaveParishMapRequest request,
+        HttpContext httpContext,
+        SaveParishMapCommandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var map = await handler.HandleAsync(
+            new SaveParishMapCommand(parishId, request.FileId, request.FileName),
+            cancellationToken);
+        return Results.Ok(ApiResults.Ok(map, httpContext));
     }
 
     private static async Task<IResult> GetAllParishesAsync(

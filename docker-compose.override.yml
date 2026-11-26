@@ -99,6 +99,7 @@ services:
       - Jwt__SigningKey=${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY (>= 32 chars) in .env}
       - IdentityClient__BaseAddress=http://identity.api:8080/
       - TaskExecutionClient__BaseAddress=http://taskexecution.api:8080/
+      - NotificationAuditClient__BaseAddress=http://notificationaudit.api:8080/
       - InternalApi__ApiKey=${INTERNAL_API_KEY:-dev-internal-api-key-change-me-0123456789}
       - Database__MigrateOnStartup=true
       - MessageBroker__Host=amqp://rabbitmq:5672

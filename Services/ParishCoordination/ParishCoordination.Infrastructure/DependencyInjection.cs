@@ -14,6 +14,7 @@ using Microsoft.Extensions.Http.Resilience;
 using ParishCoordination.Infrastructure.TaskExecution;
 using ParishCoordination.Infrastructure.Events;
 using ParishCoordination.Infrastructure.Lifecycle;
+using ParishCoordination.Infrastructure.Files;
 
 namespace ParishCoordination.Infrastructure;
 
@@ -58,6 +59,22 @@ public static class DependencyInjection
         services.AddScoped<INotificationAudienceQuery, NotificationAudienceQuery>();
         services.AddScoped<IWorkAreaCategoryRepository, WorkAreaCategoryRepository>();
         services.AddScoped<IParishCoordinationDataSeeder, ParishCoordinationDataSeeder>();
+
+        var fileAddress = configuration[NotificationAuditClientOptions.BaseAddressConfigurationKey];
+        var validFiles = Uri.TryCreate(fileAddress, UriKind.Absolute, out var files) &&
+            (files.Scheme == Uri.UriSchemeHttp || files.Scheme == Uri.UriSchemeHttps);
+        services.AddSingleton(new NotificationAuditClientOptions(
+            validFiles ? files! : new Uri("http://unconfigured.invalid/"),
+            validFiles ? configuration["InternalApi:ApiKey"] ?? string.Empty : string.Empty));
+        services.AddHttpClient<IParishFileAttachmentClient, ParishFileAttachmentClient>(client =>
+        {
+            client.BaseAddress = validFiles ? files : new Uri("http://unconfigured.invalid/");
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        }).AddStandardResilienceHandler(options =>
+        {
+            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10);
+            options.Retry.DisableForUnsafeHttpMethods();
+        });
 
         var identityClientOptions = IdentityClientOptions.FromConfiguration(configuration);
         services.AddSingleton(identityClientOptions);

@@ -11,6 +11,8 @@ public sealed record ParishDto(
     ParishStatus Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,
+    Guid? MapImageFileId,
+    string? MapImageFileName,
     int Version)
 {
     public static ParishDto From(Parish parish)
@@ -23,6 +25,8 @@ public sealed record ParishDto(
             parish.Status,
             parish.CreatedAt,
             parish.UpdatedAt,
+            parish.MapImageFileId,
+            parish.MapImageFileName,
             parish.Version);
     }
 }

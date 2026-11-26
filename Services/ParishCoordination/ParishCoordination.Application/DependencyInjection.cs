@@ -22,6 +22,7 @@ using ParishCoordination.Application.Seasons.Commands.ArchiveSeason;
 using ParishCoordination.Application.Seasons.Commands.CompleteSeason;
 using ParishCoordination.Application.Seasons.Commands.UpdateSeason;
 using ParishCoordination.Application.Parishes.Commands.UpdateParish;
+using ParishCoordination.Application.Parishes;
 using ParishCoordination.Application.Parishes.Queries.GetParish;
 using ParishCoordination.Application.Parishes.Queries.GetParishes;
 
@@ -36,6 +37,8 @@ public static class DependencyInjection
         services.AddScoped<UpdateCommunityCommandHandler>();
         services.AddScoped<CreateParishCommandHandler>();
         services.AddScoped<UpdateParishCommandHandler>();
+        services.AddScoped<SaveParishMapCommandHandler>();
+        services.AddScoped<GetParishMapQueryHandler>();
         services.AddScoped<GetParishQueryHandler>();
         services.AddScoped<GetParishesQueryHandler>();
         services.AddScoped<GetSeasonsQueryHandler>();

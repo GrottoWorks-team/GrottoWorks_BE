@@ -58,6 +58,27 @@ public sealed class Parish
             createdAtUtc);
     }
 
+    public void SetMapImage(Guid fileId, string fileName, DateTimeOffset updatedAtUtc)
+    {
+        if (fileId == Guid.Empty)
+        {
+            throw new ArgumentException("Map image file ID is required.", nameof(fileId));
+        }
+
+        MapImageFileId = fileId;
+        MapImageFileName = fileName.Trim();
+        UpdatedAt = updatedAtUtc;
+        Version++;
+    }
+
+    public void ClearMapImage(DateTimeOffset updatedAtUtc)
+    {
+        MapImageFileId = null;
+        MapImageFileName = null;
+        UpdatedAt = updatedAtUtc;
+        Version++;
+    }
+
     public void Update(
         string name,
         string? address,
@@ -86,6 +107,10 @@ public sealed class Parish
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset? UpdatedAt { get; private set; }
+
+    public Guid? MapImageFileId { get; private set; }
+
+    public string? MapImageFileName { get; private set; }
 
     public int Version { get; private set; }
 }

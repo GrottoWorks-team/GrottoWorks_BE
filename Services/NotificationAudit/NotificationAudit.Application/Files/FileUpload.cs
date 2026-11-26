@@ -129,7 +129,13 @@ public sealed class GetFileDownloadHandler(
     public async Task<FileDownloadDto> HandleAsync(Guid fileId, CancellationToken cancellationToken)
     {
         var file = await repository.GetAsync(fileId, cancellationToken);
-        if (file is null || file.UploadedByUserId != currentUser.UserId)
+        var isSharedMapImage = file is not null
+            && file.Purpose == FilePurpose.MapImage
+            && file.Status is (FileObjectStatus.Uploaded or FileObjectStatus.Attached)
+            && file.ReferenceType == "PARISH"
+            && (currentUser.Role == GrottoWorksRoles.Admin
+                || (currentUser.ParishId.HasValue && file.ReferenceId == currentUser.ParishId));
+        if (file is null || (!isSharedMapImage && file.UploadedByUserId != currentUser.UserId))
         {
             throw new DomainException("FILE_NOT_FOUND", "The file does not exist.", 404);
         }

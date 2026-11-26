@@ -45,6 +45,13 @@ public sealed class ParishConfiguration : IEntityTypeConfiguration<Parish>
             .HasColumnName("updated_at")
             .HasColumnType("timestamp with time zone");
 
+        builder.Property(parish => parish.MapImageFileId)
+            .HasColumnName("map_image_file_id");
+
+        builder.Property(parish => parish.MapImageFileName)
+            .HasColumnName("map_image_file_name")
+            .HasMaxLength(255);
+
         builder.Property(parish => parish.Version)
             .HasColumnName("version")
             .HasDefaultValue(1)

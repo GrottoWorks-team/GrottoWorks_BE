@@ -110,6 +110,15 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<Guid?>("MapImageFileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("map_image_file_id");
+
+                    b.Property<string>("MapImageFileName")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("map_image_file_name");
+
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()

@@ -81,7 +81,7 @@ public sealed class FileAttachmentHandler(IFileObjectRepository repository, IFil
     private static void ValidateRecord(string service, string referenceType, Guid referenceId)
     {
         if (referenceId == Guid.Empty ||
-            service is not ("TaskExecution" or "Resource" or "Readiness" or "NotificationAudit") ||
+            service is not ("TaskExecution" or "Resource" or "Readiness" or "NotificationAudit" or "ParishCoordination") ||
             string.IsNullOrWhiteSpace(referenceType) || referenceType.Length > 50 || referenceType != referenceType.Trim())
             throw new DomainException("VALIDATION_FAILED", "Valid reservation, service and record identity are required.", 422);
     }

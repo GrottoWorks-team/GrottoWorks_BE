@@ -167,14 +167,27 @@ public sealed class PurchaseShortageGuard(InventoryReader reader, IPurchaseReque
 {
     public async Task EnsureCoveredAsync(WorkAreaScope scope, PurchaseRequest request, CancellationToken cancellationToken)
     {
+        var shortages = (await reader.ReadAsync([scope], null, cancellationToken))
+            .ToDictionary(row => row.MaterialId, row => row.Shortage);
+
+        // 26/11/2026: a supplementary-supply request may only ask for materials that are actually short —
+        // there is no free-form creation path anymore (an override reason cannot bypass this).
+        foreach (var item in request.Items)
+        {
+            if (shortages.GetValueOrDefault(item.MaterialId) <= 0)
+            {
+                throw new DomainRuleException(
+                    "PURCHASE_NO_SHORTAGE",
+                    $"Material {item.MaterialId} is not short in this work area, so it cannot be requested for supplementary supply.");
+            }
+        }
+
         var uncheckedItems = request.Items.Where(item => item.ShortageOverrideReason is null).ToList();
         if (uncheckedItems.Count == 0)
         {
             return;
         }
 
-        var shortages = (await reader.ReadAsync([scope], null, cancellationToken))
-            .ToDictionary(row => row.MaterialId, row => row.Shortage);
         var open = (await store.GetOpenRequestedQuantitiesAsync(scope.WorkAreaId, request.PurchaseRequestId, cancellationToken))
             .ToDictionary(row => row.MaterialId, row => row.Quantity);
 

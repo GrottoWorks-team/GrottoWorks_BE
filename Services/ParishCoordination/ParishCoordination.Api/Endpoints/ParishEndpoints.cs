@@ -72,7 +72,7 @@ public static class ParishEndpoints
     private static async Task<IResult> GetParishMapAsync(
         Guid parishId,
         HttpContext httpContext,
-        GetParishMapQueryHandler handler,
+        [FromServices] GetParishMapQueryHandler handler,
         CancellationToken cancellationToken)
     {
         var map = await handler.HandleAsync(new GetParishMapQuery(parishId), cancellationToken);
@@ -88,7 +88,7 @@ public static class ParishEndpoints
         Guid parishId,
         SaveParishMapRequest request,
         HttpContext httpContext,
-        SaveParishMapCommandHandler handler,
+        [FromServices] SaveParishMapCommandHandler handler,
         CancellationToken cancellationToken)
     {
         var map = await handler.HandleAsync(

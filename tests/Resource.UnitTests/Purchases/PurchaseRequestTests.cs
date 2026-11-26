@@ -138,13 +138,13 @@ public sealed class PurchaseRequestTests
     [Fact]
     public async Task Officer_creates_a_planning_request_with_estimated_total()
     {
-        var dto = await Planning(Line(_cable, 30, 450_000m), Line(_paint, 2, 120_000m, "Sơn lại tượng"));
+        var dto = await Planning(Line(_cable, 30, 450_000m));
 
         dto.Status.Should().Be(PurchaseRequestStatus.Planning);
         dto.RequestedBy.Should().Be(_officer);
         dto.SeasonId.Should().Be(_area.SeasonId);
-        dto.EstimatedTotal.Should().Be(new MoneyDto(570_000m, "VND"));
-        dto.Items.Select(item => item.MaterialCode).Should().Equal("CABLE", "PAINT");
+        dto.EstimatedTotal.Should().Be(new MoneyDto(450_000m, "VND"));
+        dto.Items.Select(item => item.MaterialCode).Should().Equal("CABLE");
         dto.Items[0].Unit.Should().Be("m");
         _store.History.Should().ContainSingle(change => change.FromStatus == null && change.ToStatus == PurchaseRequestStatus.Planning);
         _events.Events.Should().BeEmpty();
@@ -195,16 +195,15 @@ public sealed class PurchaseRequestTests
     }
 
     [Fact]
-    public async Task Lines_cannot_exceed_the_shortage_without_an_override_reason()
+    public async Task Lines_are_limited_to_materials_that_are_actually_short()
     {
         (await Planning(Line(_cable, 30))).Items.Should().ContainSingle();
 
         (await Fails(() => Planning(Line(_cable, 30.5m)))).Code.Should().Be("PURCHASE_EXCEEDS_SHORTAGE");
 
-        // Paint has no shortage at all (BA 8.6: shortage = 0 → override + reason).
-        (await Fails(() => Planning(Line(_paint, 1)))).Code.Should().Be("PURCHASE_EXCEEDS_SHORTAGE");
-        (await Planning(Line(_paint, 1, overrideReason: "Dự phòng hư hỏng")))
-            .Items.Single().ShortageOverrideReason.Should().Be("Dự phòng hư hỏng");
+        // 26/11/2026: paint has no shortage → no supplementary-supply request at all, override cannot bypass it.
+        (await Fails(() => Planning(Line(_paint, 1)))).Code.Should().Be("PURCHASE_NO_SHORTAGE");
+        (await Fails(() => Planning(Line(_paint, 1, overrideReason: "Dự phòng hư hỏng")))).Code.Should().Be("PURCHASE_NO_SHORTAGE");
     }
 
     [Fact]
@@ -276,12 +275,12 @@ public sealed class PurchaseRequestTests
         var planning = await Planning(Line(_cable, 5));
 
         var updated = await Update().HandleAsync(
-            new UpdatePurchaseRequestCommand(planning.Id, planning.Version, "", [Line(_cable, 8, 100m), Line(_paint, 1, 50m, "Dự phòng")]));
+            new UpdatePurchaseRequestCommand(planning.Id, planning.Version, "", [Line(_cable, 8, 100m)]));
 
         updated.Reason.Should().BeNull();
-        updated.Items.Should().HaveCount(2);
+        updated.Items.Should().ContainSingle();
         updated.Items.Single(item => item.MaterialId == _cable.MaterialId).RequestedQuantity.Should().Be(8);
-        updated.EstimatedTotal.Amount.Should().Be(150m);
+        updated.EstimatedTotal.Amount.Should().Be(100m);
     }
 
     [Fact]

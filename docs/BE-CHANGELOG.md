@@ -2,6 +2,17 @@
 
 ## 2026-11-26
 - Branch: `feat/backend-workflow-improvements`
+- Service: ParishCoordination, Resource
+- Files: `ParishCoordination.Application/Seasons/Commands/CloneSeason/CloneSeasonCommand.cs` (new), `ParishCoordination.Api/Requests/CloneSeasonRequest.cs` (new), `ParishCoordination.Api/Endpoints/SeasonEndpoints.cs`, `ParishCoordination.Application/DependencyInjection.cs`, `Resource.Application/Purchases/PurchaseRequestHandlers.cs`, `docs/BE-CHANGELOG.md`.
+- Change:
+  - **`POST /api/v1/seasons/{sourceSeasonId}/clone`** (ADMIN/PARISH, 1 transaction): creates a PLANNING season and copies the selected work areas with name, description, category, coordinates, optionally dates shifted by the season window (`SAME_DAY_OF_SEASON`) and leader/MO/community (`copyAssignments`). Returns `{ season, areas, warnings }` so the FE can seed its cache and copy its map pins by area id. New season status is always PLANNING and readiness/checklist is not copied.
+  - **Supplementary-supply requests only for real shortages**: `PurchaseShortageGuard` now rejects any line whose material has no shortage in the work area (`PURCHASE_NO_SHORTAGE`) — the manual override cannot bypass the rule.
+- Contract impact: Additive endpoint `POST /seasons/{id}/clone` (shape already specified in `GrottoWorks_FE/docs/specs/2026-11-03-clone-season-and-parish-map.md`). `createPurchaseRequest` now enforces an existing business rule (no new fields).
+- Migration: No.
+- Follow-up: FE clone dialog copies map pins client-side right after the response; when map pins become server-side (`work_area.map_x/map_y`) the clone handler should copy them in the same transaction.
+
+## 2026-11-26
+- Branch: `feat/backend-workflow-improvements`
 - Service: Resource, TaskExecution, ApiGateway
 - Files: `Resource.Domain/Purchases/SelfPurchaseReceipt.cs` (new), `Resource.Infrastructure/Data/Configurations/SelfPurchaseConfigurations.cs` (new), `Resource.Infrastructure/Inventory/SelfPurchaseStore.cs` (new), `Resource.Application/Inventory/ISelfPurchaseStore.cs` + `SelfPurchaseHandlers.cs` (new), `Resource.Api/Requests/SelfPurchaseRequests.cs` + `Endpoints/SelfPurchaseEndpoints.cs` (new), `Resource.Domain/Inventory/MaterialTransaction.cs`, `Resource.Domain/Purchases/Purchase.cs`, `Resource.Infrastructure/Data/ResourceDbContext.cs`, DI + `ResourceEndpoints.cs`, `Data/Migrations/20261126131758_SelfPurchaseReceipts.cs` (+ snapshot), `TaskExecution.Application/Users/IIdentityUserLookup.cs`, `TaskExecution.Application/Assignments/AssignmentService.cs`, `Resource.Application/Purchases/PurchaseHandlers.cs`, `ApiGateway/YarpApiGateway/appsettings.json`, unit tests (`PurchaseTests`, `ShortageTests`, `DonationTests`).
 - Change:

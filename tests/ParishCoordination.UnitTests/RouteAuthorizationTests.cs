@@ -16,6 +16,8 @@ using ParishCoordination.Application.Parishes.Commands.CreateParish;
 using ParishCoordination.Application.Seasons.Queries.GetSeasons;
 using ParishCoordination.Application.Seasons.Queries.GetSeason;
 using ParishCoordination.Application.Seasons.Commands.CreateSeason;
+using ParishCoordination.Application.Seasons.Commands.CloneSeason;
+using ParishCoordination.Application.Parishes;
 using ParishCoordination.Application.Seasons.Commands.ActivateSeason;
 using ParishCoordination.Application.Seasons.Commands.ArchiveSeason;
 using ParishCoordination.Application.Seasons.Commands.CompleteSeason;
@@ -58,6 +60,9 @@ public sealed class RouteAuthorizationTests
         builder.Services.AddScoped<GetSeasonsQueryHandler>();
         builder.Services.AddScoped<GetSeasonQueryHandler>();
         builder.Services.AddScoped<CreateSeasonCommandHandler>();
+        builder.Services.AddScoped<CloneSeasonCommandHandler>();
+        builder.Services.AddScoped<GetParishMapQueryHandler>();
+        builder.Services.AddScoped<SaveParishMapCommandHandler>();
         builder.Services.AddScoped<ActivateSeasonCommandHandler>();
         builder.Services.AddScoped<ArchiveSeasonCommandHandler>();
         builder.Services.AddScoped<CompleteSeasonCommandHandler>();

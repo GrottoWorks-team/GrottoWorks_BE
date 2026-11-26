@@ -1,5 +1,134 @@
 # BE Changelog
 
+## 2026-11-26 (rev 8) — proxy-upload nhận thêm PDF
+- Branch: `feat/backend-workflow-improvements`
+- Service: NotificationAudit
+- Files: `NotificationAudit.Api/Controllers/FilesController.cs`
+- Change: `PUT /api/v1/files/{fileId}/proxy-upload` thêm `application/pdf` vào `[Consumes]` (trước chỉ octet-stream/glb/png/jpeg/webp). Cần cho đường tải dự phòng khi presigned PUT thẳng lên R2 bị **CORS** chặn (bucket chưa có AllowedOrigins cho `http://localhost:5175`) — FE nay tự chuyển sang proxy-upload khi presigned PUT thất bại. File vẫn phải qua kiểm tra loại/kích thước theo purpose như cũ (`FileUploadOptions.AllowOtherPdf` mới cho PDF thật).
+- Contract impact: Không đổi shape; chỉ mở thêm content type.
+- Migration: Không.
+- Tests: `dotnet build` 0 warning; `NotificationAudit.UnitTests` 164/164.
+- Verify: `POST /files/upload-requests` (purpose `ReadinessEvidence`, PNG) → `PUT /api/v1/files/{id}/proxy-upload` → **200** (host presigned là `146b9d71….r2.cloudflarestorage.com`, đúng host bị CORS).
+- Follow-up (hạ tầng): cấu hình CORS cho bucket R2 (`AllowedOrigins` = domain web + `http://localhost:5175`, `AllowedMethods` PUT/GET/HEAD, `AllowedHeaders` `content-type`) để đường presigned trực tiếp hoạt động trở lại; khi đó fallback proxy chỉ còn là lưới an toàn.
+
+## 2026-11-26 (rev 7) — TNV được đọc điều kiện bắt đầu của nhiệm vụ mình nhận
+- Branch: `feat/backend-workflow-improvements`
+- Service: TaskExecution
+- Files: `TaskExecution.Application/Tasks/TaskStartService.cs`, `TaskExecution.Api/Endpoints/TaskEndpoints.cs`, `tests/TaskExecution.UnitTests/Application/TaskStartTests.cs`, `tests/TaskExecution.UnitTests/Api/TaskRouteTests.cs`
+- Change:
+  - `GET /api/v1/tasks/{taskId}/start-eligibility` nay cho cả **VOLUNTEER** (trước chỉ LEADER). Trong service, `LoadEligibilityScopeAsync` cho phép:
+    - trưởng khu (LEADER + đúng `LeaderUserId`) như cũ, hoặc
+    - **người có assignment** trên task (PENDING/ACCEPTED/IN_PROGRESS/COMPLETED) đọc điều kiện (advisory).
+    Các role khác và người không có assignment vẫn nhận 403 `WORK_AREA_ACCESS_DENIED`.
+  - `POST /tasks/{taskId}/start` **vẫn chỉ LEADER** (không đổi).
+  - Lý do: app mobile (dành cho TNV) gọi endpoint này để hiển thị cảnh báo trước khi vào ca; trước đây luôn 403 nên app hiểu là "chưa xác minh được điều kiện" và **khoá nút Bắt đầu việc** dù việc đã đủ người/đủ vật tư.
+- Contract impact: Không đổi shape response. Thay đổi quyền: VOLUNTEER có assignment đọc được `start-eligibility` (200 thay vì 403).
+- Migration: Không.
+- Tests: TaskExecution **408/408** (thêm `Assigned_volunteer_reads_the_start_conditions_but_cannot_start_the_task`; route test nay kỳ vọng `Leader, Volunteer`; test HTTP dùng MO cho ca bị chặn và thêm ca VOLUNTEER đọc 200 / start 403).
+- Verify E2E (docker): TNV `dinh.truong@…` (trưởng nhóm nhiệm vụ, ACCEPTED) gọi `start-eligibility` → **200** (`acceptedMembers 2/2`, `materialsKnown true`); trước khi sửa là 403.
+- Follow-up: web leader nay có nút **Bắt đầu làm** (`POST /tasks/{id}/start`) — trước đây web chỉ có `ready` nên việc không chuyển sang IN_PROGRESS.
+
+## 2026-11-26 (rev 6) — kỹ năng khai báo thiếu cấp bậc không còn bị coi là "0 điểm"
+- Branch: `feat/backend-workflow-improvements`
+- Service: TaskExecution, Identity
+- Files:
+  - `TaskExecution.Application/Users/IIdentityUserLookup.cs` (`VolunteerSkills.DefaultLevel`, `Meets`)
+  - `Identity.Domain/Entities/SkillLevels.cs` (`Default = "BASIC"`)
+  - `Identity.Domain/Entities/AppUser.cs` (`ReplaceSkills`, `ReplaceSkillLevels`)
+  - `tests/TaskExecution.UnitTests/Application/VolunteerSkillTests.cs`, `.../VolunteerMatchTests.cs`
+  - `tests/Identity.UnitTests/Domain/AppUserS2Tests.cs`
+- Change:
+  - **`VolunteerSkills.Meets`:** kỹ năng đã khai báo nhưng `skill_level = null` được tính là **BASIC** (yêu cầu INTERMEDIATE/ADVANCED/EXPERT vẫn bị loại). Trước đây `SkillLevels.Meets(null, "BASIC")` = `0 >= 1` = false, nên TNV khai báo đúng kỹ năng vẫn bị:
+    - `409 TASK_SKILL_MISMATCH` khi đăng ký nhiệm vụ (`AssignmentService.EnsureSkills`),
+    - biến mất khỏi `GET /tasks/{id}/volunteer-matches` (danh sách mời phân công rỗng),
+    - không chọn được làm trưởng nhóm (`TaskTeamLeaderEligibility`).
+  - **Identity ghi cấp bậc mặc định:** `AppUser.ReplaceSkills` tạo link mới với `SkillLevels.Default` (BASIC) thay vì null; `ReplaceSkillLevels` chuẩn hoá `null → BASIC`. Nguyên nhân gốc là client (mobile) gọi `PUT /users/me/skills` chỉ với `{ skillIds }` → mọi kỹ năng mới đều `skill_level = null`. API shape không đổi (vẫn nhận cả `skillIds` và `skills`).
+- Contract impact: Không đổi shape. Hành vi: response `GET /internal/users` và `GET /users/me` có thể trả `skillLevel: "BASIC"` cho kỹ năng trước đây là `null`; matching coi null = BASIC.
+- Migration: Không (cột `skill_level` vẫn nullable; dữ liệu cũ null vẫn hoạt động nhờ quy tắc mới).
+- Tests: `TaskExecution.UnitTests` **407/407**, `Identity.UnitTests` **165/165** (thêm `A_declared_skill_without_a_level_counts_as_basic`, `A_volunteer_with_an_unlevelled_skill_still_matches_a_basic_requirement`, `A_newly_declared_skill_defaults_to_basic_and_a_null_level_is_not_stored`).
+- Verify E2E (docker, mùa `Giáng sinh 2026`): `GET /tasks/89d0da89-0154-43fa-8f0a-29ecdee2382d/volunteer-matches` → 3 ứng viên (trước: 0); `POST /tasks/{id}/applications` bằng TNV `khanh.dang@…` → **201** (trước: 409 `TASK_SKILL_MISMATCH`).
+- Follow-up: mobile đã gửi kèm `skills: [{skillId, skillLevel}]` khi lưu hồ sơ; dữ liệu demo (`SeedingData`) đã bổ sung cấp bậc cho các TNV liên quan hang đá.
+
+## 2026-11-26 (rev 5) — seeder demo không còn tự thêm dữ liệu vào DB đã seed
+- Branch: `feat/backend-workflow-improvements`
+- Service: ParishCoordination
+- Files: `ParishCoordination.Infrastructure/Data/ParishCoordinationDataSeeder.cs`
+- Change: `ParishCoordinationDataSeeder` chỉ tạo dữ liệu demo khi **bảng `parish` còn rỗng**. Trước đây nó kiểm tra theo id cố định nên sau khi nạp dữ liệu demo thật (`SeedingData`, mùa 2025) mỗi lần restart service lại thêm `GrottoWorks Demo Parish` + `Demo Season 2026` + `Demo Work Area North` → rác trong màn hình demo (mùa 2026 xuất hiện lại, khu vực thứ 4).
+- Contract impact: Không.
+- Migration: Không.
+- Verify: `docker compose down -v && build && up -d` → `npm run seed:2025:demo` (mùa 2025 + 3 khu) → restart parish → `work_area_scope`=3, `parish`=2, `work_area`=3; API qua gateway: 1 mùa 2025 COMPLETED, 3 khu READY, 4 task COMPLETED; `GET /parish-inventory/purchases` + `GET /dashboards/season` OK.
+- Follow-up: seeder các service khác (Identity/Readiness/…) có thể vẫn seed khi bảng rỗng — nếu cần demo sạch hoàn toàn thì nên áp dụng cùng nguyên tắc "chỉ seed khi DB rỗng".
+
+## 2026-11-26 (rev 4) — merge `main` + clone copies the map pin
+- Branch: `feat/backend-workflow-improvements`
+- Service: ParishCoordination
+- Files: `ParishCoordination.Application/Seasons/Commands/CloneSeason/CloneSeasonCommand.cs`
+- Change: `CloneSeason` now copies **`MapX/MapY`** (ghim khu trên sơ đồ) sang khu vực của mùa mới, cùng với `Latitude/Longitude`. Trước đó FE phải ghim lại từng khu sau khi clone (localStorage) — giờ BE clone nguyên tử.
+- Contract impact: Không đổi shape. `WorkAreaDto.mapX/mapY` + `mapX/mapY` trong POST/PATCH work-area là tính năng của `main` (migration `20261126040000_AddWorkAreaMapPin`).
+- Migration: Không (dùng migration của `main`).
+- Tests: `dotnet build GrottoWorks_BE.slnx` 0 warning; toàn bộ unit test xanh — Resource 260, ParishCoordination 334, TaskExecution 405, Identity 164, NotificationAudit 164, Reporting 76, Readiness 52, Platform 12.
+- Follow-up (FE đã làm cùng đợt): ghim đọc/ghi qua `WorkArea.mapX/mapY` thay cho localStorage; màn ADMIN bỏ gọi `/dashboards/season` (endpoint nay chỉ cho PARISH); hiển thị thông báo khi lưu sơ đồ trả 503 `FILE_ATTACHMENT_PENDING`.
+
+## 2026-11-26 (rev 3) — parish buys, no cost estimate, area material estimate
+- Branch: `feat/backend-workflow-improvements`
+- Service: Resource
+- Files: `Resource.Domain/Inventory/ParishPurchaseReceipt.cs` (new), `Resource.Domain/Inventory/MaterialTransaction.cs` (`TransactionReferenceType.ParishPurchaseItem`), `Resource.Infrastructure/Data/Configurations/ParishPurchaseConfigurations.cs` (new), `Resource.Infrastructure/Data/ResourceDbContext.cs`, `Resource.Infrastructure/Inventory/ParishPurchaseStore.cs` (new), `Resource.Infrastructure/Inventory/InventoryStore.cs`, `Resource.Infrastructure/DependencyInjection.cs`, `Resource.Application/Inventory/IParishPurchaseStore.cs` (new), `Resource.Application/Inventory/ParishPurchaseHandlers.cs` (new), `Resource.Application/Requirements/RequirementHandlers.cs`, `Resource.Application/DependencyInjection.cs`, `Resource.Api/Requests/ParishPurchaseRequests.cs` (new), `Resource.Api/Endpoints/ParishWarehouseEndpoints.cs`, `Resource.Api/Endpoints/RequirementEndpoints.cs`, `Data/Migrations/20261126150936_ParishPurchaseReceipts*.cs` (+ snapshot), `tests/Resource.UnitTests/Inventory/ParishPurchaseTests.cs` (new), `tests/Resource.UnitTests/Requirements/RequirementTests.cs`, `tests/Resource.UnitTests/Fakes.cs`.
+- Change:
+  - **Ban phụ trách nhập vật tư đã mua (có hoá đơn):** `POST /api/v1/parish-inventory/purchases` (PARISH, 201) + `GET /api/v1/parish-inventory/purchases?seasonId=&limit=` (PARISH/ADMIN). Body: `seasonId`, `buyerName` (bắt buộc), `supplierName`, `purchaseDate`, `items[{materialId, quantity, unitPrice}]`, `invoices[{id}]` (**bắt buộc**), `note`. Tổng tiền tính ở server, mỗi dòng post `PURCHASE_DELIVERY` vào **ledger kho tổng** (reference `PARISH_PURCHASE_ITEM`), phát `ParishMaterialStockChanged` để các màn khác thấy tồn mới → sau đó phân bổ xuống khu vực.
+  - **Ước lượng vật tư của khu vực được bật lại:** `POST /work-areas/{id}/material-requirements` và `PATCH /material-requirements/{id}` trả về nghiệp vụ thật (bỏ `MANUAL_MATERIAL_REQUIREMENT_DISABLED`). Người ghi: **MO của khu** (khi mùa chưa archived) hoặc **PARISH/ADMIN khi mùa còn `PLANNING`** (`WORK_AREA_SCOPE_DENIED` nếu khác). Vật tư phải ACTIVE, mỗi (khu, vật tư) 1 dòng (`REQUIREMENT_EXISTS`), PATCH có optimistic version.
+  - **"Cần" = max(ước lượng khu, tổng vật tư task):** `IInventoryStore.GetRequiredTotalsAsync` gộp `material_requirement` (ACTIVE) với `task_material_plan` theo từng (khu, vật tư) và lấy **max** → ước lượng có tác dụng khi chưa có task, task khai nhiều hơn thì theo task, không đếm trùng.
+  - **Bỏ ước tính chi phí khỏi yêu cầu bổ sung:** BE giữ cột `estimated_cost` (nullable) để tương thích, nhưng client đã ngừng gửi → `EstimatedTotal = 0`, BR-32 (duyệt vượt dự toán) không còn kích hoạt vì không có dự toán.
+- Contract impact: Additive 2 endpoint (`parish-inventory/purchases` GET/POST). `material-requirements` POST/PATCH đổi từ luôn 422 sang nghiệp vụ thật (thay đổi hành vi, không đổi shape).
+- Migration: Yes — `20261126150936_ParishPurchaseReceipts` (`parish_purchase_receipt`, `parish_purchase_item`, unique `ux_parish_purchase_item_material`, index theo parish/season/ngày). Apply trước khi start Resource.
+- Tests: `dotnet test tests/Resource.UnitTests` → **260/260 pass** (thêm `ParishPurchaseTests`, viết lại `RequirementTests`, `MigrationSnapshotTests` xác nhận snapshot khớp model).
+- Follow-up: dashboard/báo cáo tài chính nên cộng thêm "vật tư Ban phụ trách đã mua" (hiện chỉ có self-purchase); FE web đã có dialog nhập + danh sách gần đây ở `/community/warehouse`.
+
+## 2026-11-26
+- Branch: `feat/backend-workflow-improvements`
+- Service: Resource, TaskExecution, ApiGateway
+- Files: `Resource.Domain/Purchases/SelfPurchaseReceipt.cs`, `Resource.Infrastructure/Data/Configurations/SelfPurchaseConfigurations.cs`, `Resource.Application/Inventory/SelfPurchaseHandlers.cs`, `Resource.Api/Requests/EmergencyPurchaseRequests.cs` (new), `Resource.Api/Endpoints/SelfPurchaseEndpoints.cs`, `Resource.Application/DependencyInjection.cs`, `Data/Migrations/20261126142831_EmergencyPurchaseFields.cs` (+ designer + snapshot), `TaskExecution.Application/Assignments/AssignmentService.cs`, `Resource.Application/Purchases/PurchaseHandlers.cs`, `ApiGateway/YarpApiGateway/appsettings.json`, `tests/Resource.UnitTests/Purchases/PurchaseTests.cs`, `tests/Resource.UnitTests/Inventory/SelfPurchaseTests.cs` (new), `tests/Resource.UnitTests/Fakes.cs` (`FakeSelfPurchaseStore`), `tests/TaskExecution.UnitTests/Application/AssignmentTestFixture.cs` (parish buyer), `tests/TaskExecution.UnitTests/Application/TaskRecruitmentTests.cs`, `tests/TaskExecution.UnitTests/Application/AttendanceReviewTests.cs`.
+- Change:
+  - **Mua khẩn cấp của TNV trong lúc làm việc:** new `POST /api/v1/tasks/{taskId}/emergency-purchases` (VOLUNTEER, 201). The volunteer must be an assignee of the task (`EMERGENCY_PURCHASE_NOT_ASSIGNEE`), the task must be `IN_PROGRESS` (`TASK_INVALID_STATE`), the invoice file(s) are mandatory, and the draft total must be **under 500,000 VND** (`EMERGENCY_PURCHASE_LIMIT`). The receipt is stored with `source = VOLUNTEER_EMERGENCY` and `task_id`, posts the same `PURCHASE_DELIVERY` ledger rows as MO self-purchases and publishes shortage signals.
+  - **`self_purchase_receipt` gains `task_id` (nullable, indexed) and `source` (`MO_SELF_PURCHASE` | `VOLUNTEER_EMERGENCY`)** so finance/reporting can separate the two origins; the domain rejects any other source (`SELF_PURCHASE_SOURCE_INVALID`).
+  - **Việc đi mua trở lại do Ban phụ trách đảm nhận:** a `PURCHASE` task assignee must be a PARISH user again (`EnsureActiveAsync(..., Parish)`) and the purchase buyer must be PARISH (`PURCHASE_BUYER_NOT_PARISH`) — volunteers no longer receive purchase tasks; large shortages stay MO → supplementary supply request → PARISH.
+- Contract impact: Additive endpoint + 2 additive fields on the self-purchase receipt DTO (`taskId`, `source`). `POST /purchase-requests/{id}/purchases` reverts to parish-only buyer (restores the documented rule from before `075ea73`).
+- Migration: Yes — `20261126142831_EmergencyPurchaseFields` (`task_id`, `source` default `MO_SELF_PURCHASE`, index `ix_self_purchase_task`). Apply before starting Resource.
+- Tests: `SelfPurchaseTests` covers assignee-only, task must be in progress, < 500,000 VND (boundary), mandatory invoice, unknown material and the happy path (ledger + `VOLUNTEER_EMERGENCY`). `TaskRecruitmentTests`/`AttendanceReviewTests` now assert a purchase task cannot be offered to a volunteer (`USER_ROLE_MISMATCH`); the old "first purchase check-in starts the task" case was removed with the volunteer purchase flow. Resource 246 → 251 passing, TaskExecution 405 passing (Docker `dotnet test`).
+- Follow-up: FE/mobile read the new `source` field when listing self-purchases (mobile now shows an emergency-purchase screen in the task detail); Reporting still needs an aggregate for volunteer emergency purchases.
+
+## 2026-11-26
+- Branch: `feat/backend-workflow-improvements`
+- Service: ParishCoordination, Resource
+- Files: `ParishCoordination.Application/Seasons/Commands/CloneSeason/CloneSeasonCommand.cs` (new), `ParishCoordination.Api/Requests/CloneSeasonRequest.cs` (new), `ParishCoordination.Api/Endpoints/SeasonEndpoints.cs`, `ParishCoordination.Application/DependencyInjection.cs`, `Resource.Application/Purchases/PurchaseRequestHandlers.cs`, `docs/BE-CHANGELOG.md`.
+- Change:
+  - **`POST /api/v1/seasons/{sourceSeasonId}/clone`** (ADMIN/PARISH, 1 transaction): creates a PLANNING season and copies the selected work areas with name, description, category, coordinates, optionally dates shifted by the season window (`SAME_DAY_OF_SEASON`) and leader/MO/community (`copyAssignments`). Returns `{ season, areas, warnings }` so the FE can seed its cache and copy its map pins by area id. New season status is always PLANNING and readiness/checklist is not copied.
+  - **Supplementary-supply requests only for real shortages**: `PurchaseShortageGuard` now rejects any line whose material has no shortage in the work area (`PURCHASE_NO_SHORTAGE`) — the manual override cannot bypass the rule.
+- Contract impact: Additive endpoint `POST /seasons/{id}/clone` (shape already specified in `GrottoWorks_FE/docs/specs/2026-11-03-clone-season-and-parish-map.md`). `createPurchaseRequest` now enforces an existing business rule (no new fields).
+- Migration: No.
+- Follow-up: FE clone dialog copies map pins client-side right after the response; when map pins become server-side (`work_area.map_x/map_y`) the clone handler should copy them in the same transaction.
+
+## 2026-11-26
+- Branch: `feat/backend-workflow-improvements`
+- Service: Resource, TaskExecution, ApiGateway
+- Files: `Resource.Domain/Purchases/SelfPurchaseReceipt.cs` (new), `Resource.Infrastructure/Data/Configurations/SelfPurchaseConfigurations.cs` (new), `Resource.Infrastructure/Inventory/SelfPurchaseStore.cs` (new), `Resource.Application/Inventory/ISelfPurchaseStore.cs` + `SelfPurchaseHandlers.cs` (new), `Resource.Api/Requests/SelfPurchaseRequests.cs` + `Endpoints/SelfPurchaseEndpoints.cs` (new), `Resource.Domain/Inventory/MaterialTransaction.cs`, `Resource.Domain/Purchases/Purchase.cs`, `Resource.Infrastructure/Data/ResourceDbContext.cs`, DI + `ResourceEndpoints.cs`, `Data/Migrations/20261126131758_SelfPurchaseReceipts.cs` (+ snapshot), `TaskExecution.Application/Users/IIdentityUserLookup.cs`, `TaskExecution.Application/Assignments/AssignmentService.cs`, `Resource.Application/Purchases/PurchaseHandlers.cs`, `ApiGateway/YarpApiGateway/appsettings.json`, unit tests (`PurchaseTests`, `ShortageTests`, `DonationTests`).
+- Change:
+  - **Vật tư người khác tự mua (ngoài luồng purchase request):** new tables `self_purchase_receipt` + `self_purchase_item`; MO of the work area records buyer name, supplier, date, lines and **mandatory invoice photos**; each line posts a `PURCHASE_DELIVERY` ledger row referenced by `SELF_PURCHASE_ITEM` so stock and cost stay linked (`POST /api/v1/work-areas/{workAreaId}/self-purchases`, `GET /api/v1/self-purchases`).
+  - **Mua trong lúc thực hiện task:** a `PURCHASE` task may again be carried by a VOLUNTEER as well as a PARISH user (`EnsureActiveAnyAsync`, `TaskScopeAccess.GetWorkAreaForAssigneeWriteAsync`, buyer resolution accepts both roles).
+  - **Chứng từ bắt buộc:** `Purchase.ConfirmDelivery` now rejects a delivery with no receipt file (`PURCHASE_RECEIPT_REQUIRED`).
+- Contract impact: Additive (2 new endpoints + new tables). `confirmPurchaseDelivery` now enforces an existing documented rule; buy-task assignment accepts VOLUNTEER again (additive for callers).
+- Migration: Yes — `20261126131758_SelfPurchaseReceipts` (2 tables, 4 indexes).
+- Tests: Resource 246 pass, TaskExecution 405 pass (via `mcr.microsoft.com/dotnet/sdk:10.0` container). Two stale tests updated: manual requirement handlers are disabled (shortage test now drives the aggregate) and BR-37 material-donation-without-area now requires PARISH.
+- Follow-up: Apply the migration, rebuild/restart Resource + TaskExecution + gateway, extend Reporting read models with self-purchase lines (finance report currently sums via the list API), and update `docs/api-contract-parish-warehouse.md` when the contract is published.
+
+## 2026-11-26
+- Branch: `feat/backend-workflow-improvements`
+- Service: Identity, Reporting, Resource, TaskExecution, NotificationAudit, ApiGateway
+- Files: `Services/Identity/*`, `Services/Reporting/*`, `Services/Resource/*`, `Services/TaskExecution/*`, `Services/NotificationAudit/*`, `ApiGateway/YarpApiGateway/appsettings.json`, unit tests, and parish warehouse docs
+- Change: Completed pending workflow and reporting improvements, added parish warehouse inventory/distribution APIs and read models, expanded identity scope handling, and aligned purchase/donation/task notification behavior.
+- Contract impact: Additive parish warehouse endpoints and scope/read-model data; existing contracts remain backward-compatible.
+- Migration: Yes. Reporting and Resource database snapshots/migrations add parish warehouse and read-model structures.
+- Follow-up: Build and run unit tests, apply reporting/resource migrations, restart affected services, then verify warehouse, purchase, donation, and notification flows through the API gateway.
+
 ## 2026-11-26
 - Branch: `main`
 - Service: ParishCoordination, NotificationAudit

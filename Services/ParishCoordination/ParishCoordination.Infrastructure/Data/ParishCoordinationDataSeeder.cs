@@ -17,6 +17,14 @@ public sealed class ParishCoordinationDataSeeder(
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
+        // 26/11/2026: chỉ tự tạo dữ liệu demo khi database CHƯA có giáo xứ nào. Trước đây seeder
+        // kiểm tra theo id cố định nên sau khi seed dữ liệu demo thật (SeedingData) nó vẫn thêm
+        // "GrottoWorks Demo Parish" + "Demo Season 2026" + "Demo Work Area North" → rác trong demo.
+        if (await dbContext.Parishes.AnyAsync(cancellationToken))
+        {
+            return;
+        }
+
         var changed = false;
         var parish = await dbContext.Parishes.FindAsync(
             new object[] { DemoParishId },

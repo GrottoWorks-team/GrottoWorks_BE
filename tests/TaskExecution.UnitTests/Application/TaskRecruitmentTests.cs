@@ -66,6 +66,9 @@ public sealed class TaskRecruitmentTests
     public async Task Recruitment_still_rejects_closed_states_for_the_task_type(TaskType type, TaskState state)
     {
         var fixture = CreateFixture(type, state);
+        // 26/11/2026: a purchase task must be offered to the parish committee, not to a volunteer.
+        if (type == TaskType.Purchase)
+            fixture.Invitee = fixture.BuyerId;
 
         var invite = () => fixture.Service.AssignAsync(fixture.Command());
         (await invite.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("TASK_INVALID_STATE");
@@ -74,6 +77,23 @@ public sealed class TaskRecruitmentTests
         (await apply.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("TASK_INVALID_STATE");
 
         fixture.Store.Items.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_purchase_task_can_no_longer_be_offered_to_a_volunteer()
+    {
+        // OPEN task (no MarkReady) so recruitment is allowed and only the role rule can fail.
+        var fixture = new AssignmentTestFixture();
+        fixture.Task.SetSpecialType(TaskType.Purchase, Guid.NewGuid());
+
+        var invite = () => fixture.Service.AssignAsync(fixture.Command());
+        (await invite.Should().ThrowAsync<DomainRuleException>()).Which.Code.Should().Be("USER_ROLE_MISMATCH");
+        fixture.Store.Items.Should().BeEmpty();
+
+        fixture.Invitee = fixture.BuyerId;
+        var assigned = await fixture.Service.AssignAsync(fixture.Command());
+        assigned.VolunteerId.Should().Be(fixture.BuyerId);
+        fixture.Store.Items.Should().ContainSingle().Which.VolunteerId.Should().Be(fixture.BuyerId);
     }
 
     [Fact]

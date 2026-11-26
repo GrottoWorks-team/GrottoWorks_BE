@@ -15,6 +15,10 @@ namespace TaskExecution.UnitTests.Application;
 internal sealed class AssignmentTestFixture
 {
     public Guid VolunteerId { get; } = Guid.NewGuid();
+
+    /// <summary>26/11/2026: a purchase task is given to a parish-committee user, never to a volunteer.</summary>
+    public Guid BuyerId { get; } = Guid.NewGuid();
+
     public TestUser User { get; } = new();
     public WorkTask Task { get; }
     public WorkAreaScope Area { get; }
@@ -35,11 +39,15 @@ internal sealed class AssignmentTestFixture
             TaskPriority.Medium,60,1,null,new DateTimeOffset(2026,12,20,17,0,0,TimeSpan.Zero),DateTimeOffset.UtcNow);
         Identity.Items[User.UserId] = new(User.UserId,"Leader","ACTIVE","LEADER",User.ParishId,null,[]);
         Identity.Items[VolunteerId] = new(VolunteerId,"Volunteer","ACTIVE","VOLUNTEER",User.ParishId,null,[]);
+        Identity.Items[BuyerId] = new(BuyerId,"Buyer","ACTIVE","PARISH",User.ParishId,null,[]);
         Service = new AssignmentService(Store,new TestTasks(Task),new TaskScopeAccess(new TestScopes(Season,Area),User),
             new ActiveUserAccess(Identity,User),User,new TaskEventRecorder(Events,User,new TestCorrelation()),Support);
     }
 
-    public AssignVolunteerCommand Command() => new(Task.Id,VolunteerId,null,false,false,null);
+    /// <summary>Whoever receives the direct assignment — a volunteer by default, the parish buyer for purchase tasks.</summary>
+    public Guid Invitee { get; set; }
+
+    public AssignVolunteerCommand Command() => new(Task.Id,Invitee == Guid.Empty ? VolunteerId : Invitee,null,false,false,null);
 
     public TaskExecution.Application.Attendance.AttendanceService Attendance(TaskExecution.Application.Attendance.IAttendanceStore store) =>
         new(store,Store,new TestTasks(Task),new TaskScopeAccess(new TestScopes(Season,Area),User),

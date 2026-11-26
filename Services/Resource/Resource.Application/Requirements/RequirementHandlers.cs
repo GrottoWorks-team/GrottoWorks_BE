@@ -1,3 +1,4 @@
+using BuildingBlocks.Security;
 using Resource.Application.Abstractions;
 using Resource.Application.Catalog;
 using Resource.Application.Scope;
@@ -5,6 +6,7 @@ using Resource.Application.Shortages;
 using Resource.Domain;
 using Resource.Domain.Catalog;
 using Resource.Domain.Inventory;
+using Resource.Domain.Scope;
 
 namespace Resource.Application.Requirements;
 
@@ -78,36 +80,103 @@ public sealed class ListMaterialRequirementsQueryHandler(
 }
 
 /// <summary>
-/// F-RES-03 <c>createMaterialRequirement</c> (MO of the work area): material must be ACTIVE, quantity &gt; 0,
-/// one requirement per (work area, material) — a cancelled one is re-activated through PATCH instead.
+/// F-RES-03 <c>createMaterialRequirement</c>: the material estimate of a work area (planning figure used to
+/// derive "required"/shortage before tasks declare their own materials). The material must be ACTIVE and each
+/// (work area, material) pair exists once — a cancelled one is re-activated through PATCH instead.
 /// </summary>
 public sealed class CreateMaterialRequirementCommandHandler(
     WorkAreaAccess access,
     IMaterialRequirementStore store,
     IMaterialCatalogStore catalog,
     ShortageTracker shortages,
+    ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
 {
     public Task<MaterialRequirementDto> HandleAsync(
         CreateMaterialRequirementCommand command,
         CancellationToken cancellationToken = default) =>
-        throw DomainRuleException.Validation(
-            "MANUAL_MATERIAL_REQUIREMENT_DISABLED",
-            "Material requirements must be declared from the real materials of each task.");
+        unitOfWork.ExecuteAsync(async () =>
+        {
+            var scope = await access.ForReadAsync(command.WorkAreaId, cancellationToken);
+            MaterialEstimatePolicy.EnsureCanEdit(scope, currentUser);
+
+            var material = (await catalog.GetMaterialsAsync([command.MaterialId], cancellationToken)).SingleOrDefault()
+                ?? throw DomainRuleException.Validation("MATERIAL_UNKNOWN", "The material does not exist.");
+            if (material.Status != CatalogStatus.Active)
+            {
+                throw DomainRuleException.Validation("MATERIAL_INACTIVE", "Only an ACTIVE material can be estimated.");
+            }
+
+            if (await store.ExistsAsync(command.WorkAreaId, command.MaterialId, cancellationToken))
+            {
+                throw new DomainRuleException(
+                    "REQUIREMENT_EXISTS",
+                    "This material already has an estimate in the work area; edit that line instead.",
+                    DomainErrorKind.Conflict);
+            }
+
+            var before = await shortages.CaptureAsync(scope, command.MaterialId, cancellationToken);
+            var requirement = MaterialRequirement.Create(
+                scope.WorkAreaId, command.MaterialId, command.RequiredQuantity, command.ExistingQuantity ?? 0,
+                command.Note, DateTimeOffset.UtcNow);
+            store.Add(requirement);
+            await store.SaveChangesAsync(cancellationToken);
+            await shortages.PublishIfChangedAsync(before, cancellationToken);
+
+            return MaterialRequirementDto.From(requirement, material);
+        }, cancellationToken);
 }
 
-/// <summary>F-RES-03 <c>updateMaterialRequirement</c> (MO of the work area): quantity, note, cancel/re-activate.</summary>
+/// <summary>F-RES-03 <c>updateMaterialRequirement</c>: quantity, note, cancel/re-activate the estimate.</summary>
 public sealed class UpdateMaterialRequirementCommandHandler(
     WorkAreaAccess access,
     IMaterialRequirementStore store,
     IMaterialCatalogStore catalog,
     ShortageTracker shortages,
+    ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
 {
     public Task<MaterialRequirementDto> HandleAsync(
         UpdateMaterialRequirementCommand command,
         CancellationToken cancellationToken = default) =>
-        throw DomainRuleException.Validation(
-            "MANUAL_MATERIAL_REQUIREMENT_DISABLED",
-            "Material requirements must be declared from the real materials of each task.");
+        unitOfWork.ExecuteAsync(async () =>
+        {
+            var requirement = await store.GetAsync(command.RequirementId, cancellationToken)
+                ?? throw DomainRuleException.NotFound("REQUIREMENT_NOT_FOUND", "The material estimate does not exist.");
+            var scope = await access.ForReadAsync(requirement.WorkAreaId, cancellationToken);
+            MaterialEstimatePolicy.EnsureCanEdit(scope, currentUser);
+            requirement.EnsureVersion(command.Version);
+
+            var material = (await catalog.GetMaterialsAsync([requirement.MaterialId], cancellationToken)).SingleOrDefault()
+                ?? throw DomainRuleException.Validation("MATERIAL_UNKNOWN", "The material does not exist.");
+
+            var before = await shortages.CaptureAsync(scope, requirement.MaterialId, cancellationToken);
+            requirement.Update(command.RequiredQuantity, command.ExistingQuantity, command.Note, command.Status, DateTimeOffset.UtcNow);
+            await store.SaveChangesAsync(cancellationToken);
+            await shortages.PublishIfChangedAsync(before, cancellationToken);
+
+            return MaterialRequirementDto.From(requirement, material);
+        }, cancellationToken);
+}
+
+/// <summary>
+/// Who may change the material estimate of a work area: its material officer (while the season is not archived), or
+/// the parish committee/admin while the season is still being planned (BR: estimates are frozen once the season starts).
+/// </summary>
+internal static class MaterialEstimatePolicy
+{
+    public static void EnsureCanEdit(WorkAreaScope scope, ICurrentUser user)
+    {
+        WorkAreaAccess.EnsureWritable(scope);
+
+        var isOfficer = user.Role == GrottoWorksRoles.MaterialOfficer && scope.MaterialOfficerUserId == user.UserId;
+        var isPlanningParish =
+            user.Role is GrottoWorksRoles.Parish or GrottoWorksRoles.Admin && scope.SeasonStatus == SeasonStatus.Planning;
+        if (!isOfficer && !isPlanningParish)
+        {
+            throw DomainRuleException.Forbidden(
+                "WORK_AREA_SCOPE_DENIED",
+                "Only the material officer of this work area (or the parish while the season is planned) can change the material estimate.");
+        }
+    }
 }

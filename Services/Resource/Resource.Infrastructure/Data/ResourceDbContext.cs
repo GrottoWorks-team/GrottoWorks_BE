@@ -24,6 +24,10 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
 
     public DbSet<MaterialTransaction> MaterialTransactions => Set<MaterialTransaction>();
 
+    public DbSet<ParishMaterialTransaction> ParishMaterialTransactions => Set<ParishMaterialTransaction>();
+
+    public DbSet<ParishDistribution> ParishDistributions => Set<ParishDistribution>();
+
     public DbSet<MaterialAllocation> MaterialAllocations => Set<MaterialAllocation>();
 
     public DbSet<TaskMaterialReport> TaskMaterialReports => Set<TaskMaterialReport>();
@@ -35,6 +39,11 @@ public sealed class ResourceDbContext(DbContextOptions<ResourceDbContext> option
     public DbSet<PurchaseRequestStateChange> PurchaseRequestStateChanges => Set<PurchaseRequestStateChange>();
 
     public DbSet<Purchase> Purchases => Set<Purchase>();
+
+    public DbSet<SelfPurchaseReceipt> SelfPurchaseReceipts => Set<SelfPurchaseReceipt>();
+
+    /// <summary>26/11/2026: materials the parish committee bought for the central warehouse.</summary>
+    public DbSet<ParishPurchaseReceipt> ParishPurchaseReceipts => Set<ParishPurchaseReceipt>();
 
     public DbSet<Donor> Donors => Set<Donor>();
 

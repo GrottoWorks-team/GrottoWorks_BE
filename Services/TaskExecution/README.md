@@ -1,5 +1,9 @@
 # TaskExecution integration
 
+## Purchase task buyer (26/11/2026)
+
+A `PURCHASE` task is assigned to a **parish user** (behaviour role `PARISH`, the buyer) instead of a volunteer: `POST /tasks/{taskId}/assignments` validates the assignee as an ACTIVE `PARISH` user of the work area's parish, and `POST /task-assignments/{id}/accept|decline` plus `GET /users/me/assignments` accept both `VOLUNTEER` and `PARISH`. Any other task type keeps the volunteer-only rule. The Leader still creates the purchase task (§`createPurchaseTask`) and picks the buyer; Resource's `recordPurchase` then resolves the buyer from the accepted assignment (falling back to the parish user who approved the request), and the delivery confirmation closes the task.
+
 ## Support publication
 
 `GET /api/v1/seasons/{seasonId}/support-summary` is PARISH-only and enforces the Season parish. It returns request counts by status and responses grouped by their recorded `respondingCommunityId` (null remains unspecified/individual, never guessed from today's Identity profile). Member totals count named rows, not `responseQuantity` again: approved includes nominations, accepted excludes unconfirmed nominations, completed is a subset, rejected/cancelled remain historical. Material totals remain separate by source Work Area and material/unit; offered, approved, usable, unusable and pending-sync counts are distinct. Four grouped SQL queries plus scope verification share a repeatable-read snapshot, with no response-graph load or N+1. The Gateway Season path routes specifically to TaskExecution ahead of Parish's catch-all.

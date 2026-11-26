@@ -35,6 +35,14 @@ Rule IDs are stable so the administration UI can update a rule without discoveri
 | `000000000025` | `planning.work-area.assigned` |
 | `000000000026` | `support.member.reviewed` |
 | `000000000027` | `support.request.published` |
+| `000000000028` | `support.material.approved` |
+| `000000000029` | `support.material.reviewed` |
+| `000000000030` | `task.deadline.reminder` |
+| `000000000031` | `task.deadline.overdue` |
+| `000000000032` | `task.progress.submitted` |
+| `000000000033` | `task.completion.reviewed` |
+| `000000000034` | `parish.distribution.issued` |
+| `000000000035` | `parish.distribution.received` |
 
 Push and email preferences are persisted but providers are not connected yet. File access across business records is also deferred to each owning service integration.
 
@@ -48,7 +56,8 @@ Migration corrects the two legacy event aliases without changing rule IDs or the
 - Direct assignments notify the Volunteer; applications notify the Leader; application decisions notify the Volunteer; direct declines notify the Leader. Workflow type is mandatory for assignment events, so ambiguous legacy messages remain pending rather than notifying the wrong person.
 - Check-in requests notify the Leader; check-in and correction decisions notify the Volunteer. Volunteer cancellation and direct acceptance remain audit-only facts. Long-open attendance events notify the Volunteer and Leader once each.
 - Work Area assignment notifications use the source `leaderChanged`/`materialOfficerChanged` flags, notify only new role holders and deduplicate a user holding both roles. Community-only changes are audit-only. Legacy events missing those facts stay pending; current ownership is not evidence of which role changed in an old event.
-- Purchase requests awaiting review notify the source Leader; decisions notify the requester. Mandatory failed readiness items notify the source Leader (optional failed items remain audit-only). Recognition entries notify the awarded user. Each mapping requires its typed business-reference ID and uses fixed safe text, never private payload notes/URLs.
+- Purchase requests awaiting review: decisions notify the requester. The "awaiting decision" notification now fans out to the **parish committee** (`PARISH` users of the parish, resolved through Identity `GET /internal/parish-users`); the area Leader is only the fallback recipient when no committee audience is available. Mandatory failed readiness items notify the source Leader (optional failed items remain audit-only). Recognition entries notify the awarded user. Each mapping requires its typed business-reference ID and uses fixed safe text, never private payload notes/URLs.
+- Parish hand-downs (2026-11-26): `parish.distribution.issued` notifies the material officer of the target work area; `parish.distribution.received` notifies the parish user who issued the hand-down.
 - Support member approval/rejection notifies the named Volunteer and links the Support Request. The accompanying SUPPORT assignment fact stays audit-only to avoid duplicate decision notifications. Published Support Requests retain typed position/Task/skill-level/material requirements as `REQUIRES_CONTEXT`; matching/candidate fan-out is still required before that notification is considered delivered. Private position names and notes are not copied into retained context.
 - Community nomination approval uses `requiresConfirmation=true` and asks the Volunteer to accept/decline; it does not claim they have joined. A later decline notifies the Leader through `task.assignment.responded`. Self-offer approval keeps the accepted-participation wording; the consent flag is retained for consistent replay.
 - Events without enough recipient context are retained as `REQUIRES_CONTEXT` and never reported as delivered notifications.

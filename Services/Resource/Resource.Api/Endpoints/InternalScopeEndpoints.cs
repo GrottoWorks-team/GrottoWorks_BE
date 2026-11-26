@@ -101,7 +101,8 @@ public static class InternalScopeEndpoints
         ApplySeasonStatusHandler handler,
         CancellationToken cancellationToken)
     {
-        var updated = await handler.HandleAsync(new SeasonStatusChange(seasonId, request.Status!.Value, request.Version), cancellationToken);
+        var updated = await handler.HandleAsync(
+            new SeasonStatusChange(seasonId, request.Status!.Value, request.Version, request.ParishId), cancellationToken);
         return Results.Ok(ApiResults.Ok(new { seasonId, workAreasUpdated = updated }, httpContext));
     }
 

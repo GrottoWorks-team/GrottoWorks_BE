@@ -21,6 +21,7 @@ public sealed class DonationTests
     private readonly FakeCatalogStore _catalog = new();
     private readonly FakeRequirementStore _requirements = new();
     private readonly FakeInventoryStore _inventory;
+    private readonly FakeParishInventoryStore _parishInventory = new();
     private readonly FakeDonorStore _donors = new();
     private readonly FakeDonationStore _store = new();
     private readonly FakeIntegrationEventPublisher _events = new();
@@ -52,8 +53,10 @@ public sealed class DonationTests
     private RecordDirectDonationCommandHandler Record(FakeCurrentUser? user = null)
     {
         var current = user ?? Officer();
-        return new(new MaterialOfficerScope(new WorkAreaAccess(_scopes, current), _scopes, current), _donors, _store, _catalog,
-            new DonationReceiptPoster(_inventory, new ShortageTracker(new InventoryReader(_inventory, _catalog), _events), _events, current),
+        return new(new MaterialOfficerScope(new WorkAreaAccess(_scopes, current), new ParishWarehouseAccess(_scopes, current), _scopes, current),
+            _donors, _store, _catalog,
+            new DonationReceiptPoster(_inventory, _parishInventory, _catalog,
+                new ShortageTracker(new InventoryReader(_inventory, _catalog), _events), _events, current),
             Projector(), current, new FakeUnitOfWork());
     }
 
@@ -163,8 +166,10 @@ public sealed class DonationTests
         (await Fails(() => Record().HandleAsync(Material(Cable(1)) with { Amount = 100 }))).Code.Should().Be("DONATION_MATERIAL_HAS_AMOUNT");
         (await Fails(() => Record().HandleAsync(Material())))
             .Code.Should().Be("DONATION_ITEMS_REQUIRED");
+        // BR-37 changed 26/11/2026: a MATERIAL donation without a work area goes to the parish warehouse
+        // and only the parish committee may record it.
         (await Fails(() => Record().HandleAsync(Material(Cable(1)) with { WorkAreaId = null, SeasonId = _area.SeasonId })))
-            .Code.Should().Be("DONATION_WORK_AREA_REQUIRED");
+            .Code.Should().Be("PARISH_SCOPE_REQUIRED");
         (await Fails(() => Record().HandleAsync(Money(100))))
             .Code.Should().Be("DONATION_SEASON_REQUIRED");
     }

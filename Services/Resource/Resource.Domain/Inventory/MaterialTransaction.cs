@@ -11,7 +11,13 @@ public enum TransactionType
     TransferOut,
     AdjustmentDamaged,
     AdjustmentLost,
-    AdjustmentDisposed
+    AdjustmentDisposed,
+
+    /// <summary>Parish warehouse only: stock handed down to a work area (posted negative).</summary>
+    DistributionOut,
+
+    /// <summary>Parish warehouse only: unused stock of a cancelled distribution coming back (posted positive).</summary>
+    DistributionReturn
 }
 
 /// <summary><c>material_transaction.reference_type</c> (ERD v3.6): the source record a posting comes from.</summary>
@@ -21,7 +27,16 @@ public enum TransactionReferenceType
     DonationReceiptItem,
     TaskMaterialReportItem,
     SupportResponseMaterial,
-    InventoryAdjustment
+    InventoryAdjustment,
+
+    /// <summary>A line of a parish warehouse distribution; the same id posts the out and in rows.</summary>
+    ParishDistributionItem,
+
+    /// <summary>26/11/2026: a line of a receipt for materials someone bought outside the purchase flow.</summary>
+    SelfPurchaseItem,
+
+    /// <summary>26/11/2026: a line of a parish committee purchase receipt (parish warehouse inflow).</summary>
+    ParishPurchaseItem
 }
 
 /// <summary>
@@ -60,7 +75,8 @@ public sealed class MaterialTransaction
         TransactionType.PurchaseDelivery or
         TransactionType.DonationReceipt or
         TransactionType.TaskReturn or
-        TransactionType.TransferIn;
+        TransactionType.TransferIn or
+        TransactionType.DistributionReturn;
 
     /// <summary>
     /// Posts a movement. <paramref name="absoluteQuantity"/> is always positive; the ledger stores it negative
@@ -83,6 +99,13 @@ public sealed class MaterialTransaction
         }
 
         var quantity = Inventory.Quantity.Positive(absoluteQuantity, "TRANSACTION_QUANTITY_INVALID");
+
+        if (type is TransactionType.DistributionOut or TransactionType.DistributionReturn)
+        {
+            throw DomainRuleException.Validation(
+                "TRANSACTION_PARISH_ONLY",
+                "Distributions are posted to the parish warehouse ledger, not the work-area ledger.");
+        }
 
         if ((referenceType is null) != (referenceId is null))
         {

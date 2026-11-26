@@ -37,9 +37,12 @@ public sealed class SeasonStatusRequest
 {
     [Required] public SeasonStatus? Status { get; init; }
 
-    /// <summary>Source season version; an older snapshot is ignored. Parish also sends parishId and dates (ignored).</summary>
+    /// <summary>Source season version; an older snapshot is ignored. Dates are ignored.</summary>
     [Range(0, long.MaxValue)]
     public long? Version { get; init; }
+
+    /// <summary>Owning parish; optional for older senders that only post a status.</summary>
+    public Guid? ParishId { get; init; }
 }
 
 /// <summary>Interim feed of <c>task_projection</c> (F-RES-01) until TaskExecution publishes <c>task.*</c> events.</summary>

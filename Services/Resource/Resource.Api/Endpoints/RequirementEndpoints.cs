@@ -10,6 +10,10 @@ namespace Resource.Api.Endpoints;
 /// <summary>F-RES-03: material requirements of a work area (tag Materials).</summary>
 public static class RequirementEndpoints
 {
+    /// <summary>26/11/2026: the material officer owns the area estimate; the parish sets it while planning the season.</summary>
+    private static readonly string[] EstimateWriters =
+        [GrottoWorksRoles.MaterialOfficer, GrottoWorksRoles.Parish, GrottoWorksRoles.Admin];
+
     public static void MapRequirementEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/v1/work-areas/{workAreaId:guid}/material-requirements", ListAsync)
@@ -22,7 +26,7 @@ public static class RequirementEndpoints
         app.MapPost("/api/v1/work-areas/{workAreaId:guid}/material-requirements", CreateAsync)
             .WithName("createMaterialRequirement")
             .WithTags("Materials")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer))
+            .RequireAuthorization(policy => policy.RequireRole(EstimateWriters))
             .Accepts<CreateMaterialRequirementRequest>("application/json")
             .Produces<ApiResponse<MaterialRequirementDto>>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status403Forbidden)
@@ -33,7 +37,7 @@ public static class RequirementEndpoints
         app.MapPatch("/api/v1/material-requirements/{requirementId:guid}", UpdateAsync)
             .WithName("updateMaterialRequirement")
             .WithTags("Materials")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer))
+            .RequireAuthorization(policy => policy.RequireRole(EstimateWriters))
             .Accepts<UpdateMaterialRequirementRequest>("application/json")
             .Produces<ApiResponse<MaterialRequirementDto>>()
             .ProducesProblem(StatusCodes.Status403Forbidden)

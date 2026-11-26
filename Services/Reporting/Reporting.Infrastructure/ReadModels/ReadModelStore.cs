@@ -15,6 +15,9 @@ public sealed class ReadModelStore(ReportingDbContext dbContext) : IReadModelSto
     public async Task<MaterialLine?> GetMaterialLineAsync(Guid workAreaId, Guid materialId, CancellationToken cancellationToken = default) =>
         await dbContext.MaterialLines.FindAsync([workAreaId, materialId], cancellationToken);
 
+    public async Task<ParishMaterialLine?> GetParishMaterialLineAsync(Guid parishId, Guid seasonId, Guid materialId, CancellationToken cancellationToken = default) =>
+        await dbContext.ParishMaterialLines.FindAsync([parishId, seasonId, materialId], cancellationToken);
+
     public async Task<PurchaseRequestView?> GetPurchaseRequestAsync(Guid purchaseRequestId, CancellationToken cancellationToken = default) =>
         await dbContext.PurchaseRequestViews.FindAsync([purchaseRequestId], cancellationToken);
 
@@ -29,6 +32,8 @@ public sealed class ReadModelStore(ReportingDbContext dbContext) : IReadModelSto
 
     public void Add(MaterialLine line) => dbContext.MaterialLines.Add(line);
 
+    public void Add(ParishMaterialLine line) => dbContext.ParishMaterialLines.Add(line);
+
     public void Add(PurchaseRequestView request) => dbContext.PurchaseRequestViews.Add(request);
 
     public void Add(DonationView donation) => dbContext.DonationViews.Add(donation);
@@ -41,6 +46,11 @@ public sealed class ReadModelStore(ReportingDbContext dbContext) : IReadModelSto
 
     public async Task<IReadOnlyList<MaterialLine>> ListMaterialLinesAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
         await dbContext.MaterialLines.AsNoTracking().Where(line => workAreaIds.Contains(line.WorkAreaId)).ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<ParishMaterialLine>> ListParishMaterialLinesAsync(Guid parishId, Guid seasonId, CancellationToken cancellationToken = default) =>
+        await dbContext.ParishMaterialLines.AsNoTracking()
+            .Where(line => line.ParishId == parishId && line.SeasonId == seasonId)
+            .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<PurchaseRequestView>> ListPurchaseRequestsAsync(IReadOnlyCollection<Guid> workAreaIds, CancellationToken cancellationToken = default) =>
         await dbContext.PurchaseRequestViews.AsNoTracking().Where(request => workAreaIds.Contains(request.WorkAreaId)).ToListAsync(cancellationToken);

@@ -2,6 +2,9 @@ namespace Identity.Domain.Entities;
 
 public static class SkillLevels
 {
+    /// <summary>Mức mặc định khi khai báo kỹ năng mà không nêu cấp bậc (26/11/2026).</summary>
+    public const string Default = "BASIC";
+
     public static string? Normalize(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;

@@ -399,6 +399,57 @@ namespace Reporting.Infrastructure.Data.Migrations
                     b.ToTable("rm_material_line", (string)null);
                 });
 
+            modelBuilder.Entity("Reporting.Domain.ReadModels.ParishMaterialLine", b =>
+                {
+                    b.Property<Guid>("ParishId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parish_id");
+
+                    b.Property<Guid>("SeasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("season_id");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_id");
+
+                    b.Property<decimal>("ConfirmedAvailable")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("confirmed_available");
+
+                    b.Property<string>("MaterialCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("material_code");
+
+                    b.Property<string>("MaterialName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("material_name");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("unit");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("ParishId", "SeasonId", "MaterialId");
+
+                    b.HasIndex(new[] { "ParishId", "SeasonId" }, "ix_rm_parish_material_line_parish_season");
+
+                    b.ToTable("rm_parish_material_line", (string)null);
+                });
+
             modelBuilder.Entity("Reporting.Domain.ReadModels.PurchaseRequestView", b =>
                 {
                     b.Property<Guid>("PurchaseRequestId")

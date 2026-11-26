@@ -67,7 +67,7 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
         var sourceMessage = message;
         if(message.EventType=="support.request.published")AddSafeSupportRequirements(message.Payload,[]);
         var notifications = MapNotifications(message, out var requiresContext);
-        if(requiresContext && audience is not null && message.EventType is ("support.request.published" or "planning.season.activated" or "planning.season.completed" or "planning.season.archived"))
+        if(requiresContext && audience is not null && message.EventType is ("support.request.published" or "planning.season.activated" or "planning.season.completed" or "planning.season.archived" or "purchase.request.submitted"))
         {
             var recipients=await audience.ResolveAsync(message,cancellationToken);
             if(recipients is not null)
@@ -117,7 +117,8 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
             return MapSupportMaterialDecision(message, out requiresContext);
 
         if (message.EventType is "purchase.request.submitted" or "purchase.request.decided" or
-            "readiness.item.failed" or "recognition.entry.created")
+            "readiness.item.failed" or "recognition.entry.created" or
+            "parish.distribution.issued" or "parish.distribution.received")
             return MapUpstreamWorkflow(message, out requiresContext);
 
         if (message.EventType == "task.status.changed" && GetString(payload, "status") is "COMPLETED" or "REVISION_REQUIRED")
@@ -151,7 +152,8 @@ public sealed partial class IntegrationEventIngestionHandler(INotificationEventS
             "purchase.request.decided" or "purchase.delivery.confirmed" or "contribution.pledged" or
             "contribution.receipt.confirmed" or "contribution.donation.adjusted" or "loan.offer.submitted" or
             "readiness.item.failed" or "readiness.area.ready" or "readiness.area.reopened" or
-            "recognition.entry.created" or "support.transfer.confirmed" or "material-report.submitted" or "material-report.verified";
+            "recognition.entry.created" or "support.transfer.confirmed" or "material-report.submitted" or "material-report.verified" or
+            "parish.distribution.issued" or "parish.distribution.received";
         return [];
     }
 

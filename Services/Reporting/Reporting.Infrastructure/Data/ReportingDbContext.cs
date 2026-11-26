@@ -28,6 +28,8 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
 
     public DbSet<MaterialLine> MaterialLines => Set<MaterialLine>();
 
+    public DbSet<ParishMaterialLine> ParishMaterialLines => Set<ParishMaterialLine>();
+
     public DbSet<PurchaseRequestView> PurchaseRequestViews => Set<PurchaseRequestView>();
 
     public DbSet<DonationView> DonationViews => Set<DonationView>();

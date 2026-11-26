@@ -4,7 +4,8 @@ using Resource.Domain.Scope;
 namespace Resource.Application.Scope;
 
 /// <param name="Version">Source season version (Parish snapshot); null when the sender has none.</param>
-public sealed record SeasonStatusChange(Guid SeasonId, SeasonStatus Status, long? Version = null);
+/// <param name="ParishId">Owning parish when the sender knows it; used by the parish warehouse scope check.</param>
+public sealed record SeasonStatusChange(Guid SeasonId, SeasonStatus Status, long? Version = null, Guid? ParishId = null);
 
 public sealed record WorkAreaScopeDto(
     Guid WorkAreaId,
@@ -39,6 +40,8 @@ public sealed class ApplyWorkAreaSnapshotHandler(IWorkAreaScopeStore store)
         // Parent and child versions advance independently. A known season always owns its status,
         // even when a newer area snapshot embeds an older parent status.
         var season = await store.GetSeasonAsync(snapshot.SeasonId, cancellationToken);
+        // An area snapshot is often the first record that names the parish of the season.
+        season?.ApplyParish(snapshot.ParishId);
         snapshot = snapshot with
         {
             SeasonStatus = season?.Status ?? snapshot.SeasonStatus ?? existing?.SeasonStatus ?? SeasonStatus.Planning
@@ -71,11 +74,19 @@ public sealed class ApplySeasonStatusHandler(IWorkAreaScopeStore store)
         var season = await store.GetSeasonAsync(change.SeasonId, cancellationToken);
         if (season is null)
         {
-            store.AddSeason(SeasonScope.Create(change.SeasonId, change.Status, change.Version, now));
+            store.AddSeason(SeasonScope.Create(change.SeasonId, change.ParishId, change.Status, change.Version, now));
         }
-        else if (!season.Apply(change.Status, change.Version, now))
+        else
         {
-            return 0;
+            if (change.ParishId is { } parishId)
+            {
+                season.ApplyParish(parishId);
+            }
+
+            if (!season.Apply(change.Status, change.Version, now))
+            {
+                return 0;
+            }
         }
 
         var scopes = await store.ListBySeasonAsync(change.SeasonId, cancellationToken);

@@ -17,7 +17,7 @@ public static class PurchaseEndpoints
         app.MapPost("/api/v1/purchase-requests/{requestId:guid}/purchases", RecordAsync)
             .WithName("recordPurchase")
             .WithTags("Purchases")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Volunteer))
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer))
             .Accepts<CreatePurchaseBody>("application/json")
             .Produces<ApiResponse<PurchaseDto>>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status403Forbidden)
@@ -28,7 +28,7 @@ public static class PurchaseEndpoints
         var group = app.MapGroup("/api/v1/purchases/{purchaseId:guid}").WithTags("Purchases");
         group.MapPost("/receipts", AttachReceiptsAsync)
             .WithName("attachPurchaseReceipt")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Volunteer))
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.MaterialOfficer))
             .Accepts<List<FileReferenceRequest>>("application/json")
             .Produces<ApiResponse<PurchaseDto>>()
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -55,7 +55,7 @@ public static class PurchaseEndpoints
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
         group.MapPost("/approve-cost-overrun", ApproveCostOverrunAsync)
             .WithName("approveCostOverrun")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Parish))
             .Accepts<ApprovalCommandRequest>("application/json")
             .Produces<ApiResponse<PurchaseDto>>()
             .ProducesProblem(StatusCodes.Status403Forbidden)

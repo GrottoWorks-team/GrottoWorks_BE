@@ -10,10 +10,17 @@ namespace Resource.Application.Scope;
 /// items): with a work area → the MO of that work area; season only → the MO of any work area of the season. Archived
 /// seasons are read-only (BR-07).
 /// </summary>
-public sealed class MaterialOfficerScope(WorkAreaAccess access, IWorkAreaScopeStore scopes, ICurrentUser currentUser)
+public sealed class MaterialOfficerScope(
+    WorkAreaAccess access,
+    ParishWarehouseAccess parishAccess,
+    IWorkAreaScopeStore scopes,
+    ICurrentUser currentUser)
 {
-    /// <summary>Donations: MATERIAL needs the receiving work area (BR-37); MONEY may be for the whole season.</summary>
-    public Task<(WorkAreaScope? Scope, Guid SeasonId, Guid ParishId)> ResolveAsync(
+    /// <summary>
+    /// Donations: MATERIAL goes to the receiving work area (BR-37) or, when no work area is given, to the parish
+    /// warehouse (PARISH only); MONEY may be for the whole season.
+    /// </summary>
+    public async Task<(WorkAreaScope? Scope, Guid SeasonId, Guid ParishId)> ResolveAsync(
         DonationType type,
         Guid? workAreaId,
         Guid? seasonId,
@@ -21,10 +28,14 @@ public sealed class MaterialOfficerScope(WorkAreaAccess access, IWorkAreaScopeSt
     {
         if (workAreaId is null && type == DonationType.Material)
         {
-            throw DomainRuleException.Validation("DONATION_WORK_AREA_REQUIRED", "A MATERIAL donation needs the receiving work area (BR-37).");
+            var season = seasonId
+                ?? throw DomainRuleException.Validation("DONATION_SEASON_REQUIRED", "Choose the season for a parish warehouse donation.");
+            var (_, parishId) = await parishAccess.RequireWritableSeasonAsync(season, cancellationToken);
+            return (null, season, parishId);
         }
 
-        return ForWorkAreaOrSeasonAsync(workAreaId, seasonId, "DONATION_SEASON_MISMATCH", "DONATION_SEASON_REQUIRED", cancellationToken);
+        return await ForWorkAreaOrSeasonAsync(
+            workAreaId, seasonId, "DONATION_SEASON_MISMATCH", "DONATION_SEASON_REQUIRED", cancellationToken);
     }
 
     public async Task<(WorkAreaScope? Scope, Guid SeasonId, Guid ParishId)> ForWorkAreaOrSeasonAsync(

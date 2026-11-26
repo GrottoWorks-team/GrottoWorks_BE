@@ -1,5 +1,6 @@
 using BuildingBlocks.Security;
 using Resource.Application.Inventory;
+using Resource.Application.Requirements;
 using Resource.Application.Scope;
 using Resource.Application.Shortages;
 using Resource.Contracts.Events;
@@ -43,14 +44,15 @@ public sealed class ShortageTests
 
     private ShortageTracker Tracker() => new(Reader(), _events);
 
-    private async Task<MaterialRequirement> Require(WorkAreaScope area, Material material, decimal quantity)
+    // 26/11/2026: the test seeds the requirement row and publishes the shortage move itself (no handler in the way).
+    private async Task<MaterialRequirementDto> Require(WorkAreaScope area, Material material, decimal quantity)
     {
         var tracker = Tracker();
         var before = await tracker.CaptureAsync(area, material.MaterialId);
         var requirement = MaterialRequirement.Create(area.WorkAreaId, material.MaterialId, quantity, 0, null, DateTimeOffset.UtcNow);
         _requirements.Add(requirement);
         await tracker.PublishIfChangedAsync(before);
-        return requirement;
+        return MaterialRequirementDto.From(requirement, material);
     }
 
     private Task Open(WorkAreaScope area, Material material, decimal quantity) =>
@@ -104,15 +106,22 @@ public sealed class ShortageTests
     [Fact]
     public async Task Shortage_changed_is_published_on_requirement_and_stock_changes_only_when_it_moves()
     {
-        var requirement = await Require(_grotto, _cable, 100);
-        await Open(_grotto, _cable, 40);
+        // 26/11/2026: this test drives the aggregate and the tracker directly (no handler in the way).
         var tracker = Tracker();
-        var before = await tracker.CaptureAsync(_grotto, _cable.MaterialId);
+        var requirement = MaterialRequirement.Create(_grotto.WorkAreaId, _cable.MaterialId, 100, 0, null, DateTimeOffset.UtcNow);
+        var beforeCreation = await tracker.CaptureAsync(_grotto, _cable.MaterialId);
+        _requirements.Add(requirement);
+        await tracker.PublishIfChangedAsync(beforeCreation);
+
+        await Open(_grotto, _cable, 40);
+
+        var beforeNote = await tracker.CaptureAsync(_grotto, _cable.MaterialId);
         requirement.Update(null, null, "chỉ sửa ghi chú", null, DateTimeOffset.UtcNow);
-        await tracker.PublishIfChangedAsync(before);
-        before = await tracker.CaptureAsync(_grotto, _cable.MaterialId);
-        _requirements.Requirements.Remove(requirement);
-        await tracker.PublishIfChangedAsync(before);
+        await tracker.PublishIfChangedAsync(beforeNote);
+
+        var beforeCancel = await tracker.CaptureAsync(_grotto, _cable.MaterialId);
+        requirement.Update(null, null, null, RequirementStatus.Cancelled, DateTimeOffset.UtcNow);
+        await tracker.PublishIfChangedAsync(beforeCancel);
 
         var payloads = _events.Events.Select(e => (MaterialShortageChanged)e.Payload).ToList();
         _events.Events.Should().OnlyContain(e => e.EventType == MaterialShortageChanged.EventType);

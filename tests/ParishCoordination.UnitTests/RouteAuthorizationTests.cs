@@ -26,6 +26,7 @@ public sealed class RouteAuthorizationTests
         builder.Services.AddValidation();
         builder.Services.AddApplication();
         builder.Services.AddScoped<IReadinessProbe, TestReadinessProbe>();
+        builder.Services.AddScoped<IReadinessProbe, TestReadinessProbe>();
         using var app = builder.Build();
 
         app.MapParishEndpoints();

@@ -12,9 +12,12 @@ public static class ResourceEndpoints
         app.MapInternalSupportReconciliationEndpoints();
         app.MapRequirementEndpoints();
         app.MapInventoryEndpoints();
+        app.MapParishInventoryEndpoints();
+        app.MapParishDistributionEndpoints();
         app.MapShortageEndpoints();
         app.MapPurchaseRequestEndpoints();
         app.MapPurchaseEndpoints();
+        app.MapSelfPurchaseEndpoints();
         app.MapDonorEndpoints();
         app.MapDonationEndpoints();
         app.MapMaterialReportEndpoints();

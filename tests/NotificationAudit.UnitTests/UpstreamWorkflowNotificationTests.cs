@@ -53,6 +53,21 @@ public sealed class UpstreamWorkflowNotificationTests
         candidates.Should().BeEmpty();
     }
 
+    [Fact]
+    public void Parish_committee_audience_replaces_the_leader_for_purchase_requests()
+    {
+        var reference = Guid.NewGuid();
+        var chair = Guid.NewGuid();
+        var treasurer = Guid.NewGuid();
+        var candidates = IntegrationEventIngestionHandler.MapNotifications(
+            Message("purchase.request.submitted", new { purchaseRequestId = reference, recipientUserIds = new[] { chair, treasurer } }),
+            out var pending);
+
+        pending.Should().BeFalse();
+        candidates.Select(candidate => candidate.RecipientUserId).Should().BeEquivalentTo([chair, treasurer]);
+        candidates.Should().OnlyContain(candidate => candidate.ReferenceId == reference && candidate.ReferenceType == "PURCHASE_REQUEST");
+    }
+
     [Theory]
     [InlineData("purchase.request.submitted")]
     [InlineData("purchase.request.decided")]

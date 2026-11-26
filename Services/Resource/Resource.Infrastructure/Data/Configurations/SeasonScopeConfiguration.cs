@@ -12,6 +12,7 @@ public sealed class SeasonScopeConfiguration : IEntityTypeConfiguration<SeasonSc
         builder.ToTable("season_scope");
         builder.HasKey(season => season.SeasonId);
         builder.Property(season => season.SeasonId).HasColumnName("season_id").ValueGeneratedNever();
+        builder.Property(season => season.ParishId).HasColumnName("parish_id");
         builder.Property(season => season.Status).HasColumnName("season_status").HasConversion(EnumText.Converter<SeasonStatus>()).HasMaxLength(30).IsRequired();
         builder.Property(season => season.SourceVersion).HasColumnName("source_version").IsRequired();
         builder.Property(season => season.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone").IsRequired();

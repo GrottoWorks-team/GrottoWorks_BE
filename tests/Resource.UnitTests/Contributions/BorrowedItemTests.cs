@@ -28,7 +28,8 @@ public sealed class BorrowedItemTests
     private FakeCurrentUser Officer(Guid? id = null) => new(id ?? _officer, GrottoWorksRoles.MaterialOfficer, Parish);
 
     private BorrowedItemAccess Access(FakeCurrentUser user) =>
-        new(_store, new MaterialOfficerScope(new WorkAreaAccess(_scopes, user), _scopes, user), new WorkAreaAccess(_scopes, user), _scopes);
+        new(_store, new MaterialOfficerScope(new WorkAreaAccess(_scopes, user), new ParishWarehouseAccess(_scopes, user), _scopes, user),
+            new WorkAreaAccess(_scopes, user), _scopes);
 
     private OfferItemForLoanCommandHandler Offer(FakeCurrentUser? user = null)
     {

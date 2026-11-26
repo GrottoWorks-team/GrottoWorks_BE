@@ -38,15 +38,15 @@ public static class AssignmentEndpoints
             .Produces<ApiResponse<IReadOnlyList<AssignmentDto>>>().Produces<ProblemDetails>(400)
             .Produces<ProblemDetails>(401).Produces<ProblemDetails>(403).Produces<ProblemDetails>(404);
         group.MapGet("/users/me/assignments", MyAssignmentsAsync).WithName("listMyAssignments")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Volunteer))
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Volunteer, GrottoWorksRoles.Parish))
             .Produces<ApiResponse<IReadOnlyList<AssignmentDto>>>().Produces<ProblemDetails>(401);
         group.MapPost("/task-assignments/{assignmentId:guid}/accept", AcceptAsync).WithName("acceptTaskAssignment")
-            .RequireAuthorization(policy=>policy.RequireRole(GrottoWorksRoles.Volunteer))
+            .RequireAuthorization(policy=>policy.RequireRole(GrottoWorksRoles.Volunteer, GrottoWorksRoles.Parish))
             .Produces<ApiResponse<AssignmentDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401)
             .Produces<ProblemDetails>(403).Produces<ProblemDetails>(404).Produces<ProblemDetails>(409)
             .Produces<ProblemDetails>(412).Produces<ProblemDetails>(422).Produces<ProblemDetails>(503);
         group.MapPost("/task-assignments/{assignmentId:guid}/decline", DeclineAsync).WithName("declineTaskAssignment")
-            .RequireAuthorization(policy=>policy.RequireRole(GrottoWorksRoles.Volunteer))
+            .RequireAuthorization(policy=>policy.RequireRole(GrottoWorksRoles.Volunteer, GrottoWorksRoles.Parish))
             .Produces<ApiResponse<AssignmentDto>>().Produces<ProblemDetails>(400).Produces<ProblemDetails>(401)
             .Produces<ProblemDetails>(403).Produces<ProblemDetails>(404).Produces<ProblemDetails>(409)
             .Produces<ProblemDetails>(412).Produces<ProblemDetails>(422).Produces<ProblemDetails>(503);

@@ -12,6 +12,7 @@ using ParishCoordination.Application.Seasons.Commands.ActivateSeason;
 using ParishCoordination.Application.Seasons.Commands.ArchiveSeason;
 using ParishCoordination.Application.Seasons.Commands.CompleteSeason;
 using ParishCoordination.Application.Seasons.Commands.CreateSeason;
+using ParishCoordination.Application.Seasons.Commands.CloneSeason;
 using ParishCoordination.Application.Seasons.Commands.UpdateSeason;
 using ParishCoordination.Application.Seasons.Queries.GetSeasons;
 using ParishCoordination.Application.Seasons.Queries.GetSeason;
@@ -47,6 +48,21 @@ public static class SeasonEndpoints
                 GrottoWorksRoles.Admin,
                 GrottoWorksRoles.Parish))
             .Produces<ApiResponse<SeasonDto>>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        app.MapPost("/api/v1/seasons/{sourceSeasonId:guid}/clone", CloneSeasonAsync)
+            .WithName("cloneSeason")
+            .WithTags("Parish")
+            .RequireAuthorization(policy => policy.RequireRole(
+                GrottoWorksRoles.Admin,
+                GrottoWorksRoles.Parish))
+            .Accepts<CloneSeasonRequest>("application/json")
+            .Produces<ApiResponse<CloneSeasonResult>>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
@@ -171,6 +187,32 @@ public static class SeasonEndpoints
         SetETag(httpContext, season.Version);
 
         return Results.Ok(ApiResults.Ok(season, httpContext));
+    }
+
+    private static async Task<IResult> CloneSeasonAsync(
+        Guid sourceSeasonId,
+        CloneSeasonRequest request,
+        HttpContext httpContext,
+        CloneSeasonCommandHandler commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.HandleAsync(
+            new CloneSeasonCommand(
+                sourceSeasonId,
+                request.Name!.Trim(),
+                request.SeasonYear,
+                request.StartDate!.Value,
+                request.EndDate!.Value,
+                CleanOptionalText(request.Description),
+                request.EstimatedBudget,
+                request.DateShift ?? "NONE",
+                request.CopyAssignments,
+                request.Areas?.Select(area => new CloneSeasonAreaInput(area.SourceWorkAreaId!.Value, area.Name)).ToList(),
+                request.ParishId),
+            cancellationToken);
+
+        SetETag(httpContext, result.Season.Version);
+        return Results.Json(ApiResults.Ok(result, httpContext), statusCode: StatusCodes.Status201Created);
     }
 
     private static async Task<IResult> CreateSeasonAsync(

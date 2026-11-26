@@ -596,6 +596,55 @@ public sealed class FakePurchaseStore : Resource.Application.Purchases.IPurchase
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
 
+/// <summary>In-memory parish purchase receipts (materials the parish committee bought).</summary>
+public sealed class FakeParishPurchaseStore : Resource.Application.Inventory.IParishPurchaseStore
+{
+    public List<Resource.Domain.Inventory.ParishPurchaseReceipt> Receipts { get; } = [];
+
+    public int SaveChangesCount { get; private set; }
+
+    public void Add(Resource.Domain.Inventory.ParishPurchaseReceipt receipt) => Receipts.Add(receipt);
+
+    public Task<IReadOnlyList<Resource.Domain.Inventory.ParishPurchaseReceipt>> ListAsync(
+        Guid parishId, Guid seasonId, int limit, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Inventory.ParishPurchaseReceipt>>(Receipts
+            .Where(receipt => receipt.ParishId == parishId && receipt.SeasonId == seasonId)
+            .OrderByDescending(receipt => receipt.CreatedAt)
+            .Take(limit)
+            .ToList());
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>In-memory self-purchase receipts (materials bought outside the purchase flow).</summary>
+public sealed class FakeSelfPurchaseStore : Resource.Application.Inventory.ISelfPurchaseStore
+{
+    public List<Resource.Domain.Purchases.SelfPurchaseReceipt> Receipts { get; } = [];
+
+    public int SaveChangesCount { get; private set; }
+
+    public void Add(Resource.Domain.Purchases.SelfPurchaseReceipt receipt) => Receipts.Add(receipt);
+
+    public Task<IReadOnlyList<Resource.Domain.Purchases.SelfPurchaseReceipt>> ListAsync(
+        Guid parishId, Guid? workAreaId, Guid? seasonId, int limit, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Purchases.SelfPurchaseReceipt>>(Receipts
+            .Where(r => r.ParishId == parishId && (workAreaId is null || r.WorkAreaId == workAreaId) &&
+                        (seasonId is null || r.SeasonId == seasonId))
+            .OrderByDescending(r => r.CreatedAt)
+            .Take(limit)
+            .ToList());
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+        return Task.CompletedTask;
+    }
+}
+
 /// <summary>Accepts every file unless <see cref="Reject"/> is set (then throws it, like the NotificationAudit check).</summary>
 public sealed class FakeFileVerifier : Resource.Application.Files.IFileVerifier
 {
@@ -644,5 +693,113 @@ public sealed class FakeUnitOfWork : Resource.Application.Abstractions.IUnitOfWo
         {
             Depth--;
         }
+    }
+}
+
+/// <summary>In-memory parish warehouse ledger.</summary>
+public sealed class FakeParishInventoryStore : Resource.Application.Inventory.IParishInventoryStore
+{
+    public List<Resource.Domain.Inventory.ParishMaterialTransaction> Ledger { get; } = [];
+
+    public int SaveChangesCount { get; private set; }
+
+    public void Append(Resource.Domain.Inventory.ParishMaterialTransaction transaction) => Ledger.Add(transaction);
+
+    public Task<bool> OpeningStockExistsAsync(Guid parishId, Guid seasonId, Guid materialId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Ledger.Any(transaction => transaction.ParishId == parishId && transaction.SeasonId == seasonId &&
+                                                  transaction.MaterialId == materialId &&
+                                                  transaction.Type == Resource.Domain.Inventory.TransactionType.OpeningStock));
+
+    public Task<IReadOnlyList<Resource.Application.Inventory.ParishQuantityByMaterial>> GetTotalsAsync(
+        Guid parishId,
+        Guid seasonId,
+        Guid? materialId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Application.Inventory.ParishQuantityByMaterial>>(Ledger
+            .Where(transaction => transaction.ParishId == parishId && transaction.SeasonId == seasonId &&
+                                  (materialId is null || transaction.MaterialId == materialId))
+            .GroupBy(transaction => transaction.MaterialId)
+            .Select(group => new Resource.Application.Inventory.ParishQuantityByMaterial(group.Key, group.Sum(transaction => transaction.Quantity)))
+            .ToList());
+
+    public Task<IReadOnlyList<Resource.Domain.Inventory.ParishMaterialTransaction>> ListTransactionsAsync(
+        Resource.Application.Inventory.ParishTransactionQuery query,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Resource.Domain.Inventory.ParishMaterialTransaction>>(Ledger
+            .Where(transaction => transaction.ParishId == query.ParishId && transaction.SeasonId == query.SeasonId &&
+                                  transaction.MaterialId == query.MaterialId &&
+                                  (query.From is null || transaction.TransactionDate >= query.From) &&
+                                  (query.To is null || transaction.TransactionDate <= query.To))
+            .OrderByDescending(transaction => transaction.TransactionDate)
+            .Take(query.Limit)
+            .ToList());
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>In-memory parish distributions.</summary>
+public sealed class FakeParishDistributionStore : Resource.Application.Inventory.IParishDistributionStore
+{
+    public List<Resource.Domain.Inventory.ParishDistribution> Distributions { get; } = [];
+
+    public int SaveChangesCount { get; private set; }
+
+    public Task<T> InTransactionAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken = default) => operation();
+
+    public Task<Resource.Domain.Inventory.ParishDistribution?> GetAsync(Guid distributionId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Distributions.FirstOrDefault(distribution => distribution.ParishDistributionId == distributionId));
+
+    public Task<PagedResult<Resource.Domain.Inventory.ParishDistribution>> SearchAsync(
+        Resource.Application.Inventory.ParishDistributionSearch search,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = Distributions
+            .Where(distribution => distribution.ParishId == search.ParishId &&
+                                   (search.SeasonId is null || distribution.SeasonId == search.SeasonId) &&
+                                   (search.WorkAreaIds is null || search.WorkAreaIds.Contains(distribution.TargetWorkAreaId)) &&
+                                   (search.Status is null || distribution.Status == search.Status))
+            .OrderByDescending(distribution => distribution.IssuedAt)
+            .ToList();
+        return Task.FromResult(new PagedResult<Resource.Domain.Inventory.ParishDistribution>(
+            rows.Skip((search.Page - 1) * search.Size).Take(search.Size).ToList(), rows.Count));
+    }
+
+    public void Add(Resource.Domain.Inventory.ParishDistribution distribution) => Distributions.Add(distribution);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCount++;
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class FakeParishStockLock : Resource.Application.Inventory.IParishStockLock
+{
+    public int Acquired { get; private set; }
+
+    public int Committed { get; private set; }
+
+    public Task<Resource.Application.Abstractions.IStockLease> AcquireAsync(
+        Guid parishId,
+        Guid seasonId,
+        CancellationToken cancellationToken = default)
+    {
+        Acquired++;
+        return Task.FromResult<Resource.Application.Abstractions.IStockLease>(new Lease(this));
+    }
+
+    private sealed class Lease(FakeParishStockLock owner) : Resource.Application.Abstractions.IStockLease
+    {
+        public Task CommitAsync(CancellationToken cancellationToken = default)
+        {
+            owner.Committed++;
+            return Task.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

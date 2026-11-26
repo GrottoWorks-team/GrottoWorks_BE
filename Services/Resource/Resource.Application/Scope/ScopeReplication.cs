@@ -74,7 +74,8 @@ public sealed class ScopeReplicationHandler(IScopeReplicationInbox inbox,
         var status = ScopeReplicationMapping.Status<SeasonStatus>(snapshot.Season.Status);
         return inbox.ExecuteAsync("resource-planning", snapshot.SnapshotId, snapshot.Season.SeasonId, async () =>
         {
-            await seasons.HandleAsync(new(snapshot.Season.SeasonId, status, snapshot.Season.Version), cancellationToken);
+            await seasons.HandleAsync(
+                new(snapshot.Season.SeasonId, status, snapshot.Season.Version, snapshot.Season.ParishId), cancellationToken);
             if (area is not null) await areas.HandleAsync(area, cancellationToken);
         }, cancellationToken);
     }
@@ -92,7 +93,7 @@ public sealed class ScopeReplicationHandler(IScopeReplicationInbox inbox,
         var status = ScopeReplicationMapping.Status<SeasonStatus>(season.Status);
         return inbox.ExecuteAsync("resource-task-snapshots", snapshot.EventId, season.SeasonId, async () =>
         {
-            await seasons.HandleAsync(new(season.SeasonId, status, season.Version), cancellationToken);
+            await seasons.HandleAsync(new(season.SeasonId, status, season.Version, season.ParishId), cancellationToken);
             await areas.HandleAsync(area, cancellationToken);
             await tasks.HandleAsync(task, cancellationToken);
             if (snapshot.Materials is not null)

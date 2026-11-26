@@ -42,7 +42,14 @@ public sealed class Purchase
 
     public Guid TaskId { get; private set; }
 
+    /// <summary>The parish user who actually buys (assignee of the PURCHASE task).</summary>
     public Guid BuyerUserId { get; private set; }
+
+    /// <summary>
+    /// Material officer who entered the purchase (BR-30 changed: the officer records, the parish user buys).
+    /// Null for purchases recorded before this column existed.
+    /// </summary>
+    public Guid? RecordedByUserId { get; private set; }
 
     public Guid? ConfirmedByUserId { get; private set; }
 
@@ -78,6 +85,7 @@ public sealed class Purchase
         Guid purchaseRequestId,
         Guid taskId,
         Guid buyerUserId,
+        Guid recordedByUserId,
         IReadOnlyDictionary<Guid, Guid> requestLines,
         IReadOnlyCollection<PurchaseLineInput> lines,
         string? supplierName,
@@ -113,6 +121,7 @@ public sealed class Purchase
             PurchaseRequestId = purchaseRequestId,
             TaskId = taskId,
             BuyerUserId = buyerUserId,
+            RecordedByUserId = recordedByUserId,
             SupplierName = supplier,
             PurchaseDate = purchaseDate,
             Status = PurchaseStatus.Submitted,
@@ -197,6 +206,12 @@ public sealed class Purchase
     public void ConfirmDelivery(Guid officerUserId, IReadOnlyCollection<DeliveryLineInput> lines, decimal? remainingEstimate, DateTimeOffset now)
     {
         EnsureSubmitted();
+        if (ReceiptFileIds.Length == 0)
+        {
+            // 26/11/2026: no delivery without an invoice — a large purchase must never be confirmed without a receipt.
+            throw DomainRuleException.Validation("PURCHASE_RECEIPT_REQUIRED", "Attach at least one receipt file before the delivery is confirmed.");
+        }
+
         if (ExceedsEstimate(remainingEstimate) && CostOverrunApprovedByUserId is null)
         {
             throw new DomainRuleException(

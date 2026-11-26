@@ -59,22 +59,41 @@ public sealed class InventoryStore(ResourceDbContext dbContext) : IInventoryStor
         Guid? materialId,
         CancellationToken cancellationToken = default)
     {
-        var query =
+        // 26/11/2026: "cần" của một khu = max(ước lượng vật tư của khu, tổng vật tư các task khai) cho từng vật tư.
+        // Ước lượng có tác dụng khi chưa có task; khi task khai nhiều hơn thì theo task; không cộng dồn để tránh đếm trùng.
+        var estimates =
+            from requirement in dbContext.MaterialRequirements.AsNoTracking()
+            where workAreaIds.Contains(requirement.WorkAreaId) && requirement.Status == RequirementStatus.Active
+            select new { requirement.WorkAreaId, requirement.MaterialId, requirement.RequiredQuantity };
+
+        var planned =
             from plan in dbContext.Set<TaskMaterialPlan>().AsNoTracking()
             from scope in dbContext.Set<WorkAreaScope>().AsNoTracking()
             from item in plan.Items
             where scope.WorkAreaId == plan.WorkAreaId && scope.SeasonId == plan.SeasonId
                   && workAreaIds.Contains(plan.WorkAreaId)
             select new { plan.WorkAreaId, item.MaterialId, item.RequiredQuantity };
+
         if (materialId is { } material)
         {
-            query = query.Where(row => row.MaterialId == material);
+            estimates = estimates.Where(row => row.MaterialId == material);
+            planned = planned.Where(row => row.MaterialId == material);
         }
 
-        return await query
+        var byEstimate = await estimates
             .GroupBy(row => new { row.WorkAreaId, row.MaterialId })
             .Select(group => new QuantityByMaterial(group.Key.WorkAreaId, group.Key.MaterialId, group.Sum(row => row.RequiredQuantity)))
             .ToListAsync(cancellationToken);
+        var byTask = await planned
+            .GroupBy(row => new { row.WorkAreaId, row.MaterialId })
+            .Select(group => new QuantityByMaterial(group.Key.WorkAreaId, group.Key.MaterialId, group.Sum(row => row.RequiredQuantity)))
+            .ToListAsync(cancellationToken);
+
+        return byEstimate
+            .Concat(byTask)
+            .GroupBy(row => (row.WorkAreaId, row.MaterialId))
+            .Select(group => new QuantityByMaterial(group.Key.WorkAreaId, group.Key.MaterialId, group.Max(row => row.Quantity)))
+            .ToList();
     }
 
     public async Task<IReadOnlyList<QuantityByMaterial>> GetAllocatedTotalsAsync(

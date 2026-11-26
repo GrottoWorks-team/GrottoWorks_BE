@@ -16,7 +16,7 @@ public sealed class DonationConfiguration : IEntityTypeConfiguration<Donation>
                 "donation_type_amount_consistency",
                 "(\"donation_type\" = 'MONEY' AND (\"pledged_amount\" IS NULL OR \"pledged_amount\" > 0) AND (\"amount\" IS NULL OR \"amount\" >= 0)) OR " +
                 "(\"donation_type\" = 'MATERIAL' AND \"amount\" IS NULL AND \"pledged_amount\" IS NULL)");
-            table.HasCheckConstraint("donation_material_requires_work_area", "\"donation_type\" <> 'MATERIAL' OR \"work_area_id\" IS NOT NULL");
+            // A MATERIAL donation may target the parish warehouse (work_area_id NULL) or one work area.
             table.HasCheckConstraint("donation_cancel_reason", "\"donation_status\" <> 'CANCELLED' OR \"cancel_reason\" IS NOT NULL");
         });
 

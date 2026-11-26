@@ -32,15 +32,19 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
     {
         var assignmentInfo = await assignments.GetAsync(assignmentId, cancellationToken)
             ?? throw DomainRuleException.NotFound("TASK_ASSIGNMENT_NOT_FOUND", "The assignment does not exist.");
-        if (user.Role != GrottoWorksRoles.Volunteer || assignmentInfo.VolunteerId != user.UserId)
-            throw DomainRuleException.Forbidden("TASK_ASSIGNMENT_ACCESS_DENIED", "Only the assigned volunteer can respond.");
+        if (assignmentInfo.VolunteerId != user.UserId)
+            throw DomainRuleException.Forbidden("TASK_ASSIGNMENT_ACCESS_DENIED", "Only the assigned member can respond.");
         return await assignments.InTaskTransactionAsync(assignmentInfo.TaskId, async () =>
         {
             var assignment=await assignments.GetForUpdateAsync(assignmentId,cancellationToken)
                 ?? throw DomainRuleException.NotFound("TASK_ASSIGNMENT_NOT_FOUND","The assignment does not exist.");
             var task = await tasks.GetByIdForUpdateAsync(assignment.TaskId, cancellationToken)
                 ?? throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
-            var (area, _) = await scopeAccess.GetWorkAreaForVolunteerWriteAsync(task.WorkAreaId, cancellationToken);
+            // 26/11/2026: a PURCHASE task is assigned to a parish user (the buyer) instead of a volunteer.
+            var scopeTask = task.Type == TaskType.Purchase
+                ? scopeAccess.GetWorkAreaForAssigneeWriteAsync(task.WorkAreaId, cancellationToken)
+                : scopeAccess.GetWorkAreaForVolunteerWriteAsync(task.WorkAreaId, cancellationToken);
+            var (area, _) = await scopeTask;
             await users.EnsureCallerAsync(area.ParishId, cancellationToken);
             if (task.Status is TaskExecution.Domain.Tasks.TaskStatus.Cancelled or TaskExecution.Domain.Tasks.TaskStatus.Completed)
                 throw new DomainRuleException("TASK_INVALID_STATE", "The task no longer accepts assignment responses.");
@@ -73,8 +77,10 @@ public sealed partial class AssignmentService(IAssignmentStore assignments, ITas
                 ?? throw DomainRuleException.NotFound("TASK_NOT_FOUND", "The task does not exist.");
             var (area, _) = await scopeAccess.GetWorkAreaForLeaderWriteAsync(task.WorkAreaId, cancellationToken);
             await users.EnsureCallerAsync(area.ParishId, cancellationToken);
+            // 26/11/2026 (rev 2): volunteers do own no purchase task anymore — large shortages go through the parish
+            // supply request; a volunteer only buys in an emergency during a task (Resource emergency-purchases).
             var volunteer = await users.EnsureActiveAsync(command.VolunteerId, area.ParishId,
-                GrottoWorksRoles.Volunteer, cancellationToken);
+                task.Type == TaskType.Purchase ? GrottoWorksRoles.Parish : GrottoWorksRoles.Volunteer, cancellationToken);
             task.EnsureRecruitmentAllowed();
 
             var existing = await assignments.ListAsync(task.Id, cancellationToken);

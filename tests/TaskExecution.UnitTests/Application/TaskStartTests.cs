@@ -45,11 +45,20 @@ public sealed class TaskStartTests
         await app.StartAsync();
         using var client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
         var path = $"/api/v1/tasks/{fixture.Task.Id}";
-        client.DefaultRequestHeaders.Add("X-Test-Role", "VOLUNTEER");
+        // 26/11/2026: material officer vẫn bị chặn hoàn toàn.
+        client.DefaultRequestHeaders.Add("X-Test-Role", "MO");
         using var forbidden = await client.GetAsync(path + "/start-eligibility");
         forbidden.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         using var forbiddenStart = await client.PostAsync(path + "/start", null);
         forbiddenStart.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        // TNV được ĐỌC điều kiện bắt đầu (app mobile hiển thị cảnh báo) nhưng KHÔNG được start.
+        client.DefaultRequestHeaders.Remove("X-Test-Role");
+        client.DefaultRequestHeaders.Add("X-Test-Role", "VOLUNTEER");
+        using var volunteerRead = await client.GetAsync(path + "/start-eligibility");
+        volunteerRead.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var volunteerStart = await client.PostAsync(path + "/start", null);
+        volunteerStart.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         client.DefaultRequestHeaders.Remove("X-Test-Role");
         client.DefaultRequestHeaders.Add("X-Test-Role", "LEADER");
@@ -118,6 +127,23 @@ public sealed class TaskStartTests
         await get.Should().ThrowAsync<DomainRuleException>().Where(error => error.Kind == DomainErrorKind.Forbidden);
         await start.Should().ThrowAsync<DomainRuleException>().Where(error => error.Kind == DomainErrorKind.Forbidden);
         fixture.Resource.Calls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Assigned_volunteer_reads_the_start_conditions_but_cannot_start_the_task()
+    {
+        var fixture = new Fixture();
+        // Người gọi là chính TNV đã ACCEPT assignment (app mobile hiển thị điều kiện bắt đầu cho họ).
+        fixture.Source.User.UserId = fixture.Source.VolunteerId;
+        fixture.Source.User.Role = "VOLUNTEER";
+
+        var eligibility = await fixture.Service.GetEligibilityAsync(fixture.Task.Id, default);
+        eligibility.AcceptedMembers.Should().Be(1);
+        eligibility.Blockers.Should().BeEmpty();
+
+        var start = () => fixture.Service.StartAsync(fixture.Task.Id, null, default);
+        await start.Should().ThrowAsync<DomainRuleException>().Where(error => error.Kind == DomainErrorKind.Forbidden);
+        fixture.Source.Events.Items.Should().BeEmpty();
     }
 
     [Fact]

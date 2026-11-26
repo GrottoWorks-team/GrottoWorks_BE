@@ -28,8 +28,13 @@ public sealed class PurchaseTests
     private readonly FakeIntegrationEventPublisher _events = new();
     private readonly FakeFileVerifier _files = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
+    private readonly FakeParishInventoryStore _parishInventory = new();
+    private readonly FakeParishDistributionStore _distributions = new();
+    private readonly FakeParishStockLock _parishLock = new();
+    private readonly FakeIdentityUserLookup _identity = new();
     private readonly WorkAreaScope _area;
     private readonly Guid _leader;
+    private readonly Guid _parishUser = Guid.NewGuid();
     private readonly Material _cable;
     private readonly PurchaseRequest _request;
     private readonly TaskProjection _task;
@@ -38,7 +43,10 @@ public sealed class PurchaseTests
     {
         _inventory = new FakeInventoryStore(_requirements);
         _area = _scopes.Seed(Parish, _officer);
+        _scopes.AddSeason(SeasonScope.Create(_area.SeasonId, Parish, SeasonStatus.Active, 1, DateTimeOffset.UtcNow));
         _leader = _area.LeaderUserId!.Value;
+        _identity.Users[_buyer] = new Resource.Application.Users.IdentityUser(
+            _buyer, "Ban hành giáo", "ACTIVE", GrottoWorksRoles.Parish, Parish);
         _cable = _catalog.SeedMaterial(_catalog.SeedCategory(), "CABLE", "Dây điện", "m");
         _requirements.Add(MaterialRequirement.Create(_area.WorkAreaId, _cable.MaterialId, 50, 0, null, DateTimeOffset.UtcNow));
 
@@ -62,28 +70,28 @@ public sealed class PurchaseTests
 
     private PurchaseContext Context(FakeCurrentUser user) => new(_purchases, Loader(user));
 
-    private RecordPurchaseCommandHandler Record(Guid? buyer = null)
+    private RecordPurchaseCommandHandler Record(Guid? officer = null)
     {
-        var user = User(buyer ?? _buyer, GrottoWorksRoles.Volunteer);
-        return new(Loader(user), _tasks, _purchases, Context(user), user, _files);
+        var user = User(officer ?? _officer, GrottoWorksRoles.MaterialOfficer);
+        return new(Loader(user), _tasks, _purchases, Context(user), new WorkAreaAccess(_scopes, user), _identity, user, _files);
     }
 
     private ConfirmPurchaseDeliveryCommandHandler Confirm(Guid? officer = null)
     {
         var user = User(officer ?? _officer, GrottoWorksRoles.MaterialOfficer);
-        var reader = new InventoryReader(_inventory, _catalog);
-        return new(Context(user), _purchases, new WorkAreaAccess(_scopes, user), _inventory, new ShortageTracker(reader, _events), _events, user, _unitOfWork);
+        var issuer = new ParishDistributionIssuer(_parishInventory, _distributions, _parishLock, _catalog, _scopes, _events, user);
+        return new(Context(user), _purchases, new WorkAreaAccess(_scopes, user), _parishInventory, issuer, _events, user, _unitOfWork);
     }
 
     private PurchaseReviewCommandHandler Review(Guid userId, string role)
     {
         var user = User(userId, role);
-        return new(Context(user), _purchases, new WorkAreaAccess(_scopes, user), user);
+        return new(Context(user), _purchases, new WorkAreaAccess(_scopes, user), new ParishWarehouseAccess(_scopes, user), user);
     }
 
     private RecordPurchaseCommand Bought(decimal quantity, decimal unitPrice = 10_000m) =>
         new(_request.PurchaseRequestId, "Điện Quang", null,
-            [new PurchaseLineInput(_request.Items.Single().PurchaseRequestItemId, quantity, unitPrice, null)], []);
+            [new PurchaseLineInput(_request.Items.Single().PurchaseRequestItemId, quantity, unitPrice, null)], [Guid.NewGuid()]);
 
     private static ConfirmDeliveryCommand Delivered(PurchaseDto purchase, decimal usable, decimal unusable = 0) =>
         new(purchase.Id, null, [new DeliveryLineInput(purchase.Items.Single().Id, usable, unusable)]);
@@ -98,26 +106,48 @@ public sealed class PurchaseTests
     }
 
     [Fact]
-    public async Task Buyer_records_the_purchase_without_touching_stock()
+    public async Task Officer_records_the_purchase_without_touching_stock()
     {
         var dto = await Record().HandleAsync(Bought(50));
 
         dto.Status.Should().Be(PurchaseStatus.Submitted);
         dto.TotalCost.Amount.Should().Be(500_000m);
         dto.TaskId.Should().Be(_task.TaskId);
+        dto.BuyerUserId.Should().Be(_buyer);
+        dto.RecordedBy.Should().Be(_officer);
         dto.CostOverrun.Should().BeFalse();
         _request.Status.Should().Be(PurchaseRequestStatus.Purchased);
         _inventory.Ledger.Should().BeEmpty(); // BR-26
+        _parishInventory.Ledger.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task Only_the_accepted_buyer_records()
+    public async Task Only_the_material_officer_of_the_area_records_and_the_buyer_must_be_parish()
     {
-        (await Fails(() => Record(Guid.NewGuid()).HandleAsync(Bought(1)))).Code.Should().Be("PURCHASE_NOT_BUYER");
+        (await Fails(() => Record(Guid.NewGuid()).HandleAsync(Bought(1)))).Code.Should().Be("WORK_AREA_SCOPE_DENIED");
         (await Fails(() => Record().HandleAsync(Bought(1) with { Items = [new PurchaseLineInput(Guid.NewGuid(), 1, 1, null)] })))
             .Code.Should().Be("PURCHASE_REQUEST_ITEM_UNKNOWN");
         (await Fails(() => Record().HandleAsync(Bought(1) with { PurchaseDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(3)) })))
             .Code.Should().Be("PURCHASE_DATE_IN_FUTURE");
+
+        // 26/11/2026 (rev 2): volunteers no longer take purchase tasks; a non-parish assignee is rejected.
+        _identity.Users[_buyer] = new Resource.Application.Users.IdentityUser(
+            _buyer, "Tình nguyện viên", "ACTIVE", GrottoWorksRoles.Volunteer, Parish);
+        (await Fails(() => Record().HandleAsync(Bought(1)))).Code.Should().Be("PURCHASE_BUYER_NOT_PARISH");
+    }
+
+    [Fact]
+    public async Task Purchase_task_without_a_parish_assignee_uses_the_approving_parish_user_as_buyer()
+    {
+        _identity.Users[_buyer] = new Resource.Application.Users.IdentityUser(
+            _buyer, "Tình nguyện viên", "ACTIVE", GrottoWorksRoles.Volunteer, Parish);
+        _identity.Users[_leader] = new Resource.Application.Users.IdentityUser(
+            _leader, "Ban hành giáo", "ACTIVE", GrottoWorksRoles.Parish, Parish);
+
+        var dto = await Record().HandleAsync(Bought(10));
+
+        dto.BuyerUserId.Should().Be(_leader);
+        dto.RecordedBy.Should().Be(_officer);
     }
 
     [Fact]
@@ -128,10 +158,14 @@ public sealed class PurchaseTests
 
         confirmed.Status.Should().Be(PurchaseStatus.Confirmed);
         _request.Status.Should().Be(PurchaseRequestStatus.PartiallyReceived);
-        var posted = _inventory.Ledger.Single();
-        posted.Type.Should().Be(TransactionType.PurchaseDelivery);
+        var posted = _parishInventory.Ledger.Single(row => row.Type == TransactionType.PurchaseDelivery);
         posted.Quantity.Should().Be(28);
         posted.ReferenceType.Should().Be(TransactionReferenceType.PurchaseItem);
+        _inventory.Ledger.Should().BeEmpty(); // the work area receives stock only after confirming the distribution
+        var distribution = _distributions.Distributions.Single();
+        distribution.Origin.Should().Be(ParishDistributionOrigin.Purchase);
+        distribution.Status.Should().Be(ParishDistributionStatus.InTransit);
+        distribution.Items.Single().IssuedQuantity.Should().Be(28);
         var payload = _events.Events.Single(e => e.EventType == PurchaseDeliveryConfirmed.EventType).Payload.Should().BeOfType<PurchaseDeliveryConfirmed>().Which;
         payload.TaskId.Should().Be(_task.TaskId);
         payload.RequestStatus.Should().Be("PARTIALLY_RECEIVED");
@@ -139,7 +173,7 @@ public sealed class PurchaseTests
         var second = await Record().HandleAsync(Bought(22, 9_000m)); // 300,000 + 198,000 stays within the 500,000 estimate
         await Confirm().HandleAsync(Delivered(second, 22));
         _request.Status.Should().Be(PurchaseRequestStatus.Completed);
-        _inventory.Ledger.Sum(t => t.Quantity).Should().Be(50);
+        _parishInventory.Ledger.Where(row => row.Type == TransactionType.PurchaseDelivery).Sum(row => row.Quantity).Should().Be(50);
     }
 
     [Fact]
@@ -170,17 +204,18 @@ public sealed class PurchaseTests
     }
 
     [Fact]
-    public async Task Cost_above_the_estimate_needs_the_leader_before_confirmation()
+    public async Task Cost_above_the_estimate_needs_the_parish_before_confirmation()
     {
         var purchase = await Record().HandleAsync(Bought(50, 11_000m)); // 550,000 > 500,000
 
         purchase.CostOverrun.Should().BeTrue();
         (await Fails(() => Confirm().HandleAsync(Delivered(purchase, 50)))).Code.Should().Be("PURCHASE_COST_OVERRUN_NOT_APPROVED");
         (await Fails(() => Review(_officer, GrottoWorksRoles.MaterialOfficer).ApproveCostOverrunAsync(new PurchaseDecisionCommand(purchase.Id, null, null))))
-            .Code.Should().Be("WORK_AREA_SCOPE_DENIED");
+            .Code.Should().Be("PARISH_SCOPE_REQUIRED");
 
-        var approved = await Review(_leader, GrottoWorksRoles.Leader).ApproveCostOverrunAsync(new PurchaseDecisionCommand(purchase.Id, null, "Giá tăng"));
-        approved.CostOverrunApprovedBy.Should().Be(_leader);
+        var approved = await Review(_parishUser, GrottoWorksRoles.Parish)
+            .ApproveCostOverrunAsync(new PurchaseDecisionCommand(purchase.Id, null, "Giá tăng"));
+        approved.CostOverrunApprovedBy.Should().Be(_parishUser);
         (await Confirm().HandleAsync(Delivered(purchase, 50))).Status.Should().Be(PurchaseStatus.Confirmed);
     }
 
@@ -189,7 +224,7 @@ public sealed class PurchaseTests
     {
         var purchase = await Record().HandleAsync(Bought(10));
 
-        (await Fails(() => Review(_leader, GrottoWorksRoles.Leader).ApproveCostOverrunAsync(new PurchaseDecisionCommand(purchase.Id, null, null))))
+        (await Fails(() => Review(_parishUser, GrottoWorksRoles.Parish).ApproveCostOverrunAsync(new PurchaseDecisionCommand(purchase.Id, null, null))))
             .Code.Should().Be("PURCHASE_NO_COST_OVERRUN");
     }
 
@@ -204,11 +239,11 @@ public sealed class PurchaseTests
         needsInfo.Status.Should().Be(PurchaseStatus.NeedsInfo);
         (await Fails(() => Confirm().HandleAsync(Delivered(purchase, 10)))).Code.Should().Be("PURCHASE_INVALID_STATE");
 
-        var buyer = User(_buyer, GrottoWorksRoles.Volunteer);
+        var buyer = User(_buyer, GrottoWorksRoles.Parish);
         var resubmitted = await new AttachPurchaseReceiptsCommandHandler(Context(buyer), _purchases, buyer, _files)
             .HandleAsync(new AttachPurchaseReceiptsCommand(purchase.Id, [Guid.NewGuid()]));
         resubmitted.Status.Should().Be(PurchaseStatus.Submitted);
-        resubmitted.ReceiptFileIds.Should().ContainSingle();
+        resubmitted.ReceiptFileIds.Should().HaveCount(2); // the recorded one + the new file
         resubmitted.InfoRequestReason.Should().BeNull();
 
         var stranger = User(Guid.NewGuid(), GrottoWorksRoles.Volunteer);
@@ -239,6 +274,6 @@ public sealed class PurchaseTests
         _purchases.Purchases.Should().BeEmpty();
         var call = _files.Calls.Should().ContainSingle().Subject;
         call.Ids.Should().Equal(receipt);
-        (call.Purpose, call.Uploader).Should().Be(("PURCHASE_RECEIPT", _buyer));
+        (call.Purpose, call.Uploader).Should().Be(("PURCHASE_RECEIPT", _officer));
     }
 }

@@ -60,8 +60,8 @@ public static class TaskEndpoints
 
         group.MapGet("/tasks/{taskId:guid}/start-eligibility", GetStartEligibilityAsync)
             .WithName("getTaskStartEligibility")
-            .WithDescription("Checks whether the assigned Leader can start a NOT_STARTED work or corrective task in an ACTIVE season. Staffing, materials and early start are advisory warnings.")
-            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader))
+            .WithDescription("Checks whether a NOT_STARTED work or corrective task in an ACTIVE season can be started. Readable by the assigned Leader and by volunteers assigned to the task (advisory warnings). Staffing, materials and early start are advisory warnings.")
+            .RequireAuthorization(policy => policy.RequireRole(GrottoWorksRoles.Leader, GrottoWorksRoles.Volunteer))
             .Produces<ApiResponse<TaskStartEligibility>>()
             .ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(409).ProducesProblem(503);
 

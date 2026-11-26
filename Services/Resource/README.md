@@ -60,6 +60,15 @@ Mẫu request: `Resource.Api.http`.
 | `POST /api/v1/inventory/opening-stock` | `recordOpeningStock` | MO của work area; 1 lần/(work area, material) | F-RES-04 |
 | `GET /api/v1/inventory` | `listInventory` | PARISH, LEADER, MO (`seasonId,workAreaId,materialId,onlyShortage`) | F-RES-04 |
 | `GET /api/v1/materials/{id}/allocation-history` | `getAllocationHistory` | PARISH, LEADER, MO (`from,to,workAreaId`) | F-RES-04 |
+| `POST /api/v1/parish-inventory/opening-stock` | `recordParishOpeningStock` | PARISH; 1 lần/(parish, season, material) | F-RES-21 |
+| `GET /api/v1/parish-inventory` | `listParishInventory` | PARISH; ADMIN kèm `parishId` (`seasonId,materialId`) | F-RES-21 |
+| `GET /api/v1/parish-inventory/history` | `getParishMaterialHistory` | PARISH; ADMIN kèm `parishId` (`seasonId,materialId,from,to`) | F-RES-21 |
+| `POST /api/v1/parish-inventory-adjustments` | `createParishInventoryAdjustment` | PARISH — `DAMAGED|LOST|DISPOSED`, lý do bắt buộc, ≤ tồn kho tổng | F-RES-21 |
+| `POST /api/v1/parish-distributions` | `createParishDistribution` | PARISH — xuất kho tổng → `IN_TRANSIT` | F-RES-21 |
+| `GET /api/v1/parish-distributions` | `listParishDistributions` | PARISH, LEADER, MO (scope khu), ADMIN — `seasonId,workAreaId,status` | F-RES-21 |
+| `POST /api/v1/parish-distributions/{id}/confirm-receipt` | `confirmParishDistributionReceipt` | MO của khu đích — usable → `TRANSFER_IN` | F-RES-21 |
+| `POST /api/v1/parish-distributions/{id}/cancel` | `cancelParishDistribution` | PARISH — chỉ `IN_TRANSIT`, hoàn `DISTRIBUTION_RETURN` | F-RES-21 |
+| `GET /api/v1/parish-donors` | `listParishDonors` | PARISH — danh sách donor parish mình (`q,page,size`) cho picker khi ghi quyên góp vào kho tổng; tạo/sửa donor vẫn thuộc MO | F-RES-21 |
 | `GET /api/v1/work-areas/{id}/shortages` | `getWorkAreaShortages` | PARISH, LEADER, MO | F-RES-05 |
 | `GET /api/v1/seasons/{id}/material-needs` | `listMaterialNeeds` | USER cùng parish (chỉ shortage > 0) | F-RES-05 |
 | `GET /api/v1/purchase-requests` | `listPurchaseRequests` | PARISH, LEADER, MO (`seasonId,workAreaId,status`, sort `createdAt`, mặc định mới nhất trước) | F-RES-06 |
@@ -67,14 +76,14 @@ Mẫu request: `Resource.Api.http`.
 | `GET /api/v1/purchase-requests/{id}` | `getPurchaseRequest` | PARISH, LEADER, MO cùng parish; VOLUNTEER là người mua — kèm `purchases` | F-RES-06 |
 | `PATCH /api/v1/purchase-requests/{id}` | `updatePurchaseRequest` | MO của work area; chỉ PLANNING; `items` thay toàn bộ dòng; `version`/`If-Match` | F-RES-06 |
 | `POST /api/v1/purchase-requests/{id}/submit` | `submitPurchaseRequest` | MO của work area: PLANNING → PENDING_APPROVAL | F-RES-06 |
-| `POST /api/v1/purchase-requests/{id}/approve` | `approvePurchaseRequest` | LEADER **của work area** (D-01, BR-29) | F-RES-07 |
-| `POST /api/v1/purchase-requests/{id}/reject` | `rejectPurchaseRequest` | LEADER của work area; `reason` bắt buộc (BR-31) | F-RES-07 |
+| `POST /api/v1/purchase-requests/{id}/approve` | `approvePurchaseRequest` | **PARISH** cùng giáo xứ (BR-29 đổi 26/11/2026) | F-RES-07 |
+| `POST /api/v1/purchase-requests/{id}/reject` | `rejectPurchaseRequest` | **PARISH**; `reason` bắt buộc (BR-31) | F-RES-07 |
 | `GET /api/v1/purchase-requests/{id}/history` | `getPurchaseRequestHistory` | PARISH, LEADER, MO — `StateChange[]` cũ → mới | F-RES-06 |
 | `GET /api/v1/donors` | `listDonors` | MO (parish mình), ADMIN (`parishId` tùy chọn) — `q` (tên/sđt/email), `linked`, sort `name|createdAt` | F-RES-12 |
 | `POST /api/v1/donors` | `createDonor` | MO, ADMIN (ADMIN bắt buộc `parishId`); `userId` tùy chọn | F-RES-12 |
 | `PATCH /api/v1/donors/{id}` | `updateDonor` | MO, ADMIN; tên + liên hệ; `version`/`If-Match` | F-RES-12 |
 | `GET /api/v1/donations` | `listDonations` | PARISH, LEADER, MO — `seasonId,workAreaId,donorId,type,status`, mới nhất trước | F-RES-13 |
-| `POST /api/v1/donations` | `recordDirectDonation` | MO: MATERIAL → MO của work area nhận; MONEY → MO của work area (nếu có) hoặc MO của season | F-RES-13 |
+| `POST /api/v1/donations` | `recordDirectDonation` | MO: MATERIAL → work area nhận; MONEY → MO của work area (nếu có) hoặc MO của season. **PARISH**: MATERIAL không work area → kho tổng | F-RES-13 |
 | `GET /api/v1/donations/{id}` | `getDonation` | MO cùng parish; VOLUNTEER chỉ donation của donor gắn với tài khoản mình | F-RES-13 |
 | `GET /api/v1/users/me/contributions` | `listMyContributions` | VOLUNTEER — donation của donor gắn với tài khoản (`seasonId`) | F-RES-13 |
 | `GET /api/v1/seasons/{id}/contribution-needs` | `listContributionNeeds` | USER cùng parish — shortage trừ phần đã pledge chưa giao | F-RES-13b |
@@ -97,11 +106,11 @@ Mẫu request: `Resource.Api.http`.
 | `GET /api/v1/borrowed-items/overdue` | `listOverdueBorrowedItems` | MO — `date`, `withinDays` (mặc định 2) | F-RES-18 |
 | `POST /api/v1/borrowed-items/{id}/issue` · `PUT …/assignment` · `POST …/return` · `POST …/incidents` | `issueBorrowedItem` · `assignBorrowedItem` · `returnBorrowedItem` · `recordBorrowedItemIncident` | MO | F-RES-18 |
 | `PATCH /api/v1/donations/{id}` | `adjustDonation` | MO của work area/season — sửa một receipt, lý do bắt buộc, đối soát kho | F-RES-14 |
-| `POST /api/v1/purchase-requests/{id}/purchases` | `recordPurchase` | VOLUNTEER có assignment ACCEPTED của task PURCHASE (BR-30) — kho chưa tăng (BR-26) | F-RES-09 |
-| `POST /api/v1/purchases/{id}/receipts` | `attachPurchaseReceipt` | VOLUNTEER người mua — `FileReference[]` (≤ 5); NEEDS_INFO → SUBMITTED | F-RES-09 |
-| `POST /api/v1/purchases/{id}/confirm-delivery` | `confirmPurchaseDelivery` | MO của work area — usable → `PURCHASE_DELIVERY` | F-RES-10 |
+| `POST /api/v1/purchase-requests/{id}/purchases` | `recordPurchase` | MO của khu — buyer = user PARISH có assignment ACCEPTED của task PURCHASE (BR-30 đổi); kho chưa tăng (BR-26) | F-RES-09 |
+| `POST /api/v1/purchases/{id}/receipts` | `attachPurchaseReceipt` | MO/người ghi nhận hoặc buyer — `FileReference[]` (≤ 5); NEEDS_INFO → SUBMITTED | F-RES-09 |
+| `POST /api/v1/purchases/{id}/confirm-delivery` | `confirmPurchaseDelivery` | MO của khu — usable → `PURCHASE_DELIVERY` vào **kho tổng**, tự tạo phiếu phân xuống `IN_TRANSIT` cho khu | F-RES-10 |
 | `POST /api/v1/purchases/{id}/request-info` | `requestPurchaseInfo` | MO của work area — lý do bắt buộc | F-RES-10 |
-| `POST /api/v1/purchases/{id}/approve-cost-overrun` | `approveCostOverrun` | LEADER của work area (BR-32) | F-RES-11 |
+| `POST /api/v1/purchases/{id}/approve-cost-overrun` | `approveCostOverrun` | **PARISH** (BR-32 đổi 26/11/2026) | F-RES-11 |
 | `PUT /internal/work-area-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/season-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm | F-RES-01 |
 | `PUT /internal/task-scopes/{id}` | — | Service (`X-Internal-Api-Key`) — feed tạm `task_projection` (work area, type, status, assignee ACCEPTED) | F-RES-01 |
@@ -121,9 +130,29 @@ Mẫu request: `Resource.Api.http`.
   mở) để thay đổi và dòng outbox commit cùng nhau.
 - `material.shortage.changed` (v1) chỉ phát khi shortage của (work area, material) thực sự đổi.
 
+## Kho tổng giáo xứ (F-RES-21, quyết định 26/11/2026, thay C-05)
+
+Giáo xứ giữ **một kho tổng theo mùa**; MO chỉ quản lý vật tư đã được phân xuống khu của mình. Kho tổng có ledger
+riêng `parish_material_transaction` (không dùng `work_area_id` nullable trên `material_transaction`) để MO không bao
+giờ chạm được tồn kho tổng — kể cả qua lỗi truy vấn.
+
+- `parish_material_transaction`: append-only, `(parish_id, season_id, material_id)`, dấu cố định theo loại, CHECK trong
+  DB. Loại: `OPENING_STOCK` (1 lần/(parish, season, material)), `PURCHASE_DELIVERY`, `DONATION_IN`,
+  `DISTRIBUTION_OUT` (−), `DISTRIBUTION_RETURN` (+), `INVENTORY_ADJUSTMENT` (−). Mọi loại trừ `OPENING_STOCK` phải có
+  `reference_type/reference_id`.
+- `parish_distribution` + `parish_distribution_item`: phiếu phân xuống **2 bước** — PARISH lập phiếu (post
+  `DISTRIBUTION_OUT` ở kho tổng, `status = IN_TRANSIT`) → MO của khu đích xác nhận (`TRANSFER_IN` usable vào ledger khu,
+  unusable chỉ ghi nhận) hoặc PARISH huỷ khi còn `IN_TRANSIT` (`DISTRIBUTION_RETURN`). `origin` = `MANUAL` hoặc
+  `PURCHASE` (tự tạo khi MO xác nhận giao hàng mua).
+- `SeasonScope.ParishId` (backfill từ `work_area_scope`) cho phép kiểm tra "cùng giáo xứ" khi ghi kho tổng.
+- Quyền: PARISH ghi/đọc; LEADER và MO đọc phiếu phân xuống trong scope của mình; ADMIN chỉ đọc (phải nêu `parishId`).
+- Event: `parish.material.stock.changed` (Reporting — chưa có consumer, xem "Việc còn mở"), `parish.distribution.issued`
+  (báo MO khu đích), `parish.distribution.received` (báo người lập phiếu).
+- Hợp đồng chi tiết: `docs/api-contract-parish-warehouse.md`.
+
 ## Purchase request (F-RES-06/07, BA 8.6 + 9.5, D-01)
 
-- `PLANNING` → `PENDING_APPROVAL` (submit) → `APPROVED` / `REJECTED` (Leader của work area). Không có DRAFT (R-12,
+- `PLANNING` → `PENDING_APPROVAL` (submit) → `APPROVED` / `REJECTED` (**PARISH** cùng giáo xứ, đổi 26/11/2026). Không có DRAFT (R-12,
   Contract v1.3.2). Chỉ sửa khi PLANNING; PLANNING được
   phép chưa có dòng/lý do, submit thì bắt buộc ≥ 1 dòng + lý do (BR-27). Phê duyệt áp dụng cho cả request.
 - Dòng: material ACTIVE, mỗi material 1 lần/request, `requestedQuantity > 0` (2 số lẻ), `estimatedCost` = chi phí cả dòng
@@ -135,12 +164,14 @@ Mẫu request: `Resource.Api.http`.
   `APPROVED|REJECTED`, `decidedByUserId`, `note`) — Task (F-TSK-17) chỉ cho tạo task PURCHASE khi APPROVED.
   Payload: `Resource.Contracts/Events/PurchaseRequest*.cs`, cần Lâm review (plan §4.2 "giữa S4 chốt với Lâm").
 - Mua và nhận hàng (F-RES-09/10/11): request APPROVED → **BUYER_ASSIGNED** khi `task_projection` có task PURCHASE của
-  request với assignee (thay cho event `task.purchase-task.assigned`) → **PURCHASED** khi người mua ghi purchase (chỉ
-  assignee, kho chưa tăng — BR-26) → MO xác nhận giao: `usable + unusable ≤ purchased`, chỉ usable → `PURCHASE_DELIVERY`
-  (`reference = PURCHASE_ITEM`, post 1 lần); đủ mọi dòng → **COMPLETED**, thiếu → **PARTIALLY_RECEIVED** (vẫn giữ chỗ phần
-  chưa giao trong chặn vượt shortage). Event `purchase.delivery.confirmed` để Task tự đóng task PURCHASE (BR-65).
+  request với assignee (thay cho event `task.purchase-task.assigned`) → **PURCHASED** khi **MO của khu** ghi purchase
+  (buyer = user PARISH của assignee, hoặc user PARISH đã duyệt request khi assignee không phải PARISH; kho chưa tăng —
+  BR-26) → MO xác nhận giao: `usable + unusable ≤ purchased`, chỉ usable → `PURCHASE_DELIVERY` **vào kho tổng**
+  (`reference = PURCHASE_ITEM`, post 1 lần) + tự tạo phiếu phân xuống `IN_TRANSIT` cho khu (origin `PURCHASE`); đủ mọi
+  dòng → **COMPLETED**, thiếu → **PARTIALLY_RECEIVED** (vẫn giữ chỗ phần chưa giao trong chặn vượt shortage). Event
+  `purchase.delivery.confirmed` để Task tự đóng task PURCHASE (BR-65).
 - BR-32: `costOverrun` = chi phí purchase > dự toán còn lại (tổng `estimatedCost` − chi phí các purchase đã CONFIRMED);
-  khi đó cần LEADER `approveCostOverrun` trước khi MO xác nhận. Request không có dự toán → không chặn.
+  khi đó cần **PARISH** `approveCostOverrun` trước khi MO xác nhận (đổi 26/11/2026). Request không có dự toán → không chặn.
 - Hóa đơn: `receipt_file_ids` (≤ 5) lưu tạm id file — chờ F-NTF-01 kiểm tra quyền sở hữu/trạng thái file (BR-69).
   `requestPurchaseInfo` → NEEDS_INFO (lý do ở `info_request_reason`), người mua gửi thêm hóa đơn → SUBMITTED.
 - Bổ sung so với ERD v3.6 (đã ghi ở spec §3): bảng kỹ thuật `purchase_request_state_change` (nguồn của
@@ -159,10 +190,12 @@ Mẫu request: `Resource.Api.http`.
 ## Donation ghi nhận trực tiếp (F-RES-13, BA 8.7, BR-35..39)
 
 - Tạo donation `RECEIVED` + **một** `donation_receipt` trong cùng transaction. MONEY: `amount > 0`, không có item (BR-36),
-  `workAreaId` tùy chọn (không có thì bắt buộc `seasonId`). MATERIAL: bắt buộc `workAreaId` + ≥ 1 item (BR-37), mỗi
-  material 1 lần, `receivedQuantity > 0`, `0 ≤ unusableQuantity ≤ receivedQuantity`. `receivedAt` mặc định là lúc ghi,
-  không được ở tương lai (cho lệch 5 phút).
-- Tồn kho: mỗi dòng receipt có usable > 0 ghi 1 `material_transaction` `DONATION_RECEIPT` vào work area nhận,
+  `workAreaId` tùy chọn (không có thì bắt buộc `seasonId`). MATERIAL: bắt buộc `workAreaId` + ≥ 1 item (BR-37) — **trừ
+  PARISH**: `workAreaId = null` nghĩa là quyên góp vào **kho tổng** của giáo xứ (bắt buộc `seasonId`) và post vào
+  `parish_material_transaction` `DONATION_IN`; mỗi material 1 lần, `receivedQuantity > 0`,
+  `0 ≤ unusableQuantity ≤ receivedQuantity`. `receivedAt` mặc định là lúc ghi, không được ở tương lai (cho lệch 5 phút).
+- Tồn kho: mỗi dòng receipt có usable > 0 ghi 1 `material_transaction` `DONATION_RECEIPT` vào work area nhận (hoặc 1
+  `parish_material_transaction` `DONATION_IN` nếu PARISH chọn kho tổng),
   `reference = (DONATION_RECEIPT_ITEM, id dòng receipt)` → unique index ledger đảm bảo chỉ post **một lần** (BR-38). Phần
   unusable không vào kho. Donation, receipt và ledger lưu trong **một** `SaveChanges` (một transaction).
 - Trạng thái item suy ra từ số lượng: `FULLY_RECEIVED`, `UNUSABLE` (nhận nhưng không dùng được hết)…
@@ -279,3 +312,10 @@ Event (bảng "Event" ở trên) ghi vào `integration_event_outbox`, `OutboxDis
   retry có thể ghi trùng donation. Bằng chứng ảnh (`evidenceFileIds`) chờ F-NTF-01.
 - Gateway: `/purchase-requests/{id}/purchase-tasks` thuộc Task (F-TSK-17) — khi Lâm thêm cần route riêng `Order: -1`.
 - Chưa có integration test tự động (Testcontainers); đã smoke E2E trên PostgreSQL 16 + gateway.
+- **Kho tổng (26/11/2026)**: Reporting đã consume `parish.material.stock.changed` → `rm_parish_material_line` + dòng
+  "Kho tổng giáo xứ" trong báo cáo vật tư; NotificationAudit đã map `parish.distribution.issued/received` và báo ban
+  hành giáo khi có `purchase.request.submitted`.
+- **Gán user PARISH vào task PURCHASE**: đã mở trong TaskExecution (`assignVolunteer` + accept/decline cho task PURCHASE);
+  `recordPurchase` ưu tiên assignee PARISH, fallback user PARISH đã duyệt request.
+- Không có job dọn phiếu phân xuống `IN_TRANSIT` quá hạn (hiện PARISH tự huỷ).
+- Chưa build/test được trên máy này: chỉ có .NET SDK 9.0.300 trong khi solution target `net10.0` (cài SDK bị từ chối).

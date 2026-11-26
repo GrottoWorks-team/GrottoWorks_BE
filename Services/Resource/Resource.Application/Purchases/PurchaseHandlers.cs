@@ -5,6 +5,7 @@ using Resource.Application.Files;
 using Resource.Application.Inventory;
 using Resource.Application.Scope;
 using Resource.Application.Shortages;
+using Resource.Application.Users;
 using Resource.Contracts.Events;
 using Resource.Domain;
 using Resource.Domain.Catalog;
@@ -33,6 +34,7 @@ public sealed record PurchaseDto(
     Guid PurchaseRequestId,
     Guid TaskId,
     Guid BuyerUserId,
+    Guid? RecordedBy,
     string? SupplierName,
     DateOnly PurchaseDate,
     MoneyDto TotalCost,
@@ -48,7 +50,8 @@ public sealed record PurchaseDto(
     long Version)
 {
     public static PurchaseDto From(Purchase purchase, IReadOnlyDictionary<Guid, Material> materials, decimal? remainingEstimate) =>
-        new(purchase.PurchaseId, purchase.PurchaseRequestId, purchase.TaskId, purchase.BuyerUserId, purchase.SupplierName, purchase.PurchaseDate,
+        new(purchase.PurchaseId, purchase.PurchaseRequestId, purchase.TaskId, purchase.BuyerUserId, purchase.RecordedByUserId,
+            purchase.SupplierName, purchase.PurchaseDate,
             MoneyDto.InVnd(purchase.TotalCost), purchase.Status,
             purchase.Status == PurchaseStatus.Confirmed ? null : purchase.ExceedsEstimate(remainingEstimate),
             purchase.CostOverrunApprovedByUserId, purchase.CostOverrunApprovedAt, purchase.ConfirmedByUserId, purchase.ConfirmedAt,
@@ -146,7 +149,8 @@ public sealed class PurchaseContext(IPurchaseStore purchases, PurchaseRequestLoa
 }
 
 /// <summary>
-/// F-RES-09 <c>recordPurchase</c> (VOLUNTEER holding the ACCEPTED assignment of a PURCHASE task of the request — BR-30):
+/// F-RES-09 <c>recordPurchase</c> (MO of the work area records the trip; buyer = the parish user assigned to the
+/// PURCHASE task of the request, else the parish user who approved it — BR-30):
 /// lines of the request, quantities and prices; request → PURCHASED; stock does <b>not</b> change (BR-26).
 /// </summary>
 public sealed class RecordPurchaseCommandHandler(
@@ -154,20 +158,32 @@ public sealed class RecordPurchaseCommandHandler(
     ITaskProjectionStore tasks,
     IPurchaseStore store,
     PurchaseContext context,
+    WorkAreaAccess access,
+    IIdentityUserLookup users,
     ICurrentUser currentUser,
     IFileVerifier files)
 {
     public async Task<PurchaseDto> HandleAsync(RecordPurchaseCommand command, CancellationToken cancellationToken = default)
     {
         var (request, scope) = await requests.ForReadAsync(command.PurchaseRequestId, cancellationToken);
+        await access.ForMaterialOfficerWriteAsync(request.WorkAreaId, cancellationToken);
+
+        // BR-30 (changed): the material officer records the trip; the buyer is the parish user assigned to the
+        // PURCHASE task of this request, or — when the officer/leader assignment holds a non-parish user — the
+        // parish user who approved the request.
         var task = (await tasks.ListByPurchaseRequestAsync(request.PurchaseRequestId, cancellationToken))
-            .FirstOrDefault(candidate => candidate.Status != ProjectedTaskStatus.Cancelled && candidate.AssigneeUserIds.Contains(currentUser.UserId))
-            ?? throw DomainRuleException.Forbidden("PURCHASE_NOT_BUYER", "Only the volunteer who accepted the purchase task can record the purchase (BR-30).");
-        WorkAreaAccess.EnsureWritable(scope);
+            .Where(candidate => candidate.Status != ProjectedTaskStatus.Cancelled)
+            .OrderBy(candidate => candidate.TaskId)
+            .FirstOrDefault()
+            ?? throw new DomainRuleException(
+                "PURCHASE_TASK_REQUIRED",
+                "Create the PURCHASE task of this request before recording the purchase.");
+
+        var buyer = await ResolveBuyerAsync(task.AssigneeUserIds, request.ApprovedByUserId, scope, cancellationToken);
 
         var now = DateTimeOffset.UtcNow;
         var today = ParishClock.Today(now);
-        var purchase = Purchase.Record(request.PurchaseRequestId, task.TaskId, currentUser.UserId,
+        var purchase = Purchase.Record(request.PurchaseRequestId, task.TaskId, buyer.UserId, currentUser.UserId,
             request.Items.ToDictionary(item => item.PurchaseRequestItemId, item => item.MaterialId),
             command.Items, command.SupplierName, command.PurchaseDate ?? today, command.ReceiptFileIds, today, now);
         request.MarkPurchased(currentUser.UserId, now);
@@ -177,6 +193,55 @@ public sealed class RecordPurchaseCommandHandler(
         await store.SaveChangesAsync(cancellationToken);
         return await context.ToDtoAsync(purchase, request, cancellationToken);
     }
+
+    private async Task<Resource.Application.Users.IdentityUser> ResolveBuyerAsync(
+        IReadOnlyList<Guid> assigneeUserIds,
+        Guid? approvedByUserId,
+        WorkAreaScope scope,
+        CancellationToken cancellationToken)
+    {
+        var candidates = new List<Guid>(assigneeUserIds);
+        if (approvedByUserId is { } approver)
+        {
+            candidates.Add(approver);
+        }
+
+        candidates = candidates.Where(candidate => candidate != Guid.Empty).Distinct().ToList();
+        if (candidates.Count == 0)
+        {
+            throw new DomainRuleException(
+                "PURCHASE_BUYER_NOT_ASSIGNED",
+                "Assign a parish user to the PURCHASE task before recording the purchase.");
+        }
+
+        foreach (var candidate in candidates)
+        {
+            Resource.Application.Users.IdentityUser? buyer;
+            try
+            {
+                buyer = await users.GetByIdAsync(candidate, cancellationToken);
+            }
+            catch (IdentityUserLookupUnavailableException)
+            {
+                throw new DomainRuleException(
+                    "IDENTITY_SERVICE_UNAVAILABLE",
+                    "The buyer could not be verified with Identity. Try again later.",
+                    DomainErrorKind.ServiceUnavailable);
+            }
+
+            if (buyer is not null &&
+                string.Equals(buyer.Status, "ACTIVE", StringComparison.OrdinalIgnoreCase) &&
+                buyer.Role == GrottoWorksRoles.Parish &&
+                buyer.ParishId == scope.ParishId)
+            {
+                return buyer;
+            }
+        }
+
+        throw DomainRuleException.Validation(
+            "PURCHASE_BUYER_NOT_PARISH",
+            "The buyer assigned to the PURCHASE task must be an active parish user of the same parish.");
+    }
 }
 
 /// <summary>F-RES-09 <c>attachPurchaseReceipt</c> (the buyer): receipt files (≤ 5); NEEDS_INFO goes back to SUBMITTED.</summary>
@@ -184,8 +249,11 @@ public sealed class AttachPurchaseReceiptsCommandHandler(PurchaseContext context
 {
     public async Task<PurchaseDto> HandleAsync(AttachPurchaseReceiptsCommand command, CancellationToken cancellationToken = default)
     {
-        var (purchase, request, _) = await context.LoadAsync(command.PurchaseId, cancellationToken);
-        if (purchase.BuyerUserId != currentUser.UserId)
+        var (purchase, request, scope) = await context.LoadAsync(command.PurchaseId, cancellationToken);
+        var canAttach = purchase.BuyerUserId == currentUser.UserId
+            || purchase.RecordedByUserId == currentUser.UserId
+            || (currentUser.Role == GrottoWorksRoles.MaterialOfficer && scope.MaterialOfficerUserId == currentUser.UserId);
+        if (!canAttach)
         {
             throw PurchaseContext.NotFound();
         }
@@ -205,6 +273,7 @@ public sealed class PurchaseReviewCommandHandler(
     PurchaseContext context,
     IPurchaseStore store,
     WorkAreaAccess access,
+    Resource.Application.Scope.ParishWarehouseAccess parishAccess,
     ICurrentUser currentUser)
 {
     public async Task<PurchaseDto> RequestInfoAsync(PurchaseDecisionCommand command, CancellationToken cancellationToken = default)
@@ -220,7 +289,12 @@ public sealed class PurchaseReviewCommandHandler(
     public async Task<PurchaseDto> ApproveCostOverrunAsync(PurchaseDecisionCommand command, CancellationToken cancellationToken = default)
     {
         var (purchase, request, scope) = await context.LoadAsync(command.PurchaseId, cancellationToken);
-        await access.ForLeaderWriteAsync(scope.WorkAreaId, cancellationToken);
+        var (_, parishId) = await parishAccess.RequireWritableSeasonAsync(scope.SeasonId, cancellationToken);
+        if (parishId != scope.ParishId)
+        {
+            throw PurchaseContext.NotFound();
+        }
+
         purchase.EnsureVersion(command.Version);
         var all = await store.ListByRequestAsync(request.PurchaseRequestId, cancellationToken);
         purchase.ApproveCostOverrun(currentUser.UserId, PurchaseBudget.Remaining(request, all, purchase.PurchaseId) ?? decimal.MaxValue,
@@ -240,8 +314,8 @@ public sealed class ConfirmPurchaseDeliveryCommandHandler(
     PurchaseContext context,
     IPurchaseStore store,
     WorkAreaAccess access,
-    IInventoryStore inventory,
-    ShortageTracker shortages,
+    IParishInventoryStore parishInventory,
+    ParishDistributionIssuer distributions,
     IIntegrationEventPublisher publisher,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
@@ -260,13 +334,12 @@ public sealed class ConfirmPurchaseDeliveryCommandHandler(
         var now = DateTimeOffset.UtcNow;
         purchase.ConfirmDelivery(currentUser.UserId, command.Items, PurchaseBudget.Remaining(request, all, purchase.PurchaseId), now);
 
-        var before = new List<ShortageTracker.Snapshot>();
+        // The purchase belongs to one work area, but the stock lands in the parish warehouse first (F-RES-21).
         foreach (var item in purchase.Items.Where(item => item.ReceivedUsableQuantity > 0))
         {
-            before.Add(await shortages.CaptureAsync(scope, item.MaterialId, cancellationToken));
-            inventory.Append(MaterialTransaction.Post(
-                scope.WorkAreaId, item.MaterialId, TransactionType.PurchaseDelivery, item.ReceivedUsableQuantity!.Value, now, currentUser.UserId,
-                null, TransactionReferenceType.PurchaseItem, item.PurchaseItemId));
+            parishInventory.Append(ParishMaterialTransaction.Post(
+                scope.ParishId, scope.SeasonId, item.MaterialId, TransactionType.PurchaseDelivery, item.ReceivedUsableQuantity!.Value,
+                now, currentUser.UserId, null, TransactionReferenceType.PurchaseItem, item.PurchaseItemId));
         }
 
         var delivered = all.Where(other => other.PurchaseId != purchase.PurchaseId && other.Status == PurchaseStatus.Confirmed)
@@ -276,10 +349,18 @@ public sealed class ConfirmPurchaseDeliveryCommandHandler(
             .ToDictionary(group => group.Key, group => group.Sum(item => item.ReceivedUsableQuantity ?? 0));
         request.MarkDelivered(delivered, currentUser.UserId, now);
 
+        // Flush the delivery rows before the issuer reads the parish balance (same transaction).
         await store.SaveChangesAsync(cancellationToken);
-        foreach (var snapshot in before)
+
+        var lines = purchase.Items
+            .Where(item => item.ReceivedUsableQuantity is { } usable && usable > 0)
+            .Select(item => new DistributionLineInput(item.MaterialId, item.ReceivedUsableQuantity!.Value))
+            .ToList();
+        if (lines.Count > 0)
         {
-            await shortages.PublishIfChangedAsync(snapshot, cancellationToken);
+            await distributions.IssueAsync(
+                scope.ParishId, scope.SeasonId, scope.WorkAreaId, lines, ParishDistributionOrigin.Purchase,
+                $"Hàng nhập từ đơn mua {purchase.PurchaseId:D}", cancellationToken);
         }
 
         await publisher.PublishAsync(

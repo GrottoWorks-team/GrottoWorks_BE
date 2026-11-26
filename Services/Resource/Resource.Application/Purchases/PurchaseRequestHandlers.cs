@@ -167,14 +167,27 @@ public sealed class PurchaseShortageGuard(InventoryReader reader, IPurchaseReque
 {
     public async Task EnsureCoveredAsync(WorkAreaScope scope, PurchaseRequest request, CancellationToken cancellationToken)
     {
+        var shortages = (await reader.ReadAsync([scope], null, cancellationToken))
+            .ToDictionary(row => row.MaterialId, row => row.Shortage);
+
+        // 26/11/2026: a supplementary-supply request may only ask for materials that are actually short —
+        // there is no free-form creation path anymore (an override reason cannot bypass this).
+        foreach (var item in request.Items)
+        {
+            if (shortages.GetValueOrDefault(item.MaterialId) <= 0)
+            {
+                throw new DomainRuleException(
+                    "PURCHASE_NO_SHORTAGE",
+                    $"Material {item.MaterialId} is not short in this work area, so it cannot be requested for supplementary supply.");
+            }
+        }
+
         var uncheckedItems = request.Items.Where(item => item.ShortageOverrideReason is null).ToList();
         if (uncheckedItems.Count == 0)
         {
             return;
         }
 
-        var shortages = (await reader.ReadAsync([scope], null, cancellationToken))
-            .ToDictionary(row => row.MaterialId, row => row.Shortage);
         var open = (await store.GetOpenRequestedQuantitiesAsync(scope.WorkAreaId, request.PurchaseRequestId, cancellationToken))
             .ToDictionary(row => row.MaterialId, row => row.Quantity);
 
@@ -368,6 +381,7 @@ public sealed class SubmitPurchaseRequestCommandHandler(
 /// </summary>
 public sealed class DecidePurchaseRequestCommandHandler(
     WorkAreaAccess access,
+    Resource.Application.Scope.ParishWarehouseAccess parishAccess,
     IPurchaseRequestStore store,
     PurchaseRequestLoader loader,
     IIntegrationEventPublisher publisher,
@@ -385,7 +399,13 @@ public sealed class DecidePurchaseRequestCommandHandler(
     private async Task<PurchaseRequestDto> DecideInTransactionAsync(PurchaseRequestCommand command, bool approve, CancellationToken cancellationToken)
     {
         var (request, _) = await loader.ForReadAsync(command.PurchaseRequestId, cancellationToken);
-        var scope = await access.ForLeaderWriteAsync(request.WorkAreaId, cancellationToken);
+        var scope = await access.ForReadAsync(request.WorkAreaId, cancellationToken);
+        var (_, parishId) = await parishAccess.RequireWritableSeasonAsync(scope.SeasonId, cancellationToken);
+        if (parishId != scope.ParishId)
+        {
+            throw PurchaseRequestLoader.NotFound();
+        }
+
         request.EnsureVersion(command.Version);
 
         var now = DateTimeOffset.UtcNow;

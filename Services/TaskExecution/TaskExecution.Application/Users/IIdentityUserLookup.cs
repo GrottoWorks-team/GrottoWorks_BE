@@ -12,12 +12,20 @@ public sealed record IdentityAvailability(DateTimeOffset AvailableFrom, DateTime
 
 public static class VolunteerSkills
 {
+    /// <summary>
+    /// 26/11/2026: mức mặc định khi TNV khai báo kỹ năng mà chưa chọn cấp bậc. Trước đây level null
+    /// bị coi là 0 điểm nên TNV "đã khai báo đúng kỹ năng" vẫn bị 409 TASK_SKILL_MISMATCH (và không
+    /// xuất hiện trong danh sách mời / danh sách chọn trưởng nhóm).
+    /// </summary>
+    public const string DefaultLevel = "BASIC";
+
     public static bool Meets(IdentityUser volunteer, Guid skillId, string? minimumLevel)
     {
         if (!volunteer.SkillIds.Contains(skillId)) return false;
         if (minimumLevel is null) return true;
         var declaration = volunteer.Skills?.SingleOrDefault(skill => skill.SkillId == skillId);
-        return SkillLevels.Meets(declaration?.SkillLevel, minimumLevel);
+        // Khai báo mà chưa xếp hạng (= null) được tính là BASIC; yêu cầu cao hơn vẫn bị loại.
+        return SkillLevels.Meets(declaration?.SkillLevel ?? DefaultLevel, minimumLevel);
     }
 }
 
@@ -41,6 +49,18 @@ public sealed class ActiveUserAccess(IIdentityUserLookup users, ICurrentUser cur
         if (user.Status != "ACTIVE") throw new DomainRuleException("USER_NOT_ACTIVE", "The user is not active.");
         if (user.ParishId != parishId) throw DomainRuleException.Forbidden("PARISH_ACCESS_DENIED", "The user belongs to another parish.");
         if (user.Role != role) throw new DomainRuleException("USER_ROLE_MISMATCH", "The user has an incompatible role.");
+        return user;
+    }
+
+    /// <summary>Same checks as <see cref="EnsureActiveAsync"/>, but the user may hold any of <paramref name="roles"/>.</summary>
+    public async Task<IdentityUser> EnsureActiveAnyAsync(Guid userId, Guid parishId, IReadOnlyCollection<string> roles,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await users.FindAsync(userId, cancellationToken)
+            ?? throw DomainRuleException.NotFound("USER_NOT_FOUND", "The user does not exist.");
+        if (user.Status != "ACTIVE") throw new DomainRuleException("USER_NOT_ACTIVE", "The user is not active.");
+        if (user.ParishId != parishId) throw DomainRuleException.Forbidden("PARISH_ACCESS_DENIED", "The user belongs to another parish.");
+        if (!roles.Contains(user.Role)) throw new DomainRuleException("USER_ROLE_MISMATCH", "The user has an incompatible role.");
         return user;
     }
 

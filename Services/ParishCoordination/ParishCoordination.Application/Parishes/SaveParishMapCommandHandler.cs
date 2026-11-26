@@ -1,5 +1,6 @@
 using BuildingBlocks.Security;
 using BuildingBlocks.Web.Exceptions;
+using ParishCoordination.Domain.Entities;
 
 namespace ParishCoordination.Application.Parishes;
 
@@ -37,47 +38,61 @@ public sealed class SaveParishMapCommandHandler(
         if (intent?.MapSaved == true)
         {
             await TryFinalizeAsync(intent, cancellationToken);
-            return new ParishMapDto(parish.MapImageFileId, parish.MapImageFileName, parish.UpdatedAt);
+            return ToDto(parish);
         }
 
-        if (!alreadyAttached)
+        if (alreadyAttached)
         {
-            if (intent is null)
+            if (parish.MapImageFileId != command.FileId)
             {
-                intent = new ParishMapAttachmentIntent
-                {
-                    Id = Guid.NewGuid(), ParishId = command.ParishId, FileId = command.FileId,
-                    NextAttemptAt = timeProvider.GetUtcNow().AddSeconds(30)
-                };
-                intents.Add(intent);
+                parish.SetMapImage(command.FileId, command.FileName, timeProvider.GetUtcNow());
                 await parishRepository.SaveChangesAsync(cancellationToken);
             }
-
-            try
-            {
-                await fileClient.ReserveAsync(command.FileId, command.ParishId, currentUser.UserId, intent.Id, cancellationToken);
-            }
-            catch (DomainException error) when (error.StatusCode is 403 or 404 or 409 or 422)
-            {
-                // A definite refusal did not reserve the file for this operation.
-                await intents.RemoveAsync(intent, cancellationToken);
-                throw;
-            }
-
-            intent.MapSaved = true;
+            return ToDto(parish);
         }
 
-        var changed = parish.MapImageFileId != command.FileId;
-        if (changed)
+        intent ??= await CreateIntentAsync(command, cancellationToken);
+        await ReserveAsync(intent, cancellationToken);
+
+        // Save the map and the instruction to finalize the file in the same transaction.
+        if (parish.MapImageFileId != command.FileId)
             parish.SetMapImage(command.FileId, command.FileName, timeProvider.GetUtcNow());
-        if (!alreadyAttached || changed)
-            await parishRepository.SaveChangesAsync(cancellationToken);
-
-        if (!alreadyAttached && intent is not null)
-            await TryFinalizeAsync(intent, cancellationToken);
-
-        return new ParishMapDto(parish.MapImageFileId, parish.MapImageFileName, parish.UpdatedAt);
+        intent.MapSaved = true;
+        await parishRepository.SaveChangesAsync(cancellationToken);
+        await TryFinalizeAsync(intent, cancellationToken);
+        return ToDto(parish);
     }
+
+    private async Task<ParishMapAttachmentIntent> CreateIntentAsync(SaveParishMapCommand command, CancellationToken ct)
+    {
+        var intent = new ParishMapAttachmentIntent
+        {
+            Id = Guid.NewGuid(),
+            ParishId = command.ParishId,
+            FileId = command.FileId,
+            NextAttemptAt = timeProvider.GetUtcNow().AddSeconds(30)
+        };
+        intents.Add(intent);
+        await parishRepository.SaveChangesAsync(ct);
+        return intent;
+    }
+
+    private async Task ReserveAsync(ParishMapAttachmentIntent intent, CancellationToken ct)
+    {
+        try
+        {
+            await fileClient.ReserveAsync(intent.FileId, intent.ParishId, currentUser.UserId, intent.Id, ct);
+        }
+        catch (DomainException error) when (error.StatusCode is 403 or 404 or 409 or 422)
+        {
+            // A definite refusal did not reserve the file for this operation.
+            await intents.RemoveAsync(intent, ct);
+            throw;
+        }
+    }
+
+    private static ParishMapDto ToDto(Parish parish) =>
+        new(parish.MapImageFileId, parish.MapImageFileName, parish.UpdatedAt);
 
     private async Task TryFinalizeAsync(ParishMapAttachmentIntent intent, CancellationToken ct)
     {

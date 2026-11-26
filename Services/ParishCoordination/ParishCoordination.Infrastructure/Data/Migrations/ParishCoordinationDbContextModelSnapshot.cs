@@ -22,6 +22,20 @@ namespace ParishCoordination.Infrastructure.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("ParishCoordination.Application.Parishes.ParishMapAttachmentIntent", b =>
+                {
+                    b.Property<Guid>("Id").HasColumnType("uuid").HasColumnName("reservation_id");
+                    b.Property<Guid>("FileId").HasColumnType("uuid").HasColumnName("file_id");
+                    b.Property<bool>("MapSaved").HasColumnType("boolean").HasColumnName("map_saved");
+                    b.Property<DateTimeOffset>("NextAttemptAt").HasColumnType("timestamp with time zone").HasColumnName("next_attempt_at");
+                    b.Property<Guid>("ParishId").HasColumnType("uuid").HasColumnName("parish_id");
+
+                    b.HasKey("Id");
+                    b.HasIndex("NextAttemptAt");
+                    b.HasIndex("ParishId", "FileId").IsUnique();
+                    b.ToTable("parish_map_attachment_intent");
+                });
+
             modelBuilder.Entity("ParishCoordination.Domain.Entities.Community", b =>
                 {
                     b.Property<Guid>("Id")

@@ -10,8 +10,9 @@ namespace NotificationAudit.Api.Controllers;
 [Authorize]
 public sealed class FilesController(ProxyUploadPendingHandler proxyUpload) : ControllerBase
 {
-    [HttpPut("{fileId:guid}/proxy-upload")]
-    [Consumes("application/octet-stream", "image/png", "image/jpeg", "image/webp")]
+    [HttpPut("{fileId:guid}/proxy-upload", Name = "proxyUploadFile")]
+    [RequestSizeLimit(FileUploadLimits.DesignAssetBytes)]
+    [Consumes(FileUploadLimits.BinaryContentType, FileUploadLimits.GlbContentType, "image/png", "image/jpeg", "image/webp")]
     [Produces("application/json")]
     public async Task<IActionResult> ProxyUpload(
         Guid fileId,
